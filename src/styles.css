@@ -139,6 +139,12 @@ a { color: var(--accent); }
 .gate-card h1 { margin: 6px 0 0; font-size: 22px; }
 .gate-card p { margin: 0; }
 .demo-link { margin-top: 6px; }
+.signin-form { display: flex; flex-direction: column; gap: 10px; width: 100%; }
+.signin-form .btn { justify-content: center; min-height: 44px; }
+.signin-form .input { font-size: 16px; min-height: 44px; }
+.form-error { color: var(--danger); font-size: 14px; }
+.or { display: flex; align-items: center; gap: 10px; width: 100%; color: var(--muted); font-size: 13px; }
+.or::before, .or::after { content: ''; flex: 1; height: 1px; background: var(--border); }
 
 .logo-mark {
   display: inline-grid; place-items: center; width: 32px; height: 32px;
