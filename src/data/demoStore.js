@@ -101,6 +101,10 @@ export const demoStore = {
     return () => {};
   },
   async signIn() {},
+  async sendEmailLink() {},
+  isEmailLink: () => false,
+  savedEmail: () => '',
+  async completeEmailLink() {},
   async signOut() {
     localStorage.removeItem(KEY);
     location.search = '';

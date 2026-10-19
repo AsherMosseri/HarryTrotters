@@ -38,6 +38,10 @@ function readDoc(snap) {
   return out;
 }
 
+const EMAIL_KEY = 'signin-email';
+// Page URL without the sign-in link's query params.
+const homeUrl = () => location.origin + location.pathname;
+
 const actorFields = (actor) => ({ by: actor.name, byEmail: actor.email });
 
 export const firebaseStore = {
@@ -58,6 +62,28 @@ export const firebaseStore = {
       if (err.code === 'auth/popup-blocked') await signInWithRedirect(auth, provider);
       else if (err.code !== 'auth/popup-closed-by-user' && err.code !== 'auth/cancelled-popup-request') throw err;
     }
+  },
+
+  // Passwordless email-link sign-in: works with school accounts whose Google
+  // Workspace admin blocks third-party "Sign in with Google".
+  async sendEmailLink(email) {
+    const clean = email.trim().toLowerCase();
+    await sendSignInLinkToEmail(auth, clean, { url: homeUrl(), handleCodeInApp: true });
+    localStorage.setItem(EMAIL_KEY, clean);
+  },
+
+  isEmailLink() {
+    return isSignInWithEmailLink(auth, location.href);
+  },
+
+  savedEmail() {
+    return localStorage.getItem(EMAIL_KEY) || '';
+  },
+
+  async completeEmailLink(email) {
+    await signInWithEmailLink(auth, email.trim().toLowerCase(), location.href);
+    localStorage.removeItem(EMAIL_KEY);
+    history.replaceState(null, '', homeUrl());
   },
 
   signOut() {
