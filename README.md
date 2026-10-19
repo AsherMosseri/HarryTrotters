@@ -5,7 +5,7 @@ A live, shared task board for the team — replaces the old Google Sheet task lo
 - **Board** view: drag cards between Backlog → To Do → In Progress → Blocked / Waiting on Parts → Testing / Review → Done (on iPad, press and hold a card to drag).
 - **Table** view: spreadsheet-style list with sorting, inline editing, and quick add.
 - **Task details**: multiple assignees, subteam, priority, due date, blocker notes, links, comments, and an automatic history of every change.
-- Sign in with an emailed one-tap link (works with school accounts) or Google; only people on the Team list can see or edit anything. Firebase's free plan sends at most 5 sign-in emails per day, but each device stays signed in.
+- Sign in with an emailed one-tap link (works with school accounts — Google sign-in isn't offered because the school blocks it); only people on the Team list can see or edit anything. Firebase's free plan sends at most 5 sign-in emails per day, but each device stays signed in.
 
 Try it without signing in: open the site with `?demo` at the end of the URL.
 

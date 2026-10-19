@@ -1,15 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { loadStore } from './data/store.js';
-import { ROSTER, TEAM_NAME } from './config.js';
+import { TEAM_NAME } from './config.js';
 import { SignInScreen, NoAccessScreen, LoadingScreen, ConfirmEmailScreen, authMessage } from './components/Gate.jsx';
 import Workspace from './components/Workspace.jsx';
-
-// Matches a Google display name to the roster ("Asher M." -> "Asher Mosseri").
-function rosterName(displayName = '') {
-  const dn = displayName.toLowerCase().trim();
-  if (!dn) return null;
-  return ROSTER.find((n) => n.toLowerCase() === dn) || ROSTER.find((n) => n.split(' ')[0].toLowerCase() === dn.split(' ')[0]) || null;
-}
 
 export default function App() {
   const [store, setStore] = useState(null);
@@ -75,7 +68,7 @@ export default function App() {
 
   const actor = useMemo(() => {
     if (!user || !access) return null;
-    return { email: user.email, name: access.name || rosterName(user.displayName) || user.displayName || user.email };
+    return { email: user.email, name: access.name || user.displayName || user.email };
   }, [user, access]);
 
   useEffect(() => {

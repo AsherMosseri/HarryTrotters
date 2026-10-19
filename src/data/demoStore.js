@@ -100,7 +100,6 @@ export const demoStore = {
     cb(demoUser);
     return () => {};
   },
-  async signIn() {},
   async sendEmailLink() {},
   isEmailLink: () => false,
   savedEmail: () => '',

@@ -1,10 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import {
   getAuth,
-  GoogleAuthProvider,
   onAuthStateChanged,
-  signInWithPopup,
-  signInWithRedirect,
   sendSignInLinkToEmail,
   isSignInWithEmailLink,
   signInWithEmailLink,
@@ -63,19 +60,8 @@ export const firebaseStore = {
     );
   },
 
-  async signIn() {
-    const provider = new GoogleAuthProvider();
-    provider.setCustomParameters({ prompt: 'select_account' });
-    try {
-      await signInWithPopup(auth, provider);
-    } catch (err) {
-      if (err.code === 'auth/popup-blocked') await signInWithRedirect(auth, provider);
-      else if (err.code !== 'auth/popup-closed-by-user' && err.code !== 'auth/cancelled-popup-request') throw err;
-    }
-  },
-
-  // Passwordless email-link sign-in: works with school accounts whose Google
-  // Workspace admin blocks third-party "Sign in with Google".
+  // Passwordless email-link sign-in. (Google sign-in isn't offered: school
+  // Workspace accounts block third-party Google apps.)
   async sendEmailLink(email) {
     const clean = email.trim().toLowerCase();
     await sendSignInLinkToEmail(auth, clean, { url: homeUrl(), handleCodeInApp: true });

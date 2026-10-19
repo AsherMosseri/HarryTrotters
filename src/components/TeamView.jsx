@@ -25,7 +25,7 @@ export default function TeamView({ store, members, roster, fail }) {
     <main className="content team">
       <section className="team-card">
         <h2>Add a teammate</h2>
-        <p className="muted small">Only people on this list can sign in and see tasks. Use the Google account they'll sign in with.</p>
+        <p className="muted small">Only people on this list can sign in and see tasks. Use the email they'll sign in with (school email is fine).</p>
         <form className="team-form" onSubmit={add}>
           <input className="input" list="roster-names" value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" />
           <datalist id="roster-names">
@@ -38,7 +38,7 @@ export default function TeamView({ store, members, roster, fail }) {
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="their.email@gmail.com"
+            placeholder="name@ahschool.com"
           />
           <button className="btn primary" disabled={!name.trim() || !email.trim()}>
             Add
