@@ -1,5 +1,5 @@
 // Firebase web config. These values are public by design; access is
-// enforced by the Firestore security rules in firestore.rules.
+// enforced by the team code in the Firestore security rules (firestore.rules).
 export const firebaseConfig = {
   apiKey: 'AIzaSyArsywiQyBAhiUr5RFJO-deMSV-lECZ89M',
   authDomain: 'ftc-32313-tasks.firebaseapp.com',
@@ -11,11 +11,8 @@ export const firebaseConfig = {
 
 export const TEAM_NAME = 'FTC 32313';
 
-// Must match the admin list in firestore.rules (lowercase).
-export const ADMIN_EMAILS = ['asher@mosseri.org'];
-
-// Default roster for the assignee picker. Names of members added on the
-// Team screen are merged in automatically.
+// Names shown on the join screen and in the assignee picker. Anyone who joins
+// as "Someone else" is added to the picker automatically.
 export const ROSTER = [
   'Asher Mosseri',
   'Sebastian Tolbert',

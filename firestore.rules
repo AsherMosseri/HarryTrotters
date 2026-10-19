@@ -1,31 +1,42 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    function signedIn() {
-      return request.auth != null && request.auth.token.email_verified == true;
-    }
-    function email() { return request.auth.token.email.lower(); }
-    function isAdmin() {
-      return signedIn() && email() in ['asher@mosseri.org'];
-    }
+    // The team code. Replace CHANGE-ME with your real code (lowercase) when you
+    // paste these rules into the Firebase console. Keep the real code out of
+    // this file so it never ends up on GitHub.
+    function teamCode() { return 'CHANGE-ME'; }
+
+    function signedIn() { return request.auth != null; }
     function isMember() {
-      return signedIn() && (isAdmin() ||
-        exists(/databases/$(database)/documents/members/$(email())));
+      return signedIn() && exists(/databases/$(database)/documents/members/$(request.auth.uid));
+    }
+    function validName(data) {
+      return data.name is string && data.name.size() > 0 && data.name.size() <= 60;
     }
 
-    // Team allowlist: one doc per teammate, doc ID = their lowercase email
-    match /members/{memberEmail} {
-      allow read: if isMember() || (signedIn() && memberEmail == email());
-      allow write: if isAdmin();
+    // One doc per device that entered the right code. Only that device can read it.
+    match /members/{uid} {
+      allow read, delete: if signedIn() && request.auth.uid == uid;
+      allow create: if signedIn() && request.auth.uid == uid
+        && request.resource.data.code == teamCode()
+        && validName(request.resource.data);
+    }
+
+    // Public name list for the assignee picker; written together with members/{uid}.
+    match /people/{uid} {
+      allow read: if isMember();
+      allow create, update: if signedIn() && request.auth.uid == uid
+        && existsAfter(/databases/$(database)/documents/members/$(uid))
+        && validName(request.resource.data);
+      allow delete: if signedIn() && request.auth.uid == uid;
     }
 
     match /tasks/{taskId} {
       allow read, write: if isMember();
 
-      // Comments + change history: anyone on the team can add, only admin can edit/delete
+      // Comments + change history: anyone on the team can add; nobody can rewrite history.
       match /activity/{activityId} {
         allow read, create: if isMember();
-        allow update, delete: if isAdmin();
       }
     }
   }

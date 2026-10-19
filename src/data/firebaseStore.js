@@ -1,12 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import {
-  getAuth,
-  onAuthStateChanged,
-  sendSignInLinkToEmail,
-  isSignInWithEmailLink,
-  signInWithEmailLink,
-  signOut as fbSignOut,
-} from 'firebase/auth';
+import { getAuth, onAuthStateChanged, signInAnonymously, signOut as fbSignOut } from 'firebase/auth';
 import {
   initializeFirestore,
   persistentLocalCache,
@@ -18,10 +11,9 @@ import {
   serverTimestamp,
   writeBatch,
   increment,
-  setDoc,
   deleteDoc,
 } from 'firebase/firestore';
-import { firebaseConfig, ADMIN_EMAILS } from '../config.js';
+import { firebaseConfig } from '../config.js';
 import { describeChanges, derivedFields, newTaskDefaults } from './diff.js';
 
 const app = initializeApp(firebaseConfig);
@@ -32,70 +24,60 @@ const db = initializeFirestore(app, {
 });
 
 const tasksCol = collection(db, 'tasks');
+// members/{uid} holds the team code a device joined with (only readable by that
+// device); people/{uid} is the public name list everyone on the team can read.
 const membersCol = collection(db, 'members');
+const peopleCol = collection(db, 'people');
 
 const millis = (v) => (v && typeof v.toMillis === 'function' ? v.toMillis() : (v ?? null));
 
 function readDoc(snap) {
   const data = snap.data({ serverTimestamps: 'estimate' });
   const out = { id: snap.id, ...data };
-  for (const k of ['createdAt', 'updatedAt', 'completedAt', 'at', 'addedAt']) {
+  for (const k of ['createdAt', 'updatedAt', 'completedAt', 'at', 'joinedAt']) {
     if (k in out) out[k] = millis(out[k]);
   }
   return out;
 }
 
-const EMAIL_KEY = 'signin-email';
-// Page URL without the sign-in link's query params.
-const homeUrl = () => location.origin + location.pathname;
-
-const actorFields = (actor) => ({ by: actor.name, byEmail: actor.email });
+const actorFields = (actor) => ({ by: actor.name, byUid: actor.uid });
 
 export const firebaseStore = {
   mode: 'firebase',
 
-  onAuth(cb) {
-    return onAuthStateChanged(auth, (user) =>
-      cb(user ? { email: user.email.toLowerCase(), displayName: user.displayName, photoURL: user.photoURL } : null),
-    );
+  // Every device gets a silent anonymous account; the team code (checked by
+  // the security rules) is what actually grants access.
+  onAuth(cb, onError) {
+    return onAuthStateChanged(auth, (user) => {
+      if (user) cb({ uid: user.uid });
+      else signInAnonymously(auth).catch(onError);
+    });
   },
 
-  // Passwordless email-link sign-in. (Google sign-in isn't offered: school
-  // Workspace accounts block third-party Google apps.)
-  async sendEmailLink(email) {
-    const clean = email.trim().toLowerCase();
-    await sendSignInLinkToEmail(auth, clean, { url: homeUrl(), handleCodeInApp: true });
-    localStorage.setItem(EMAIL_KEY, clean);
+  async getMember(uid) {
+    try {
+      const snap = await getDoc(doc(membersCol, uid));
+      return snap.exists() ? snap.data().name : null;
+    } catch (err) {
+      if (err.code === 'permission-denied') return null;
+      throw err;
+    }
   },
 
-  isEmailLink() {
-    return isSignInWithEmailLink(auth, location.href);
+  async join(uid, name, code) {
+    const batch = writeBatch(db);
+    batch.set(doc(membersCol, uid), { name, code: code.trim().toLowerCase(), joinedAt: serverTimestamp() });
+    batch.set(doc(peopleCol, uid), { name, joinedAt: serverTimestamp() });
+    await batch.commit();
   },
 
-  savedEmail() {
-    return localStorage.getItem(EMAIL_KEY) || '';
-  },
-
-  async completeEmailLink(email) {
-    await signInWithEmailLink(auth, email.trim().toLowerCase(), location.href);
-    localStorage.removeItem(EMAIL_KEY);
-    history.replaceState(null, '', homeUrl());
-  },
-
-  signOut() {
+  // Forget this device; it gets a fresh anonymous account and must re-enter the code.
+  leave() {
     return fbSignOut(auth);
   },
 
-  async checkMembership(user) {
-    const isAdmin = ADMIN_EMAILS.includes(user.email);
-    let member = null;
-    try {
-      const snap = await getDoc(doc(membersCol, user.email));
-      if (snap.exists()) member = snap.data();
-    } catch (err) {
-      if (err.code !== 'permission-denied') throw err;
-    }
-    return { allowed: isAdmin || !!member, isAdmin, name: member?.name || null };
+  subscribePeople(cb, onError) {
+    return onSnapshot(peopleCol, (snap) => cb(snap.docs.map(readDoc)), onError);
   },
 
   subscribeTasks(cb, onError) {
@@ -154,18 +136,5 @@ export const firebaseStore = {
     batch.set(doc(collection(ref, 'activity')), { type: 'comment', text, ...actorFields(actor), at: serverTimestamp() });
     batch.update(ref, { commentCount: increment(1) });
     await batch.commit();
-  },
-
-  subscribeMembers(cb, onError) {
-    return onSnapshot(membersCol, (snap) => cb(snap.docs.map(readDoc)), onError);
-  },
-
-  addMember(email, name) {
-    const id = email.trim().toLowerCase();
-    return setDoc(doc(membersCol, id), { email: id, name: name.trim(), addedAt: serverTimestamp() });
-  },
-
-  removeMember(email) {
-    return deleteDoc(doc(membersCol, email));
   },
 };

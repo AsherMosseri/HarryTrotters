@@ -1,7 +1,6 @@
 // In-browser backend used with ?demo in the URL: no sign-in, data kept in
 // localStorage. Handy for trying the UI before Firebase is set up.
 import { describeChanges, derivedFields, newTaskDefaults } from './diff.js';
-import { ADMIN_EMAILS } from '../config.js';
 
 const KEY = 'ftc32313-demo-v1';
 const listeners = new Set();
@@ -66,7 +65,7 @@ function seed() {
   ];
   const activity = {};
   for (const task of tasks) activity[task.id] = [{ id: uid(), type: 'created', by: 'Asher Mosseri', at: task.createdAt }];
-  return { tasks, activity, members: [{ id: ADMIN_EMAILS[0], email: ADMIN_EMAILS[0], name: 'Asher Mosseri', addedAt: now }] };
+  return { tasks, activity, people: [] };
 }
 
 let state;
@@ -91,25 +90,23 @@ function listen(fn) {
   return () => listeners.delete(fn);
 }
 
-const demoUser = { email: ADMIN_EMAILS[0], displayName: 'Asher Mosseri (demo)', photoURL: null };
-
 export const demoStore = {
   mode: 'demo',
 
   onAuth(cb) {
-    cb(demoUser);
+    cb({ uid: 'demo' });
     return () => {};
   },
-  async sendEmailLink() {},
-  isEmailLink: () => false,
-  savedEmail: () => '',
-  async completeEmailLink() {},
-  async signOut() {
+  async getMember() {
+    return 'Asher Mosseri';
+  },
+  async join() {},
+  async leave() {
     localStorage.removeItem(KEY);
     location.search = '';
   },
-  async checkMembership() {
-    return { allowed: true, isAdmin: true, name: 'Asher Mosseri' };
+  subscribePeople(cb) {
+    return listen(() => cb([...(state.people || [])]));
   },
 
   subscribeTasks(cb) {
@@ -158,19 +155,6 @@ export const demoStore = {
   async addComment(taskId, text, actor) {
     (state.activity[taskId] ||= []).push({ id: uid(), type: 'comment', text, by: actor.name, at: Date.now() });
     state.tasks = state.tasks.map((t) => (t.id === taskId ? { ...t, commentCount: (t.commentCount || 0) + 1 } : t));
-    commit();
-  },
-
-  subscribeMembers(cb) {
-    return listen(() => cb([...state.members]));
-  },
-  async addMember(email, name) {
-    const id = email.trim().toLowerCase();
-    state.members = [...state.members.filter((m) => m.id !== id), { id, email: id, name: name.trim(), addedAt: Date.now() }];
-    commit();
-  },
-  async removeMember(email) {
-    state.members = state.members.filter((m) => m.id !== email);
     commit();
   },
 };

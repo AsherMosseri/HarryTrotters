@@ -5,7 +5,7 @@ A live, shared task board for the team — replaces the old Google Sheet task lo
 - **Board** view: drag cards between Backlog → To Do → In Progress → Blocked / Waiting on Parts → Testing / Review → Done (on iPad, press and hold a card to drag).
 - **Table** view: spreadsheet-style list with sorting, inline editing, and quick add.
 - **Task details**: multiple assignees, subteam, priority, due date, blocker notes, links, comments, and an automatic history of every change.
-- Sign in with an emailed one-tap link (works with school accounts — Google sign-in isn't offered because the school blocks it); only people on the Team list can see or edit anything. Firebase's free plan sends at most 5 sign-in emails per day, but each device stays signed in.
+- Join by picking your name and entering the team code (once per device). The code is checked by the Firestore security rules, so a wrong code can't read or change anything.
 
 Try it without signing in: open the site with `?demo` at the end of the URL.
 
@@ -21,13 +21,16 @@ Pushing to `main` deploys to GitHub Pages via `.github/workflows/deploy.yml`.
 
 ## Configuration
 
-- `src/config.js` — Firebase config, admin email, roster, statuses, subteams, priorities.
-- `firestore.rules` — database security rules. After changing them, paste into
-  Firebase console → Firestore Database → Rules → Publish. Keep the admin email
-  here in sync with `ADMIN_EMAILS` in `src/config.js`.
+- `src/config.js` — Firebase config, roster, statuses, subteams, priorities.
+- `firestore.rules` — database security rules, including the team code. The
+  file in this repo has a `CHANGE-ME` placeholder; the real code only lives in
+  Firebase console → Firestore Database → Rules. To change the code, edit it
+  there and Publish. Devices that already joined stay signed in.
+- Firebase Authentication must have the **Anonymous** provider enabled.
 
 ## Data model (Firestore)
 
-- `members/{email}` — `{ email, name, addedAt }` — the access allowlist.
+- `members/{uid}` — `{ name, code, joinedAt }` — one per device that entered the right code; only readable by that device.
+- `people/{uid}` — `{ name, joinedAt }` — names for the assignee picker, readable by the team.
 - `tasks/{id}` — `{ title, description, status, assignees[], subteam, priority, dueDate, blockedReason, links[], commentCount, createdAt/By, updatedAt/By, completedAt }`
 - `tasks/{id}/activity/{id}` — comments and automatic change history.

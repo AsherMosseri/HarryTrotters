@@ -131,16 +131,18 @@ a { color: var(--accent); }
 /* ---------- gate screens ---------- */
 .gate { min-height: 100%; display: grid; place-items: center; padding: 24px 16px; }
 .gate-card {
-  width: min(420px, 100%); padding: 36px 28px; text-align: center;
+  width: min(460px, 100%); padding: 36px 28px; text-align: center;
   background: var(--surface); border: 1px solid var(--border); border-radius: 20px; box-shadow: var(--shadow-lg);
   display: flex; flex-direction: column; align-items: center; gap: 14px;
 }
 .gate-card h1 { margin: 6px 0 0; font-size: 22px; }
 .gate-card p { margin: 0; }
 .demo-link { margin-top: 6px; }
-.signin-form { display: flex; flex-direction: column; gap: 10px; width: 100%; }
-.signin-form .btn { justify-content: center; min-height: 44px; }
-.signin-form .input { font-size: 16px; min-height: 44px; }
+.join-form { display: flex; flex-direction: column; gap: 10px; width: 100%; }
+.join-form .btn { justify-content: center; min-height: 44px; }
+.join-form .input { font-size: 16px; min-height: 44px; }
+.join-names { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-bottom: 4px; }
+.join-names .person { min-height: 36px; }
 .form-error { color: var(--danger); font-size: 14px; }
 
 .logo-mark {
@@ -394,15 +396,6 @@ tr:hover .open-btn, .open-btn:focus { opacity: 1; }
 }
 .dialog .panel-head { margin: 0 -20px; padding: 12px 14px 12px 20px; }
 
-/* ---------- team ---------- */
-.team { display: grid; align-content: start; gap: 16px; max-width: 720px; width: 100%; margin: 0 auto; }
-.team-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 20px; box-shadow: var(--shadow); }
-.team-card h2 { margin: 0 0 4px; font-size: 17px; }
-.team-form { display: grid; grid-template-columns: 1fr 1.4fr auto; gap: 8px; margin: 12px 0 4px; }
-.member-list { list-style: none; margin: 8px 0 0; padding: 0; }
-.member-list li { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--border); }
-.member-list li:first-child { border-top: 0; }
-
 .toast {
   position: fixed; left: 50%; bottom: max(20px, env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 60;
   background: #1f2230; color: #fff; padding: 10px 16px; border-radius: 10px; box-shadow: var(--shadow-lg); max-width: calc(100% - 32px);
@@ -427,7 +420,6 @@ tr:hover .open-btn, .open-btn:focus { opacity: 1; }
   .column { max-height: none; }
   .fields { grid-template-columns: 1fr; gap: 6px; }
   .fields .field-label { padding-top: 6px; }
-  .team-form { grid-template-columns: 1fr; }
   .panel-backdrop.center { padding: 0; }
   .dialog { border-radius: 0; min-height: 100%; }
   input, select, textarea { font-size: 16px; }

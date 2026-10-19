@@ -6,7 +6,6 @@ import TableView from './TableView.jsx';
 import BoardView from './BoardView.jsx';
 import TaskPanel from './TaskPanel.jsx';
 import NewTaskDialog from './NewTaskDialog.jsx';
-import TeamView from './TeamView.jsx';
 
 function ThemeIcon({ theme }) {
   const common = {
@@ -41,10 +40,11 @@ function ThemeIcon({ theme }) {
 
 const EMPTY_FILTERS = { q: '', person: '', subteam: '', priority: '', statuses: [], hideDone: false };
 
-export default function Workspace({ store, user, actor, isAdmin }) {
+export default function Workspace({ store, actor }) {
   const [tasks, setTasks] = useState(null);
-  const [members, setMembers] = useState([]);
-  const [view, setView] = useLocalStorage('view', 'board');
+  const [people, setPeople] = useState([]);
+  const [savedView, setView] = useLocalStorage('view', 'board');
+  const view = savedView === 'table' ? 'table' : 'board';
   const [filters, setFilters] = useLocalStorage('filters', EMPTY_FILTERS);
   const [theme, setTheme] = useLocalStorage('theme', 'system');
   const [openId, setOpenId] = useState(null);
@@ -57,7 +57,7 @@ export default function Workspace({ store, user, actor, isAdmin }) {
   }, []);
 
   useEffect(() => store.subscribeTasks(setTasks, fail), [store, fail]);
-  useEffect(() => store.subscribeMembers(setMembers, fail), [store, fail]);
+  useEffect(() => store.subscribePeople(setPeople, fail), [store, fail]);
 
   useEffect(() => {
     if (theme === 'system') document.documentElement.removeAttribute('data-theme');
@@ -72,10 +72,10 @@ export default function Workspace({ store, user, actor, isAdmin }) {
 
   const roster = useMemo(() => {
     const names = new Set(ROSTER);
-    for (const m of members) if (m.name) names.add(m.name);
+    for (const p of people) if (p.name) names.add(p.name);
     names.add(actor.name);
     return [...names];
-  }, [members, actor.name]);
+  }, [people, actor.name]);
 
   // Store calls wrapped with the signed-in person and error reporting.
   const api = useMemo(
@@ -114,7 +114,10 @@ export default function Workspace({ store, user, actor, isAdmin }) {
   const openTask = tasks?.find((t) => t.id === openId) || null;
   const setF = (patch) => setFilters({ ...EMPTY_FILTERS, ...filters, ...patch });
   const anyFilter = filters.q || filters.person || filters.subteam || filters.priority || filters.statuses.length || filters.hideDone;
-  const views = [['board', 'Board'], ['table', 'Table'], ...(isAdmin ? [['team', 'Team']] : [])];
+  const views = [
+    ['board', 'Board'],
+    ['table', 'Table'],
+  ];
 
   return (
     <div className="app">
@@ -145,110 +148,103 @@ export default function Workspace({ store, user, actor, isAdmin }) {
           >
             <ThemeIcon theme={theme} />
           </button>
-          <div className="user-chip" title={user.email}>
-            <Avatar name={actor.name} photo={user.photoURL} size={30} />
+          <div className="user-chip">
+            <Avatar name={actor.name} size={30} />
             <span className="user-name">{actor.name.split(' ')[0]}</span>
-            <button className="link-btn" onClick={() => store.signOut()}>
-              Sign out
+            <button
+              className="link-btn"
+              title="Not you? Switch to a different name (needs the team code again)"
+              onClick={() => confirm('Switch user? You will need the team code again on this device.') && store.leave()}
+            >
+              Switch
             </button>
           </div>
         </div>
       </header>
 
-      {view === 'team' && isAdmin ? (
-        <TeamView store={store} members={members} roster={roster} fail={fail} />
-      ) : (
-        <>
-          <div className="toolbar">
-            <input
-              className="search"
-              type="search"
-              placeholder="Search tasks…"
-              value={filters.q}
-              onChange={(e) => setF({ q: e.target.value })}
-            />
-            <div className="filters">
-              <button
-                className={`chip${filters.person === '__me' ? ' on' : ''}`}
-                onClick={() => setF({ person: filters.person === '__me' ? '' : '__me' })}
-              >
-                My tasks
-              </button>
-              <select className="filter" value={filters.person} onChange={(e) => setF({ person: e.target.value })} aria-label="Person">
-                <option value="">Everyone</option>
-                <option value="__me">Me ({actor.name.split(' ')[0]})</option>
-                <option value="__none">Unassigned</option>
-                {roster.map((n) => (
-                  <option key={n} value={n}>
-                    {n}
-                  </option>
-                ))}
-              </select>
-              <select className="filter" value={filters.subteam} onChange={(e) => setF({ subteam: e.target.value })} aria-label="Subteam">
-                <option value="">All subteams</option>
-                {SUBTEAMS.map((s) => (
-                  <option key={s}>{s}</option>
-                ))}
-              </select>
-              <select
-                className="filter"
-                value={filters.priority}
-                onChange={(e) => setF({ priority: e.target.value })}
-                aria-label="Priority"
-              >
-                <option value="">Any priority</option>
-                {PRIORITIES.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.label}
-                  </option>
-                ))}
-              </select>
-              <button className={`chip${filters.hideDone ? ' on' : ''}`} onClick={() => setF({ hideDone: !filters.hideDone })}>
-                Hide done
-              </button>
-              {anyFilter ? (
-                <button className="link-btn" onClick={() => setFilters(EMPTY_FILTERS)}>
-                  Clear
-                </button>
-              ) : null}
-            </div>
-            <span className="spacer" />
-            <button className="btn primary" onClick={() => setNewTask({ status: 'todo' })}>
-              <PlusIcon /> New task
+      <div className="toolbar">
+        <input
+          className="search"
+          type="search"
+          placeholder="Search tasks…"
+          value={filters.q}
+          onChange={(e) => setF({ q: e.target.value })}
+        />
+        <div className="filters">
+          <button
+            className={`chip${filters.person === '__me' ? ' on' : ''}`}
+            onClick={() => setF({ person: filters.person === '__me' ? '' : '__me' })}
+          >
+            My tasks
+          </button>
+          <select className="filter" value={filters.person} onChange={(e) => setF({ person: e.target.value })} aria-label="Person">
+            <option value="">Everyone</option>
+            <option value="__me">Me ({actor.name.split(' ')[0]})</option>
+            <option value="__none">Unassigned</option>
+            {roster.map((n) => (
+              <option key={n} value={n}>
+                {n}
+              </option>
+            ))}
+          </select>
+          <select className="filter" value={filters.subteam} onChange={(e) => setF({ subteam: e.target.value })} aria-label="Subteam">
+            <option value="">All subteams</option>
+            {SUBTEAMS.map((s) => (
+              <option key={s}>{s}</option>
+            ))}
+          </select>
+          <select className="filter" value={filters.priority} onChange={(e) => setF({ priority: e.target.value })} aria-label="Priority">
+            <option value="">Any priority</option>
+            {PRIORITIES.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.label}
+              </option>
+            ))}
+          </select>
+          <button className={`chip${filters.hideDone ? ' on' : ''}`} onClick={() => setF({ hideDone: !filters.hideDone })}>
+            Hide done
+          </button>
+          {anyFilter ? (
+            <button className="link-btn" onClick={() => setFilters(EMPTY_FILTERS)}>
+              Clear
             </button>
-          </div>
+          ) : null}
+        </div>
+        <span className="spacer" />
+        <button className="btn primary" onClick={() => setNewTask({ status: 'todo' })}>
+          <PlusIcon /> New task
+        </button>
+      </div>
 
-          {view === 'table' && (
-            <div className="status-strip">
-              {STATUSES.map((s) => {
-                const on = filters.statuses.includes(s.id);
-                return (
-                  <button
-                    key={s.id}
-                    className={`status-count${on ? ' on' : ''}`}
-                    style={{ '--c': s.color }}
-                    onClick={() => setF({ statuses: on ? filters.statuses.filter((x) => x !== s.id) : [...filters.statuses, s.id] })}
-                  >
-                    <span className="dot" />
-                    {s.short || s.label}
-                    <strong>{counts[s.id]}</strong>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-
-          <main className="content">
-            {tasks === null ? (
-              <p className="empty">Loading tasks…</p>
-            ) : view === 'table' ? (
-              <TableView tasks={filtered} api={api} onOpen={setOpenId} total={tasks.length} />
-            ) : (
-              <BoardView tasks={filtered} api={api} onOpen={setOpenId} onAdd={(status) => setNewTask({ status })} />
-            )}
-          </main>
-        </>
+      {view === 'table' && (
+        <div className="status-strip">
+          {STATUSES.map((s) => {
+            const on = filters.statuses.includes(s.id);
+            return (
+              <button
+                key={s.id}
+                className={`status-count${on ? ' on' : ''}`}
+                style={{ '--c': s.color }}
+                onClick={() => setF({ statuses: on ? filters.statuses.filter((x) => x !== s.id) : [...filters.statuses, s.id] })}
+              >
+                <span className="dot" />
+                {s.short || s.label}
+                <strong>{counts[s.id]}</strong>
+              </button>
+            );
+          })}
+        </div>
       )}
+
+      <main className="content">
+        {tasks === null ? (
+          <p className="empty">Loading tasks…</p>
+        ) : view === 'table' ? (
+          <TableView tasks={filtered} api={api} onOpen={setOpenId} total={tasks.length} />
+        ) : (
+          <BoardView tasks={filtered} api={api} onOpen={setOpenId} onAdd={(status) => setNewTask({ status })} />
+        )}
+      </main>
 
       {openTask && <TaskPanel task={openTask} api={api} roster={roster} onClose={() => setOpenId(null)} />}
       {newTask && (
