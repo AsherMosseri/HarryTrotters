@@ -33,7 +33,7 @@ export const STATUSES = [
   { id: 'done', label: 'Done', color: 'var(--st-done)' },
 ];
 
-export const SUBTEAMS = ['Build', 'Programming', 'CAD', 'Electrical', 'Drive Practice', 'Outreach', 'Portfolio / Notebook', 'Business'];
+export const SUBTEAMS = ['Assembly', 'Mechanical', 'Electrical', 'Team Management', 'CAD'];
 
 export const PRIORITIES = [
   { id: 'urgent', label: 'Urgent', rank: 0 },

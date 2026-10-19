@@ -2,7 +2,7 @@
 // localStorage. Handy for trying the UI before Firebase is set up.
 import { describeChanges, derivedFields, newTaskDefaults } from './diff.js';
 
-const KEY = 'ftc32313-demo-v1';
+const KEY = 'ftc32313-demo-v2';
 const listeners = new Set();
 const uid = () => Math.random().toString(36).slice(2, 11);
 
@@ -30,14 +30,14 @@ function seed() {
     t('Tune autonomous path for left start', {
       status: 'todo',
       assignees: ['Jackson Lucks', 'Asher Mosseri'],
-      subteam: 'Programming',
+      subteam: '',
       priority: 'urgent',
       dueDate: iso(-1),
     }),
     t('Order 2 more GoBILDA 312 RPM motors', {
       status: 'blocked',
       assignees: ['Sophia Bermudez'],
-      subteam: 'Business',
+      subteam: 'Team Management',
       priority: 'high',
       blockedReason: 'Waiting on coach to approve purchase order',
     }),
@@ -51,14 +51,14 @@ function seed() {
     t('Write portfolio page on drivetrain design', {
       status: 'backlog',
       assignees: ['Katrina Jurasic'],
-      subteam: 'Portfolio / Notebook',
+      subteam: 'Team Management',
       priority: 'low',
     }),
-    t('Library outreach demo signup', { status: 'done', assignees: ['Matthew Kuhle'], subteam: 'Outreach', priority: 'medium' }),
+    t('Library outreach demo signup', { status: 'done', assignees: ['Matthew Kuhle'], subteam: 'Team Management', priority: 'medium' }),
     t('Driver practice: 10 full matches', {
       status: 'todo',
       assignees: ['Sebastian Tolbert'],
-      subteam: 'Drive Practice',
+      subteam: 'Assembly',
       priority: 'medium',
       dueDate: iso(6),
     }),
