@@ -1,0 +1,32 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+    function email() { return request.auth.token.email.lower(); }
+    function isAdmin() {
+      return signedIn() && email() in ['asher@mosseri.org'];
+    }
+    function isMember() {
+      return signedIn() && (isAdmin() ||
+        exists(/databases/$(database)/documents/members/$(email())));
+    }
+
+    // Team allowlist: one doc per teammate, doc ID = their lowercase email
+    match /members/{memberEmail} {
+      allow read: if isMember() || (signedIn() && memberEmail == email());
+      allow write: if isAdmin();
+    }
+
+    match /tasks/{taskId} {
+      allow read, write: if isMember();
+
+      // Comments + change history: anyone on the team can add, only admin can edit/delete
+      match /activity/{activityId} {
+        allow read, create: if isMember();
+        allow update, delete: if isAdmin();
+      }
+    }
+  }
+}
