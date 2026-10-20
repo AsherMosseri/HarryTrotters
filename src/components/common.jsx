@@ -1,24 +1,36 @@
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { STATUSES, PRIORITIES, statusById, priorityById } from '../config.js';
 import { colorFor, initials, dueInfo } from '../util.js';
+import { decorationById, nameStyle } from '../nitro.js';
 
 // Profiles, who's online, and each person's subteams, for any component that
 // shows people (set up in Workspace; empty on the join screen).
 export const PeopleContext = createContext(null);
 export const usePeople = () => useContext(PeopleContext);
 
-// A profile picture, or colored initials. showOnline adds a green dot when
-// the person has the app open.
-export function Avatar({ name, size = 26, photo, showOnline = false }) {
+// A profile picture (GIFs stay animated), or colored initials, with the
+// person's avatar decoration. showOnline adds a green dot when the person has
+// the app open.
+export function Avatar({ name, size = 26, photo, showOnline = false, decoration }) {
   const people = usePeople();
   const src = photo || people?.photoOf(name);
-  const pic = src ? (
+  const deco = decoration ?? people?.profileOf(name)?.decoration ?? '';
+  let pic = src ? (
     <img className="avatar" src={src} alt={name} title={name} style={{ width: size, height: size }} referrerPolicy="no-referrer" />
   ) : (
     <span className="avatar" title={name} style={{ width: size, height: size, background: colorFor(name), fontSize: size * 0.4 }}>
       {initials(name)}
     </span>
   );
+  if (deco && decorationById[deco]) {
+    const badge = size >= 28 && decorationById[deco].badge;
+    pic = (
+      <span className={`deco deco-${deco}`} style={{ width: size, height: size, '--s': `${size}px` }}>
+        {pic}
+        {badge && <span className="deco-badge">{badge}</span>}
+      </span>
+    );
+  }
   if (!showOnline) return pic;
   return (
     <span className="avatar-wrap" style={{ width: size, height: size }}>
@@ -27,6 +39,17 @@ export function Avatar({ name, size = 26, photo, showOnline = false }) {
         <span className="online-dot" style={{ width: Math.max(8, size * 0.3), height: Math.max(8, size * 0.3) }} />
       )}
     </span>
+  );
+}
+
+// A person's name in their chosen style (font, color, gradient), else their
+// subteam color.
+export function DisplayName({ name, className = '', as: Tag = 'span', ...rest }) {
+  const people = usePeople();
+  return (
+    <Tag className={`display-name ${className}`} style={nameStyle(people?.profileOf(name), people?.infoOf(name)?.color)} {...rest}>
+      {name}
+    </Tag>
   );
 }
 

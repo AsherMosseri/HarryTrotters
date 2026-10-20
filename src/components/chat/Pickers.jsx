@@ -13,7 +13,7 @@ function useEscape(onClose) {
 
 // Every emoji, searchable, plus the team's own (:name:). onPick gets the emoji
 // character, or ':name:' for a team emoji.
-export function EmojiPicker({ onPick, onClose, teamEmoji = [], canManage, onManage, className = '' }) {
+export function EmojiPicker({ onPick, onClose, teamEmoji = [], canManage, onManage, className = '', title = '' }) {
   const [ready, setReady] = useState(!!emojiList());
   const [q, setQ] = useState('');
   const [group, setGroup] = useState(-1); // -1 = recent + team
@@ -41,6 +41,7 @@ export function EmojiPicker({ onPick, onClose, teamEmoji = [], canManage, onMana
 
   return (
     <div className={`emoji-picker big ${className}`} onClick={(e) => e.stopPropagation()}>
+      {title && <div className="picker-title">{title}</div>}
       <div className="row gap-sm">
         <input className="input grow" autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search emoji" />
         <button className="icon-btn small" onClick={onClose} aria-label="Close">
@@ -211,7 +212,8 @@ export function GifPicker({ onPick, onUpload, onClose }) {
     const t = setTimeout(
       async () => {
         setStatus('loading');
-        const params = new URLSearchParams({ api_key: GIPHY_API_KEY, limit: '24', rating: 'g' });
+        // Every rating GIPHY has (up to R), as team management chose.
+        const params = new URLSearchParams({ api_key: GIPHY_API_KEY, limit: '24', rating: 'r' });
         if (q.trim()) params.set('q', q.trim());
         try {
           const res = await fetch(`https://api.giphy.com/v1/gifs/${q.trim() ? 'search' : 'trending'}?${params}`, { signal: ctrl.signal });
@@ -352,6 +354,121 @@ export function PollDialog({ onCreate, onClose }) {
           Post poll
         </button>
       </form>
+    </div>
+  );
+}
+
+// Team stickers: tap one to send it. Team management adds and removes them.
+export function StickerPicker({ stickers, onPick, onClose, canManage, onManage }) {
+  const [q, setQ] = useState('');
+  useEscape(onClose);
+  const shown = stickers.filter((s) => !q || s.name.toLowerCase().includes(q.toLowerCase()));
+  return (
+    <div className="emoji-picker big sticker-picker" onClick={(e) => e.stopPropagation()}>
+      <div className="row gap-sm">
+        <input className="input grow" autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search stickers" />
+        <button className="icon-btn small" onClick={onClose} aria-label="Close">
+          <CloseIcon />
+        </button>
+      </div>
+      <div className="emoji-scroll">
+        <div className="sticker-grid">
+          {shown.map((s) => (
+            <button key={s.id} onClick={() => onPick(s)} title={s.name}>
+              <img src={s.url} alt={s.name} loading="lazy" />
+            </button>
+          ))}
+          {canManage && !q && (
+            <button className="emoji-add sticker-add" onClick={onManage} title="Add or remove stickers">
+              ＋
+            </button>
+          )}
+        </div>
+        {!stickers.length && (
+          <p className="muted small">No stickers yet.{canManage ? ' Tap ＋ to add the first one.' : ' Team management can add some.'}</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Still pictures become 320px PNGs; GIFs stay animated (up to 2 MB).
+async function shrinkSticker(file) {
+  if (file.type === 'image/gif') {
+    if (file.size > 2e6) throw new Error('That GIF is too big for a sticker (2 MB max).');
+    return file;
+  }
+  const bmp = await createImageBitmap(file);
+  const k = Math.min(1, 320 / Math.max(bmp.width, bmp.height));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(bmp.width * k);
+  canvas.height = Math.round(bmp.height * k);
+  canvas.getContext('2d').drawImage(bmp, 0, 0, canvas.width, canvas.height);
+  const blob = await new Promise((r) => canvas.toBlob(r, 'image/png'));
+  return new File([blob], 'sticker.png', { type: 'image/png' });
+}
+
+export function StickerManager({ stickers, api, onClose }) {
+  const [name, setName] = useState('');
+  const [file, setFile] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  useEscape(onClose);
+  const add = async () => {
+    setErr('');
+    setBusy(true);
+    try {
+      await api.addSticker(name.trim().slice(0, 30) || 'sticker', await shrinkSticker(file));
+      setName('');
+      setFile(null);
+    } catch (e) {
+      setErr(e?.message || String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="panel-backdrop center" onClick={onClose}>
+      <div className="dialog" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Team stickers">
+        <div className="panel-head">
+          <h2>Team stickers</h2>
+          <span className="spacer" />
+          <button className="icon-btn" onClick={onClose} aria-label="Close">
+            <CloseIcon />
+          </button>
+        </div>
+        <p className="muted small">Stickers are sent as a big picture. PNGs with a see-through background look best; GIFs stay animated.</p>
+        <div className="row gap">
+          <input className="input grow" value={name} onChange={(e) => setName(e.target.value)} placeholder="Name, like robot dance" />
+          <label className="btn">
+            {file ? '✓ Picture' : 'Picture…'}
+            <input
+              type="file"
+              accept="image/png,image/gif,image/jpeg,image/webp"
+              hidden
+              onChange={(e) => setFile(e.target.files[0] || null)}
+            />
+          </label>
+          <button className="btn primary" onClick={add} disabled={busy || !file}>
+            {busy ? 'Adding…' : 'Add'}
+          </button>
+        </div>
+        {err && <p className="form-error">{err}</p>}
+        <div className="sticker-grid admin">
+          {stickers.map((s) => (
+            <div key={s.id} className="sticker-admin">
+              <img src={s.url} alt={s.name} />
+              <span className="tiny">{s.name}</span>
+              <button
+                className="link-btn danger-text tiny"
+                onClick={() => confirm(`Delete the "${s.name}" sticker?`) && api.deleteSticker(s)}
+              >
+                Delete
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

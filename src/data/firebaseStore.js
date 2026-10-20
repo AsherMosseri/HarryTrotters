@@ -65,6 +65,7 @@ const dmsCol = collection(db, 'dms');
 const profilesCol = collection(db, 'profiles');
 const presenceCol = collection(db, 'presence');
 const emojiCol = collection(db, 'emoji');
+const stickersCol = collection(db, 'stickers');
 const isDm = (conv) => conv.startsWith('dm:');
 const convCol = (conv) => (isDm(conv) ? collection(dmsCol, conv.slice(3), 'messages') : collection(channelsCol, conv, 'messages'));
 const convFolder = (conv) => `chat/${conv.replace(':', '-')}`;
@@ -523,7 +524,19 @@ export const firebaseStore = {
     batch.set(doc(convCol(conv)), { ...msg, by: actor.name, byUid: actor.uid, at });
     // DMs keep their latest message on the DM itself, for the list.
     if (isDm(conv)) {
-      const lastText = msg.text || (msg.poll ? `📊 ${msg.poll.question}` : msg.gif ? 'GIF' : msg.photo ? 'Photo' : '');
+      const lastText =
+        msg.text ||
+        (msg.poll
+          ? `📊 ${msg.poll.question}`
+          : msg.sticker
+            ? 'Sticker'
+            : msg.files?.length
+              ? `📎 ${msg.files[0].name}`
+              : msg.gif
+                ? 'GIF'
+                : msg.photo
+                  ? 'Photo'
+                  : '');
       batch.update(doc(dmsCol, conv.slice(3)), { lastAt: at, lastBy: actor.name, lastText: lastText.slice(0, 120) });
     }
     return batch.commit();
@@ -554,15 +567,36 @@ export const firebaseStore = {
       mentions: [],
       reactions: {},
       votes: {},
+      supers: {},
+      sticker: null,
+      files: [],
       pinned: false,
     });
     if (msg.photo) await deletePhotoFiles(msg.photo);
+    for (const f of msg.files || []) await deleteObject(fileRef(storage, f.path)).catch(() => {});
     if (msg.gif?.path) await deleteObject(fileRef(storage, msg.gif.path)).catch(() => {});
   },
 
   // reactions: { [emoji]: { [uid]: name } }, updated per person so taps don't collide.
   react(conv, id, emoji, actor, on) {
     return updateDoc(doc(convCol(conv), id), new FieldPath('reactions', emoji, actor.uid), on ? actor.name : deleteField());
+  },
+
+  // Super reactions (animated): supers: { [emoji]: { [uid]: name } }.
+  superReact(conv, id, emoji, actor, on) {
+    return updateDoc(doc(convCol(conv), id), new FieldPath('supers', emoji, actor.uid), on ? actor.name : deleteField());
+  },
+
+  // Any file (up to 25 MB): videos, PDFs, CAD files… Returns what the message keeps.
+  async uploadChatFile(conv, file, onProgress) {
+    const safe = file.name.replace(/[^\w.\- ]+/g, '_').slice(-80) || 'file';
+    const path = `files/${conv.replace(':', '-')}/${itemId()}-${safe}`;
+    const r = fileRef(storage, path);
+    const task = uploadBytesResumable(r, file, { contentType: file.type || 'application/octet-stream' });
+    await new Promise((resolve, reject) =>
+      task.on('state_changed', (s) => onProgress?.(s.bytesTransferred / s.totalBytes), reject, resolve),
+    );
+    return { name: file.name.slice(0, 120), size: file.size, type: file.type || '', url: await getDownloadURL(r), path };
   },
 
   removeReaction(conv, id, emoji) {
@@ -634,14 +668,29 @@ export const firebaseStore = {
   saveProfile(name, patch) {
     return setDoc(doc(profilesCol, personId(name)), { ...patch, name, updatedAt: Date.now() }, { merge: true });
   },
+  // Pictures are cropped JPEGs, or GIFs kept as they are (animated).
   async uploadAvatar(name, blob, oldPath) {
-    const path = `avatars/${personId(name)}-${itemId()}.jpg`;
+    const gif = blob.type === 'image/gif';
+    const path = `avatars/${personId(name)}-${itemId()}.${gif ? 'gif' : 'jpg'}`;
     const r = fileRef(storage, path);
-    await uploadBytes(r, blob, { contentType: 'image/jpeg' });
+    await uploadBytes(r, blob, { contentType: gif ? 'image/gif' : 'image/jpeg' });
     const photo = { url: await getDownloadURL(r), path };
     await this.saveProfile(name, { photo });
     if (oldPath) await deleteObject(fileRef(storage, oldPath)).catch(() => {});
     return photo;
+  },
+  async uploadBanner(name, blob, oldPath) {
+    const gif = blob.type === 'image/gif';
+    const path = `banners/${personId(name)}-${itemId()}.${gif ? 'gif' : 'jpg'}`;
+    const r = fileRef(storage, path);
+    await uploadBytes(r, blob, { contentType: gif ? 'image/gif' : 'image/jpeg' });
+    const banner = { url: await getDownloadURL(r), path };
+    await this.saveProfile(name, { banner });
+    if (oldPath) await deleteObject(fileRef(storage, oldPath)).catch(() => {});
+  },
+  async removeBanner(name, oldPath) {
+    await this.saveProfile(name, { banner: null });
+    if (oldPath) await deleteObject(fileRef(storage, oldPath)).catch(() => {});
   },
   async removeAvatar(name, oldPath) {
     await this.saveProfile(name, { photo: null });
@@ -654,6 +703,23 @@ export const firebaseStore = {
   },
   setPresence(actor, patch) {
     return setDoc(doc(presenceCol, actor.uid), { name: actor.name, ...patch }, { merge: true });
+  },
+
+  // Team stickers, sent as their own message.
+  subscribeStickers(cb, onError) {
+    return onSnapshot(stickersCol, (snap) => cb(snap.docs.map(readDoc)), onError);
+  },
+  async addSticker(name, file, actor) {
+    const ext = { 'image/gif': 'gif', 'image/png': 'png', 'image/webp': 'webp' }[file.type] || 'jpg';
+    const ref = doc(stickersCol);
+    const path = `stickers/${ref.id}.${ext}`;
+    const r = fileRef(storage, path);
+    await uploadBytes(r, file, { contentType: file.type || 'image/png' });
+    await setDoc(ref, { name, url: await getDownloadURL(r), path, by: actor.name, at: Date.now() });
+  },
+  async deleteSticker(s) {
+    await deleteDoc(doc(stickersCol, s.id));
+    await deleteObject(fileRef(storage, s.path)).catch(() => {});
   },
 
   // Team emoji, used as :name: in messages and reactions.

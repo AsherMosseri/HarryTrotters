@@ -1,5 +1,5 @@
 // Chat text formatting, like Discord:
-//   **bold**  *italic*  __underline__  ~~strike~~  `code`  ||spoiler||
+//   ***bold italic***  **bold**  *italic*  __underline__  ~~strike~~  `code`  ||spoiler||
 //   ```code block```   > quote   # big   ## medium   ### small   -# subtext
 //   - list   1. list   [text](link)
 // plus links, @mentions (people, @everyone, @Subteam), and :team_emoji:.
@@ -32,6 +32,14 @@ function inlineRules(ctx) {
     { re: /\|\|([\s\S]+?)\|\|/, render: (m, k) => <Spoiler key={k}>{inline(m[1], ctx)}</Spoiler> },
     { re: /\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/, render: (m, k) => link(m[2], inline(m[1], ctx), k) },
     { re: URL_RE, render: (m, k) => link(m[0], m[0], k) },
+    {
+      re: /\*\*\*([\s\S]+?)\*\*\*/,
+      render: (m, k) => (
+        <strong key={k}>
+          <em>{inline(m[1], ctx)}</em>
+        </strong>
+      ),
+    },
     { re: /\*\*([\s\S]+?)\*\*/, render: (m, k) => <strong key={k}>{inline(m[1], ctx)}</strong> },
     { re: /__([\s\S]+?)__/, render: (m, k) => <u key={k}>{inline(m[1], ctx)}</u> },
     { re: /~~([\s\S]+?)~~/, render: (m, k) => <s key={k}>{inline(m[1], ctx)}</s> },

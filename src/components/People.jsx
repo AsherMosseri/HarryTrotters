@@ -1,7 +1,8 @@
 // Profile card (tap someone's name or picture) and the profile editor
-// (picture, status).
+// (pictures, about me, Nitro-style looks, status).
 import { useEffect, useRef, useState } from 'react';
 import { SUBTEAM_COLORS } from '../config.js';
+import { DECORATIONS, EFFECTS, NAME_FONTS, SWATCHES, effectById, nameStyle } from '../nitro.js';
 import { activeStatus } from '../people.js';
 import { Avatar, CloseIcon, usePeople } from './common.jsx';
 
@@ -47,30 +48,63 @@ function useEscape(onClose) {
   }, [onClose]);
 }
 
-export function ProfileCard({ name, actor, tasks, onClose, onMessage, onEdit }) {
+// Drifting particles over the profile card.
+function ProfileEffect({ id }) {
+  const e = effectById[id];
+  if (!e?.icon) return null;
+  return (
+    <div className={`profile-effect fx-${id}`} aria-hidden="true">
+      {Array.from({ length: 14 }, (_, i) => (
+        <span key={i} style={{ '--i': i, '--x': `${(i * 37) % 100}%`, '--d': `${3 + ((i * 7) % 5)}s` }}>
+          {id === 'confetti' ? '' : e.icon}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+// The card itself, also used as the live preview in the editor (with `look`
+// overriding the saved profile).
+function CardBody({ name, look, actor, tasks, children }) {
   const people = usePeople();
-  useEscape(onClose);
   const info = people?.infoOf(name) || {};
-  const status = activeStatus(people?.profileOf(name));
+  const profile = { ...(people?.profileOf(name) || {}), ...look };
+  const status = activeStatus(profile);
   const online = people?.isOnline(name);
   const open = tasks.filter((t) => t.status !== 'done' && (t.assignees || []).includes(name));
-  const me = name === actor.name;
+  const themed = profile.theme?.a && profile.theme?.b;
+  const banner = profile.banner?.url;
   return (
-    <div className="panel-backdrop center" onClick={onClose}>
-      <div className="dialog profile-card" onClick={(e) => e.stopPropagation()} role="dialog" aria-label={name}>
-        <div className="profile-banner" style={{ background: info.color || 'var(--accent)' }} />
-        <button className="icon-btn profile-close" onClick={onClose} aria-label="Close">
-          <CloseIcon />
-        </button>
-        <div className="profile-avatar">
-          <Avatar name={name} size={84} showOnline />
-        </div>
-        <h2 style={{ color: info.color || undefined }}>{name}</h2>
-        <p className="muted small">{online ? '🟢 Online now' : 'Offline'}</p>
+    <div
+      className={`profile-body${themed ? ' themed' : ''}`}
+      style={themed ? { '--pa': profile.theme.a, '--pb': profile.theme.b } : undefined}
+    >
+      <ProfileEffect id={profile.effect} />
+      <div
+        className="profile-banner"
+        style={banner ? { backgroundImage: `url("${banner}")` } : { background: profile.bannerColor || info.color || 'var(--accent)' }}
+      />
+      <div className="profile-avatar">
+        <Avatar name={name} size={84} showOnline decoration={profile.decoration} />
+      </div>
+      <div className="profile-inner">
+        <h2 className="display-name" style={nameStyle(profile, info.color)}>
+          {name}
+        </h2>
+        <p className="muted small">
+          {profile.pronouns && <span className="pronouns">{profile.pronouns} · </span>}
+          {online ? '🟢 Online now' : 'Offline'}
+        </p>
         {status && (
           <p className="profile-status">
             {status.emoji} {status.text}
           </p>
+        )}
+        {profile.about && (
+          <div className="profile-section">
+            <h3>About me</h3>
+            <p className="about-text">{profile.about}</p>
+          </div>
         )}
         {info.title && <p className="profile-title">{info.title}</p>}
         {info.subteams?.length > 0 && (
@@ -99,24 +133,41 @@ export function ProfileCard({ name, actor, tasks, onClose, onMessage, onEdit }) 
               : 'None'}
           </p>
         </div>
-        <div className="row gap profile-actions">
-          {me ? (
-            <button className="btn primary grow" onClick={onEdit}>
-              Edit profile
-            </button>
-          ) : (
-            <>
-              <button className="btn primary grow" onClick={onMessage}>
-                ✉️ Message
+        {children}
+      </div>
+    </div>
+  );
+}
+
+export function ProfileCard({ name, actor, tasks, onClose, onMessage, onEdit }) {
+  useEscape(onClose);
+  const me = name === actor.name;
+  return (
+    <div className="panel-backdrop center" onClick={onClose}>
+      <div className="dialog profile-card" onClick={(e) => e.stopPropagation()} role="dialog" aria-label={name}>
+        <button className="icon-btn profile-close" onClick={onClose} aria-label="Close">
+          <CloseIcon />
+        </button>
+        <CardBody name={name} actor={actor} tasks={tasks}>
+          <div className="row gap profile-actions">
+            {me ? (
+              <button className="btn primary grow" onClick={onEdit}>
+                Edit profile
               </button>
-              {actor.admin && (
-                <button className="btn" onClick={onEdit}>
-                  Change picture
+            ) : (
+              <>
+                <button className="btn primary grow" onClick={onMessage}>
+                  ✉️ Message
                 </button>
-              )}
-            </>
-          )}
-        </div>
+                {actor.admin && (
+                  <button className="btn" onClick={onEdit}>
+                    Edit profile
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+        </CardBody>
       </div>
     </div>
   );
@@ -201,142 +252,363 @@ function Cropper({ file, onDone, onCancel }) {
   );
 }
 
-// Your own picture and status, or (team management) someone else's picture.
-export function ProfileEditor({ name, actor, api, onClose }) {
+// Banners: 960×320 JPEG (center crop), or a GIF kept as it is.
+async function prepareBanner(file) {
+  if (file.type === 'image/gif') {
+    if (file.size > 6e6) throw new Error('That GIF is too big for a banner (6 MB max).');
+    return file;
+  }
+  const bmp = await createImageBitmap(file);
+  const W = 960;
+  const H = 320;
+  const k = Math.max(W / bmp.width, H / bmp.height);
+  const canvas = document.createElement('canvas');
+  canvas.width = W;
+  canvas.height = H;
+  canvas.getContext('2d').drawImage(bmp, (W - bmp.width * k) / 2, (H - bmp.height * k) / 2, bmp.width * k, bmp.height * k);
+  return new Promise((r) => canvas.toBlob(r, 'image/jpeg', 0.85));
+}
+
+function ColorRow({ value, onChange, allowNone = true }) {
+  return (
+    <div className="swatches">
+      {allowNone && (
+        <button className={`swatch none${!value ? ' on' : ''}`} onClick={() => onChange('')} title="None" aria-label="None">
+          ⌀
+        </button>
+      )}
+      {SWATCHES.map((c) => (
+        <button
+          key={c}
+          className={`swatch${value === c ? ' on' : ''}`}
+          style={{ background: c }}
+          onClick={() => onChange(c)}
+          aria-label={c}
+        />
+      ))}
+      <label className="swatch custom" title="Any color">
+        <input type="color" value={value || '#6366f1'} onChange={(e) => onChange(e.target.value)} />
+        🎨
+      </label>
+    </div>
+  );
+}
+
+// Your profile (or, for team management, anyone's): pictures, about me,
+// pronouns, name style, decoration, effect, profile colors, and status.
+export function ProfileEditor({ name, actor, api, tasks = [], onClose }) {
   const people = usePeople();
   useEscape(onClose);
-  const profile = people?.profileOf(name);
+  const profile = people?.profileOf(name) || {};
   const me = name === actor.name;
   const current = activeStatus(profile);
+  const [tab, setTab] = useState('profile');
+  const [look, setLook] = useState({
+    about: profile.about || '',
+    pronouns: profile.pronouns || '',
+    decoration: profile.decoration || '',
+    effect: profile.effect || '',
+    nameStyle: profile.nameStyle || { font: '', colors: [] },
+    theme: profile.theme || null,
+    bannerColor: profile.bannerColor || '',
+  });
   const [emoji, setEmoji] = useState(current?.emoji || '');
   const [text, setText] = useState(current?.text || '');
   const [clearAfter, setClearAfter] = useState('never');
   const [file, setFile] = useState(null);
-  const [busy, setBusy] = useState(false);
-  const input = useRef(null);
+  const [busy, setBusy] = useState('');
+  const [err, setErr] = useState('');
+  const avatarInput = useRef(null);
+  const bannerInput = useRef(null);
+  const set = (patch) => setLook((l) => ({ ...l, ...patch }));
+  const colors = look.nameStyle.colors || [];
 
-  const upload = async (blob) => {
-    setFile(null);
-    setBusy(true);
+  const run = async (what, fn) => {
+    setBusy(what);
+    setErr('');
     try {
-      await api.uploadAvatar(name, blob, profile?.photo?.path);
+      await fn();
+    } catch (e) {
+      setErr(e?.message || String(e));
     } finally {
-      setBusy(false);
+      setBusy('');
     }
   };
-  const saveStatus = async () => {
-    setBusy(true);
-    try {
-      await api.saveProfile(name, {
-        status: text.trim() || emoji ? { emoji, text: text.trim().slice(0, 80), until: untilFor(clearAfter) } : null,
-      });
+  const pickAvatar = (f) => {
+    // GIFs stay animated (no cropping); other pictures go through the cropper.
+    if (f.type === 'image/gif') {
+      if (f.size > 4e6) return setErr('That GIF is too big for a picture (4 MB max).');
+      run('avatar', () => api.uploadAvatar(name, f, profile.photo?.path));
+    } else setFile(f);
+  };
+  const save = () =>
+    run('save', async () => {
+      const patch = { ...look, about: look.about.trim().slice(0, 190), pronouns: look.pronouns.trim().slice(0, 40) };
+      if (me) patch.status = text.trim() || emoji ? { emoji, text: text.trim().slice(0, 80), until: untilFor(clearAfter) } : null;
+      await api.saveProfile(name, patch);
       onClose();
-    } finally {
-      setBusy(false);
-    }
-  };
+    });
 
   return (
     <div className="panel-backdrop center" onClick={onClose}>
       <div className="dialog profile-editor" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Edit profile">
         <div className="panel-head">
-          <h2>{me ? 'Your profile' : `${name.split(' ')[0]}'s picture`}</h2>
+          <h2>{me ? 'Your profile' : `${name.split(' ')[0]}'s profile`}</h2>
           <span className="spacer" />
           <button className="icon-btn" onClick={onClose} aria-label="Close">
             <CloseIcon />
           </button>
         </div>
         {file ? (
-          <Cropper file={file} onDone={upload} onCancel={() => setFile(null)} />
+          <Cropper
+            file={file}
+            onDone={(blob) => {
+              setFile(null);
+              run('avatar', () => api.uploadAvatar(name, blob, profile.photo?.path));
+            }}
+            onCancel={() => setFile(null)}
+          />
         ) : (
-          <div className="row gap avatar-edit">
-            <Avatar name={name} size={72} />
-            <div className="col gap-sm">
-              <button className="btn" onClick={() => input.current?.click()} disabled={busy}>
-                {busy ? 'Saving…' : profile?.photo ? 'Change picture' : 'Add a picture'}
-              </button>
-              {profile?.photo && (
-                <button className="link-btn danger-text" onClick={() => api.removeAvatar(name, profile.photo.path)} disabled={busy}>
-                  Remove picture
-                </button>
-              )}
-            </div>
-            <input
-              ref={input}
-              type="file"
-              accept="image/*"
-              hidden
-              onChange={(e) => {
-                const f = e.target.files[0];
-                e.target.value = '';
-                if (f) setFile(f);
-              }}
-            />
-          </div>
-        )}
-        {me && !file && (
-          <>
-            <h3 className="field-label">Status</h3>
-            <div className="row gap">
-              <input
-                className="input status-emoji"
-                value={emoji}
-                onChange={(e) => setEmoji(lastGrapheme(e.target.value.trim()))}
-                placeholder="🙂"
-                aria-label="Status emoji"
-              />
-              <input
-                className="input grow"
-                value={text}
-                maxLength={80}
-                onChange={(e) => setText(e.target.value)}
-                placeholder="What are you up to?"
-                aria-label="Status"
-              />
-            </div>
-            <div className="status-ideas">
-              {STATUS_IDEAS.map(([e, t]) => (
-                <button
-                  key={t}
-                  className="chip"
-                  onClick={() => {
-                    setEmoji(e);
-                    setText(t);
-                  }}
-                >
-                  {e} {t}
-                </button>
-              ))}
-            </div>
-            <label className="row gap small">
-              <span>Clear after</span>
-              <select className="input" value={clearAfter} onChange={(e) => setClearAfter(e.target.value)}>
-                {CLEAR_AFTER.map(([v, l]) => (
-                  <option key={v} value={v}>
-                    {l}
-                  </option>
+          <div className="editor-grid">
+            <div className="editor-form">
+              <div className="segmented editor-tabs">
+                {[['profile', 'Profile'], ['style', 'Style'], ...(me ? [['status', 'Status']] : [])].map(([id, label]) => (
+                  <button key={id} className={tab === id ? 'active' : ''} onClick={() => setTab(id)}>
+                    {label}
+                  </button>
                 ))}
-              </select>
-            </label>
-            <div className="row gap">
-              {current && (
-                <button
-                  className="btn"
-                  onClick={() => {
-                    setEmoji('');
-                    setText('');
-                    api.saveProfile(name, { status: null });
-                  }}
-                >
-                  Clear status
-                </button>
+              </div>
+              {tab === 'profile' && (
+                <>
+                  <h3 className="field-label">Picture</h3>
+                  <div className="row gap">
+                    <button className="btn" onClick={() => avatarInput.current?.click()} disabled={!!busy}>
+                      {busy === 'avatar' ? 'Saving…' : profile.photo ? 'Change picture' : 'Add a picture'}
+                    </button>
+                    {profile.photo && (
+                      <button
+                        className="link-btn danger-text"
+                        onClick={() => run('avatar', () => api.removeAvatar(name, profile.photo.path))}
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                  <p className="muted tiny">GIFs stay animated.</p>
+                  <input
+                    ref={avatarInput}
+                    type="file"
+                    accept="image/*"
+                    hidden
+                    onChange={(e) => (e.target.files[0] && pickAvatar(e.target.files[0]), (e.target.value = ''))}
+                  />
+                  <h3 className="field-label">Banner</h3>
+                  <div className="row gap">
+                    <button className="btn" onClick={() => bannerInput.current?.click()} disabled={!!busy}>
+                      {busy === 'banner' ? 'Saving…' : profile.banner ? 'Change banner' : 'Add a banner image'}
+                    </button>
+                    {profile.banner && (
+                      <button
+                        className="link-btn danger-text"
+                        onClick={() => run('banner', () => api.removeBanner(name, profile.banner.path))}
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                  <input
+                    ref={bannerInput}
+                    type="file"
+                    accept="image/*"
+                    hidden
+                    onChange={(e) => {
+                      const f = e.target.files[0];
+                      e.target.value = '';
+                      if (f) run('banner', async () => api.uploadBanner(name, await prepareBanner(f), profile.banner?.path));
+                    }}
+                  />
+                  {!profile.banner && (
+                    <>
+                      <p className="muted tiny">Or a banner color:</p>
+                      <ColorRow value={look.bannerColor} onChange={(c) => set({ bannerColor: c })} />
+                    </>
+                  )}
+                  <h3 className="field-label">Pronouns</h3>
+                  <input
+                    className="input"
+                    value={look.pronouns}
+                    maxLength={40}
+                    onChange={(e) => set({ pronouns: e.target.value })}
+                    placeholder="e.g. she/her, he/him, they/them"
+                  />
+                  <h3 className="field-label">About me</h3>
+                  <textarea
+                    className="input about-input"
+                    value={look.about}
+                    maxLength={190}
+                    rows={3}
+                    onChange={(e) => set({ about: e.target.value })}
+                    placeholder="What you do on the team, what you're good at…"
+                  />
+                  <p className="muted tiny right">{190 - look.about.length} left</p>
+                </>
               )}
-              <span className="spacer" />
-              <button className="btn primary" onClick={saveStatus} disabled={busy}>
-                Save
-              </button>
+              {tab === 'style' && (
+                <>
+                  <h3 className="field-label">Name font</h3>
+                  <div className="choice-grid">
+                    {NAME_FONTS.map((f) => (
+                      <button
+                        key={f.id}
+                        className={`choice${(look.nameStyle.font || '') === f.id ? ' on' : ''}`}
+                        style={f.css ? { fontFamily: f.css } : undefined}
+                        onClick={() => set({ nameStyle: { ...look.nameStyle, font: f.id } })}
+                      >
+                        {f.label}
+                      </button>
+                    ))}
+                  </div>
+                  <h3 className="field-label">Name color</h3>
+                  <ColorRow
+                    value={colors[0] || ''}
+                    onChange={(c) => set({ nameStyle: { ...look.nameStyle, colors: c ? [c, colors[1] || ''] : [] } })}
+                  />
+                  {colors[0] && (
+                    <>
+                      <p className="muted tiny">Second color for a gradient (optional):</p>
+                      <ColorRow
+                        value={colors[1] || ''}
+                        onChange={(c) => set({ nameStyle: { ...look.nameStyle, colors: [colors[0], c] } })}
+                      />
+                    </>
+                  )}
+                  <h3 className="field-label">Avatar decoration</h3>
+                  <div className="choice-grid deco-grid">
+                    {DECORATIONS.map((d) => (
+                      <button
+                        key={d.id}
+                        className={`choice${look.decoration === d.id ? ' on' : ''}`}
+                        onClick={() => set({ decoration: d.id })}
+                        title={d.label}
+                      >
+                        <Avatar name={name} size={36} decoration={d.id} />
+                        <span className="tiny">{d.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <h3 className="field-label">Profile effect</h3>
+                  <div className="choice-grid">
+                    {EFFECTS.map((f) => (
+                      <button key={f.id} className={`choice${look.effect === f.id ? ' on' : ''}`} onClick={() => set({ effect: f.id })}>
+                        {f.icon} {f.label}
+                      </button>
+                    ))}
+                  </div>
+                  <h3 className="field-label">Profile colors</h3>
+                  <div className="row gap">
+                    <label className="row gap-sm small">
+                      Top{' '}
+                      <input
+                        type="color"
+                        value={look.theme?.a || '#6366f1'}
+                        onChange={(e) => set({ theme: { a: e.target.value, b: look.theme?.b || '#ec4899' } })}
+                      />
+                    </label>
+                    <label className="row gap-sm small">
+                      Bottom{' '}
+                      <input
+                        type="color"
+                        value={look.theme?.b || '#ec4899'}
+                        onChange={(e) => set({ theme: { a: look.theme?.a || '#6366f1', b: e.target.value } })}
+                      />
+                    </label>
+                    {look.theme && (
+                      <button className="link-btn small" onClick={() => set({ theme: null })}>
+                        Reset
+                      </button>
+                    )}
+                  </div>
+                </>
+              )}
+              {tab === 'status' && me && (
+                <>
+                  <div className="row gap">
+                    <input
+                      className="input status-emoji"
+                      value={emoji}
+                      onChange={(e) => setEmoji(lastGrapheme(e.target.value.trim()))}
+                      placeholder="🙂"
+                      aria-label="Status emoji"
+                    />
+                    <input
+                      className="input grow"
+                      value={text}
+                      maxLength={80}
+                      onChange={(e) => setText(e.target.value)}
+                      placeholder="What are you up to?"
+                      aria-label="Status"
+                    />
+                  </div>
+                  <div className="status-ideas">
+                    {STATUS_IDEAS.map(([e, t]) => (
+                      <button
+                        key={t}
+                        className="chip"
+                        onClick={() => {
+                          setEmoji(e);
+                          setText(t);
+                        }}
+                      >
+                        {e} {t}
+                      </button>
+                    ))}
+                  </div>
+                  <label className="row gap small">
+                    <span>Clear after</span>
+                    <select className="input" value={clearAfter} onChange={(e) => setClearAfter(e.target.value)}>
+                      {CLEAR_AFTER.map(([v, l]) => (
+                        <option key={v} value={v}>
+                          {l}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  {(emoji || text) && (
+                    <button
+                      className="link-btn"
+                      onClick={() => {
+                        setEmoji('');
+                        setText('');
+                      }}
+                    >
+                      Clear status
+                    </button>
+                  )}
+                </>
+              )}
+              {err && <p className="form-error">{err}</p>}
+              <div className="row gap editor-save">
+                <span className="spacer" />
+                <button className="btn" onClick={onClose}>
+                  Cancel
+                </button>
+                <button className="btn primary" onClick={save} disabled={!!busy}>
+                  {busy === 'save' ? 'Saving…' : 'Save'}
+                </button>
+              </div>
             </div>
-          </>
+            <div className="editor-preview">
+              <h3 className="field-label">Preview</h3>
+              <div className="profile-card preview-card">
+                <CardBody
+                  name={name}
+                  actor={actor}
+                  tasks={tasks}
+                  look={{ ...look, status: me ? (text || emoji ? { emoji, text } : null) : profile.status }}
+                />
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>

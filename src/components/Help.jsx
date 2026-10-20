@@ -68,12 +68,12 @@ const SECTIONS = [
       '📣 #announcements is for news from team management; everyone can read it, only they can post. New announcements also show at the top of the board.',
       '#general is for everyone; each subteam has its own channel. A number means unread messages (red means someone @mentioned you, your subteam, or @everyone).',
       'Type @ to mention someone, @Programming (or any subteam) to ping that subteam, # to link a task, and : for emoji (like :fire:).',
-      'Tap Aa for text styles: bold, italic, underline, strikethrough, big/medium/small headings, small gray text, quotes, lists, code, and ||spoilers|| (hidden until tapped). You can also type them: **bold**, *italic*, __underline__, ~~strike~~, # Big, ## Medium, ### Small, -# small text, > quote.',
-      'Tap 📷 for a photo, GIF for GIFs, 📊 for a poll, and 😊 for every emoji (on a phone these are under ＋). Pasting a picture works too. Links show a preview, and YouTube videos play right in the chat.',
-      'Tap (or hover over) a message to react, reply, 📌 pin it, edit or delete your own, or turn it into a task with +Task. 📌 at the top shows the channel’s pinned messages; 🔍 searches messages.',
+      'Tap Aa for text styles: bold, italic, bold italic, underline, strikethrough, big/medium/small headings, small gray text, quotes, lists, code, and ||spoilers|| (hidden until tapped). You can also type them: **bold**, *italic*, ***bold italic***, __underline__, ~~strike~~, # Big, ## Medium, ### Small, -# small text, > quote.',
+      'Tap 📷 for a photo, GIF for GIFs, 📊 for a poll, 📎 for any file up to 25 MB (videos play right in the chat), 🎫 for team stickers, and 😊 for every emoji (on a phone or iPad these are under ＋). Pasting a picture or file works too. Links show a preview, and YouTube videos play in the chat.',
+      'Tap (or hover over) a message to react (✨ for an animated super reaction), reply, 📌 pin it, edit or delete your own, or turn it into a task with +Task. 📌 at the top shows the channel’s pinned messages; 🔍 searches messages.',
       '🔔 at the top of a channel: All messages, Only @mentions (the default), or Nothing. Announcements and DMs default to All.',
       'Direct messages: tap ＋ next to Direct messages (or Message on someone’s profile) to message one person or a group. Team management can read DMs.',
-      'Tap anyone’s name or picture for their profile. Tap your own picture (top right) to add a profile picture or a status like “🔧 At the shop”. A green dot means they have the app open; you’ll see when someone is typing.',
+      'Tap anyone’s name or picture for their profile. Tap your own picture (top right) → Edit profile for a picture (GIFs stay animated), a banner, pronouns, about me, your name’s font and colors, an avatar decoration, a profile effect, profile colors, and a status like “🔧 At the shop”. A green dot means they have the app open; you’ll see when someone is typing.',
     ],
   ],
   [
@@ -102,7 +102,7 @@ const SECTIONS = [
     [
       'You only enter the team code once per device.',
       'Switch (top right) signs this device out so someone else can use it. You’ll need the code again.',
-      'The sun/moon button switches between light, dark, and automatic.',
+      'The sun/moon button picks light, dark, or automatic, and a color theme (Sunset, Ocean, Forest…) for this device.',
       'When the site is updated, you’ll be asked to tap Update now.',
     ],
   ],
@@ -114,7 +114,7 @@ const MANAGER_TIPS = [
   'Delete checklists, and permanently delete tasks from Recently deleted.',
   'Chat: post in #announcements (everyone gets a notification), use @everyone, delete any message, and remove reactions (🚫☺ on a message).',
   'Channels: ＋ next to Channels adds one; ⚙ on a channel renames it, sets its topic and subteam color, moves it up or down, or deletes it.',
-  'Team emoji: open 😊 and tap ＋ under Team emoji to add your own (:name:), or remove them.',
+  'Team emoji: open 😊 and tap ＋ under Team emoji to add your own (:name:), or remove them. Stickers: open 🎫 and tap ＋.',
   'DMs: you can read every DM (under Team DMs) but can’t post in other people’s. You can change anyone’s profile picture from their profile.',
 ];
 

@@ -56,7 +56,7 @@ function plainText(text) {
     .replace(/\|\|[\s\S]*?\|\|/g, '(spoiler)')
     .replace(/```[a-z]*\n?/gi, '')
     .replace(/^(#{1,3}|-#|>)\s+/gm, '')
-    .replace(/(\*\*|__|~~|\*|_|`)(\S(?:[\s\S]*?\S)?)\1/g, '$2')
+    .replace(/(\*\*\*|\*\*|__|~~|\*|_|`)(\S(?:[\s\S]*?\S)?)\1/g, '$2')
     .replace(/\[([^\]]+)\]\((https?:[^)]+)\)/g, '$1')
     .replace(/\s+/g, ' ')
     .trim();
@@ -64,6 +64,8 @@ function plainText(text) {
 
 function messagePreview(m) {
   if (m.poll) return `📊 ${clip(m.poll.question)}`;
+  if (m.sticker) return `sent a sticker: ${m.sticker.name}`;
+  if (m.files?.length && !m.text) return `📎 ${m.files[0].name}`;
   if (m.text) return clip(plainText(m.text));
   if (m.gif) return 'sent a GIF';
   if (m.photo) return 'sent a photo';
@@ -162,8 +164,10 @@ export const onChatMessage = onDocumentCreated('channels/{channelId}/messages/{m
     const wants = level(to, channelId, announce ? 'all' : 'mentions');
     if (wants === 'none') continue;
     if (announce) notes.push({ to, type: 'announcement', title: `Announcement from ${first(sender)}`, body, open, by: sender });
-    else if (mentioned.has(to)) notes.push({ to, type: 'mention', title: `${first(sender)} mentioned ${how} in #${channel}`, body, open, by: sender });
-    else if (wants === 'all') notes.push({ to, type: 'message', title: `${first(sender)} in #${channel}`, body, open, by: sender, tag: open });
+    else if (mentioned.has(to))
+      notes.push({ to, type: 'mention', title: `${first(sender)} mentioned ${how} in #${channel}`, body, open, by: sender });
+    else if (wants === 'all')
+      notes.push({ to, type: 'message', title: `${first(sender)} in #${channel}`, body, open, by: sender, tag: open });
   }
   await notify(notes);
 });
@@ -180,7 +184,9 @@ export const onDmMessage = onDocumentCreated('dms/{dmId}/messages/{messageId}', 
   const sender = rename(m.by || '');
   const conv = `dm:${dmId}`;
   const group = dm.people.length > 2;
-  const title = group ? `${first(sender)} in ${dm.name || dm.people.map(rename).map(first).join(', ')}` : `${first(sender)} sent you a message`;
+  const title = group
+    ? `${first(sender)} in ${dm.name || dm.people.map(rename).map(first).join(', ')}`
+    : `${first(sender)} sent you a message`;
   await notify(
     [...new Set(dm.people.map(rename))]
       .filter((to) => to && to !== sender && level(to, conv, 'all') !== 'none')

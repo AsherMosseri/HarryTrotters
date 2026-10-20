@@ -5,7 +5,7 @@ import PhotoViewer from './PhotoViewer.jsx';
 import Composer from './chat/Composer.jsx';
 import Message from './chat/Message.jsx';
 import { mentionPattern } from './chat/format.jsx';
-import { EmojiManager } from './chat/Pickers.jsx';
+import { EmojiManager, StickerManager } from './chat/Pickers.jsx';
 import { ChannelDialog, ChannelIcon, MembersPanel, NewDmDialog, NotifyMenu, PinsPanel, SearchPanel, slugChannel } from './chat/Panels.jsx';
 
 const GROUP_MINUTES = 5;
@@ -83,6 +83,7 @@ export default function ChatView({
   tasks,
   api,
   teamEmoji,
+  stickers,
   typing,
   levelOf,
   setLevel,
@@ -507,6 +508,8 @@ export default function ChatView({
             editing={editing}
             teamEmoji={teamEmoji}
             onManageEmoji={() => setDialog({ type: 'emoji' })}
+            stickers={stickers}
+            onManageStickers={() => setDialog({ type: 'stickers' })}
             onTyping={() => api.typing(conv.key)}
             onDone={() => {
               setReplyTo(null);
@@ -562,6 +565,7 @@ export default function ChatView({
         />
       )}
       {dialog?.type === 'emoji' && <EmojiManager teamEmoji={teamEmoji} api={api} onClose={() => setDialog(null)} />}
+      {dialog?.type === 'stickers' && <StickerManager stickers={stickers} api={api} onClose={() => setDialog(null)} />}
       {viewing && (
         <PhotoViewer
           photos={[{ ...viewing.photo, by: viewing.by, at: viewing.at }]}

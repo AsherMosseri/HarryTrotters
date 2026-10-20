@@ -11,7 +11,7 @@ import {
 } from './diff.js';
 import { STARTER_CHECKLISTS, starterItems } from '../checklists.js';
 
-const KEY = 'ftc32313-demo-v12';
+const KEY = 'ftc32313-demo-v13';
 const listeners = new Set();
 const uid = () => Math.random().toString(36).slice(2, 11);
 
@@ -193,8 +193,27 @@ function seed() {
     },
   ];
   const profiles = [
-    { id: 'sebastian-tolbert', name: 'Sebastian Tolbert', status: { emoji: '🔧', text: 'at the shop' }, updatedAt: now },
-    { id: 'katarina-jurasic', name: 'Katarina Jurasic', status: { emoji: '💻', text: 'tuning auto' }, updatedAt: now },
+    {
+      id: 'sebastian-tolbert',
+      name: 'Sebastian Tolbert',
+      status: { emoji: '🔧', text: 'at the shop' },
+      decoration: 'crown',
+      effect: 'sparkles',
+      nameStyle: { font: 'chunky', colors: ['#f97316', '#db2777'] },
+      theme: { a: '#f97316', b: '#7c3aed' },
+      about: 'Team management, logistics, and assembly. Ask me about parts orders.',
+      pronouns: 'he/him',
+      updatedAt: now,
+    },
+    {
+      id: 'katarina-jurasic',
+      name: 'Katarina Jurasic',
+      status: { emoji: '💻', text: 'tuning auto' },
+      decoration: 'rainbow',
+      nameStyle: { font: 'script', colors: ['#22c55e'] },
+      about: 'Programming. Autonomous is my thing.',
+      updatedAt: now,
+    },
   ];
   const robot = {
     versions: [
@@ -265,6 +284,7 @@ function seed() {
     profiles,
     channels: [],
     emoji: [],
+    stickers: [],
   };
 }
 
@@ -626,6 +646,9 @@ export const demoStore = {
       mentions: [],
       reactions: {},
       votes: {},
+      supers: {},
+      sticker: null,
+      files: [],
       pinned: false,
     }));
   },
@@ -636,6 +659,19 @@ export const demoStore = {
       else delete who[actor.uid];
       return { ...m, reactions: { ...m.reactions, [emoji]: who } };
     });
+  },
+  async superReact(conv, id, emoji, actor, on) {
+    updateMsg(conv, id, (m) => {
+      const who = { ...((m.supers || {})[emoji] || {}) };
+      if (on) who[actor.uid] = actor.name;
+      else delete who[actor.uid];
+      return { ...m, supers: { ...m.supers, [emoji]: who } };
+    });
+  },
+  // Demo files stay in this browser only (an object URL).
+  async uploadChatFile(conv, file, onProgress) {
+    onProgress?.(1);
+    return { name: file.name, size: file.size, type: file.type || '', url: URL.createObjectURL(file), path: '' };
   },
   async removeReaction(conv, id, emoji) {
     updateMsg(conv, id, (m) => {
@@ -711,6 +747,12 @@ export const demoStore = {
     await this.saveProfile(name, { photo });
     return photo;
   },
+  async uploadBanner(name, blob) {
+    await this.saveProfile(name, { banner: { url: await dataUrl(blob), path: '' } });
+  },
+  async removeBanner(name) {
+    await this.saveProfile(name, { banner: null });
+  },
   async removeAvatar(name) {
     await this.saveProfile(name, { photo: null });
   },
@@ -731,6 +773,19 @@ export const demoStore = {
     state.presence = [...(state.presence || []).filter((p) => p.id !== actor.uid), { id: actor.uid, name: actor.name, ...patch }];
     // Presence isn't saved, so skip localStorage and just notify.
     for (const fn of listeners) fn();
+  },
+
+  subscribeStickers(cb) {
+    return listen(() => cb([...(state.stickers || [])]));
+  },
+  async addSticker(name, file, actor) {
+    if (file.size > 400000) throw new Error('Demo mode only keeps stickers under 400 KB.');
+    state.stickers = [...(state.stickers || []), { id: uid(), name, url: await dataUrl(file), path: '', by: actor.name, at: Date.now() }];
+    commit();
+  },
+  async deleteSticker(s) {
+    state.stickers = (state.stickers || []).filter((x) => x.id !== s.id);
+    commit();
   },
 
   subscribeEmoji(cb) {

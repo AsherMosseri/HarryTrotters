@@ -1,6 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CHANNELS, COMPETITION, RENAMED, ROBOT_TAB_PEOPLE, ROSTER, STATUSES, SUBTEAMS, PRIORITIES, TEAM_NAME } from '../config.js';
 import { ONLINE_MS, TYPING_MS, buildPeopleInfo, buildProfiles } from '../people.js';
+import { PALETTES } from '../nitro.js';
 import { daysBetween, todayISO } from '../milestones.js';
 import { newTaskDefaults, personId } from '../data/diff.js';
 import { preparePhoto, useLocalStorage } from '../util.js';
@@ -22,6 +23,44 @@ import ChatView from './ChatView.jsx';
 const RobotView = lazy(() => import('./RobotView.jsx'));
 import { HelpDialog, WelcomeCard } from './Help.jsx';
 import Inbox from './Inbox.jsx';
+
+// Light / dark / automatic, plus the app color themes.
+function ThemeMenu({ theme, setTheme, palette, setPalette, onClose }) {
+  useEffect(() => {
+    const away = (e) => !e.target.closest('.theme-wrap') && onClose();
+    const esc = (e) => e.key === 'Escape' && onClose();
+    document.addEventListener('pointerdown', away);
+    window.addEventListener('keydown', esc);
+    return () => {
+      document.removeEventListener('pointerdown', away);
+      window.removeEventListener('keydown', esc);
+    };
+  }, [onClose]);
+  return (
+    <div className="theme-menu" role="dialog" aria-label="Theme">
+      <div className="segmented">
+        {[
+          ['light', '☀️ Light'],
+          ['dark', '🌙 Dark'],
+          ['system', 'Auto'],
+        ].map(([id, label]) => (
+          <button key={id} className={theme === id ? 'active' : ''} onClick={() => setTheme(id)}>
+            {label}
+          </button>
+        ))}
+      </div>
+      <h4>Color theme</h4>
+      <div className="palette-grid">
+        {PALETTES.map((p) => (
+          <button key={p.id} className={`palette${palette === p.id ? ' on' : ''}`} onClick={() => setPalette(p.id)}>
+            <span className="palette-dot" style={{ background: `linear-gradient(135deg, ${p.colors[0]}, ${p.colors[1]})` }} />
+            {p.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function ThemeIcon({ theme }) {
   const common = {
@@ -192,12 +231,14 @@ export default function Workspace({ store, actor, rename, renames }) {
   const [profileDocs, setProfileDocs] = useState([]);
   const [presence, setPresence] = useState([]);
   const [teamEmoji, setTeamEmoji] = useState([]);
+  const [stickers, setStickers] = useState([]);
   useEffect(() => store.subscribeChannels(setChannelDocs, quiet('channels')), [store, quiet]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => store.subscribeDms(actor, actor.admin, setDmDocs, quiet('dms')), [store, actor.name, actor.admin, quiet]);
   useEffect(() => store.subscribeProfiles(setProfileDocs, quiet('profiles')), [store, quiet]);
   useEffect(() => store.subscribePresence(setPresence, quiet('presence')), [store, quiet]);
   useEffect(() => store.subscribeEmoji(setTeamEmoji, quiet('emoji')), [store, quiet]);
+  useEffect(() => store.subscribeStickers(setStickers, quiet('stickers')), [store, quiet]);
   const competitionDate = settings.competitionDate || COMPETITION.date;
 
   // Notifications: the bell's list, and phone notifications on this device.
@@ -244,6 +285,13 @@ export default function Workspace({ store, actor, rename, renames }) {
     if (theme === 'system') document.documentElement.removeAttribute('data-theme');
     else document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
+  // App color theme (per device), on top of light/dark.
+  const [palette, setPalette] = useLocalStorage('palette', '');
+  const [themeMenu, setThemeMenu] = useState(false);
+  useEffect(() => {
+    if (palette) document.documentElement.setAttribute('data-palette', palette);
+    else document.documentElement.removeAttribute('data-palette');
+  }, [palette]);
 
   useEffect(() => {
     if (!toast) return;
@@ -618,6 +666,16 @@ export default function Workspace({ store, actor, rename, renames }) {
       removeAvatar: (name, oldPath) => store.removeAvatar(name, oldPath).catch(fail),
       addEmoji: (name, file) => store.addEmoji(name, file, actor),
       deleteEmoji: (e) => store.deleteEmoji(e).catch(fail),
+      addSticker: (name, file) => store.addSticker(name, file, actor),
+      deleteSticker: (st) => store.deleteSticker(st).catch(fail),
+      superReact: (conv, id, emoji, on) => store.superReact(conv, id, emoji, actor, on).catch(fail),
+      uploadChatFile: (conv, file, onProgress) =>
+        store.uploadChatFile(conv, file, onProgress).catch((e) => {
+          fail(e?.code === 'storage/unauthorized' ? { message: "Couldn't upload that file (25 MB max)." } : e);
+          return null;
+        }),
+      uploadBanner: (name, blob, oldPath) => store.uploadBanner(name, blob, oldPath),
+      removeBanner: (name, oldPath) => store.removeBanner(name, oldPath).catch(fail),
       editMessage: (channel, id, patch) => store.editMessage(channel, id, patch).catch(fail),
       uploadChatGif: (channel, file) => store.uploadChatGif(channel, file).catch((e) => (fail(e), null)),
       deleteMessage: (channel, m) => store.deleteMessage(channel, m).catch(fail),
@@ -727,13 +785,25 @@ export default function Workspace({ store, actor, rename, renames }) {
             <button className="icon-btn help-btn" title="Help" aria-label="Help" onClick={() => setShowHelp(true)}>
               ?
             </button>
-            <button
-              className="icon-btn"
-              title={`Theme: ${theme}`}
-              onClick={() => setTheme(theme === 'dark' ? 'light' : theme === 'light' ? 'system' : 'dark')}
-            >
-              <ThemeIcon theme={theme} />
-            </button>
+            <span className="theme-wrap">
+              <button
+                className={`icon-btn${themeMenu ? ' on' : ''}`}
+                title="Theme"
+                aria-label="Theme"
+                onClick={() => setThemeMenu(!themeMenu)}
+              >
+                <ThemeIcon theme={theme} />
+              </button>
+              {themeMenu && (
+                <ThemeMenu
+                  theme={theme}
+                  setTheme={setTheme}
+                  palette={palette}
+                  setPalette={setPalette}
+                  onClose={() => setThemeMenu(false)}
+                />
+              )}
+            </span>
             <div className="user-chip">
               <button className="avatar-btn" onClick={() => setProfileFor(actor.name)} title="Your profile" aria-label="Your profile">
                 <Avatar name={actor.name} size={30} />
@@ -904,6 +974,7 @@ export default function Workspace({ store, actor, rename, renames }) {
             tasks={tasks}
             api={api}
             teamEmoji={teamEmoji}
+            stickers={stickers}
             typing={typingIn(currentConv.key)}
             levelOf={levelOf}
             setLevel={(c, v) => api.saveProfile(actor.name, { notify: { [c.key]: v } })}
@@ -1017,7 +1088,9 @@ export default function Workspace({ store, actor, rename, renames }) {
             }}
           />
         )}
-        {editProfileFor && <ProfileEditor name={editProfileFor} actor={actor} api={api} onClose={() => setEditProfileFor(null)} />}
+        {editProfileFor && (
+          <ProfileEditor name={editProfileFor} actor={actor} api={api} tasks={tasks || []} onClose={() => setEditProfileFor(null)} />
+        )}
       </div>
     </PeopleContext.Provider>
   );

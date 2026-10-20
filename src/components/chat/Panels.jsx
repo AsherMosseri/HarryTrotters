@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { SUBTEAMS, SUBTEAM_COLORS } from '../../config.js';
 import { activeStatus } from '../../people.js';
-import { Avatar, CloseIcon, usePeople } from '../common.jsx';
+import { Avatar, CloseIcon, DisplayName, usePeople } from '../common.jsx';
 import { renderRich } from './format.jsx';
 import { timeOf } from './Message.jsx';
 
@@ -34,9 +34,7 @@ export function MembersPanel({ names, onPerson, onClose }) {
       <button key={n} className={`member-row${people?.isOnline(n) ? '' : ' offline'}`} onClick={(e) => onPerson(n, e)}>
         <Avatar name={n} size={32} showOnline />
         <span className="grow">
-          <span className="member-name" style={{ color: people?.infoOf(n)?.color || undefined }}>
-            {n}
-          </span>
+          <DisplayName name={n} className="member-name" />
           {status && (
             <span className="member-status">
               {status.emoji} {status.text}

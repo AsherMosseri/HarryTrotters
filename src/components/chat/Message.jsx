@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { personId } from '../../data/diff.js';
-import { Avatar, StatusDot, usePeople } from '../common.jsx';
+import { Avatar, DisplayName, StatusDot } from '../common.jsx';
 import { isJumbo, renderRich } from './format.jsx';
 import { EmojiPicker } from './Pickers.jsx';
 import { CUSTOM_RE } from './emoji.js';
@@ -100,6 +100,96 @@ function Poll({ m, actor, onVote, onEnd, canEnd }) {
   );
 }
 
+const fmtSize = (n) => (n > 1e6 ? `${(n / 1e6).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1e3))} KB`);
+const FILE_ICONS = {
+  pdf: '📕',
+  stl: '🧊',
+  step: '🧊',
+  stp: '🧊',
+  f3d: '🧊',
+  glb: '🧊',
+  zip: '🗜',
+  java: '☕',
+  kt: '💻',
+  py: '🐍',
+  txt: '📄',
+  doc: '📘',
+  docx: '📘',
+  xls: '📗',
+  xlsx: '📗',
+  csv: '📗',
+  ppt: '📙',
+  pptx: '📙',
+};
+
+// A file in a message: videos and audio play inline, pictures show, anything
+// else is a download card.
+function Attachment({ f }) {
+  const kind = f.type.split('/')[0];
+  if (kind === 'video')
+    return <video className="msg-video" src={f.url} controls playsInline preload="metadata" onClick={(e) => e.stopPropagation()} />;
+  if (kind === 'audio') return <audio className="msg-audio" src={f.url} controls preload="metadata" onClick={(e) => e.stopPropagation()} />;
+  if (kind === 'image')
+    return (
+      <a href={f.url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>
+        <img className="msg-image-file" src={f.url} alt={f.name} loading="lazy" />
+      </a>
+    );
+  const ext = (f.name.split('.').pop() || '').toLowerCase();
+  return (
+    <a className="file-card" href={f.url} target="_blank" rel="noreferrer" download={f.name} onClick={(e) => e.stopPropagation()}>
+      <span className="file-icon">{FILE_ICONS[ext] || '📎'}</span>
+      <span className="grow">
+        <b className="file-name">{f.name}</b>
+        <span className="muted tiny">{fmtSize(f.size)}</span>
+      </span>
+      <span className="file-dl">⬇</span>
+    </a>
+  );
+}
+
+// A super reaction: bursts when someone adds one.
+function SuperChip({ emoji, who, mine, teamEmoji, onClick, fresh }) {
+  const count = Object.keys(who).length;
+  const last = useRef(count);
+  // A chip that appears after the message was already showing (someone just
+  // added it) starts with a burst too.
+  const [burst, setBurst] = useState(fresh);
+  useEffect(() => {
+    if (!fresh) return;
+    const t = setTimeout(() => setBurst(false), 1300);
+    return () => clearTimeout(t);
+  }, [fresh]);
+  useEffect(() => {
+    if (count > last.current) {
+      setBurst(true);
+      const t = setTimeout(() => setBurst(false), 1300);
+      last.current = count;
+      return () => clearTimeout(t);
+    }
+    last.current = count;
+  }, [count]);
+  return (
+    <button
+      className={`reaction super${mine ? ' mine' : ''}${burst ? ' burst' : ''}`}
+      title={`Super reaction: ${Object.values(who).join(', ')}`}
+      onClick={onClick}
+    >
+      <span className="super-glyph">
+        <ReactionGlyph emoji={emoji} teamEmoji={teamEmoji} />
+        {burst && (
+          <span className="burst-ring" aria-hidden="true">
+            {Array.from({ length: 8 }, (_, i) => (
+              <i key={i} style={{ '--a': `${i * 45}deg` }} />
+            ))}
+          </span>
+        )}
+      </span>{' '}
+      {count}
+    </button>
+  );
+}
+
 // Shows a reaction: a normal emoji, or a team emoji's picture.
 export function ReactionGlyph({ emoji, teamEmoji }) {
   const custom = CUSTOM_RE.exec(emoji);
@@ -132,7 +222,6 @@ export default function Message({
   onJump,
   onPerson,
 }) {
-  const people = usePeople();
   const [picker, setPicker] = useState(false);
   const [removing, setRemoving] = useState(false);
   const mine = m.byUid === actor.uid;
@@ -140,12 +229,23 @@ export default function Message({
   const myRoles = ctx.myRoles || [];
   // Highlight messages that ping me (not my own).
   const mentionsMe = !mine && ((m.mentions || []).includes(actor.name) || m.everyone || (m.roles || []).some((r) => myRoles.includes(r)));
-  const color = people?.infoOf(m.by)?.color;
   const react = (emoji) => {
+    if (picker === 'super') return superReact(emoji);
     const on = !(m.reactions?.[emoji] && m.reactions[emoji][actor.uid]);
     api.react(conv, m.id, emoji, on);
     setPicker(false);
   };
+  const superReact = (emoji) => {
+    const on = !m.supers?.[emoji]?.[actor.uid];
+    api.superReact(conv, m.id, emoji, on);
+    setPicker(false);
+  };
+  const supers = Object.entries(m.supers || {}).filter(([, who]) => who && Object.keys(who).length);
+  // Set once the message has rendered, so later super reactions animate.
+  const shown = useRef(false);
+  useEffect(() => {
+    shown.current = true;
+  }, []);
   const yt = youtubeId(m.preview?.url) || youtubeId(/https?:\/\/\S+/.exec(m.text || '')?.[0]);
   const jumbo = !m.poll && isJumbo(m.text, ctx.emoji);
 
@@ -170,9 +270,7 @@ export default function Message({
       <div className="msg-body">
         {first && (
           <div className="msg-head">
-            <button className="name-btn" style={color ? { color } : undefined} onClick={(e) => onPerson(m.by, e)}>
-              {m.by}
-            </button>{' '}
+            <DisplayName as="button" name={m.by} className="name-btn" onClick={(e) => onPerson(m.by, e)} />{' '}
             <span className="muted tiny">{timeOf(m.at)}</span>
             {m.pinned && (
               <span className="muted tiny" title={`Pinned by ${m.pinnedBy}`}>
@@ -209,6 +307,12 @@ export default function Message({
               />
             )}
             {m.gif && <img className="msg-gif" src={m.gif.url} alt={m.gif.title || 'GIF'} loading="lazy" />}
+            {m.sticker && (
+              <img className="msg-sticker" src={m.sticker.url} alt={`Sticker: ${m.sticker.name}`} title={m.sticker.name} loading="lazy" />
+            )}
+            {(m.files || []).map((f) => (
+              <Attachment key={f.path || f.url} f={f} />
+            ))}
             {m.photo && (
               <button className="msg-photo" onClick={() => onPhoto(m)} aria-label="Open photo">
                 <img src={m.photo.thumbUrl || m.photo.url} alt="" loading="lazy" />
@@ -232,8 +336,19 @@ export default function Message({
             )}
           </>
         )}
-        {reactions.length > 0 && (
+        {(reactions.length > 0 || supers.length > 0) && (
           <div className="msg-reactions">
+            {supers.map(([emoji, who]) => (
+              <SuperChip
+                key={`s-${emoji}`}
+                fresh={shown.current}
+                emoji={emoji}
+                who={who}
+                mine={!!who[actor.uid]}
+                teamEmoji={teamEmoji}
+                onClick={() => superReact(emoji)}
+              />
+            ))}
             {reactions.map(([emoji, who]) => (
               <button
                 key={emoji}
@@ -277,6 +392,13 @@ export default function Message({
           <button onClick={() => setPicker((p) => !p)} aria-label="More reactions" title="More reactions">
             ☺+
           </button>
+          <button
+            onClick={() => setPicker((p) => (p === 'super' ? false : 'super'))}
+            aria-label="Super reaction"
+            title="Super reaction (animated)"
+          >
+            ✨
+          </button>
           {canPost && (
             <button onClick={() => onReply(m)} title="Reply">
               ↩
@@ -305,6 +427,7 @@ export default function Message({
           )}
           {picker && (
             <EmojiPicker
+              title={picker === 'super' ? '✨ Super reaction' : ''}
               onPick={react}
               onClose={() => setPicker(false)}
               teamEmoji={teamEmoji}

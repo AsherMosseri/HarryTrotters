@@ -4,12 +4,13 @@ import { preparePhoto } from '../../util.js';
 import { Avatar, CloseIcon, StatusDot, usePeople } from '../common.jsx';
 import { prefixLines, wrapSelection } from './format.jsx';
 import { emojiList, loadEmoji, rememberEmoji, searchEmoji } from './emoji.js';
-import { EmojiPicker, GifPicker, PollDialog } from './Pickers.jsx';
+import { EmojiPicker, GifPicker, PollDialog, StickerPicker } from './Pickers.jsx';
 
 // The formatting bar: [label, title, what it does].
 const FORMATS = [
   ['B', 'Bold', ['wrap', '**']],
   ['I', 'Italic', ['wrap', '*']],
+  ['BI', 'Bold italic', ['wrap', '***']],
   ['U', 'Underline', ['wrap', '__']],
   ['S', 'Strikethrough', ['wrap', '~~']],
   ['H1', 'Big heading', ['line', '# ']],
@@ -35,6 +36,8 @@ export default function Composer({
   editing,
   onDone,
   teamEmoji,
+  stickers = [],
+  onManageStickers,
   onManageEmoji,
   onTyping,
   isDm,
@@ -51,6 +54,8 @@ export default function Composer({
   const [emojiReady, setEmojiReady] = useState(!!emojiList());
   const box = useRef(null);
   const fileInput = useRef(null);
+  const anyFileInput = useRef(null);
+  const [upload, setUpload] = useState(null); // { name, progress }
   const caretAfterUpdate = useRef(null);
 
   useEffect(() => {
@@ -193,6 +198,20 @@ export default function Composer({
       setSending(false);
     }
   };
+  // Any file up to 25 MB goes out as its own message (videos play in chat).
+  const sendFile = async (f) => {
+    if (f.size > 25e6) return alert('That file is too big (25 MB max).');
+    setPanel(null);
+    setUpload({ name: f.name, progress: 0 });
+    try {
+      const stored = await api.uploadChatFile(conv, f, (p) => setUpload({ name: f.name, progress: p }));
+      if (stored) await api.sendMessage(conv, { text: text.trim(), mentions: [], taskIds: [], replyTo: replyInfo(), files: [stored] });
+      if (stored && text.trim()) setText('');
+      if (replyTo) onDone();
+    } finally {
+      setUpload(null);
+    }
+  };
   const addPhoto = async (f) => {
     const prepared = await preparePhoto(f);
     setPhoto({ file: prepared, preview: URL.createObjectURL(prepared.thumb) });
@@ -259,6 +278,26 @@ export default function Composer({
           }}
           className="composer-emoji"
         />
+      )}
+      {panel === 'sticker' && (
+        <StickerPicker
+          stickers={stickers}
+          onPick={(st) => sendExtra({ sticker: { id: st.id, name: st.name, url: st.url } })}
+          onClose={() => setPanel(null)}
+          canManage={isManager}
+          onManage={() => {
+            setPanel(null);
+            onManageStickers();
+          }}
+        />
+      )}
+      {upload && (
+        <div className="upload-bar">
+          📎 Uploading {upload.name}… {Math.round(upload.progress * 100)}%
+          <span className="upload-track">
+            <span style={{ width: `${upload.progress * 100}%` }} />
+          </span>
+        </div>
       )}
       {panel === 'poll' && <PollDialog onCreate={(poll) => sendExtra({ poll, text: '', votes: {} })} onClose={() => setPanel(null)} />}
       {suggest && options.length > 0 && (
@@ -332,6 +371,8 @@ export default function Composer({
                 <button onClick={() => (setPanel(null), fileInput.current?.click())}>📷 Photo</button>
                 <button onClick={() => setPanel('gif')}>🎞 GIF</button>
                 <button onClick={() => setPanel('poll')}>📊 Poll</button>
+                <button onClick={() => (setPanel(null), anyFileInput.current?.click())}>📎 File or video</button>
+                <button onClick={() => setPanel('sticker')}>🎫 Sticker</button>
                 <button onClick={() => setPanel('emoji')}>😊 Emoji</button>
               </div>
             )}
@@ -349,6 +390,32 @@ export default function Composer({
             <button className="icon-btn hide-phone" onClick={() => setPanel('poll')} aria-label="Make a poll" title="Poll">
               📊
             </button>
+            <button
+              className="icon-btn hide-phone"
+              onClick={() => anyFileInput.current?.click()}
+              aria-label="Attach a file"
+              title="File or video (25 MB)"
+            >
+              📎
+            </button>
+            <button
+              className="icon-btn hide-phone"
+              onClick={() => setPanel(panel === 'sticker' ? null : 'sticker')}
+              aria-label="Stickers"
+              title="Stickers"
+            >
+              🎫
+            </button>
+            <input
+              ref={anyFileInput}
+              type="file"
+              hidden
+              onChange={(e) => {
+                const f = e.target.files[0];
+                e.target.value = '';
+                if (f) sendFile(f);
+              }}
+            />
             <input
               ref={fileInput}
               type="file"
@@ -368,11 +435,12 @@ export default function Composer({
           value={text}
           onChange={onChange}
           onPaste={(e) => {
-            const f = [...(e.clipboardData?.files || [])].find((x) => x.type.startsWith('image/'));
+            const f = e.clipboardData?.files?.[0];
             if (f && !editing) {
               e.preventDefault();
               if (f.type === 'image/gif') uploadGif(f);
-              else addPhoto(f);
+              else if (/^image\/(jpeg|png|webp|heic)/.test(f.type)) addPhoto(f);
+              else sendFile(f);
             }
           }}
           onKeyDown={(e) => {
