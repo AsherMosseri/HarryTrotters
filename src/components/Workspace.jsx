@@ -118,12 +118,18 @@ export default function Workspace({ store, actor, rename, renames }) {
     setToast({ text: e?.code === 'permission-denied' ? "You don't have permission to do that." : e?.message || 'Something went wrong.' });
   }, []);
   // Loading errors name what failed, so a screenshot tells us where to look.
+  // Collects every part that failed to load into one message, so nothing is hidden.
+  const loadFailures = useRef(new Map());
   const loadFail = useCallback(
     (what) => (e) => {
       console.error(what, e);
       const why =
         e?.code === 'permission-denied' ? 'the database rules need updating (ask team management)' : e?.message || 'unknown error';
-      setToast({ text: `Couldn't load ${what}: ${why}.` });
+      loadFailures.current.set(what, why);
+      const byReason = new Map();
+      for (const [name, reason] of loadFailures.current) byReason.set(reason, [...(byReason.get(reason) || []), name]);
+      const text = [...byReason].map(([reason, names]) => `Couldn't load ${names.join(', ')}: ${reason}.`).join(' ');
+      setToast({ text });
     },
     [],
   );
