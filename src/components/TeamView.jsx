@@ -5,8 +5,10 @@ import { personId } from '../data/diff.js';
 import { todayISO } from '../milestones.js';
 import { Avatar, CloseIcon } from './common.jsx';
 
-// Shown side by side under the team name; everything else branches below.
-const LEAD_GROUPS = ['Team Management', 'Secretary'];
+// Team Management sits under the team name with the subteams below it;
+// Secretary is a support role that hangs off to the side of Team Management.
+const LEAD_GROUP = 'Team Management';
+const STAFF_GROUP = 'Secretary';
 const EMPTY_ROLE = { title: '', subteams: [], responsibilities: [] };
 
 function SubteamPill({ name }) {
@@ -163,8 +165,21 @@ export default function TeamView({ roster, roles, tasks, api, isManager }) {
 
   const inTeam = (s) => people.filter((p) => p.subteams.includes(s));
   const onEdit = isManager ? setEditing : null;
-  const leadGroups = LEAD_GROUPS.map((s) => ({ name: s, members: inTeam(s) }));
-  const groups = ORG_GROUPS.filter((s) => !LEAD_GROUPS.includes(s)).map((s) => ({ name: s, members: inTeam(s) }));
+  const groups = ORG_GROUPS.filter((s) => s !== LEAD_GROUP && s !== STAFF_GROUP).map((s) => ({ name: s, members: inTeam(s) }));
+  const groupBox = (name, className = '') => {
+    const members = inTeam(name);
+    return (
+      <div className={`org-box ${className}`} style={{ '--c': SUBTEAM_COLORS[name] }}>
+        <h3>{name}</h3>
+        <div className="org-members">
+          {members.map((p) => (
+            <MemberChip key={p.name} p={p} onEdit={onEdit} />
+          ))}
+          {!members.length && <span className="muted small">No one yet</span>}
+        </div>
+      </div>
+    );
+  };
   const unassigned = people.filter((p) => !p.subteams.length);
 
   return (
@@ -175,18 +190,14 @@ export default function TeamView({ roster, roles, tasks, api, isManager }) {
           <span>{TEAM_NICKNAME}</span>
         </div>
         <div className="org-stem" />
-        <div className="org-lead-row">
-          {leadGroups.map((g) => (
-            <div key={g.name} className="org-box org-lead" style={{ '--c': SUBTEAM_COLORS[g.name] }}>
-              <h3>{g.name}</h3>
-              <div className="org-members">
-                {g.members.map((p) => (
-                  <MemberChip key={p.name} p={p} onEdit={onEdit} />
-                ))}
-                {!g.members.length && <span className="muted small">No one yet</span>}
-              </div>
-            </div>
-          ))}
+        {groupBox(LEAD_GROUP, 'org-lead')}
+        <div className="org-staff-row">
+          <span />
+          <span className="org-staff-stem" />
+          <div className="org-staff">
+            <span className="org-staff-line" />
+            {groupBox(STAFF_GROUP, 'org-secretary')}
+          </div>
         </div>
         <div className="org-stem" />
         <div className="org-branches">

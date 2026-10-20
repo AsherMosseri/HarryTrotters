@@ -509,9 +509,14 @@ button.brand:active .logo-mark { transform: rotate(-12deg) scale(0.95); }
 }
 .org-box h3 { margin: 0 0 8px; font-size: 14px; display: flex; align-items: center; gap: 6px; }
 .org-box h3::before { content: ''; width: 9px; height: 9px; border-radius: 50%; background: var(--c, var(--muted)); }
-.org-lead-row { position: relative; display: flex; justify-content: center; gap: 16px; width: 100%; }
-.org-lead { min-width: min(360px, 100%); }
+.org-lead { min-width: min(420px, 100%); }
 .org-lead .org-members { flex-direction: row; flex-wrap: wrap; justify-content: center; }
+/* Secretary: a support box off to the side of the line under Team Management. */
+.org-staff-row { display: grid; grid-template-columns: 1fr 2px 1fr; width: 100%; }
+.org-staff-stem { background: var(--border); }
+.org-staff { display: flex; align-items: center; padding: 14px 0 0; }
+.org-staff-line { flex: none; width: 28px; height: 2px; background: var(--border); }
+.org-secretary { min-width: 0; max-width: 300px; flex: 1; }
 .org-branches {
   position: relative; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; width: 100%; padding-top: 18px;
 }
@@ -630,7 +635,8 @@ div.org-member { cursor: default; }
   .tl-label .ms-state { display: none; }
   .org-branches { grid-template-columns: 1fr 1fr; padding-top: 0; }
   .org-branches::before, .org-branches > .org-box::before { display: none; }
-  .org-lead-row { flex-direction: column; gap: 10px; }
+  .org-staff-line { width: 14px; }
+  .org-staff-row + .org-stem { display: none; }
   .org-lead { min-width: 0; width: 100%; }
   .ms-header .btn.primary { width: 100%; justify-content: center; }
   input, select, textarea { font-size: 16px; }
