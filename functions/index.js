@@ -177,8 +177,8 @@ function localDate(days) {
   return new Date(Date.now() + days * 86400000).toLocaleDateString('en-CA', { timeZone: TIME_ZONE });
 }
 
-// Every morning: what's due tomorrow, one notification per person. Also
-// clears inbox items older than 30 days.
+// Every morning at 7:30 (New York time): what's due tomorrow, one
+// notification per person. Also clears inbox items older than 30 days.
 export const dueTomorrow = onSchedule({ schedule: '30 7 * * *', timeZone: TIME_ZONE }, async () => {
   const rename = await renamer();
   const tomorrow = localDate(1);

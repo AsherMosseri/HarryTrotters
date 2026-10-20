@@ -57,3 +57,7 @@ jobs:
           if [ -n "$added" ]; then sleep 90; fi
       - run: npm ci --prefix functions
       - run: npx -y firebase-tools@15.34.0 deploy --only firestore:rules,storage,functions --project ftc-32313-tasks --non-interactive --force
+      - name: Check the morning reminder is scheduled
+        run: |
+          REGION=$(node -e 'const l=require("./functions/location.json").firestore;console.log({nam5:"us-central1",nam7:"us-central1",eur3:"europe-west1"}[l]||l)')
+          gcloud scheduler jobs describe "firebase-schedule-dueTomorrow-$REGION" --location="$REGION" --format='value(schedule,timeZone,state)'
