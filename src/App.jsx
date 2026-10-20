@@ -53,7 +53,12 @@ export default function App() {
 
   useEffect(() => {
     if (!store || !user) return;
-    return store.subscribeNames(setRenames, (e) => console.warn('names', e));
+    // Only take a new object when the renames actually change, so everything
+    // keyed on the signed-in person stays put.
+    return store.subscribeNames(
+      (next) => setRenames((prev) => (JSON.stringify(prev) === JSON.stringify(next) ? prev : next)),
+      (e) => console.warn('names', e),
+    );
   }, [store, user]);
 
   const actor = useMemo(

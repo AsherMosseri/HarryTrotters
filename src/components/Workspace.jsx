@@ -1,9 +1,11 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { CHANNELS, COMPETITION, ROBOT_TAB_PEOPLE, ROSTER, STATUSES, SUBTEAMS, PRIORITIES, TEAM_NAME } from '../config.js';
+import { CHANNELS, COMPETITION, RENAMED, ROBOT_TAB_PEOPLE, ROSTER, STATUSES, SUBTEAMS, PRIORITIES, TEAM_NAME } from '../config.js';
+import { ONLINE_MS, TYPING_MS, buildPeopleInfo, buildProfiles } from '../people.js';
 import { daysBetween, todayISO } from '../milestones.js';
 import { newTaskDefaults, personId } from '../data/diff.js';
 import { preparePhoto, useLocalStorage } from '../util.js';
-import { Avatar, PlusIcon } from './common.jsx';
+import { Avatar, PeopleContext, PlusIcon } from './common.jsx';
+import { ProfileCard, ProfileEditor } from './People.jsx';
 import TableView from './TableView.jsx';
 import BoardView from './BoardView.jsx';
 import TaskPanel from './TaskPanel.jsx';
@@ -182,12 +184,20 @@ export default function Workspace({ store, actor, rename, renames }) {
   useEffect(() => store.subscribeChecklists(setChecklists, loadFail('checklists')), [store, loadFail]);
   useEffect(() => store.subscribeRuns(setRuns, loadFail('the match log')), [store, loadFail]);
   useEffect(() => store.subscribeRobot(setRobot, loadFail('the robot')), [store, loadFail]);
-  useEffect(() => {
-    const stops = CHANNELS.map((c) =>
-      store.subscribeChannel(c.id, CHAT_PAGE, (msgs) => setChat((all) => ({ ...all, [c.id]: msgs })), loadFail('chat')),
-    );
-    return () => stops.forEach((stop) => stop());
-  }, [store, loadFail]);
+  // Chat extras. Quiet on failure: the board works without them (e.g. before
+  // the new rules are published).
+  const quiet = useCallback((what) => (e) => console.warn(what, e), []);
+  const [channelDocs, setChannelDocs] = useState([]);
+  const [dmDocs, setDmDocs] = useState([]);
+  const [profileDocs, setProfileDocs] = useState([]);
+  const [presence, setPresence] = useState([]);
+  const [teamEmoji, setTeamEmoji] = useState([]);
+  useEffect(() => store.subscribeChannels(setChannelDocs, quiet('channels')), [store, quiet]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => store.subscribeDms(actor, actor.admin, setDmDocs, quiet('dms')), [store, actor.name, actor.admin, quiet]);
+  useEffect(() => store.subscribeProfiles(setProfileDocs, quiet('profiles')), [store, quiet]);
+  useEffect(() => store.subscribePresence(setPresence, quiet('presence')), [store, quiet]);
+  useEffect(() => store.subscribeEmoji(setTeamEmoji, quiet('emoji')), [store, quiet]);
   const competitionDate = settings.competitionDate || COMPETITION.date;
 
   // Notifications: the bell's list, and phone notifications on this device.
@@ -203,7 +213,8 @@ export default function Workspace({ store, actor, rename, renames }) {
   );
   useEffect(() => {
     store.refreshPush(actor).catch((e) => console.warn('push refresh', e));
-  }, [store, actor]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [store, actor.uid, actor.name]);
   const inboxUnread = inbox.filter((n) => !n.read).length;
   // The red number on the Home Screen icon.
   useEffect(() => {
@@ -264,49 +275,6 @@ export default function Workspace({ store, actor, rename, renames }) {
     }
   }, [trash, actor.admin, store]);
 
-  // Unread chat: other people's messages newer than what this device has read.
-  // On first use everything already there counts as read.
-  useEffect(() => {
-    // First use, or a channel added since: start it as "read up to now".
-    if (chatRead === null) setChatRead(Object.fromEntries(CHANNELS.map((c) => [c.id, Date.now()])));
-    else if (CHANNELS.some((c) => !(c.id in chatRead))) {
-      setChatRead({ ...Object.fromEntries(CHANNELS.map((c) => [c.id, Date.now()])), ...chatRead });
-    }
-  }, [chatRead, setChatRead]);
-  const unread = useMemo(() => {
-    const out = {};
-    for (const c of CHANNELS) {
-      const since = chatRead?.[c.id] ?? Date.now();
-      const fresh = (chat[c.id] || []).filter((m) => m.at > since && m.byUid !== actor.uid && !m.deleted);
-      // Announcements always count as important (red), like a mention.
-      const important = c.announce ? fresh.length : fresh.filter((m) => (m.mentions || []).includes(actor.name)).length;
-      out[c.id] = { count: fresh.length, mentions: important };
-    }
-    return out;
-  }, [chat, chatRead, actor.uid, actor.name]);
-  const unreadTotal = Object.values(unread).reduce((s, u) => s + u.count, 0);
-  // Newest unread announcement from someone else, shown as a banner on the board.
-  const announcement = useMemo(() => {
-    const since = chatRead?.announcements ?? Date.now();
-    const fresh = (chat.announcements || []).filter((m) => m.at > since && m.byUid !== actor.uid && !m.deleted);
-    return fresh[fresh.length - 1] || null;
-  }, [chat, chatRead, actor.uid]);
-  const unreadMentions = Object.values(unread).reduce((s, u) => s + u.mentions, 0);
-
-  // Mark the open channel read while it's on screen.
-  useEffect(() => {
-    if (view !== 'chat' || !chatRead) return;
-    const markRead = () => {
-      if (document.visibilityState !== 'visible') return;
-      const msgs = chat[chatChannel] || [];
-      const newest = msgs.length ? msgs[msgs.length - 1].at : 0;
-      if (newest > (chatRead[chatChannel] || 0)) setChatRead({ ...chatRead, [chatChannel]: newest });
-    };
-    markRead();
-    document.addEventListener('visibilitychange', markRead);
-    return () => document.removeEventListener('visibilitychange', markRead);
-  }, [view, chat, chatChannel, chatRead, setChatRead]);
-
   const milestones = useMemo(
     () => rawMilestones.map((m) => (m.owners?.some((n) => rename(n) !== n) ? { ...m, owners: [...new Set(m.owners.map(rename))] } : m)),
     [rawMilestones, rename],
@@ -322,11 +290,197 @@ export default function Workspace({ store, actor, rename, renames }) {
     return [...names].filter((n) => !removed.has(n) || n === actor.name);
   }, [people, roles, actor.name, rename]);
 
+  // Channels: the defaults in config.js, changed or added by team management.
+  const convs = useMemo(() => {
+    const docs = Object.fromEntries(channelDocs.map((d) => [d.id, d]));
+    const merged = new Map(
+      CHANNELS.map((c, i) => [c.id, { id: c.id, name: c.id, subteam: c.subteam, announce: !!c.announce, order: i, topic: '' }]),
+    );
+    for (const d of channelDocs)
+      merged.set(d.id, { ...(merged.get(d.id) || { name: d.id, order: 99 }), ...d, announce: d.id === 'announcements' });
+    const channels = [...merged.values()]
+      .filter((c) => !c.deleted || c.id === 'announcements' || c.id === 'general')
+      .sort((a, b) => (a.order ?? 99) - (b.order ?? 99) || a.name.localeCompare(b.name))
+      .map((c) => ({ ...c, key: c.id, kind: 'channel', label: `#${c.name}` }));
+    const dms = dmDocs
+      .map((d) => {
+        const ppl = [...new Set((d.people || []).map(rename))];
+        const others = ppl.filter((n) => n !== actor.name);
+        const label = d.name || others.join(', ') || actor.name;
+        const short = d.name || (others.length === 1 ? others[0] : others.map((n) => n.split(' ')[0]).join(', '));
+        return { ...d, key: `dm:${d.id}`, kind: 'dm', people: ppl, label, short, mine: ppl.includes(actor.name) };
+      })
+      .sort((a, b) => (b.lastAt || 0) - (a.lastAt || 0));
+    return {
+      channels,
+      dms: dms.filter((d) => d.mine),
+      teamDms: dms.filter((d) => !d.mine),
+      allChannelIds: [...merged.keys(), ...Object.keys(docs)],
+    };
+  }, [channelDocs, dmDocs, rename, actor.name]);
+  const allConvs = useMemo(() => [...convs.channels, ...convs.dms, ...convs.teamDms], [convs]);
+  const currentConv = allConvs.find((c) => c.key === chatChannel) || convs.channels.find((c) => c.id === 'general') || convs.channels[0];
+
+  // Live chat for every channel and my DMs (for unread counts), plus a team DM
+  // being viewed.
+  const liveKeys = useMemo(() => {
+    const keys = [...convs.channels, ...convs.dms].map((c) => c.key);
+    if (view === 'chat' && currentConv && !keys.includes(currentConv.key)) keys.push(currentConv.key);
+    return keys.join('|');
+  }, [convs, view, currentConv]);
+  const chatSubs = useRef(new Map());
+  useEffect(() => {
+    const want = new Set(liveKeys.split('|').filter(Boolean));
+    for (const [key, stop] of chatSubs.current)
+      if (!want.has(key)) {
+        stop();
+        chatSubs.current.delete(key);
+      }
+    for (const key of want)
+      if (!chatSubs.current.has(key))
+        chatSubs.current.set(
+          key,
+          store.subscribeChannel(
+            key,
+            CHAT_PAGE,
+            (msgs) => setChat((all) => ({ ...all, [key]: msgs })),
+            key.startsWith('dm:') ? quiet('dm') : loadFail('chat'),
+          ),
+        );
+  }, [liveKeys, store, loadFail, quiet]);
+  useEffect(() => () => chatSubs.current.forEach((stop) => stop()), []);
+
+  // People: pictures, statuses, org info, and who's online (rechecked every 30 s).
+  const profiles = useMemo(() => buildProfiles(profileDocs, rename), [profileDocs, rename]);
+  const peopleInfo = useMemo(() => buildPeopleInfo(roster, roles, rename), [roster, roles, rename]);
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), view === 'chat' ? 2000 : 30000);
+    return () => clearInterval(t);
+  }, [view]);
+  const online = useMemo(() => {
+    const out = new Set();
+    for (const p of presence) if (p.name && (p.at || 0) > now - ONLINE_MS) out.add(rename(p.name));
+    out.add(actor.name);
+    return out;
+  }, [presence, now, rename, actor.name]);
+  const typingIn = useCallback(
+    (key) => [
+      ...new Set(
+        presence
+          .filter((p) => p.typing === key && (p.typingAt || 0) > now - TYPING_MS && rename(p.name || '') !== actor.name)
+          .map((p) => rename(p.name)),
+      ),
+    ],
+    [presence, now, rename, actor.name],
+  );
+  const [profileFor, setProfileFor] = useState(null);
+  const [editProfileFor, setEditProfileFor] = useState(null);
+  const peopleCtx = useMemo(
+    () => ({
+      photoOf: (name) => profiles.get(name)?.photo?.url || '',
+      profileOf: (name) => profiles.get(name),
+      isOnline: (name) => online.has(name),
+      infoOf: (name) => peopleInfo.get(name) || { subteams: [], responsibilities: [], title: '', color: '' },
+    }),
+    [profiles, online, peopleInfo],
+  );
+  const openPerson = useCallback((name) => setProfileFor(name), []);
+
+  // Heartbeat: this device is online while the app is open and visible.
+  useEffect(() => {
+    const beat = () => store.setPresence(actor, { at: document.visibilityState === 'visible' ? Date.now() : 0 }).catch(() => {});
+    beat();
+    const t = setInterval(() => document.visibilityState === 'visible' && beat(), 60000);
+    document.addEventListener('visibilitychange', beat);
+    window.addEventListener('pagehide', beat);
+    return () => {
+      clearInterval(t);
+      document.removeEventListener('visibilitychange', beat);
+      window.removeEventListener('pagehide', beat);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [store, actor.uid, actor.name]);
+
+  // Notification settings per conversation (announcements and DMs default to all).
+  const levelOf = useCallback(
+    (c) => {
+      const saved = profiles.get(actor.name)?.notify?.[c.key];
+      const fallback = c.kind === 'dm' || c.announce ? 'all' : 'mentions';
+      return { value: saved || fallback, isDefault: !saved || saved === fallback };
+    },
+    [profiles, actor.name],
+  );
+
+  // The rules recognize renamed people through settings/names, so make sure
+  // the renames built into config.js are there too.
+  useEffect(() => {
+    if (!actor.admin || store.mode === 'demo') return;
+    const missing = Object.entries(RENAMED).filter(([from]) => !(from in (renames || {})));
+    if (missing.length) store.mergeRenames(Object.fromEntries(missing)).catch((e) => console.warn('renames', e));
+  }, [actor.admin, renames, store]);
+
+  // Unread chat: other people's messages newer than what this device has read.
+  // On first use everything already there counts as read.
+  useEffect(() => {
+    // First use, or a channel added since: start it as "read up to now". A new
+    // DM starts unread, so its first message shows up.
+    const keys = [...convs.channels, ...convs.dms];
+    if (chatRead === null) setChatRead(Object.fromEntries(keys.map((c) => [c.key, c.kind === 'dm' ? (c.createdAt || 1) - 1 : Date.now()])));
+    else if (keys.some((c) => !(c.key in chatRead))) {
+      setChatRead({ ...Object.fromEntries(keys.map((c) => [c.key, c.kind === 'dm' ? (c.createdAt || 1) - 1 : Date.now()])), ...chatRead });
+    }
+  }, [chatRead, setChatRead, convs]);
+  const unread = useMemo(() => {
+    const out = {};
+    const myRoles = peopleInfo.get(actor.name)?.subteams || [];
+    for (const c of [...convs.channels, ...convs.dms]) {
+      const since = chatRead?.[c.key] ?? Date.now();
+      const fresh = (chat[c.key] || []).filter((m) => m.at > since && m.byUid !== actor.uid && !m.deleted);
+      // Announcements and DMs always count as important (red), like a mention.
+      const important =
+        c.announce || c.kind === 'dm'
+          ? fresh.length
+          : fresh.filter((m) => (m.mentions || []).includes(actor.name) || m.everyone || (m.roles || []).some((r) => myRoles.includes(r)))
+              .length;
+      const muted = levelOf(c).value === 'none';
+      out[c.key] = { count: fresh.length, mentions: important, muted };
+    }
+    return out;
+  }, [chat, chatRead, actor.uid, actor.name, convs, levelOf, peopleInfo]);
+  // Muted conversations don't count toward the Chat tab badge (mentions still do).
+  const unreadTotal = Object.values(unread).reduce((s, u) => s + (u.muted ? u.mentions : u.count), 0);
+  // Newest unread announcement from someone else, shown as a banner on the board.
+  const announcement = useMemo(() => {
+    const since = chatRead?.announcements ?? Date.now();
+    const fresh = (chat.announcements || []).filter((m) => m.at > since && m.byUid !== actor.uid && !m.deleted);
+    return fresh[fresh.length - 1] || null;
+  }, [chat, chatRead, actor.uid]);
+  const unreadMentions = Object.values(unread).reduce((s, u) => s + u.mentions, 0);
+
+  // Mark the open channel read while it's on screen.
+  useEffect(() => {
+    if (view !== 'chat' || !chatRead) return;
+    const markRead = () => {
+      if (document.visibilityState !== 'visible') return;
+      const key = currentConv?.key;
+      const msgs = chat[key] || [];
+      const newest = msgs.length ? msgs[msgs.length - 1].at : 0;
+      if (key && newest > (chatRead[key] || 0)) setChatRead({ ...chatRead, [key]: newest });
+    };
+    markRead();
+    document.addEventListener('visibilitychange', markRead);
+    return () => document.removeEventListener('visibilitychange', markRead);
+  }, [view, chat, currentConv, chatRead, setChatRead]);
+
   // Lets api.create see the current filters without rebuilding api on every change.
   const filterState = useRef();
   filterState.current = { filters, view, taskView };
   const tasksRef = useRef(allTasks);
   tasksRef.current = allTasks;
+  const dmsRef = useRef(dmDocs);
+  dmsRef.current = dmDocs;
+  const typingSent = useRef(0);
   const milestonesRef = useRef(milestones);
   milestonesRef.current = milestones;
 
@@ -398,6 +552,7 @@ export default function Workspace({ store, actor, rename, renames }) {
               tasks: (tasksRef.current || []).filter((t) => t.assignees?.includes(oldName)),
               milestones: milestonesRef.current.filter((m) => m.owners?.includes(oldName)),
               role,
+              dms: dmsRef.current.filter((d) => d.people?.includes(oldName)),
             },
             actor,
           )
@@ -436,7 +591,33 @@ export default function Workspace({ store, actor, rename, renames }) {
       deleteRobotPin: (id) => store.deleteRobotPin(id).catch(fail),
       saveRobotLayout: (data) => store.saveRobotLayout(data, actor).catch(fail),
       deleteRobotLayout: (id) => store.deleteRobotLayout(id).catch(fail),
-      sendMessage: (channel, data, photoFiles) => store.sendMessage(channel, data, actor, photoFiles).catch(fail),
+      sendMessage: (conv, data, photoFiles) => {
+        store.setPresence(actor, { typing: '', typingAt: 0 }).catch(() => {});
+        typingSent.current = 0;
+        return store.sendMessage(conv, data, actor, photoFiles).catch(fail);
+      },
+      // "Typing…": at most one write every 3 seconds.
+      typing: (conv) => {
+        if (Date.now() - typingSent.current < 3000) return;
+        typingSent.current = Date.now();
+        store.setPresence(actor, { typing: conv, typingAt: Date.now(), at: Date.now() }).catch(() => {});
+      },
+      vote: (conv, msg, optionId, on) => store.vote(conv, msg, optionId, actor, on).catch(fail),
+      pin: (conv, id, on) => store.pin(conv, id, on, actor).catch(fail),
+      subscribePins: (conv, cb) => store.subscribePins(conv, cb, fail),
+      hidePreview: (conv, id) => store.hidePreview(conv, id).catch(fail),
+      recentMessages: (conv, count) =>
+        store.recentMessages(conv, count).catch((e) => {
+          console.warn('search', conv, e);
+          return [];
+        }),
+      saveChannel: (id, data) => store.saveChannel(id, data, actor).catch(fail),
+      openDm: (names, name) => store.openDm(names, actor, name).catch((e) => (fail(e), null)),
+      saveProfile: (name, patch) => store.saveProfile(name, patch).catch(fail),
+      uploadAvatar: (name, blob, oldPath) => store.uploadAvatar(name, blob, oldPath).catch(fail),
+      removeAvatar: (name, oldPath) => store.removeAvatar(name, oldPath).catch(fail),
+      addEmoji: (name, file) => store.addEmoji(name, file, actor),
+      deleteEmoji: (e) => store.deleteEmoji(e).catch(fail),
       editMessage: (channel, id, patch) => store.editMessage(channel, id, patch).catch(fail),
       uploadChatGif: (channel, file) => store.uploadChatGif(channel, file).catch((e) => (fail(e), null)),
       deleteMessage: (channel, m) => store.deleteMessage(channel, m).catch(fail),
@@ -506,301 +687,338 @@ export default function Workspace({ store, actor, rename, renames }) {
   const anyFilter = filters.q || filters.person || filters.subteam || filters.priority || filters.statuses.length || filters.hideDone;
 
   return (
-    <div className={`app${view === 'chat' || view === 'robot' ? ' chat-mode' : ''}`}>
-      {store.mode === 'demo' && (
-        <div className="demo-banner">
-          Demo mode — sample data saved only in this browser. <a href="./">Go to the real board</a>
-        </div>
-      )}
-      <header className="topbar">
-        <button className="brand" onClick={() => setCat(true)}>
-          <span className="logo-mark">✓</span>
-          <span className="brand-text">
-            {TEAM_NAME} <span className="muted">Tasks</span>
-          </span>
-        </button>
-        <nav className="tabs" role="tablist" ref={tabsRef}>
-          {views.map(([id, label]) => (
-            <button key={id} role="tab" aria-selected={view === id} className={view === id ? 'active' : ''} onClick={() => setView(id)}>
-              {label}
-              {id === 'chat' && unreadTotal > 0 && (
-                <span className={`tab-badge${unreadMentions ? ' mention' : ''}`} aria-label={`${unreadTotal} unread`}>
-                  {unreadTotal > 99 ? '99+' : unreadTotal}
-                </span>
-              )}
+    <PeopleContext.Provider value={peopleCtx}>
+      <div className={`app${view === 'chat' || view === 'robot' ? ' chat-mode' : ''}`}>
+        {store.mode === 'demo' && (
+          <div className="demo-banner">
+            Demo mode — sample data saved only in this browser. <a href="./">Go to the real board</a>
+          </div>
+        )}
+        <header className="topbar">
+          <button className="brand" onClick={() => setCat(true)}>
+            <span className="logo-mark">✓</span>
+            <span className="brand-text">
+              {TEAM_NAME} <span className="muted">Tasks</span>
+            </span>
+          </button>
+          <nav className="tabs" role="tablist" ref={tabsRef}>
+            {views.map(([id, label]) => (
+              <button key={id} role="tab" aria-selected={view === id} className={view === id ? 'active' : ''} onClick={() => setView(id)}>
+                {label}
+                {id === 'chat' && unreadTotal > 0 && (
+                  <span className={`tab-badge${unreadMentions ? ' mention' : ''}`} aria-label={`${unreadTotal} unread`}>
+                    {unreadTotal > 99 ? '99+' : unreadTotal}
+                  </span>
+                )}
+              </button>
+            ))}
+          </nav>
+          <div className="topbar-right">
+            <Countdown date={competitionDate} />
+            <Inbox
+              items={inbox}
+              pushStatus={pushStatus}
+              onEnablePush={enablePush}
+              onDisablePush={disablePush}
+              onOpen={goTo}
+              onMarkRead={(ids) => store.markInboxRead(actor.name, ids).catch(fail)}
+              onClear={(ids) => store.clearInbox(actor.name, ids).catch(fail)}
+            />
+            <button className="icon-btn help-btn" title="Help" aria-label="Help" onClick={() => setShowHelp(true)}>
+              ?
             </button>
-          ))}
-        </nav>
-        <div className="topbar-right">
-          <Countdown date={competitionDate} />
-          <Inbox
-            items={inbox}
+            <button
+              className="icon-btn"
+              title={`Theme: ${theme}`}
+              onClick={() => setTheme(theme === 'dark' ? 'light' : theme === 'light' ? 'system' : 'dark')}
+            >
+              <ThemeIcon theme={theme} />
+            </button>
+            <div className="user-chip">
+              <button className="avatar-btn" onClick={() => setProfileFor(actor.name)} title="Your profile" aria-label="Your profile">
+                <Avatar name={actor.name} size={30} />
+              </button>
+              <span className="user-name">{actor.name.split(' ')[0]}</span>
+              <button
+                className="link-btn"
+                title="Not you? Switch to a different name (needs the team code again)"
+                onClick={() => confirm('Switch user? You will need the team code again on this device.') && store.leave()}
+              >
+                Switch
+              </button>
+            </div>
+          </div>
+        </header>
+
+        {taskView && announcement && (
+          <div className="announce-banner" role="status">
+            <span className="announce-icon">📣</span>
+            <div className="grow">
+              <b>{announcement.by.split(' ')[0]}:</b> {announcement.text || (announcement.gif ? 'sent a GIF' : 'shared a photo')}
+            </div>
+            <button
+              className="btn small-btn"
+              onClick={() => {
+                setChatChannel('announcements');
+                setView('chat');
+              }}
+            >
+              Open
+            </button>
+            <button
+              className="icon-btn small"
+              aria-label="Dismiss"
+              onClick={() => setChatRead({ ...chatRead, announcements: announcement.at })}
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
+        {taskView && (
+          <div className="toolbar">
+            <input
+              className="search"
+              type="search"
+              placeholder="Search tasks…"
+              value={filters.q}
+              onChange={(e) => setF({ q: e.target.value })}
+            />
+            <div className="filters">
+              <button
+                className={`chip${filters.person === '__me' ? ' on' : ''}`}
+                onClick={() => setF({ person: filters.person === '__me' ? '' : '__me' })}
+              >
+                My tasks
+              </button>
+              <select className="filter" value={filters.person} onChange={(e) => setF({ person: e.target.value })} aria-label="Person">
+                <option value="">Everyone</option>
+                <option value="__me">Me ({actor.name.split(' ')[0]})</option>
+                <option value="__none">Unassigned</option>
+                {roster.map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+              </select>
+              <select className="filter" value={filters.subteam} onChange={(e) => setF({ subteam: e.target.value })} aria-label="Subteam">
+                <option value="">All subteams</option>
+                {SUBTEAMS.map((s) => (
+                  <option key={s}>{s}</option>
+                ))}
+              </select>
+              <select
+                className="filter"
+                value={filters.priority}
+                onChange={(e) => setF({ priority: e.target.value })}
+                aria-label="Priority"
+              >
+                <option value="">Any priority</option>
+                {PRIORITIES.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.label}
+                  </option>
+                ))}
+              </select>
+              <button className={`chip${filters.hideDone ? ' on' : ''}`} onClick={() => setF({ hideDone: !filters.hideDone })}>
+                Hide done
+              </button>
+              {anyFilter ? (
+                <button className="link-btn" onClick={() => setFilters(EMPTY_FILTERS)}>
+                  Clear
+                </button>
+              ) : null}
+              {trash.length > 0 && (
+                <button className="chip trash-chip" onClick={() => setShowTrash(true)}>
+                  🗑 Recently deleted ({trash.length})
+                </button>
+              )}
+            </div>
+            <span className="spacer" />
+            <button className="btn primary" onClick={() => setNewTask({ status: 'todo' })}>
+              <PlusIcon /> New task
+            </button>
+          </div>
+        )}
+
+        {view === 'table' && (
+          <div className="status-strip">
+            {STATUSES.map((s) => {
+              const on = filters.statuses.includes(s.id);
+              return (
+                <button
+                  key={s.id}
+                  className={`status-count${on ? ' on' : ''}`}
+                  style={{ '--c': s.color }}
+                  onClick={() => setF({ statuses: on ? filters.statuses.filter((x) => x !== s.id) : [...filters.statuses, s.id] })}
+                >
+                  <span className="dot" />
+                  {s.short || s.label}
+                  <strong>{counts[s.id]}</strong>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {tasks === null ? (
+          <main className="content">
+            {tasksError ? (
+              <div className="empty-card">
+                <h2>Couldn't load tasks</h2>
+                <p className="muted">{tasksError}</p>
+                <button className="btn primary" onClick={() => location.reload()}>
+                  Reload
+                </button>
+              </div>
+            ) : (
+              <p className="empty">Loading…</p>
+            )}
+          </main>
+        ) : view === 'milestones' ? (
+          <MilestonesView
+            milestones={milestones}
+            competitionDate={competitionDate}
+            isManager={actor.admin}
+            tasks={tasks}
+            roster={roster}
+            api={api}
+            onOpenTask={setOpenId}
+            onAddTask={(m) => setNewTask({ status: 'todo', milestoneId: m.id, subteam: m.subteam || '' })}
+          />
+        ) : view === 'parts' ? (
+          <PartsView parts={parts} tasks={tasks} api={api} onOpenTask={setOpenId} />
+        ) : view === 'checklists' ? (
+          <ChecklistsView checklists={checklists} api={api} isManager={actor.admin} />
+        ) : view === 'chat' ? (
+          <ChatView
+            convs={convs}
+            current={currentConv}
+            setCurrent={setChatChannel}
+            messages={chat}
+            unread={unread}
+            readAt={chatRead || {}}
+            actor={actor}
+            isManager={actor.admin}
+            roster={roster}
+            tasks={tasks}
+            api={api}
+            teamEmoji={teamEmoji}
+            typing={typingIn(currentConv.key)}
+            levelOf={levelOf}
+            setLevel={(c, v) => api.saveProfile(actor.name, { notify: { [c.key]: v } })}
+            onPerson={openPerson}
+            onOpenTask={setOpenId}
+            onMakeTask={(m, c) =>
+              setNewTask({
+                status: 'todo',
+                subteam: c.subteam || '',
+                title: (m.text || m.poll?.question || 'Follow up on chat photo').replace(/\s+/g, ' ').slice(0, 90),
+                description: `From ${c.label}, ${m.by}: ${m.text || m.poll?.question || '(photo)'}`,
+              })
+            }
+          />
+        ) : view === 'robot' ? (
+          <Suspense
+            fallback={
+              <main className="content">
+                <p className="empty">Loading the 3D viewer…</p>
+              </main>
+            }
+          >
+            <RobotView
+              robot={robot}
+              tasks={tasks}
+              parts={parts}
+              actor={actor}
+              isManager={actor.admin}
+              api={api}
+              theme={theme}
+              onOpenTask={setOpenId}
+              onMakeTask={(data) => setNewTask({ status: 'todo', ...data })}
+            />
+          </Suspense>
+        ) : view === 'runs' ? (
+          <RunsView runs={runs} roster={roster} api={api} />
+        ) : view === 'team' ? (
+          <TeamView roster={roster} roles={roles} tasks={tasks} api={api} isManager={actor.admin} rename={rename} />
+        ) : (
+          <main className="content">
+            {view === 'table' ? (
+              <TableView tasks={filtered} api={api} onOpen={setOpenId} total={tasks.length} />
+            ) : (
+              <BoardView tasks={filtered} milestones={milestones} api={api} onOpen={setOpenId} onAdd={(status) => setNewTask({ status })} />
+            )}
+          </main>
+        )}
+
+        {openTask && (
+          <TaskPanel task={openTask} api={api} roster={roster} milestones={milestones} parts={parts} onClose={() => setOpenId(null)} />
+        )}
+        {newTask && (
+          <NewTaskDialog
+            initial={newTask}
+            roster={roster}
+            milestones={milestones}
+            me={actor.name}
+            onClose={() => setNewTask(null)}
+            onCreate={async (data) => {
+              setNewTask(null);
+              await api.create(data);
+            }}
+          />
+        )}
+        {showTrash && <TrashDialog trash={trash} days={TRASH_DAYS} isManager={actor.admin} api={api} onClose={() => setShowTrash(false)} />}
+        {!welcomed && (
+          <WelcomeCard
+            name={actor.name}
+            showRobot={showRobot}
             pushStatus={pushStatus}
             onEnablePush={enablePush}
-            onDisablePush={disablePush}
-            onOpen={goTo}
-            onMarkRead={(ids) => store.markInboxRead(actor.name, ids).catch(fail)}
-            onClear={(ids) => store.clearInbox(actor.name, ids).catch(fail)}
+            onClose={() => setWelcomed(true)}
           />
-          <button className="icon-btn help-btn" title="Help" aria-label="Help" onClick={() => setShowHelp(true)}>
-            ?
-          </button>
-          <button
-            className="icon-btn"
-            title={`Theme: ${theme}`}
-            onClick={() => setTheme(theme === 'dark' ? 'light' : theme === 'light' ? 'system' : 'dark')}
-          >
-            <ThemeIcon theme={theme} />
-          </button>
-          <div className="user-chip">
-            <Avatar name={actor.name} size={30} />
-            <span className="user-name">{actor.name.split(' ')[0]}</span>
-            <button
-              className="link-btn"
-              title="Not you? Switch to a different name (needs the team code again)"
-              onClick={() => confirm('Switch user? You will need the team code again on this device.') && store.leave()}
-            >
-              Switch
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {taskView && announcement && (
-        <div className="announce-banner" role="status">
-          <span className="announce-icon">📣</span>
-          <div className="grow">
-            <b>{announcement.by.split(' ')[0]}:</b> {announcement.text || (announcement.gif ? 'sent a GIF' : 'shared a photo')}
-          </div>
-          <button
-            className="btn small-btn"
-            onClick={() => {
-              setChatChannel('announcements');
-              setView('chat');
-            }}
-          >
-            Open
-          </button>
-          <button
-            className="icon-btn small"
-            aria-label="Dismiss"
-            onClick={() => setChatRead({ ...chatRead, announcements: announcement.at })}
-          >
-            ✕
-          </button>
-        </div>
-      )}
-
-      {taskView && (
-        <div className="toolbar">
-          <input
-            className="search"
-            type="search"
-            placeholder="Search tasks…"
-            value={filters.q}
-            onChange={(e) => setF({ q: e.target.value })}
-          />
-          <div className="filters">
-            <button
-              className={`chip${filters.person === '__me' ? ' on' : ''}`}
-              onClick={() => setF({ person: filters.person === '__me' ? '' : '__me' })}
-            >
-              My tasks
-            </button>
-            <select className="filter" value={filters.person} onChange={(e) => setF({ person: e.target.value })} aria-label="Person">
-              <option value="">Everyone</option>
-              <option value="__me">Me ({actor.name.split(' ')[0]})</option>
-              <option value="__none">Unassigned</option>
-              {roster.map((n) => (
-                <option key={n} value={n}>
-                  {n}
-                </option>
-              ))}
-            </select>
-            <select className="filter" value={filters.subteam} onChange={(e) => setF({ subteam: e.target.value })} aria-label="Subteam">
-              <option value="">All subteams</option>
-              {SUBTEAMS.map((s) => (
-                <option key={s}>{s}</option>
-              ))}
-            </select>
-            <select className="filter" value={filters.priority} onChange={(e) => setF({ priority: e.target.value })} aria-label="Priority">
-              <option value="">Any priority</option>
-              {PRIORITIES.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.label}
-                </option>
-              ))}
-            </select>
-            <button className={`chip${filters.hideDone ? ' on' : ''}`} onClick={() => setF({ hideDone: !filters.hideDone })}>
-              Hide done
-            </button>
-            {anyFilter ? (
-              <button className="link-btn" onClick={() => setFilters(EMPTY_FILTERS)}>
-                Clear
-              </button>
-            ) : null}
-            {trash.length > 0 && (
-              <button className="chip trash-chip" onClick={() => setShowTrash(true)}>
-                🗑 Recently deleted ({trash.length})
+        )}
+        {showHelp && <HelpDialog isManager={actor.admin} showRobot={showRobot} onClose={() => setShowHelp(false)} />}
+        {cat && <CatParty onClose={() => setCat(false)} />}
+        {toast && (
+          <div className="toast" role="alert" onClick={() => setToast(null)}>
+            <span>{toast.text}</span>
+            {toast.action && (
+              <button
+                className="toast-action"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toast.action.run();
+                  setToast(null);
+                }}
+              >
+                {toast.action.label}
               </button>
             )}
           </div>
-          <span className="spacer" />
-          <button className="btn primary" onClick={() => setNewTask({ status: 'todo' })}>
-            <PlusIcon /> New task
-          </button>
-        </div>
-      )}
-
-      {view === 'table' && (
-        <div className="status-strip">
-          {STATUSES.map((s) => {
-            const on = filters.statuses.includes(s.id);
-            return (
-              <button
-                key={s.id}
-                className={`status-count${on ? ' on' : ''}`}
-                style={{ '--c': s.color }}
-                onClick={() => setF({ statuses: on ? filters.statuses.filter((x) => x !== s.id) : [...filters.statuses, s.id] })}
-              >
-                <span className="dot" />
-                {s.short || s.label}
-                <strong>{counts[s.id]}</strong>
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      {tasks === null ? (
-        <main className="content">
-          {tasksError ? (
-            <div className="empty-card">
-              <h2>Couldn't load tasks</h2>
-              <p className="muted">{tasksError}</p>
-              <button className="btn primary" onClick={() => location.reload()}>
-                Reload
-              </button>
-            </div>
-          ) : (
-            <p className="empty">Loading…</p>
-          )}
-        </main>
-      ) : view === 'milestones' ? (
-        <MilestonesView
-          milestones={milestones}
-          competitionDate={competitionDate}
-          isManager={actor.admin}
-          tasks={tasks}
-          roster={roster}
-          api={api}
-          onOpenTask={setOpenId}
-          onAddTask={(m) => setNewTask({ status: 'todo', milestoneId: m.id, subteam: m.subteam || '' })}
-        />
-      ) : view === 'parts' ? (
-        <PartsView parts={parts} tasks={tasks} api={api} onOpenTask={setOpenId} />
-      ) : view === 'checklists' ? (
-        <ChecklistsView checklists={checklists} api={api} isManager={actor.admin} />
-      ) : view === 'chat' ? (
-        <ChatView
-          channel={CHANNELS.some((c) => c.id === chatChannel) ? chatChannel : 'general'}
-          setChannel={setChatChannel}
-          messages={chat}
-          unread={unread}
-          actor={actor}
-          isManager={actor.admin}
-          roster={roster}
-          tasks={tasks}
-          api={api}
-          onOpenTask={setOpenId}
-          onMakeTask={(m, ch) =>
-            setNewTask({
-              status: 'todo',
-              subteam: ch.subteam || '',
-              title: (m.text || 'Follow up on chat photo').replace(/\s+/g, ' ').slice(0, 90),
-              description: `From #${ch.id}, ${m.by}: ${m.text || '(photo)'}`,
-            })
-          }
-        />
-      ) : view === 'robot' ? (
-        <Suspense
-          fallback={
-            <main className="content">
-              <p className="empty">Loading the 3D viewer…</p>
-            </main>
-          }
-        >
-          <RobotView
-            robot={robot}
-            tasks={tasks}
-            parts={parts}
+        )}
+        {profileFor && (
+          <ProfileCard
+            name={profileFor}
             actor={actor}
-            isManager={actor.admin}
-            api={api}
-            theme={theme}
-            onOpenTask={setOpenId}
-            onMakeTask={(data) => setNewTask({ status: 'todo', ...data })}
+            tasks={tasks || []}
+            onClose={() => setProfileFor(null)}
+            onEdit={() => {
+              setEditProfileFor(profileFor);
+              setProfileFor(null);
+            }}
+            onMessage={async () => {
+              const key = await api.openDm([actor.name, profileFor]);
+              setProfileFor(null);
+              if (key) {
+                setChatChannel(key);
+                setView('chat');
+              }
+            }}
           />
-        </Suspense>
-      ) : view === 'runs' ? (
-        <RunsView runs={runs} roster={roster} api={api} />
-      ) : view === 'team' ? (
-        <TeamView roster={roster} roles={roles} tasks={tasks} api={api} isManager={actor.admin} rename={rename} />
-      ) : (
-        <main className="content">
-          {view === 'table' ? (
-            <TableView tasks={filtered} api={api} onOpen={setOpenId} total={tasks.length} />
-          ) : (
-            <BoardView tasks={filtered} milestones={milestones} api={api} onOpen={setOpenId} onAdd={(status) => setNewTask({ status })} />
-          )}
-        </main>
-      )}
-
-      {openTask && (
-        <TaskPanel task={openTask} api={api} roster={roster} milestones={milestones} parts={parts} onClose={() => setOpenId(null)} />
-      )}
-      {newTask && (
-        <NewTaskDialog
-          initial={newTask}
-          roster={roster}
-          milestones={milestones}
-          me={actor.name}
-          onClose={() => setNewTask(null)}
-          onCreate={async (data) => {
-            setNewTask(null);
-            await api.create(data);
-          }}
-        />
-      )}
-      {showTrash && <TrashDialog trash={trash} days={TRASH_DAYS} isManager={actor.admin} api={api} onClose={() => setShowTrash(false)} />}
-      {!welcomed && (
-        <WelcomeCard
-          name={actor.name}
-          showRobot={showRobot}
-          pushStatus={pushStatus}
-          onEnablePush={enablePush}
-          onClose={() => setWelcomed(true)}
-        />
-      )}
-      {showHelp && <HelpDialog isManager={actor.admin} showRobot={showRobot} onClose={() => setShowHelp(false)} />}
-      {cat && <CatParty onClose={() => setCat(false)} />}
-      {toast && (
-        <div className="toast" role="alert" onClick={() => setToast(null)}>
-          <span>{toast.text}</span>
-          {toast.action && (
-            <button
-              className="toast-action"
-              onClick={(e) => {
-                e.stopPropagation();
-                toast.action.run();
-                setToast(null);
-              }}
-            >
-              {toast.action.label}
-            </button>
-          )}
-        </div>
-      )}
-    </div>
+        )}
+        {editProfileFor && <ProfileEditor name={editProfileFor} actor={actor} api={api} onClose={() => setEditProfileFor(null)} />}
+      </div>
+    </PeopleContext.Provider>
   );
 }

@@ -66,9 +66,14 @@ const SECTIONS = [
     'Chat',
     [
       '📣 #announcements is for news from team management; everyone can read it, only they can post. New announcements also show at the top of the board.',
-      '#general is for everyone; each subteam has its own channel. A number on the Chat tab means unread messages (red means someone @mentioned you or there’s a new announcement).',
-      'Type @ to mention someone and # to link a task. Tap 📷 to send a photo, or GIF to search for a GIF or upload your own.',
-      'Tap (or hover over) a message to react, reply, edit or delete your own, or turn it into a task with +Task.',
+      '#general is for everyone; each subteam has its own channel. A number means unread messages (red means someone @mentioned you, your subteam, or @everyone).',
+      'Type @ to mention someone, @Programming (or any subteam) to ping that subteam, # to link a task, and : for emoji (like :fire:).',
+      'Tap Aa for text styles: bold, italic, underline, strikethrough, big/medium/small headings, small gray text, quotes, lists, code, and ||spoilers|| (hidden until tapped). You can also type them: **bold**, *italic*, __underline__, ~~strike~~, # Big, ## Medium, ### Small, -# small text, > quote.',
+      'Tap 📷 for a photo, GIF for GIFs, 📊 for a poll, and 😊 for every emoji (on a phone these are under ＋). Pasting a picture works too. Links show a preview, and YouTube videos play right in the chat.',
+      'Tap (or hover over) a message to react, reply, 📌 pin it, edit or delete your own, or turn it into a task with +Task. 📌 at the top shows the channel’s pinned messages; 🔍 searches messages.',
+      '🔔 at the top of a channel: All messages, Only @mentions (the default), or Nothing. Announcements and DMs default to All.',
+      'Direct messages: tap ＋ next to Direct messages (or Message on someone’s profile) to message one person or a group. Team management can read DMs.',
+      'Tap anyone’s name or picture for their profile. Tap your own picture (top right) to add a profile picture or a status like “🔧 At the shop”. A green dot means they have the app open; you’ll see when someone is typing.',
     ],
   ],
   [
@@ -107,7 +112,10 @@ const MANAGER_TIPS = [
   'Team tab: Edit anyone’s role, subteams, responsibilities, and name. Add or remove people.',
   'Milestones tab: Change the competition date, and delete milestones.',
   'Delete checklists, and permanently delete tasks from Recently deleted.',
-  'Chat: post in #announcements (everyone gets a notification), delete any message, and remove reactions (🚫☺ on a message).',
+  'Chat: post in #announcements (everyone gets a notification), use @everyone, delete any message, and remove reactions (🚫☺ on a message).',
+  'Channels: ＋ next to Channels adds one; ⚙ on a channel renames it, sets its topic and subteam color, moves it up or down, or deletes it.',
+  'Team emoji: open 😊 and tap ＋ under Team emoji to add your own (:name:), or remove them.',
+  'DMs: you can read every DM (under Team DMs) but can’t post in other people’s. You can change anyone’s profile picture from their profile.',
 ];
 
 function TipList({ showRobot }) {

@@ -1,78 +1,16 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { CHANNELS, GIPHY_API_KEY, SUBTEAM_COLORS } from '../config.js';
-import { preparePhoto } from '../util.js';
-import { Avatar, CloseIcon, StatusDot } from './common.jsx';
+import { SUBTEAMS, SUBTEAM_COLORS } from '../config.js';
+import { Avatar, usePeople } from './common.jsx';
 import PhotoViewer from './PhotoViewer.jsx';
+import Composer from './chat/Composer.jsx';
+import Message from './chat/Message.jsx';
+import { mentionPattern } from './chat/format.jsx';
+import { EmojiManager } from './chat/Pickers.jsx';
+import { ChannelDialog, ChannelIcon, MembersPanel, NewDmDialog, NotifyMenu, PinsPanel, SearchPanel, slugChannel } from './chat/Panels.jsx';
 
-const QUICK_REACTIONS = ['👍', '✅', '😂', '❤️', '🔥', '👀'];
-const MORE_EMOJIS = [
-  '😀',
-  '😄',
-  '😁',
-  '😅',
-  '🤣',
-  '😊',
-  '😍',
-  '🥳',
-  '😎',
-  '🤔',
-  '😮',
-  '😢',
-  '😭',
-  '😤',
-  '😬',
-  '🙃',
-  '🙌',
-  '👏',
-  '💪',
-  '🙏',
-  '👌',
-  '🤝',
-  '✌️',
-  '👋',
-  '🫡',
-  '🤞',
-  '👎',
-  '💯',
-  '⭐',
-  '✨',
-  '🎉',
-  '🏆',
-  '🥇',
-  '🚀',
-  '⚡',
-  '💥',
-  '🛠️',
-  '🔧',
-  '🔩',
-  '⚙️',
-  '🪛',
-  '🔌',
-  '🔋',
-  '💻',
-  '🤖',
-  '📐',
-  '📏',
-  '📷',
-  '📦',
-  '🧰',
-  '⏰',
-  '📅',
-  '✔️',
-  '❌',
-  '⚠️',
-  '❓',
-  '❗',
-  '🐐',
-  '🐱',
-  '🍕',
-  '☕',
-  '🎯',
-];
 const GROUP_MINUTES = 5;
+const PAGE = 60;
 
-const channelName = (id) => `#${id}`;
-const timeOf = (ms) => new Date(ms).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
 function dayLabel(ms) {
   const d = new Date(ms);
   const today = new Date();
@@ -83,546 +21,76 @@ function dayLabel(ms) {
   return d.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
 }
 
-// Keeps the first character the person typed if it's an emoji.
-function firstEmoji(text) {
-  const t = text.trim();
-  if (!t) return '';
-  const first = typeof Intl.Segmenter === 'function' ? [...new Intl.Segmenter().segment(t)][0].segment : [...t][0];
-  return /\p{Extended_Pictographic}|\p{Regional_Indicator}/u.test(first) ? first : '';
-}
-
-// Splits message text into plain text, @mentions, and links.
-function renderText(text, names, me) {
-  if (!text) return null;
-  const sorted = [...names].sort((a, b) => b.length - a.length).map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
-  const pattern = new RegExp(`(https?://[^\\s]+)${sorted.length ? `|@(${sorted.join('|')})` : ''}`, 'g');
-  const out = [];
-  let last = 0;
-  for (const m of text.matchAll(pattern)) {
-    if (m.index > last) out.push(text.slice(last, m.index));
-    if (m[1]) {
-      out.push(
-        <a key={m.index} href={m[1]} target="_blank" rel="noreferrer">
-          {m[1]}
-        </a>,
-      );
-    } else {
-      out.push(
-        <span key={m.index} className={`mention${m[2] === me ? ' me' : ''}`}>
-          @{m[2]}
-        </span>,
-      );
-    }
-    last = m.index + m[0].length;
-  }
-  if (last < text.length) out.push(text.slice(last));
-  return out;
-}
-
-function EmojiPicker({ onPick, onClose }) {
-  const [typed, setTyped] = useState('');
-  useEffect(() => {
-    const onKey = (e) => e.key === 'Escape' && onClose();
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+function TypingLine({ names }) {
+  if (!names.length) return <div className="typing-line" />;
+  const first = names.map((n) => n.split(' ')[0]);
+  const who = first.length === 1 ? first[0] : first.length === 2 ? `${first[0]} and ${first[1]}` : 'Several people';
   return (
-    <div className="emoji-picker" onClick={(e) => e.stopPropagation()}>
-      <div className="emoji-grid">
-        {[...QUICK_REACTIONS, ...MORE_EMOJIS].map((e) => (
-          <button key={e} onClick={() => onPick(e)} aria-label={`React ${e}`}>
-            {e}
-          </button>
-        ))}
-      </div>
-      <form
-        className="row gap"
-        onSubmit={(e) => {
-          e.preventDefault();
-          const em = firstEmoji(typed);
-          if (em) onPick(em);
-        }}
-      >
-        <input className="input" value={typed} onChange={(e) => setTyped(e.target.value)} placeholder="Or type any emoji" />
-        <button className="btn" disabled={!firstEmoji(typed)}>
-          Add
-        </button>
-      </form>
+    <div className="typing-line" aria-live="polite">
+      <span className="typing-dots">
+        <i />
+        <i />
+        <i />
+      </span>{' '}
+      <b>{who}</b> {first.length === 1 ? 'is' : 'are'} typing…
     </div>
   );
 }
 
-// GIF picker: GIPHY search (G-rated) when a key is set, plus uploading your own.
-function GifPicker({ onPick, onUpload, onClose }) {
-  const [q, setQ] = useState('');
-  const [results, setResults] = useState([]);
-  const [status, setStatus] = useState(GIPHY_API_KEY ? 'loading' : 'off');
-  const upload = useRef(null);
-
-  useEffect(() => {
-    if (!GIPHY_API_KEY) return;
-    const ctrl = new AbortController();
-    const t = setTimeout(
-      async () => {
-        setStatus('loading');
-        const params = new URLSearchParams({ api_key: GIPHY_API_KEY, limit: '24', rating: 'g' });
-        if (q.trim()) params.set('q', q.trim());
-        try {
-          const res = await fetch(`https://api.giphy.com/v1/gifs/${q.trim() ? 'search' : 'trending'}?${params}`, { signal: ctrl.signal });
-          if (!res.ok) throw new Error(String(res.status));
-          const { data } = await res.json();
-          setResults(data);
-          setStatus('ready');
-        } catch (e) {
-          if (e.name !== 'AbortError') setStatus('error');
-        }
-      },
-      q ? 350 : 0,
-    );
-    return () => {
-      clearTimeout(t);
-      ctrl.abort();
-    };
-  }, [q]);
-
-  useEffect(() => {
-    const onKey = (e) => e.key === 'Escape' && onClose();
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
-
-  return (
-    <div className="gif-picker">
-      <div className="row gap">
-        {GIPHY_API_KEY ? (
-          <input className="input grow" autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search GIFs" />
-        ) : (
-          <span className="muted small grow">GIF search turns on once team management adds a GIPHY key. You can still upload a GIF.</span>
-        )}
-        <button className="btn" onClick={() => upload.current?.click()}>
-          Upload GIF
-        </button>
-        <input
-          ref={upload}
-          type="file"
-          accept="image/gif"
-          hidden
-          onChange={(e) => {
-            const f = e.target.files[0];
-            e.target.value = '';
-            if (f) onUpload(f);
-          }}
-        />
-        <button className="icon-btn small" onClick={onClose} aria-label="Close GIFs">
-          <CloseIcon />
-        </button>
-      </div>
-      {GIPHY_API_KEY && (
-        <>
-          <div className="gif-grid">
-            {results.map((g) => (
-              <button
-                key={g.id}
-                onClick={() => {
-                  const img = g.images.downsized || g.images.original;
-                  onPick({ source: 'giphy', id: g.id, title: g.title, url: img.url, width: Number(img.width), height: Number(img.height) });
-                }}
-                aria-label={g.title || 'GIF'}
-              >
-                <img src={g.images.fixed_width_small?.url || g.images.fixed_width.url} alt="" loading="lazy" />
-              </button>
-            ))}
-            {status === 'loading' && !results.length && <p className="muted small">Loading…</p>}
-            {status === 'error' && <p className="muted small">Couldn't reach GIPHY. Check the connection or the API key.</p>}
-            {status === 'ready' && !results.length && <p className="muted small">No GIFs found.</p>}
-          </div>
-          <p className="giphy-credit">Powered by GIPHY</p>
-        </>
-      )}
-    </div>
-  );
-}
-
-function Message({
-  m,
-  first,
-  actor,
-  isManager,
-  names,
-  taskById,
-  selected,
-  onSelect,
-  api,
-  channel,
-  onReply,
-  onEdit,
-  onMakeTask,
-  onOpenTask,
-  onPhoto,
-  canReply,
-}) {
-  const [picker, setPicker] = useState(false);
-  const [removing, setRemoving] = useState(false);
-  const mine = m.byUid === actor.uid;
-  const reactions = Object.entries(m.reactions || {}).filter(([, who]) => who && Object.keys(who).length);
-  const mentionsMe = (m.mentions || []).includes(actor.name);
-  const react = (emoji) => {
-    const on = !(m.reactions?.[emoji] && m.reactions[emoji][actor.uid]);
-    api.react(channel, m.id, emoji, on);
-    setPicker(false);
-  };
-
+function ConvButton({ conv, active, unread, onClick, onSettings, actor }) {
+  const others = conv.kind === 'dm' ? conv.people.filter((n) => n !== actor.name) : [];
   return (
     <div
-      className={`msg${first ? ' first' : ''}${selected ? ' selected' : ''}${mentionsMe ? ' mentions-me' : ''}`}
-      id={`msg-${m.id}`}
-      onClick={(e) => {
-        if (e.target.closest('a,button,input,.emoji-picker')) return;
-        onSelect(selected ? null : m.id);
-      }}
+      className={`conv-row${active ? ' active' : ''}${unread?.muted ? ' muted' : ''}${unread?.count && !unread.muted ? ' has-unread' : ''}`}
     >
-      <div className="msg-gutter">{first ? <Avatar name={m.by} size={34} /> : <span className="msg-time-hover">{timeOf(m.at)}</span>}</div>
-      <div className="msg-body">
-        {first && (
-          <div className="msg-head">
-            <b>{m.by}</b> <span className="muted tiny">{timeOf(m.at)}</span>
-          </div>
-        )}
-        {m.replyTo && (
-          <button
-            className="msg-reply-quote"
-            onClick={() => document.getElementById(`msg-${m.replyTo.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
-          >
-            ↩ <b>{m.replyTo.by?.split(' ')[0]}</b> {m.replyTo.text || 'a photo'}
-          </button>
-        )}
-        {m.deleted ? (
-          <div className="msg-text muted">
-            <i>Message deleted</i>
-          </div>
-        ) : (
-          <>
-            {m.text && (
-              <div className="msg-text">
-                {renderText(m.text, names, actor.name)}
-                {m.editedAt && <span className="muted tiny"> (edited)</span>}
-              </div>
-            )}
-            {m.gif && <img className="msg-gif" src={m.gif.url} alt={m.gif.title || 'GIF'} loading="lazy" />}
-            {m.photo && (
-              <button className="msg-photo" onClick={() => onPhoto(m)} aria-label="Open photo">
-                <img src={m.photo.thumbUrl || m.photo.url} alt="" loading="lazy" />
-              </button>
-            )}
-            {(m.taskIds || []).filter((id) => taskById[id]).length > 0 && (
-              <div className="msg-tasks">
-                {m.taskIds
-                  .filter((id) => taskById[id])
-                  .map((id) => (
-                    <button key={id} className="task-chip" onClick={() => onOpenTask(id)}>
-                      <StatusDot status={taskById[id].status} /> {taskById[id].title}
-                    </button>
-                  ))}
-              </div>
-            )}
-          </>
-        )}
-        {reactions.length > 0 && (
-          <div className="msg-reactions">
-            {reactions.map(([emoji, who]) => (
-              <button
-                key={emoji}
-                className={`reaction${who[actor.uid] ? ' mine' : ''}`}
-                title={Object.values(who).join(', ')}
-                onClick={() => react(emoji)}
-              >
-                {emoji} {Object.keys(who).length}
-              </button>
-            ))}
-          </div>
-        )}
-        {removing && (
-          <div className="msg-reactions remove-mode">
-            <span className="muted small">Remove a reaction:</span>
-            {reactions.map(([emoji]) => (
-              <button
-                key={emoji}
-                className="reaction"
-                onClick={() => {
-                  api.removeReaction(channel, m.id, emoji);
-                  if (reactions.length <= 1) setRemoving(false);
-                }}
-              >
-                {emoji} ✕
-              </button>
-            ))}
-            <button className="link-btn" onClick={() => setRemoving(false)}>
-              Done
-            </button>
-          </div>
-        )}
-      </div>
-      {!m.deleted && (
-        <div className="msg-actions" onClick={(e) => e.stopPropagation()}>
-          {QUICK_REACTIONS.slice(0, 3).map((e) => (
-            <button key={e} onClick={() => react(e)} aria-label={`React ${e}`}>
-              {e}
-            </button>
-          ))}
-          <button onClick={() => setPicker((p) => !p)} aria-label="More reactions" title="More reactions">
-            ☺+
-          </button>
-          {canReply && (
-            <button onClick={() => onReply(m)} title="Reply">
-              ↩
-            </button>
-          )}
-          <button onClick={() => onMakeTask(m)} title="Make a task from this message">
-            ＋Task
-          </button>
-          {mine && (
-            <button onClick={() => onEdit(m)} title="Edit">
-              ✏️
-            </button>
-          )}
-          {isManager && reactions.length > 0 && (
-            <button onClick={() => setRemoving(true)} title="Remove reactions">
-              🚫☺
-            </button>
-          )}
-          {(mine || isManager) && (
-            <button className="danger-text" onClick={() => confirm('Delete this message?') && api.deleteMessage(channel, m)} title="Delete">
-              🗑
-            </button>
-          )}
-          {picker && <EmojiPicker onPick={react} onClose={() => setPicker(false)} />}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function Composer({ channel, actor, roster, tasks, api, replyTo, editing, onDone }) {
-  const [text, setText] = useState('');
-  const [taskIds, setTaskIds] = useState([]);
-  const [photo, setPhoto] = useState(null); // { file, preview }
-  const [suggest, setSuggest] = useState(null); // { kind: '@' | '#', query, start }
-  const [sending, setSending] = useState(false);
-  const [gifs, setGifs] = useState(false);
-  const box = useRef(null);
-  const fileInput = useRef(null);
-  const caretAfterUpdate = useRef(null);
-  // Short placeholder on phones so it fits on one line.
-  const wide = typeof matchMedia === 'function' && matchMedia('(min-width: 761px)').matches;
-
-  useEffect(() => {
-    if (editing) {
-      setText(editing.text || '');
-      setTaskIds(editing.taskIds || []);
-      box.current?.focus();
-    }
-  }, [editing]);
-  useEffect(() => {
-    if (replyTo) box.current?.focus();
-  }, [replyTo]);
-  // Put the cursor after an inserted @name/#task before the next keystroke lands.
-  useLayoutEffect(() => {
-    const pos = caretAfterUpdate.current;
-    if (pos === null || !box.current) return;
-    caretAfterUpdate.current = null;
-    box.current.focus();
-    box.current.setSelectionRange(pos, pos);
-  }, [text]);
-  useEffect(() => {
-    const el = box.current;
-    if (!el) return;
-    el.style.height = 'auto';
-    el.style.height = Math.min(el.scrollHeight, 160) + 'px';
-  }, [text]);
-
-  const options = useMemo(() => {
-    if (!suggest) return [];
-    const q = suggest.query.toLowerCase();
-    if (suggest.kind === '@')
-      return roster
-        .filter(
-          (n) =>
-            n
-              .toLowerCase()
-              .split(' ')
-              .some((w) => w.startsWith(q)) || n.toLowerCase().startsWith(q),
-        )
-        .slice(0, 6);
-    return tasks.filter((t) => (t.title || '').toLowerCase().includes(q)).slice(0, 6);
-  }, [suggest, roster, tasks]);
-
-  const onChange = (e) => {
-    const value = e.target.value;
-    setText(value);
-    const caret = e.target.selectionStart;
-    const m = /(^|\s)([@#])([^\s@#]{0,30})$/.exec(value.slice(0, caret));
-    setSuggest(m ? { kind: m[2], query: m[3], start: caret - m[3].length - 1, end: caret } : null);
-  };
-
-  const pick = (opt) => {
-    const insert = suggest.kind === '@' ? `@${opt} ` : `#${opt.title} `;
-    const next = text.slice(0, suggest.start) + insert + text.slice(suggest.end);
-    setText(next);
-    if (suggest.kind === '#') setTaskIds((ids) => [...new Set([...ids, opt.id])]);
-    setSuggest(null);
-    caretAfterUpdate.current = suggest.start + insert.length;
-  };
-
-  const reset = () => {
-    setText('');
-    setTaskIds([]);
-    setPhoto(null);
-    setSuggest(null);
-    onDone();
-  };
-
-  const replyInfo = () => (replyTo ? { id: replyTo.id, by: replyTo.by, text: (replyTo.text || '').slice(0, 120) } : null);
-
-  // A GIF goes out as its own message (keeping any reply context).
-  const sendGif = async (gif) => {
-    setGifs(false);
-    setSending(true);
-    try {
-      await api.sendMessage(channel, { text: '', mentions: [], taskIds: [], replyTo: replyInfo(), gif });
-      if (replyTo) onDone();
-    } finally {
-      setSending(false);
-    }
-  };
-  const uploadGif = async (file) => {
-    if (file.type !== 'image/gif') return alert('That file is not a GIF.');
-    if (file.size > 8e6) return alert('That GIF is too big (8 MB max).');
-    setGifs(false);
-    setSending(true);
-    try {
-      const img = await createImageBitmap(file).catch(() => null);
-      const stored = await api.uploadChatGif(channel, file);
-      if (stored) await sendGif({ source: 'upload', ...stored, width: img?.width || 0, height: img?.height || 0 });
-    } finally {
-      setSending(false);
-    }
-  };
-
-  const send = async () => {
-    const body = text.trim();
-    if ((!body && !photo) || sending) return;
-    const mentions = roster.filter((n) => body.includes(`@${n}`));
-    const linked = taskIds.filter((id) => tasks.some((t) => t.id === id && body.includes(`#${t.title}`)));
-    setSending(true);
-    try {
-      if (editing) {
-        await api.editMessage(channel, editing.id, { text: body, mentions, taskIds: linked });
-      } else {
-        await api.sendMessage(channel, { text: body, mentions, taskIds: linked, replyTo: replyInfo() }, photo?.file);
-      }
-      reset();
-    } finally {
-      setSending(false);
-    }
-  };
-
-  return (
-    <div className="composer">
-      {(replyTo || editing) && (
-        <div className="composer-context">
-          {editing ? (
-            <span>✏️ Editing your message</span>
+      <button className="conv-main" onClick={onClick}>
+        {conv.kind === 'dm' ? (
+          others.length === 1 ? (
+            <Avatar name={others[0]} size={24} showOnline />
           ) : (
-            <span>
-              ↩ Replying to <b>{replyTo.by.split(' ')[0]}</b>: {replyTo.text?.slice(0, 80) || 'a photo'}
-            </span>
-          )}
-          <button className="icon-btn small" onClick={reset} aria-label="Cancel">
-            <CloseIcon />
-          </button>
-        </div>
-      )}
-      {photo && (
-        <div className="composer-photo">
-          <img src={photo.preview} alt="" />
-          <button className="icon-btn small" onClick={() => setPhoto(null)} aria-label="Remove photo">
-            <CloseIcon />
-          </button>
-        </div>
-      )}
-      {gifs && <GifPicker onPick={sendGif} onUpload={uploadGif} onClose={() => setGifs(false)} />}
-      {suggest && options.length > 0 && (
-        <ul className="suggest">
-          {options.map((o) => (
-            <li key={suggest.kind === '@' ? o : o.id}>
-              <button onMouseDown={(e) => e.preventDefault()} onClick={() => pick(o)}>
-                {suggest.kind === '@' ? (
-                  <>
-                    <Avatar name={o} size={22} /> {o}
-                  </>
-                ) : (
-                  <>
-                    <StatusDot status={o.status} /> {o.title}
-                  </>
-                )}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-      <div className="composer-row">
-        {!editing && (
-          <>
-            <button className="icon-btn" onClick={() => fileInput.current?.click()} aria-label="Add a photo" title="Add a photo">
-              📷
-            </button>
-            <button className="icon-btn gif-btn" onClick={() => setGifs((g) => !g)} aria-label="Add a GIF" title="GIFs">
-              GIF
-            </button>
-            <input
-              ref={fileInput}
-              type="file"
-              accept="image/*"
-              hidden
-              onChange={async (e) => {
-                const f = e.target.files[0];
-                e.target.value = '';
-                if (f) {
-                  const prepared = await preparePhoto(f);
-                  setPhoto({ file: prepared, preview: URL.createObjectURL(prepared.thumb) });
-                }
-              }}
-            />
-          </>
+            <span className="group-dm-icon">👥</span>
+          )
+        ) : (
+          <ChannelIcon conv={conv} />
         )}
-        <textarea
-          ref={box}
-          rows={1}
-          value={text}
-          onChange={onChange}
-          onKeyDown={(e) => {
-            if (suggest && options.length && (e.key === 'Enter' || e.key === 'Tab')) {
-              e.preventDefault();
-              pick(options[0]);
-            } else if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault();
-              send();
-            } else if (e.key === 'Escape') {
-              if (suggest) setSuggest(null);
-              else if (editing || replyTo) reset();
-            }
-          }}
-          placeholder={wide ? `Message ${channelName(channel)}  ·  @ to mention, # to link a task` : `Message ${channelName(channel)}`}
-        />
-        <button className="btn primary" onClick={send} disabled={sending || (!text.trim() && !photo)}>
-          {editing ? 'Save' : sending ? '…' : 'Send'}
+        <span className="grow conv-name">{conv.kind === 'dm' ? conv.short : conv.name}</span>
+        {unread?.muted && (
+          <span className="muted tiny" title="Muted">
+            🔕
+          </span>
+        )}
+        {unread?.count > 0 && !unread.muted && <span className={`unread${unread.mentions ? ' mention' : ''}`}>{unread.count}</span>}
+      </button>
+      {onSettings && (
+        <button className="conv-gear" onClick={onSettings} title={`#${conv.name} settings`} aria-label={`#${conv.name} settings`}>
+          ⚙
         </button>
-      </div>
+      )}
     </div>
   );
 }
 
-export default function ChatView({ channel, setChannel, messages, unread, actor, isManager, roster, tasks, api, onOpenTask, onMakeTask }) {
+export default function ChatView({
+  convs,
+  current,
+  setCurrent,
+  messages,
+  unread,
+  readAt,
+  actor,
+  isManager,
+  roster,
+  tasks,
+  api,
+  teamEmoji,
+  typing,
+  levelOf,
+  setLevel,
+  onPerson,
+  onOpenTask,
+  onMakeTask,
+}) {
+  const people = usePeople();
   const [selected, setSelected] = useState(null);
   const [replyTo, setReplyTo] = useState(null);
   const [editing, setEditing] = useState(null);
@@ -630,23 +98,52 @@ export default function ChatView({ channel, setChannel, messages, unread, actor,
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [viewing, setViewing] = useState(null);
   const [newBelow, setNewBelow] = useState(false);
+  const [side, setSide] = useState(() =>
+    typeof matchMedia === 'function' && matchMedia('(min-width: 1200px)').matches ? 'members' : null,
+  );
+  const [dialog, setDialog] = useState(null); // { type: 'channel', channel? } | { type: 'dm' } | { type: 'emoji' }
+  const [notifyOpen, setNotifyOpen] = useState(false);
+  const [showTeamDms, setShowTeamDms] = useState(false);
+  const [flash, setFlash] = useState(null);
   const list = useRef(null);
   const atBottom = useRef(true);
   const lastCount = useRef(0);
+  const pendingJump = useRef(null);
 
-  const all = useMemo(() => [...(older[channel] || []), ...(messages[channel] || [])], [older, messages, channel]);
+  const conv = current;
+  const all = useMemo(() => [...(older[conv.key] || []), ...(messages[conv.key] || [])], [older, messages, conv.key]);
   const taskById = useMemo(() => Object.fromEntries(tasks.map((t) => [t.id, t])), [tasks]);
-  const names = useMemo(() => [...new Set([...roster, ...all.map((m) => m.by)])], [roster, all]);
+  const emojiMap = useMemo(() => new Map(teamEmoji.map((e) => [e.name, e.url])), [teamEmoji]);
+  const myRoles = people?.infoOf(actor.name)?.subteams || [];
+  const ctx = useMemo(
+    () => ({
+      me: actor.name,
+      mentionRe: mentionPattern(['everyone', ...SUBTEAMS, ...roster, ...all.map((m) => m.by)]),
+      roles: SUBTEAMS,
+      myRoles,
+      everyoneOk: true,
+      roleColor: (s) => SUBTEAM_COLORS[s],
+      emoji: emojiMap,
+      onPerson,
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [actor.name, roster, all, emojiMap, onPerson, myRoles.join()],
+  );
+  // Where "new" starts: what was read when this conversation was opened.
+  const [newSince, setNewSince] = useState(readAt[conv.key] ?? Date.now());
 
-  // Start at the newest message when switching channels.
+  // Start at the newest message when switching conversations.
   useLayoutEffect(() => {
     setSelected(null);
     setReplyTo(null);
     setEditing(null);
     setNewBelow(false);
+    setNotifyOpen(false);
+    setNewSince(readAt[conv.key] ?? Date.now());
     lastCount.current = 0;
     if (list.current) list.current.scrollTop = list.current.scrollHeight;
-  }, [channel]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conv.key]);
 
   // Follow new messages if already at the bottom (or if they're mine).
   useLayoutEffect(() => {
@@ -654,12 +151,21 @@ export default function ChatView({ channel, setChannel, messages, unread, actor,
     if (!el) return;
     const newest = all[all.length - 1];
     const grew = all.length > lastCount.current;
+    const firstLoad = lastCount.current === 0;
     lastCount.current = all.length;
     if (!grew) return;
-    if (atBottom.current || newest?.byUid === actor.uid) {
+    // On opening, show the first unread message near the top (Discord-style).
+    if (firstLoad) {
+      const firstNew = all.find((m) => m.at > newSince && m.byUid !== actor.uid);
+      const node = firstNew && document.getElementById(`msg-${firstNew.id}`);
+      if (node) node.scrollIntoView({ block: 'center' });
+      else el.scrollTop = el.scrollHeight;
+    } else if (atBottom.current || newest?.byUid === actor.uid) {
       el.scrollTop = el.scrollHeight;
       setNewBelow(false);
     } else setNewBelow(true);
+    if (pendingJump.current) jumpTo(pendingJump.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [all, actor.uid]);
 
   const onScroll = () => {
@@ -669,86 +175,282 @@ export default function ChatView({ channel, setChannel, messages, unread, actor,
   };
 
   const loadOlder = async () => {
-    if (!all.length) return;
+    if (!all.length) return [];
     setLoadingOlder(true);
     const el = list.current;
     const before = el.scrollHeight;
-    const more = await api.loadOlderMessages(channel, all[0].at);
-    setOlder((o) => ({ ...o, [channel]: [...more, ...(o[channel] || [])] }));
+    const more = await api.loadOlderMessages(conv.key, all[0].at);
+    setOlder((o) => ({ ...o, [conv.key]: [...more, ...(o[conv.key] || [])] }));
     setLoadingOlder(false);
     requestAnimationFrame(() => (el.scrollTop = el.scrollHeight - before));
+    return more;
   };
 
-  const ch = CHANNELS.find((c) => c.id === channel) || CHANNELS[0];
-  // #announcements: only team management posts (the rules enforce it too).
-  const canPost = !ch.announce || isManager;
+  // Scroll to a message (loading older pages if needed) and flash it.
+  const jumpTo = async (id, tries = 0) => {
+    const node = document.getElementById(`msg-${id}`);
+    if (node) {
+      pendingJump.current = null;
+      node.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setFlash(id);
+      setTimeout(() => setFlash((f) => (f === id ? null : f)), 1800);
+      return;
+    }
+    if (tries >= 6) return;
+    const more = await loadOlder();
+    if (more.length) requestAnimationFrame(() => jumpTo(id, tries + 1));
+  };
+
+  const openAt = (key, id) => {
+    if (key !== conv.key) {
+      pendingJump.current = id;
+      setCurrent(key);
+    } else jumpTo(id);
+    if (typeof matchMedia === 'function' && !matchMedia('(min-width: 1200px)').matches) setSide(null);
+  };
+
+  const myConvs = useMemo(() => [...convs.channels, ...convs.dms], [convs]);
+  const canPost = conv.kind === 'dm' ? conv.mine : !conv.announce || isManager;
+  const level = levelOf(conv);
+  const memberNames = conv.kind === 'dm' ? conv.people : roster;
   let lastDay = '';
+  let newShown = false;
+
+  const moveChannel = (channel, dir) => {
+    const ordered = [...convs.channels];
+    const i = ordered.findIndex((c) => c.id === channel.id);
+    const j = i + dir;
+    if (j < 0 || j >= ordered.length) return;
+    [ordered[i], ordered[j]] = [ordered[j], ordered[i]];
+    ordered.forEach((c, k) => c.order !== k && api.saveChannel(c.id, { order: k }));
+  };
+
+  const sideList = (
+    <>
+      <div className="side-section">
+        <h2>Channels</h2>
+        {isManager && (
+          <button className="side-add" onClick={() => setDialog({ type: 'channel' })} title="New channel" aria-label="New channel">
+            ＋
+          </button>
+        )}
+      </div>
+      {convs.channels.map((c) => (
+        <ConvButton
+          key={c.key}
+          conv={c}
+          actor={actor}
+          active={c.key === conv.key}
+          unread={unread[c.key]}
+          onClick={() => setCurrent(c.key)}
+          onSettings={isManager ? () => setDialog({ type: 'channel', channel: c }) : null}
+        />
+      ))}
+      <div className="side-section">
+        <h2>Direct messages</h2>
+        <button className="side-add" onClick={() => setDialog({ type: 'dm' })} title="New message" aria-label="New direct message">
+          ＋
+        </button>
+      </div>
+      {convs.dms.map((c) => (
+        <ConvButton
+          key={c.key}
+          conv={c}
+          actor={actor}
+          active={c.key === conv.key}
+          unread={unread[c.key]}
+          onClick={() => setCurrent(c.key)}
+        />
+      ))}
+      {!convs.dms.length && <p className="muted tiny side-hint">Tap ＋ to message someone.</p>}
+      {isManager && convs.teamDms.length > 0 && (
+        <>
+          <button className="side-section team-dms-toggle" onClick={() => setShowTeamDms(!showTeamDms)}>
+            <h2>
+              {showTeamDms ? '▾' : '▸'} Team DMs ({convs.teamDms.length})
+            </h2>
+          </button>
+          {showTeamDms &&
+            convs.teamDms.map((c) => (
+              <ConvButton key={c.key} conv={c} actor={actor} active={c.key === conv.key} onClick={() => setCurrent(c.key)} />
+            ))}
+        </>
+      )}
+    </>
+  );
 
   return (
-    <main className="content chat">
-      <aside className="channel-list">
-        <h2>Channels</h2>
-        {CHANNELS.map((c) => (
-          <button key={c.id} className={c.id === channel ? 'active' : ''} onClick={() => setChannel(c.id)}>
-            <span className="hash" style={{ color: SUBTEAM_COLORS[c.subteam] || 'var(--accent)' }}>
-              {c.announce ? '📣' : '#'}
-            </span>
-            <span className="grow">{c.id}</span>
-            {unread[c.id]?.count > 0 && <span className={`unread${unread[c.id].mentions ? ' mention' : ''}`}>{unread[c.id].count}</span>}
-          </button>
-        ))}
-      </aside>
-      <select className="input channel-select" value={channel} onChange={(e) => setChannel(e.target.value)} aria-label="Channel">
-        {CHANNELS.map((c) => (
-          <option key={c.id} value={c.id}>
-            #{c.id}
-            {unread[c.id]?.count ? ` (${unread[c.id].count})` : ''}
-          </option>
-        ))}
-      </select>
+    <main className={`content chat${side ? ' with-side' : ''}`}>
+      <aside className="channel-list">{sideList}</aside>
+      <div className="chat-mobile-bar">
+        <select className="input channel-select" value={conv.key} onChange={(e) => setCurrent(e.target.value)} aria-label="Channel or DM">
+          <optgroup label="Channels">
+            {convs.channels.map((c) => (
+              <option key={c.key} value={c.key}>
+                #{c.name}
+                {unread[c.key]?.count && !unread[c.key].muted ? ` (${unread[c.key].count})` : ''}
+              </option>
+            ))}
+          </optgroup>
+          {convs.dms.length > 0 && (
+            <optgroup label="Direct messages">
+              {convs.dms.map((c) => (
+                <option key={c.key} value={c.key}>
+                  {c.short}
+                  {unread[c.key]?.count ? ` (${unread[c.key].count})` : ''}
+                </option>
+              ))}
+            </optgroup>
+          )}
+          {isManager && convs.teamDms.length > 0 && (
+            <optgroup label="Team DMs (view only)">
+              {convs.teamDms.map((c) => (
+                <option key={c.key} value={c.key}>
+                  {c.short}
+                </option>
+              ))}
+            </optgroup>
+          )}
+        </select>
+        <button className="btn" onClick={() => setDialog({ type: 'dm' })} aria-label="New direct message">
+          ✉️ New
+        </button>
+      </div>
 
       <section className="chat-main">
         <header className="chat-head">
-          <h2>
-            {ch.announce ? '📣 ' : '#'}
-            {ch.id}
-          </h2>
-          <span className="muted small">
-            {ch.announce ? 'Only team management posts here' : ch.subteam ? `${ch.subteam} subteam` : 'The whole team'}
-          </span>
+          <div className="chat-title">
+            {conv.kind === 'dm' ? (
+              <h2>
+                {conv.people.length === 2 ? (
+                  <Avatar name={conv.people.find((n) => n !== actor.name) || conv.people[0]} size={24} showOnline />
+                ) : (
+                  '👥'
+                )}{' '}
+                {conv.label}
+              </h2>
+            ) : (
+              <h2>
+                <ChannelIcon conv={conv} />
+                {conv.name}
+              </h2>
+            )}
+            <span className="muted small chat-topic">
+              {conv.kind === 'dm'
+                ? conv.mine
+                  ? 'Direct message · team management can read DMs'
+                  : '👁 Viewing as team management (only the people in it can post)'
+                : conv.topic ||
+                  (conv.announce ? 'Only team management posts here' : conv.subteam ? `${conv.subteam} subteam` : 'The whole team')}
+            </span>
+          </div>
+          <div className="chat-tools">
+            <button
+              className={`icon-btn${side === 'search' ? ' on' : ''}`}
+              onClick={() => setSide(side === 'search' ? null : 'search')}
+              title="Search"
+              aria-label="Search messages"
+            >
+              🔍
+            </button>
+            <button
+              className={`icon-btn${side === 'pins' ? ' on' : ''}`}
+              onClick={() => setSide(side === 'pins' ? null : 'pins')}
+              title="Pinned messages"
+              aria-label="Pinned messages"
+            >
+              📌
+            </button>
+            {(conv.kind !== 'dm' || conv.mine) && (
+              <span className="notify-wrap">
+                <button
+                  className={`icon-btn notify-btn${notifyOpen ? ' on' : ''}`}
+                  onClick={() => setNotifyOpen(!notifyOpen)}
+                  title="Notification settings"
+                  aria-label="Notification settings"
+                >
+                  {level.value === 'none' ? '🔕' : level.value === 'all' ? '🔔' : '🔔'}
+                  {level.value === 'all' && <span className="notify-all-dot" />}
+                </button>
+                {notifyOpen && (
+                  <NotifyMenu
+                    level={level.value}
+                    isDefault={level.isDefault}
+                    onChange={(v) => {
+                      setLevel(conv, v);
+                      setNotifyOpen(false);
+                    }}
+                    onClose={() => setNotifyOpen(false)}
+                  />
+                )}
+              </span>
+            )}
+            <button
+              className={`icon-btn${side === 'members' ? ' on' : ''}`}
+              onClick={() => setSide(side === 'members' ? null : 'members')}
+              title="Members"
+              aria-label="Members"
+            >
+              👥
+            </button>
+          </div>
         </header>
         <div className="msg-list" ref={list} onScroll={onScroll}>
-          {all.length >= 60 && (
+          {all.length >= PAGE && (
             <button className="btn ghost load-older" onClick={loadOlder} disabled={loadingOlder}>
               {loadingOlder ? 'Loading…' : 'Load older messages'}
             </button>
           )}
-          {!all.length && <p className="empty">No messages in #{ch.id} yet. Say hi! 👋</p>}
+          {!all.length && (
+            <div className="empty conv-empty">
+              {conv.kind === 'dm' ? (
+                <p>This is the start of your messages with {conv.label}. Say hi! 👋</p>
+              ) : (
+                <>
+                  <div className="conv-empty-icon">
+                    <ChannelIcon conv={conv} />
+                  </div>
+                  <h3>Welcome to #{conv.name}!</h3>
+                  <p className="muted">This is the start of the channel.</p>
+                </>
+              )}
+            </div>
+          )}
           {all.map((m, i) => {
             const prev = all[i - 1];
             const day = dayLabel(m.at);
             const showDay = day !== lastDay;
             lastDay = day;
-            const first = showDay || !prev || prev.byUid !== m.byUid || m.at - prev.at > GROUP_MINUTES * 60000 || !!m.replyTo;
+            const isNew = !newShown && m.at > newSince && m.byUid !== actor.uid;
+            if (isNew) newShown = true;
+            const first =
+              showDay || isNew || !prev || prev.byUid !== m.byUid || m.at - prev.at > GROUP_MINUTES * 60000 || !!m.replyTo || !!m.poll;
             return (
-              <div key={m.id}>
+              <div key={m.id} className={flash === m.id ? 'flash' : ''}>
                 {showDay && (
                   <div className="day-sep">
                     <span>{day}</span>
                   </div>
                 )}
+                {isNew && (
+                  <div className="new-sep">
+                    <span>New</span>
+                  </div>
+                )}
                 <Message
                   m={m}
-                  canReply={canPost}
+                  conv={conv.key}
+                  ctx={ctx}
+                  canPost={canPost}
                   first={first}
                   actor={actor}
                   isManager={isManager}
-                  names={names}
                   taskById={taskById}
                   selected={selected === m.id}
                   onSelect={setSelected}
                   api={api}
-                  channel={channel}
+                  teamEmoji={teamEmoji}
+                  onManageEmoji={() => setDialog({ type: 'emoji' })}
                   onReply={(msg) => {
                     setEditing(null);
                     setReplyTo(msg);
@@ -761,10 +463,12 @@ export default function ChatView({ channel, setChannel, messages, unread, actor,
                   }}
                   onMakeTask={(msg) => {
                     setSelected(null);
-                    onMakeTask(msg, ch);
+                    onMakeTask(msg, conv);
                   }}
                   onOpenTask={onOpenTask}
                   onPhoto={setViewing}
+                  onJump={(id) => jumpTo(id)}
+                  onPerson={onPerson}
                 />
               </div>
             );
@@ -781,17 +485,29 @@ export default function ChatView({ channel, setChannel, messages, unread, actor,
             New messages ↓
           </button>
         )}
+        <TypingLine names={typing} />
         {!canPost ? (
-          <div className="composer read-only">📣 Only team management can post announcements. You can still react.</div>
+          <div className="composer read-only">
+            {conv.kind === 'dm'
+              ? '👁 You can read this DM because you’re on team management.'
+              : '📣 Only team management can post announcements. You can still react.'}
+          </div>
         ) : (
           <Composer
-            channel={channel}
+            key={conv.key}
+            conv={conv.key}
+            label={conv.kind === 'dm' ? conv.label : `#${conv.name}`}
+            isDm={conv.kind === 'dm'}
             actor={actor}
+            isManager={isManager}
             roster={roster}
             tasks={tasks}
             api={api}
             replyTo={replyTo}
             editing={editing}
+            teamEmoji={teamEmoji}
+            onManageEmoji={() => setDialog({ type: 'emoji' })}
+            onTyping={() => api.typing(conv.key)}
             onDone={() => {
               setReplyTo(null);
               setEditing(null);
@@ -799,6 +515,53 @@ export default function ChatView({ channel, setChannel, messages, unread, actor,
           />
         )}
       </section>
+
+      {side === 'members' && <MembersPanel names={memberNames} onPerson={onPerson} onClose={() => setSide(null)} />}
+      {side === 'pins' && (
+        <PinsPanel conv={conv} api={api} ctx={ctx} canUnpin={canPost} onJump={(id) => openAt(conv.key, id)} onClose={() => setSide(null)} />
+      )}
+      {side === 'search' && (
+        <SearchPanel convs={myConvs} current={conv} api={api} roster={roster} onOpen={openAt} onClose={() => setSide(null)} />
+      )}
+
+      {dialog?.type === 'channel' && (
+        <ChannelDialog
+          channel={dialog.channel}
+          channels={convs.channels}
+          onClose={() => setDialog(null)}
+          onMove={(dir) => moveChannel(dialog.channel, dir)}
+          onDelete={() => {
+            api.saveChannel(dialog.channel.id, { deleted: true });
+            if (conv.key === dialog.channel.key) setCurrent('general');
+            setDialog(null);
+          }}
+          onSave={async (data) => {
+            if (dialog.channel) await api.saveChannel(dialog.channel.id, data);
+            else {
+              // New channels get an id from their name (kept if renamed later).
+              let id = slugChannel(data.name);
+              const ids = new Set(convs.allChannelIds);
+              for (let n = 2; ids.has(id); n++) id = `${slugChannel(data.name)}-${n}`;
+              await api.saveChannel(id, { ...data, order: convs.channels.length, deleted: false });
+              setCurrent(id);
+            }
+            setDialog(null);
+          }}
+        />
+      )}
+      {dialog?.type === 'dm' && (
+        <NewDmDialog
+          roster={roster}
+          actor={actor}
+          onClose={() => setDialog(null)}
+          onStart={async (names, name) => {
+            const key = await api.openDm(names, name);
+            setDialog(null);
+            if (key) setCurrent(key);
+          }}
+        />
+      )}
+      {dialog?.type === 'emoji' && <EmojiManager teamEmoji={teamEmoji} api={api} onClose={() => setDialog(null)} />}
       {viewing && (
         <PhotoViewer
           photos={[{ ...viewing.photo, by: viewing.by, at: viewing.at }]}

@@ -23,6 +23,7 @@ import {
   startAfter,
   getDocs,
   FieldPath,
+  where,
 } from 'firebase/firestore';
 import { getStorage, ref as fileRef, uploadBytes, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
 import { firebaseConfig, VAPID_KEY } from '../config.js';
@@ -59,7 +60,14 @@ const namesDoc = doc(db, 'settings', 'names');
 const partsCol = collection(db, 'parts');
 const checklistsCol = collection(db, 'checklists');
 const runsCol = collection(db, 'runs');
-const messagesCol = (channel) => collection(db, 'channels', channel, 'messages');
+const channelsCol = collection(db, 'channels');
+const dmsCol = collection(db, 'dms');
+const profilesCol = collection(db, 'profiles');
+const presenceCol = collection(db, 'presence');
+const emojiCol = collection(db, 'emoji');
+const isDm = (conv) => conv.startsWith('dm:');
+const convCol = (conv) => (isDm(conv) ? collection(dmsCol, conv.slice(3), 'messages') : collection(channelsCol, conv, 'messages'));
+const convFolder = (conv) => `chat/${conv.replace(':', '-')}`;
 const robotVersionsCol = collection(db, 'robotVersions');
 const robotPinsCol = collection(db, 'robotPins');
 const robotLayoutsCol = collection(db, 'robotLayouts');
@@ -176,6 +184,7 @@ export const firebaseStore = {
     const token = savedToken();
     if (token) await deleteDoc(doc(pushTokensCol, token)).catch(() => {});
     saveToken('');
+    if (auth.currentUser) await deleteDoc(doc(presenceCol, auth.currentUser.uid)).catch(() => {});
     return fbSignOut(auth);
   },
 
@@ -378,15 +387,20 @@ export const firebaseStore = {
     return setDoc(doc(rolesCol, id), { ...data, updatedAt: serverTimestamp(), updatedBy: actor.name });
   },
 
+  mergeRenames(map) {
+    return setDoc(namesDoc, { renames: map }, { merge: true });
+  },
+
   subscribeNames(cb, onError) {
     return onSnapshot(namesDoc, (snap) => cb((snap.exists() && snap.data().renames) || {}), onError);
   },
 
   // One batch: record the rename, fix assignees and milestone owners, and move
   // the person's org-chart entry to the new name.
-  async renamePerson(oldName, newName, { renames, tasks, milestones, role }, actor) {
+  async renamePerson(oldName, newName, { renames, tasks, milestones, role, dms = [] }, actor) {
     const swap = (list) => list.map((n) => (n === oldName ? newName : n));
     const batch = writeBatch(db);
+    for (const d of dms) batch.update(doc(dmsCol, d.id), { people: swap(d.people) });
     batch.set(namesDoc, { renames, updatedAt: serverTimestamp(), updatedBy: actor.name }, { merge: true });
     for (const t of tasks) batch.update(doc(tasksCol, t.id), { assignees: swap(t.assignees) });
     for (const m of milestones) batch.update(doc(milestonesCol, m.id), { owners: swap(m.owners) });
@@ -481,59 +495,181 @@ export const firebaseStore = {
     return deleteDoc(doc(runsCol, id));
   },
 
-  // Chat. Messages are ordered by the sender's clock (`at`, ms) so a message
+  // Chat. A conversation (conv) is a channel id, or 'dm:<id>' for a direct
+  // message. Messages are ordered by the sender's clock (`at`, ms) so a message
   // shows in place immediately, before the server confirms it.
-  subscribeChannel(channel, count, cb, onError) {
-    const q = query(messagesCol(channel), orderBy('at', 'desc'), limit(count));
+  subscribeChannel(conv, count, cb, onError) {
+    const q = query(convCol(conv), orderBy('at', 'desc'), limit(count));
     return onSnapshot(q, (snap) => cb(snap.docs.map(readDoc).reverse()), onError);
   },
 
-  async loadOlderMessages(channel, beforeAt, count) {
-    const snap = await getDocs(query(messagesCol(channel), orderBy('at', 'desc'), startAfter(beforeAt), limit(count)));
+  async loadOlderMessages(conv, beforeAt, count) {
+    const snap = await getDocs(query(convCol(conv), orderBy('at', 'desc'), startAfter(beforeAt), limit(count)));
     return snap.docs.map(readDoc).reverse();
   },
 
-  async sendMessage(channel, data, actor, photoFiles) {
+  // The newest `count` messages, for search.
+  async recentMessages(conv, count) {
+    const snap = await getDocs(query(convCol(conv), orderBy('at', 'desc'), limit(count)));
+    return snap.docs.map(readDoc);
+  },
+
+  async sendMessage(conv, data, actor, photoFiles) {
     const msg = { text: '', mentions: [], taskIds: [], replyTo: null, photo: null, reactions: {}, ...data };
     if (photoFiles)
-      msg.photo = { ...(await uploadPhoto(`chat/${channel}`, photoFiles)), width: photoFiles.width, height: photoFiles.height };
-    return setDoc(doc(messagesCol(channel)), { ...msg, by: actor.name, byUid: actor.uid, at: Date.now() });
+      msg.photo = { ...(await uploadPhoto(convFolder(conv), photoFiles)), width: photoFiles.width, height: photoFiles.height };
+    const at = Date.now();
+    const batch = writeBatch(db);
+    batch.set(doc(convCol(conv)), { ...msg, by: actor.name, byUid: actor.uid, at });
+    // DMs keep their latest message on the DM itself, for the list.
+    if (isDm(conv)) {
+      const lastText = msg.text || (msg.poll ? `📊 ${msg.poll.question}` : msg.gif ? 'GIF' : msg.photo ? 'Photo' : '');
+      batch.update(doc(dmsCol, conv.slice(3)), { lastAt: at, lastBy: actor.name, lastText: lastText.slice(0, 120) });
+    }
+    return batch.commit();
   },
 
   // Animated GIFs are uploaded as-is (not shrunk to JPEG, which would freeze them).
-  async uploadChatGif(channel, file) {
-    const path = `chat/${channel}/${itemId()}.gif`;
+  async uploadChatGif(conv, file) {
+    const path = `${convFolder(conv)}/${itemId()}.gif`;
     const r = fileRef(storage, path);
     await uploadBytes(r, file, { contentType: 'image/gif' });
     return { path, url: await getDownloadURL(r) };
   },
 
-  editMessage(channel, id, patch) {
-    return updateDoc(doc(messagesCol(channel), id), { ...patch, editedAt: Date.now() });
+  editMessage(conv, id, patch) {
+    return updateDoc(doc(convCol(conv), id), { ...patch, editedAt: Date.now() });
   },
 
   // Leaves a "Message deleted" placeholder so replies still make sense.
-  async deleteMessage(channel, msg) {
-    await updateDoc(doc(messagesCol(channel), msg.id), {
+  async deleteMessage(conv, msg) {
+    await updateDoc(doc(convCol(conv), msg.id), {
       deleted: true,
       text: '',
       photo: null,
       gif: null,
+      poll: null,
+      preview: null,
       taskIds: [],
       mentions: [],
       reactions: {},
+      votes: {},
+      pinned: false,
     });
     if (msg.photo) await deletePhotoFiles(msg.photo);
     if (msg.gif?.path) await deleteObject(fileRef(storage, msg.gif.path)).catch(() => {});
   },
 
   // reactions: { [emoji]: { [uid]: name } }, updated per person so taps don't collide.
-  react(channel, id, emoji, actor, on) {
-    return updateDoc(doc(messagesCol(channel), id), new FieldPath('reactions', emoji, actor.uid), on ? actor.name : deleteField());
+  react(conv, id, emoji, actor, on) {
+    return updateDoc(doc(convCol(conv), id), new FieldPath('reactions', emoji, actor.uid), on ? actor.name : deleteField());
   },
 
-  removeReaction(channel, id, emoji) {
-    return updateDoc(doc(messagesCol(channel), id), new FieldPath('reactions', emoji), deleteField());
+  removeReaction(conv, id, emoji) {
+    return updateDoc(doc(convCol(conv), id), new FieldPath('reactions', emoji), deleteField());
+  },
+
+  // Polls: votes: { [optionId]: { [personKey]: name } }. One vote per person
+  // (not per device); single-choice polls clear the person's other votes.
+  vote(conv, msg, optionId, actor, on) {
+    const me = personId(actor.name);
+    const args = [new FieldPath('votes', optionId, me), on ? actor.name : deleteField()];
+    if (on && !msg.poll.multi)
+      for (const o of msg.poll.options)
+        if (o.id !== optionId && msg.votes?.[o.id]?.[me]) args.push(new FieldPath('votes', o.id, me), deleteField());
+    return updateDoc(doc(convCol(conv), msg.id), ...args);
+  },
+
+  pin(conv, id, on, actor) {
+    return updateDoc(doc(convCol(conv), id), { pinned: on, pinnedBy: on ? actor.name : '', pinnedAt: on ? Date.now() : 0 });
+  },
+
+  subscribePins(conv, cb, onError) {
+    return onSnapshot(query(convCol(conv), where('pinned', '==', true)), (snap) => cb(snap.docs.map(readDoc)), onError);
+  },
+
+  // The author can hide a link preview.
+  hidePreview(conv, id) {
+    return updateDoc(doc(convCol(conv), id), { preview: false });
+  },
+
+  // Channels team management added, renamed, or removed (defaults are in config.js).
+  subscribeChannels(cb, onError) {
+    return onSnapshot(channelsCol, (snap) => cb(snap.docs.map(readDoc)), onError);
+  },
+  saveChannel(id, data, actor) {
+    return setDoc(doc(channelsCol, id), { ...data, updatedAt: Date.now(), updatedBy: actor.name }, { merge: true });
+  },
+
+  // Direct messages. 1-on-1 DMs have a fixed id so there's only ever one per pair.
+  subscribeDms(actor, all, cb, onError) {
+    const q = all ? dmsCol : query(dmsCol, where('people', 'array-contains', actor.name));
+    return onSnapshot(q, (snap) => cb(snap.docs.map(readDoc)), onError);
+  },
+  async openDm(people, actor, name = '') {
+    const sorted = [...new Set(people)].sort();
+    const id = sorted.length === 2 ? sorted.map(personId).join('--') : itemId();
+    const ref = doc(dmsCol, id);
+    const existing = await getDoc(ref).catch(() => null);
+    if (!existing?.exists())
+      await setDoc(ref, {
+        people: sorted,
+        name,
+        createdBy: actor.name,
+        createdAt: Date.now(),
+        lastAt: Date.now(),
+        lastBy: '',
+        lastText: '',
+      });
+    return `dm:${id}`;
+  },
+  renameDm(id, name) {
+    return updateDoc(doc(dmsCol, id), { name });
+  },
+
+  // Profiles: picture, status, and notification settings, one doc per person.
+  subscribeProfiles(cb, onError) {
+    return onSnapshot(profilesCol, (snap) => cb(snap.docs.map(readDoc)), onError);
+  },
+  saveProfile(name, patch) {
+    return setDoc(doc(profilesCol, personId(name)), { ...patch, name, updatedAt: Date.now() }, { merge: true });
+  },
+  async uploadAvatar(name, blob, oldPath) {
+    const path = `avatars/${personId(name)}-${itemId()}.jpg`;
+    const r = fileRef(storage, path);
+    await uploadBytes(r, blob, { contentType: 'image/jpeg' });
+    const photo = { url: await getDownloadURL(r), path };
+    await this.saveProfile(name, { photo });
+    if (oldPath) await deleteObject(fileRef(storage, oldPath)).catch(() => {});
+    return photo;
+  },
+  async removeAvatar(name, oldPath) {
+    await this.saveProfile(name, { photo: null });
+    if (oldPath) await deleteObject(fileRef(storage, oldPath)).catch(() => {});
+  },
+
+  // Who's online: each device writes a heartbeat (and what it's typing in).
+  subscribePresence(cb, onError) {
+    return onSnapshot(presenceCol, (snap) => cb(snap.docs.map(readDoc)), onError);
+  },
+  setPresence(actor, patch) {
+    return setDoc(doc(presenceCol, actor.uid), { name: actor.name, ...patch }, { merge: true });
+  },
+
+  // Team emoji, used as :name: in messages and reactions.
+  subscribeEmoji(cb, onError) {
+    return onSnapshot(emojiCol, (snap) => cb(snap.docs.map(readDoc)), onError);
+  },
+  async addEmoji(name, file, actor) {
+    const ext = { 'image/gif': 'gif', 'image/png': 'png', 'image/webp': 'webp' }[file.type] || 'jpg';
+    const path = `emoji/${name}-${itemId()}.${ext}`;
+    const r = fileRef(storage, path);
+    await uploadBytes(r, file, { contentType: file.type || 'image/png' });
+    await setDoc(doc(emojiCol, name), { name, url: await getDownloadURL(r), path, by: actor.name, at: Date.now() });
+  },
+  async deleteEmoji(e) {
+    await deleteDoc(doc(emojiCol, e.id));
+    await deleteObject(fileRef(storage, e.path)).catch(() => {});
   },
 
   // Robot tab: 3D model versions (files in Storage), pins, and sandbox layouts.

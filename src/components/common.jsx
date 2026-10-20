@@ -1,12 +1,31 @@
-import { useEffect, useRef, useState } from 'react';
+import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { STATUSES, PRIORITIES, statusById, priorityById } from '../config.js';
 import { colorFor, initials, dueInfo } from '../util.js';
 
-export function Avatar({ name, size = 26, photo }) {
-  if (photo) return <img className="avatar" src={photo} alt={name} style={{ width: size, height: size }} referrerPolicy="no-referrer" />;
-  return (
+// Profiles, who's online, and each person's subteams, for any component that
+// shows people (set up in Workspace; empty on the join screen).
+export const PeopleContext = createContext(null);
+export const usePeople = () => useContext(PeopleContext);
+
+// A profile picture, or colored initials. showOnline adds a green dot when
+// the person has the app open.
+export function Avatar({ name, size = 26, photo, showOnline = false }) {
+  const people = usePeople();
+  const src = photo || people?.photoOf(name);
+  const pic = src ? (
+    <img className="avatar" src={src} alt={name} title={name} style={{ width: size, height: size }} referrerPolicy="no-referrer" />
+  ) : (
     <span className="avatar" title={name} style={{ width: size, height: size, background: colorFor(name), fontSize: size * 0.4 }}>
       {initials(name)}
+    </span>
+  );
+  if (!showOnline) return pic;
+  return (
+    <span className="avatar-wrap" style={{ width: size, height: size }}>
+      {pic}
+      {people?.isOnline(name) && (
+        <span className="online-dot" style={{ width: Math.max(8, size * 0.3), height: Math.max(8, size * 0.3) }} />
+      )}
     </span>
   );
 }

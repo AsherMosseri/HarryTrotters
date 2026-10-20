@@ -17,13 +17,39 @@ service firebase.storage {
         && firestore.get(/databases/(default)/documents/members/$(request.auth.uid)).data.get('admin', false) == true;
     }
 
-    // Chat photos (shrunk JPEGs) and animated GIFs (uploaded as-is).
+    function isManager() {
+      return isMember()
+        && firestore.get(/databases/(default)/documents/members/$(request.auth.uid)).data.get('admin', false) == true;
+    }
+
+    // Chat photos (shrunk JPEGs) and animated GIFs (uploaded as-is). Files can
+    // be opened by their link but folders can't be listed.
     match /chat/{channelId}/{file} {
-      allow read, delete: if isMember();
+      allow get, delete: if isMember();
       allow create: if isMember() && (
         (request.resource.contentType == 'image/jpeg' && request.resource.size < 5 * 1024 * 1024)
         || (request.resource.contentType == 'image/gif' && request.resource.size < 8 * 1024 * 1024)
       );
+    }
+
+    // Profile pictures (cropped, shrunk JPEGs), named <person-id>-<random>.jpg.
+    // Only that person (by the name they joined with) or team management
+    // removes one.
+    function myPersonId() {
+      return firestore.get(/databases/(default)/documents/members/$(request.auth.uid)).data.name.lower().replace('[^a-z0-9]+', '-');
+    }
+    match /avatars/{file} {
+      allow get: if isMember();
+      allow delete: if isManager() || (isMember() && file.matches(myPersonId() + '-.*'));
+      allow create: if isMember() && request.resource.contentType == 'image/jpeg' && request.resource.size < 1024 * 1024;
+    }
+
+    // Team emoji, added by team management.
+    match /emoji/{file} {
+      allow get: if isMember();
+      allow create: if isManager()
+        && request.resource.contentType.matches('image/(png|gif|jpeg|webp)') && request.resource.size < 1024 * 1024;
+      allow delete: if isManager();
     }
 
     match /tasks/{taskId}/{file} {

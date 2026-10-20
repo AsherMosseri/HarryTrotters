@@ -11,7 +11,7 @@ import {
 } from './diff.js';
 import { STARTER_CHECKLISTS, starterItems } from '../checklists.js';
 
-const KEY = 'ftc32313-demo-v11';
+const KEY = 'ftc32313-demo-v12';
 const listeners = new Set();
 const uid = () => Math.random().toString(36).slice(2, 11);
 
@@ -143,7 +143,59 @@ function seed() {
       }),
     ],
     assembly: [msg(60, 'Ira Kumar', 'Intake side plates are printed')],
+    programming: [
+      msg(
+        240,
+        'Katarina Jurasic',
+        '## Auto plan for Saturday\n- **Left start:** score preload, park\n- *Right start:* 2 samples\n> Test both before 5pm\n-# updated after Tuesday practice',
+        {
+          pinned: true,
+          pinnedBy: 'Asher Mosseri',
+          pinnedAt: now - 200 * 60000,
+        },
+      ),
+      msg(90, 'Michael Meidan', 'Which day works for the code review?', {
+        poll: {
+          question: 'Which day works for the code review?',
+          multi: false,
+          options: [
+            { id: 'a', text: 'Thursday' },
+            { id: 'b', text: 'Friday' },
+            { id: 'c', text: 'Saturday' },
+          ],
+        },
+        votes: {
+          a: { 'katarina-jurasic': 'Katarina Jurasic' },
+          c: { 'michael-meidan': 'Michael Meidan', 'asher-mosseri': 'Asher Mosseri' },
+        },
+      }),
+      msg(20, 'Michael Meidan', 'Odometry docs: https://gm0.org/en/latest/docs/software/concepts/odometry.html ||spoiler: it works now||', {
+        preview: {
+          url: 'https://gm0.org/en/latest/docs/software/concepts/odometry.html',
+          site: 'gm0.org',
+          title: 'Odometry — Game Manual 0',
+          description: 'A guide to odometry for FTC robots: dead wheels, localization, and tuning.',
+        },
+      }),
+    ],
+    'dm:asher-mosseri--cooper-mlezcko': [msg(15, 'Cooper Mlezcko', 'hey, can you send me the intake CAD link?', { byUid: 'cooper' })],
   };
+  const dms = [
+    {
+      id: 'asher-mosseri--cooper-mlezcko',
+      people: ['Asher Mosseri', 'Cooper Mlezcko'],
+      name: '',
+      createdBy: 'Cooper Mlezcko',
+      createdAt: now - 15 * 60000,
+      lastAt: now - 15 * 60000,
+      lastBy: 'Cooper Mlezcko',
+      lastText: 'hey, can you send me the intake CAD link?',
+    },
+  ];
+  const profiles = [
+    { id: 'sebastian-tolbert', name: 'Sebastian Tolbert', status: { emoji: '🔧', text: 'at the shop' }, updatedAt: now },
+    { id: 'katarina-jurasic', name: 'Katarina Jurasic', status: { emoji: '💻', text: 'tuning auto' }, updatedAt: now },
+  ];
   const robot = {
     versions: [
       { id: 'sample-1', name: 'v1 – original robot', notes: 'Built-in sample model', sample: 1, by: 'Shrey Kumar', at: now - 6 * day },
@@ -197,11 +249,44 @@ function seed() {
     },
     { id: uid(), type: 'due', title: 'Due tomorrow', body: tasks[1].title, open: `task:${tasks[1].id}`, at: now - 1.5 * day, read: true },
   ];
-  return { tasks, activity, people: [], milestones, roles: [], parts, checklists, runs, chat, robot, inbox };
+  return {
+    tasks,
+    activity,
+    people: [],
+    milestones,
+    roles: [],
+    parts,
+    checklists,
+    runs,
+    chat,
+    robot,
+    inbox,
+    dms,
+    profiles,
+    channels: [],
+    emoji: [],
+  };
 }
 
 // Demo uploads: version id -> object URL (not saved across reloads).
 const demoFiles = new Map();
+
+const dataUrl = (blob) =>
+  new Promise((resolve) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.readAsDataURL(blob);
+  });
+
+function updateMsg(conv, id, fn) {
+  state.chat = { ...state.chat, [conv]: (state.chat[conv] || []).map((m) => (m.id === id ? fn(m) : m)) };
+  commit();
+}
+
+function demoPreview(url) {
+  const host = new URL(url).hostname.replace(/^www\./, '');
+  return { url, site: host, title: `A page on ${host}`, description: 'Link previews are made by the server on the real board.' };
+}
 
 let state;
 try {
@@ -375,11 +460,16 @@ export const demoStore = {
     commit();
   },
 
+  async mergeRenames(map) {
+    state.renames = { ...(state.renames || {}), ...map };
+    commit();
+  },
   subscribeNames(cb) {
     return listen(() => cb({ ...(state.renames || {}) }));
   },
   async renamePerson(oldName, newName, { renames, tasks, milestones, role }, actor) {
     const swap = (list) => list.map((n) => (n === oldName ? newName : n));
+    state.dms = (state.dms || []).map((d) => ({ ...d, people: swap(d.people) }));
     const taskIds = new Set(tasks.map((t) => t.id));
     const msIds = new Set(milestones.map((m) => m.id));
     state.renames = { ...(state.renames || {}), ...renames };
@@ -473,24 +563,24 @@ export const demoStore = {
     commit();
   },
 
-  // Chat: messages kept per channel; photos stored as small data URLs.
-  subscribeChannel(channel, count, cb) {
-    return listen(() => cb([...((state.chat || {})[channel] || [])].sort((a, b) => a.at - b.at).slice(-count)));
+  // Chat: messages kept per conversation (channel id or 'dm:<id>'); photos
+  // stored as small data URLs.
+  subscribeChannel(conv, count, cb) {
+    return listen(() => cb([...((state.chat || {})[conv] || [])].sort((a, b) => a.at - b.at).slice(-count)));
   },
-  async loadOlderMessages(channel, beforeAt, count) {
-    return [...((state.chat || {})[channel] || [])]
+  async loadOlderMessages(conv, beforeAt, count) {
+    return [...((state.chat || {})[conv] || [])]
       .filter((m) => m.at < beforeAt)
       .sort((a, b) => a.at - b.at)
       .slice(-count);
   },
-  async sendMessage(channel, data, actor, photoFiles) {
+  async recentMessages(conv, count) {
+    return [...((state.chat || {})[conv] || [])].sort((a, b) => b.at - a.at).slice(0, count);
+  },
+  async sendMessage(conv, data, actor, photoFiles) {
     let photo = null;
     if (photoFiles) {
-      const url = await new Promise((resolve) => {
-        const r = new FileReader();
-        r.onload = () => resolve(r.result);
-        r.readAsDataURL(photoFiles.thumb);
-      });
+      const url = await dataUrl(photoFiles.thumb);
       photo = { id: uid(), url, thumbUrl: url, width: photoFiles.width, height: photoFiles.height };
     }
     const m = {
@@ -506,45 +596,156 @@ export const demoStore = {
       byUid: actor.uid,
       at: Date.now(),
     };
-    state.chat = { ...(state.chat || {}), [channel]: [...((state.chat || {})[channel] || []), m] };
+    // Pretend the server found a preview for the first link.
+    const link = /https?:\/\/[^\s<>()]+/.exec(m.text || '')?.[0];
+    if (link) m.preview = demoPreview(link);
+    state.chat = { ...(state.chat || {}), [conv]: [...((state.chat || {})[conv] || []), m] };
+    if (conv.startsWith('dm:'))
+      state.dms = state.dms.map((d) =>
+        `dm:${d.id}` === conv ? { ...d, lastAt: m.at, lastBy: actor.name, lastText: m.text || 'Photo' } : d,
+      );
     commit();
   },
-  async uploadChatGif(channel, file) {
+  async uploadChatGif(conv, file) {
     if (file.size > 1.5e6) throw new Error('Demo mode only keeps GIFs under 1.5 MB.');
-    const url = await new Promise((resolve) => {
-      const r = new FileReader();
-      r.onload = () => resolve(r.result);
-      r.readAsDataURL(file);
-    });
-    return { url };
+    return { url: await dataUrl(file) };
   },
-  async editMessage(channel, id, patch) {
-    state.chat[channel] = state.chat[channel].map((m) => (m.id === id ? { ...m, ...patch, editedAt: Date.now() } : m));
-    commit();
+  async editMessage(conv, id, patch) {
+    updateMsg(conv, id, (m) => ({ ...m, ...patch, editedAt: Date.now() }));
   },
-  async deleteMessage(channel, msg) {
-    state.chat[channel] = state.chat[channel].map((m) =>
-      m.id === msg.id ? { ...m, deleted: true, text: '', photo: null, gif: null, taskIds: [], mentions: [], reactions: {} } : m,
-    );
-    commit();
+  async deleteMessage(conv, msg) {
+    updateMsg(conv, msg.id, (m) => ({
+      ...m,
+      deleted: true,
+      text: '',
+      photo: null,
+      gif: null,
+      poll: null,
+      preview: null,
+      taskIds: [],
+      mentions: [],
+      reactions: {},
+      votes: {},
+      pinned: false,
+    }));
   },
-  async react(channel, id, emoji, actor, on) {
-    state.chat[channel] = state.chat[channel].map((m) => {
-      if (m.id !== id) return m;
+  async react(conv, id, emoji, actor, on) {
+    updateMsg(conv, id, (m) => {
       const who = { ...((m.reactions || {})[emoji] || {}) };
       if (on) who[actor.uid] = actor.name;
       else delete who[actor.uid];
       return { ...m, reactions: { ...m.reactions, [emoji]: who } };
     });
-    commit();
   },
-  async removeReaction(channel, id, emoji) {
-    state.chat[channel] = state.chat[channel].map((m) => {
-      if (m.id !== id) return m;
+  async removeReaction(conv, id, emoji) {
+    updateMsg(conv, id, (m) => {
       const reactions = { ...m.reactions };
       delete reactions[emoji];
       return { ...m, reactions };
     });
+  },
+  async vote(conv, msg, optionId, actor, on) {
+    const me = personId(actor.name);
+    updateMsg(conv, msg.id, (m) => {
+      const votes = Object.fromEntries(Object.entries(m.votes || {}).map(([k, v]) => [k, { ...v }]));
+      if (on && !m.poll.multi) for (const k of Object.keys(votes)) delete votes[k][me];
+      votes[optionId] = votes[optionId] || {};
+      if (on) votes[optionId][me] = actor.name;
+      else delete votes[optionId][me];
+      return { ...m, votes };
+    });
+  },
+  async pin(conv, id, on, actor) {
+    updateMsg(conv, id, (m) => ({ ...m, pinned: on, pinnedBy: on ? actor.name : '', pinnedAt: on ? Date.now() : 0 }));
+  },
+  subscribePins(conv, cb) {
+    return listen(() => cb(((state.chat || {})[conv] || []).filter((m) => m.pinned)));
+  },
+  async hidePreview(conv, id) {
+    updateMsg(conv, id, (m) => ({ ...m, preview: false }));
+  },
+
+  subscribeChannels(cb) {
+    return listen(() => cb([...(state.channels || [])]));
+  },
+  async saveChannel(id, data) {
+    const rest = (state.channels || []).filter((c) => c.id !== id);
+    const prev = (state.channels || []).find((c) => c.id === id) || {};
+    state.channels = [...rest, { ...prev, ...data, id }];
+    commit();
+  },
+
+  subscribeDms(actor, all, cb) {
+    return listen(() => cb((state.dms || []).filter((d) => all || d.people.includes(actor.name))));
+  },
+  async openDm(people, actor, name = '') {
+    const sorted = [...new Set(people)].sort();
+    const id = sorted.length === 2 ? sorted.map(personId).join('--') : uid();
+    if (!(state.dms || []).some((d) => d.id === id)) {
+      state.dms = [
+        ...(state.dms || []),
+        { id, people: sorted, name, createdBy: actor.name, createdAt: Date.now(), lastAt: Date.now(), lastBy: '', lastText: '' },
+      ];
+      commit();
+    }
+    return `dm:${id}`;
+  },
+  async renameDm(id, name) {
+    state.dms = state.dms.map((d) => (d.id === id ? { ...d, name } : d));
+    commit();
+  },
+
+  subscribeProfiles(cb) {
+    return listen(() => cb([...(state.profiles || [])]));
+  },
+  async saveProfile(name, patch) {
+    const id = personId(name);
+    const prev = (state.profiles || []).find((p) => p.id === id) || {};
+    const merged = { ...prev, ...patch, id, name, updatedAt: Date.now() };
+    if (patch.notify) merged.notify = { ...(prev.notify || {}), ...patch.notify };
+    state.profiles = [...(state.profiles || []).filter((p) => p.id !== id), merged];
+    commit();
+  },
+  async uploadAvatar(name, blob) {
+    const photo = { url: await dataUrl(blob), path: '' };
+    await this.saveProfile(name, { photo });
+    return photo;
+  },
+  async removeAvatar(name) {
+    await this.saveProfile(name, { photo: null });
+  },
+
+  // A few teammates look online, and one is "typing" in #general.
+  subscribePresence(cb) {
+    return listen(() => {
+      const now = Date.now();
+      cb([
+        ...(state.presence || []),
+        { id: 'p-seb', name: 'Sebastian Tolbert', at: now },
+        { id: 'p-cooper', name: 'Cooper Mlezcko', at: now, typing: 'general', typingAt: now + 3600000 },
+        { id: 'p-sophia', name: 'Sophia Bermudez', at: now - 60000 },
+      ]);
+    });
+  },
+  async setPresence(actor, patch) {
+    state.presence = [...(state.presence || []).filter((p) => p.id !== actor.uid), { id: actor.uid, name: actor.name, ...patch }];
+    // Presence isn't saved, so skip localStorage and just notify.
+    for (const fn of listeners) fn();
+  },
+
+  subscribeEmoji(cb) {
+    return listen(() => cb([...(state.emoji || [])]));
+  },
+  async addEmoji(name, file, actor) {
+    if (file.size > 300000) throw new Error('Demo mode only keeps emoji under 300 KB.');
+    state.emoji = [
+      ...(state.emoji || []).filter((e) => e.id !== name),
+      { id: name, name, url: await dataUrl(file), path: '', by: actor.name, at: Date.now() },
+    ];
+    commit();
+  },
+  async deleteEmoji(e) {
+    state.emoji = (state.emoji || []).filter((x) => x.id !== e.id);
     commit();
   },
 

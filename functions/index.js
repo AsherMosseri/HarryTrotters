@@ -9,6 +9,7 @@ import { logger } from 'firebase-functions';
 import { initializeApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getMessaging } from 'firebase-admin/messaging';
+import { fetchPage, firstLink, readPreview } from './preview.js';
 
 // Functions run next to the database. The deploy workflow writes location.json
 // from the database's location; nam5 (the US multi-region) pairs with us-central1.
@@ -49,8 +50,21 @@ async function renamer() {
 const first = (name) => (name || 'Someone').split(' ')[0];
 const clip = (text, n = 180) => (text.length > n ? `${text.slice(0, n - 1)}…` : text);
 
+// Message text without formatting marks, for notifications.
+function plainText(text) {
+  return text
+    .replace(/\|\|[\s\S]*?\|\|/g, '(spoiler)')
+    .replace(/```[a-z]*\n?/gi, '')
+    .replace(/^(#{1,3}|-#|>)\s+/gm, '')
+    .replace(/(\*\*|__|~~|\*|_|`)(\S(?:[\s\S]*?\S)?)\1/g, '$2')
+    .replace(/\[([^\]]+)\]\((https?:[^)]+)\)/g, '$1')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function messagePreview(m) {
-  if (m.text) return clip(m.text);
+  if (m.poll) return `📊 ${clip(m.poll.question)}`;
+  if (m.text) return clip(plainText(m.text));
   if (m.gif) return 'sent a GIF';
   if (m.photo) return 'sent a photo';
   return '';
@@ -111,38 +125,93 @@ async function notify(notes) {
   await Promise.all(stale.map((t) => db.collection('pushTokens').doc(t).delete()));
 }
 
-// Announcements go to everyone; @mentions go to the people mentioned.
+// Each person's notification setting for a conversation: 'all', 'mentions',
+// or 'none' (from their profile; announcements and DMs default to 'all').
+async function notifyLevels(rename) {
+  const snap = await db.collection('profiles').get();
+  const latest = new Map();
+  for (const d of snap.docs) {
+    const name = rename(d.get('name') || '');
+    const prev = latest.get(name);
+    if (name && (!prev || (d.get('updatedAt') || 0) > (prev.get('updatedAt') || 0))) latest.set(name, d);
+  }
+  return (name, conv, fallback) => latest.get(name)?.get('notify')?.[conv] || fallback;
+}
+
+// Announcements go to everyone; @mentions (people, @subteam, @everyone) to the
+// people mentioned; "All messages" channels to everyone who chose that.
 export const onChatMessage = onDocumentCreated('channels/{channelId}/messages/{messageId}', async (event) => {
   const m = event.data?.data();
   if (!m || m.deleted) return;
   const { channelId } = event.params;
   const rename = await renamer();
+  const level = await notifyLevels(rename);
   const sender = rename(m.by || '');
   const open = `chat:${channelId}`;
-  const notes = new Map();
+  const channel = (await db.doc(`channels/${channelId}`).get()).get('name') || channelId;
+  const announce = channelId === 'announcements';
+  const mentioned = new Set((m.mentions || []).map(rename));
+  const how = m.everyone ? '@everyone' : m.roles?.length ? `@${m.roles[0]}` : 'you';
+  const body = messagePreview(m);
 
-  if (channelId === 'announcements') {
-    const people = await db.collection('people').get();
-    for (const p of people.docs) {
-      const to = rename(p.get('name') || '');
-      if (to && to !== sender)
-        notes.set(to, { to, type: 'announcement', title: `Announcement from ${first(sender)}`, body: messagePreview(m), open, by: sender });
-    }
+  const people = new Set([...mentioned]);
+  for (const p of (await db.collection('people').get()).docs) people.add(rename(p.get('name') || ''));
+  const notes = [];
+  for (const to of people) {
+    if (!to || to === sender) continue;
+    const wants = level(to, channelId, announce ? 'all' : 'mentions');
+    if (wants === 'none') continue;
+    if (announce) notes.push({ to, type: 'announcement', title: `Announcement from ${first(sender)}`, body, open, by: sender });
+    else if (mentioned.has(to)) notes.push({ to, type: 'mention', title: `${first(sender)} mentioned ${how} in #${channel}`, body, open, by: sender });
+    else if (wants === 'all') notes.push({ to, type: 'message', title: `${first(sender)} in #${channel}`, body, open, by: sender, tag: open });
   }
-  for (const name of m.mentions || []) {
-    const to = rename(name);
-    if (to && to !== sender && !notes.has(to))
-      notes.set(to, {
-        to,
-        type: 'mention',
-        title: `${first(sender)} mentioned you in #${channelId}`,
-        body: messagePreview(m),
-        open,
-        by: sender,
-      });
-  }
-  await notify([...notes.values()]);
+  await notify(notes);
 });
+
+// DMs go to the other people in the DM (unless they turned that DM off).
+export const onDmMessage = onDocumentCreated('dms/{dmId}/messages/{messageId}', async (event) => {
+  const m = event.data?.data();
+  if (!m || m.deleted) return;
+  const { dmId } = event.params;
+  const dm = (await db.doc(`dms/${dmId}`).get()).data();
+  if (!dm) return;
+  const rename = await renamer();
+  const level = await notifyLevels(rename);
+  const sender = rename(m.by || '');
+  const conv = `dm:${dmId}`;
+  const group = dm.people.length > 2;
+  const title = group ? `${first(sender)} in ${dm.name || dm.people.map(rename).map(first).join(', ')}` : `${first(sender)} sent you a message`;
+  await notify(
+    [...new Set(dm.people.map(rename))]
+      .filter((to) => to && to !== sender && level(to, conv, 'all') !== 'none')
+      .map((to) => ({ to, type: 'dm', title, body: messagePreview(m), open: `chat:${conv}`, by: sender, tag: conv })),
+  );
+});
+
+// Link previews: the server fetches the first link's title, description, and
+// image (see preview.js).
+async function previewFor(event) {
+  const after = event.data?.after?.data();
+  if (!after || after.deleted || after.preview === false) return;
+  const before = event.data?.before?.data();
+  if (before && before.text === after.text) return;
+  const url = firstLink(after.text);
+  if (!url) {
+    if (after.preview) await event.data.after.ref.update({ preview: null });
+    return;
+  }
+  if (after.preview?.url === url) return;
+  let preview = null;
+  try {
+    const page = await fetchPage(url);
+    preview = readPreview(page.html, url);
+  } catch (e) {
+    logger.info('no preview', url, e.message);
+  }
+  await event.data.after.ref.update({ preview });
+}
+export const channelLinkPreview = onDocumentWritten('channels/{channelId}/messages/{messageId}', previewFor);
+export const dmLinkPreview = onDocumentWritten('dms/{dmId}/messages/{messageId}', previewFor);
 
 // Someone new on a task's assignee list (not the person who added them).
 export const onTaskAssigned = onDocumentWritten('tasks/{taskId}', async (event) => {
