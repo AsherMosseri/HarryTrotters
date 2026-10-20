@@ -1,0 +1,19 @@
+rules_version = '2';
+// Cloud Storage rules for task photos. Paste into Firebase console →
+// Storage → Rules. Only devices that joined with the team code (they have a
+// members/{uid} doc in Firestore) can see, add, or delete photos.
+service firebase.storage {
+  match /b/{bucket}/o {
+    function isMember() {
+      return request.auth != null
+        && firestore.exists(/databases/(default)/documents/members/$(request.auth.uid));
+    }
+
+    match /tasks/{taskId}/{file} {
+      allow read, delete: if isMember();
+      allow create: if isMember()
+        && request.resource.contentType == 'image/jpeg'
+        && request.resource.size < 5 * 1024 * 1024;
+    }
+  }
+}

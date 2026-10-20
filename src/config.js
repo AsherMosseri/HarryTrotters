@@ -16,6 +16,10 @@ export const TEAM_NICKNAME = 'Harry Trotters';
 // manager code (checked by firestore.rules), and unlocks editing the org chart,
 // adding and removing people, deleting milestones, and changing the competition date.
 export const MANAGER_NAMES = ['Asher Mosseri', 'Sebastian Tolbert'];
+// Old spellings still stored on devices or tasks, mapped to the right name.
+export const RENAMED = { 'Matthew Kuhle': 'Matthew Kuehl' };
+export const fixName = (name) => RENAMED[name] || name;
+
 export const isManagerName = (name) => MANAGER_NAMES.some((n) => n.toLowerCase() === name.trim().toLowerCase());
 
 // Names shown on the join screen and in the assignee picker. People the manager
@@ -26,7 +30,7 @@ export const ROSTER = [
   'Jackson Lucks',
   'Cooper Mlezcko',
   'Michael Meidan',
-  'Matthew Kuhle',
+  'Matthew Kuehl',
   'Katarina Jurasic',
   'Sophia Bermudez',
   'Shrey Kumar',
@@ -81,7 +85,7 @@ export const ORG_DEFAULTS = {
   },
   'Shrey Kumar': { title: '', subteams: ['CAD'], responsibilities: ['Design (CAD)'] },
   'Jackson Lucks': { title: '', subteams: ['Assembly', 'Electrical'], responsibilities: ['Assembly', 'Electrical'] },
-  'Matthew Kuhle': { title: '', subteams: ['CAD'], responsibilities: ['Design (CAD)'] },
+  'Matthew Kuehl': { title: '', subteams: ['CAD'], responsibilities: ['Design (CAD)'] },
   'Cooper Mlezcko': { title: '', subteams: ['Assembly'], responsibilities: ['Assembly'] },
   'Ira Kumar': { title: '', subteams: ['Assembly'], responsibilities: ['Assembly'] },
   'Michael Meidan': { title: '', subteams: ['Programming', 'CAD'], responsibilities: ['Programming', 'Design (CAD)'] },

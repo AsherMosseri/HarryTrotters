@@ -3,7 +3,7 @@
 import { describeChanges, derivedFields, newTaskDefaults, newMilestoneDefaults, newPartDefaults } from './diff.js';
 import { STARTER_CHECKLISTS, starterItems } from '../checklists.js';
 
-const KEY = 'ftc32313-demo-v5';
+const KEY = 'ftc32313-demo-v6';
 const listeners = new Set();
 const uid = () => Math.random().toString(36).slice(2, 11);
 
@@ -55,7 +55,7 @@ function seed() {
       subteam: 'Team Management',
       priority: 'low',
     }),
-    t('Library outreach demo signup', { status: 'done', assignees: ['Matthew Kuhle'], subteam: 'Team Management', priority: 'medium' }),
+    t('Library outreach demo signup', { status: 'done', assignees: ['Matthew Kuehl'], subteam: 'Team Management', priority: 'medium' }),
     t('Driver practice: 10 full matches', {
       status: 'todo',
       assignees: ['Sebastian Tolbert'],
@@ -72,7 +72,7 @@ function seed() {
   });
   const milestones = [
     m('Review robot and pick revisions', 'Team Management', -1, 1, { owners: ['Sebastian Tolbert'], done: true }),
-    m('CAD revised intake', 'CAD', 0, 6, { owners: ['Shrey Kumar', 'Matthew Kuhle'] }),
+    m('CAD revised intake', 'CAD', 0, 6, { owners: ['Shrey Kumar', 'Matthew Kuehl'] }),
     m('Build and assemble revisions', 'Assembly', 7, 15, { owners: ['Cooper Mlezcko', 'Ira Kumar'] }),
     m('Autonomous + TeleOp updates', 'Programming', 10, 19, { owners: ['Katarina Jurasic', 'Asher Mosseri'] }),
     m('Full-robot testing', 'Assembly', 18, 23),
@@ -177,6 +177,24 @@ export const demoStore = {
   async deleteTask(id) {
     state.tasks = state.tasks.filter((t) => t.id !== id);
     delete state.activity[id];
+    commit();
+  },
+
+  // Demo keeps only the thumbnail, as a data URL, so localStorage doesn't fill up.
+  async addTaskPhoto(taskId, { thumb, width, height }, actor) {
+    const dataUrl = await new Promise((resolve) => {
+      const r = new FileReader();
+      r.onload = () => resolve(r.result);
+      r.readAsDataURL(thumb);
+    });
+    const photo = { id: uid(), url: dataUrl, thumbUrl: dataUrl, width, height, by: actor.name, at: Date.now() };
+    state.tasks = state.tasks.map((t) => (t.id === taskId ? { ...t, photos: [...(t.photos || []), photo] } : t));
+    (state.activity[taskId] ||= []).push({ id: uid(), type: 'change', field: 'photos', to: 'added', by: actor.name, at: Date.now() });
+    commit();
+  },
+  async removeTaskPhoto(taskId, photo, actor) {
+    state.tasks = state.tasks.map((t) => (t.id === taskId ? { ...t, photos: (t.photos || []).filter((p) => p.id !== photo.id) } : t));
+    (state.activity[taskId] ||= []).push({ id: uid(), type: 'change', field: 'photos', to: 'removed', by: actor.name, at: Date.now() });
     commit();
   },
 

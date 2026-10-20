@@ -57,6 +57,7 @@ export function newTaskDefaults(data) {
     links: [],
     milestoneId: '',
     checklist: [],
+    photos: [],
     commentCount: 0,
     ...data,
   };

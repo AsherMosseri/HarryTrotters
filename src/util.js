@@ -73,3 +73,37 @@ export function useLocalStorage(key, initial) {
   }, [key, value]);
   return [value, setValue];
 }
+
+async function decodeImage(file) {
+  try {
+    return await createImageBitmap(file, { imageOrientation: 'from-image' });
+  } catch {
+    // Older Safari: fall back to an <img>, which also applies EXIF rotation.
+    const img = new Image();
+    img.src = URL.createObjectURL(file);
+    await img.decode();
+    return img;
+  }
+}
+
+function toJpeg(source, srcW, srcH, maxSize, quality) {
+  const scale = Math.min(1, maxSize / Math.max(srcW, srcH));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(srcW * scale);
+  canvas.height = Math.round(srcH * scale);
+  canvas.getContext('2d').drawImage(source, 0, 0, canvas.width, canvas.height);
+  return new Promise((resolve, reject) =>
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Couldn't process that photo."))), 'image/jpeg', quality),
+  );
+}
+
+// iPad photos are several MB: make a 1600px copy to view and a 480px thumbnail.
+export async function preparePhoto(file) {
+  const img = await decodeImage(file);
+  const width = img.naturalWidth || img.width;
+  const height = img.naturalHeight || img.height;
+  const [full, thumb] = await Promise.all([toJpeg(img, width, height, 1600, 0.82), toJpeg(img, width, height, 480, 0.75)]);
+  if (img.close) img.close();
+  else URL.revokeObjectURL(img.src);
+  return { full, thumb, width, height };
+}

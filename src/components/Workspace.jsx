@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { COMPETITION, ROSTER, STATUSES, SUBTEAMS, PRIORITIES, TEAM_NAME } from '../config.js';
+import { COMPETITION, ROSTER, STATUSES, SUBTEAMS, PRIORITIES, TEAM_NAME, fixName } from '../config.js';
 import { daysBetween, todayISO } from '../milestones.js';
-import { personId } from '../data/diff.js';
-import { useLocalStorage } from '../util.js';
+import { newTaskDefaults, personId } from '../data/diff.js';
+import { preparePhoto, useLocalStorage } from '../util.js';
 import { Avatar, PlusIcon } from './common.jsx';
 import TableView from './TableView.jsx';
 import BoardView from './BoardView.jsx';
@@ -73,6 +73,22 @@ const VIEWS = [
   ['team', 'Team'],
 ];
 
+function matchesFilters(t, filters, me, view) {
+  const q = filters.q.trim().toLowerCase();
+  const who = t.assignees || [];
+  if (q && !`${t.title} ${t.description} ${t.subteam} ${who.join(' ')}`.toLowerCase().includes(q)) return false;
+  if (filters.person === '__me' && !who.includes(me)) return false;
+  if (filters.person === '__none' && who.length) return false;
+  if (filters.person && !filters.person.startsWith('__') && !who.includes(filters.person)) return false;
+  if (filters.subteam && t.subteam !== filters.subteam) return false;
+  if (filters.priority && t.priority !== filters.priority) return false;
+  if (filters.hideDone && t.status === 'done') return false;
+  if (view === 'table' && filters.statuses.length && !filters.statuses.includes(t.status)) return false;
+  return true;
+}
+
+const withFixedNames = (t) => (t.assignees?.some((n) => fixName(n) !== n) ? { ...t, assignees: t.assignees.map(fixName) } : t);
+
 const EMPTY_FILTERS = { q: '', person: '', subteam: '', priority: '', statuses: [], hideDone: false };
 
 export default function Workspace({ store, actor }) {
@@ -96,20 +112,48 @@ export default function Workspace({ store, actor }) {
   const [theme, setTheme] = useLocalStorage('theme', 'system');
   const [openId, setOpenId] = useState(null);
   const [newTask, setNewTask] = useState(null);
-  const [toast, setToast] = useState('');
+  const [toast, setToast] = useState(null); // { text, action?: { label, run } }
+  const [tasksError, setTasksError] = useState('');
 
   const fail = useCallback((e) => {
     console.error(e);
-    setToast(e?.code === 'permission-denied' ? "You don't have permission to do that." : e?.message || 'Something went wrong.');
+    setToast({ text: e?.code === 'permission-denied' ? "You don't have permission to do that." : e?.message || 'Something went wrong.' });
   }, []);
+  // Loading errors name what failed, so a screenshot tells us where to look.
+  const loadFail = useCallback(
+    (what) => (e) => {
+      console.error(what, e);
+      const why =
+        e?.code === 'permission-denied' ? 'the database rules need updating (ask team management)' : e?.message || 'unknown error';
+      setToast({ text: `Couldn't load ${what}: ${why}.` });
+    },
+    [],
+  );
 
-  useEffect(() => store.subscribeTasks(setTasks, fail), [store, fail]);
-  useEffect(() => store.subscribePeople(setPeople, fail), [store, fail]);
-  useEffect(() => store.subscribeMilestones(setMilestones, fail), [store, fail]);
-  useEffect(() => store.subscribeRoles(setRoles, fail), [store, fail]);
-  useEffect(() => store.subscribeSettings(setSettings, fail), [store, fail]);
-  useEffect(() => store.subscribeParts(setParts, fail), [store, fail]);
-  useEffect(() => store.subscribeChecklists(setChecklists, fail), [store, fail]);
+  useEffect(
+    () =>
+      store.subscribeTasks(
+        (ts) => {
+          setTasksError('');
+          setTasks(ts.map(withFixedNames));
+        },
+        (e) => {
+          console.error('tasks', e);
+          setTasksError(
+            e?.code === 'permission-denied'
+              ? "This device isn't allowed to read tasks. Tap Switch and join again."
+              : e?.message || String(e),
+          );
+        },
+      ),
+    [store],
+  );
+  useEffect(() => store.subscribePeople(setPeople, loadFail('the team list')), [store, loadFail]);
+  useEffect(() => store.subscribeMilestones(setMilestones, loadFail('milestones')), [store, loadFail]);
+  useEffect(() => store.subscribeRoles(setRoles, loadFail('the org chart')), [store, loadFail]);
+  useEffect(() => store.subscribeSettings(setSettings, loadFail('settings')), [store, loadFail]);
+  useEffect(() => store.subscribeParts(setParts, loadFail('parts')), [store, loadFail]);
+  useEffect(() => store.subscribeChecklists(setChecklists, loadFail('checklists')), [store, loadFail]);
   const competitionDate = settings.competitionDate || COMPETITION.date;
 
   useEffect(() => {
@@ -119,7 +163,7 @@ export default function Workspace({ store, actor }) {
 
   useEffect(() => {
     if (!toast) return;
-    const t = setTimeout(() => setToast(''), 4000);
+    const t = setTimeout(() => setToast(null), toast.action ? 8000 : 5000);
     return () => clearTimeout(t);
   }, [toast]);
 
@@ -128,17 +172,47 @@ export default function Workspace({ store, actor }) {
   const roster = useMemo(() => {
     const removed = new Set(roles.filter((r) => r.removed).map((r) => r.name));
     const names = new Set(ROSTER);
-    for (const r of roles) if (r.name) names.add(r.name);
-    for (const p of people) if (p.name) names.add(p.name);
+    for (const r of roles) if (r.name) names.add(fixName(r.name));
+    for (const p of people) if (p.name) names.add(fixName(p.name));
     return [...names].filter((n) => !removed.has(n) || n === actor.name);
   }, [people, roles, actor.name]);
+
+  // Lets api.create see the current filters without rebuilding api on every change.
+  const filterState = useRef();
+  filterState.current = { filters, view, taskView };
 
   // Store calls wrapped with the signed-in person and error reporting.
   const api = useMemo(
     () => ({
-      create: (data) => store.createTask(data, actor).catch(fail),
+      create: async (data) => {
+        try {
+          await store.createTask(data, actor);
+        } catch (e) {
+          return fail(e);
+        }
+        // A new task that the current filters hide looks like it never saved.
+        const { filters: f, view: v, taskView: onTasks } = filterState.current;
+        if (onTasks && !matchesFilters(newTaskDefaults(data), f, actor.name, v)) {
+          setToast({
+            text: 'Task added, but your filters are hiding it.',
+            action: { label: 'Clear filters', run: () => setFilters(EMPTY_FILTERS) },
+          });
+        }
+      },
       update: (task, patch) => store.updateTask(task.id, patch, actor, task).catch(fail),
-      remove: (task) => store.deleteTask(task.id).catch(fail),
+      remove: (task) => store.deleteTask(task.id, task.photos || []).catch(fail),
+      addPhoto: async (task, file) => {
+        try {
+          await store.addTaskPhoto(task.id, await preparePhoto(file), actor);
+        } catch (e) {
+          fail(
+            e?.code === 'storage/unauthorized'
+              ? { message: 'Photo upload was blocked. The photo storage rules may need setting up (ask team management).' }
+              : e,
+          );
+        }
+      },
+      removePhoto: (task, photo) => store.removeTaskPhoto(task.id, photo, actor).catch(fail),
       comment: (task, text) => store.addComment(task.id, text, actor).catch(fail),
       subscribeActivity: (id, cb) => store.subscribeActivity(id, cb, fail),
       createMilestone: (data) => store.createMilestone(data, actor).catch(fail),
@@ -169,24 +243,13 @@ export default function Workspace({ store, actor }) {
       removeChecklistItem: (list, item) => store.removeChecklistItem(list.id, item.id).catch(fail),
       deleteChecklist: (list) => store.deleteChecklist(list.id).catch(fail),
     }),
-    [store, actor, fail],
+    [store, actor, fail, setFilters],
   );
 
-  const filtered = useMemo(() => {
-    if (!tasks) return [];
-    const q = filters.q.trim().toLowerCase();
-    return tasks.filter((t) => {
-      if (q && !`${t.title} ${t.description} ${t.subteam} ${(t.assignees || []).join(' ')}`.toLowerCase().includes(q)) return false;
-      if (filters.person === '__me' && !(t.assignees || []).includes(actor.name)) return false;
-      if (filters.person === '__none' && (t.assignees || []).length) return false;
-      if (filters.person && !filters.person.startsWith('__') && !(t.assignees || []).includes(filters.person)) return false;
-      if (filters.subteam && t.subteam !== filters.subteam) return false;
-      if (filters.priority && t.priority !== filters.priority) return false;
-      if (filters.hideDone && t.status === 'done') return false;
-      if (view === 'table' && filters.statuses.length && !filters.statuses.includes(t.status)) return false;
-      return true;
-    });
-  }, [tasks, filters, actor.name, view]);
+  const filtered = useMemo(
+    () => (tasks || []).filter((t) => matchesFilters(t, filters, actor.name, view)),
+    [tasks, filters, actor.name, view],
+  );
 
   const counts = useMemo(() => {
     const c = Object.fromEntries(STATUSES.map((s) => [s.id, 0]));
@@ -320,7 +383,17 @@ export default function Workspace({ store, actor }) {
 
       {tasks === null ? (
         <main className="content">
-          <p className="empty">Loading…</p>
+          {tasksError ? (
+            <div className="empty-card">
+              <h2>Couldn't load tasks</h2>
+              <p className="muted">{tasksError}</p>
+              <button className="btn primary" onClick={() => location.reload()}>
+                Reload
+              </button>
+            </div>
+          ) : (
+            <p className="empty">Loading…</p>
+          )}
         </main>
       ) : view === 'milestones' ? (
         <MilestonesView
@@ -367,8 +440,20 @@ export default function Workspace({ store, actor }) {
       )}
       {cat && <CatParty onClose={() => setCat(false)} />}
       {toast && (
-        <div className="toast" role="alert" onClick={() => setToast('')}>
-          {toast}
+        <div className="toast" role="alert" onClick={() => setToast(null)}>
+          <span>{toast.text}</span>
+          {toast.action && (
+            <button
+              className="toast-action"
+              onClick={(e) => {
+                e.stopPropagation();
+                toast.action.run();
+                setToast(null);
+              }}
+            >
+              {toast.action.label}
+            </button>
+          )}
         </div>
       )}
     </div>

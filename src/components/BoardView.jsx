@@ -31,6 +31,9 @@ function byPriorityThenDue(a, b) {
 function CardBody({ task }) {
   return (
     <>
+      {task.photos?.length > 0 && (
+        <img className="card-cover" src={task.photos[0].thumbUrl || task.photos[0].url} alt="" loading="lazy" draggable="false" />
+      )}
       <div className="card-top">
         <PriorityBadge value={task.priority} />
         {task.subteam && <span className="tag">{task.subteam}</span>}

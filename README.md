@@ -35,6 +35,7 @@ Pushing to `main` deploys to GitHub Pages via `.github/workflows/deploy.yml`.
   Firebase console → Firestore Database → Rules. To change the code, edit it
   there and Publish. Devices that already joined stay signed in.
 - Firebase Authentication must have the **Anonymous** provider enabled.
+- `storage.rules` — Cloud Storage rules for task photos (paste into Firebase console → Storage → Rules).
 
 ## Data model (Firestore)
 
@@ -42,6 +43,7 @@ Pushing to `main` deploys to GitHub Pages via `.github/workflows/deploy.yml`.
 - `roles/{personId}` — `{ name, title, subteams[], responsibilities[], removed }` — org chart edits and people the manager added or removed.
 - `settings/team` — `{ competitionDate }`.
 - `parts/{id}` — `{ name, vendor, partNumber, qty, unitCost, url, status, subteam, taskId, notes }`.
+- Task photos live in Cloud Storage at `tasks/{taskId}/{photoId}.jpg` (+ `-thumb.jpg`); the task's `photos` array holds their URLs.
 - `checklists/{id}` — `{ title, items: { [itemId]: { text, done, doneBy, doneAt, order } } }` (a map so simultaneous ticks don't collide).
 - `members/{uid}` — `{ name, code, joinedAt }` — one per device that entered the right code; only readable by that device.
 - `people/{uid}` — `{ name, joinedAt }` — names for the assignee picker, readable by the team.

@@ -1,7 +1,26 @@
 // Picks the backend: ?demo in the URL runs fully offline with sample data.
 export const isDemo = new URLSearchParams(location.search).has('demo');
 
+// After a new deploy, a page loaded earlier can ask for code files that no
+// longer exist. Reload once to pick up the new version instead of failing.
+export function reloadOnceForNewVersion() {
+  const key = 'reloaded-for-new-version';
+  try {
+    if (Date.now() - Number(sessionStorage.getItem(key) || 0) < 60000) return false;
+    sessionStorage.setItem(key, String(Date.now()));
+  } catch {
+    return false;
+  }
+  location.reload();
+  return true;
+}
+
 export async function loadStore() {
-  if (isDemo) return (await import('./demoStore.js')).demoStore;
-  return (await import('./firebaseStore.js')).firebaseStore;
+  try {
+    if (isDemo) return (await import('./demoStore.js')).demoStore;
+    return (await import('./firebaseStore.js')).firebaseStore;
+  } catch (e) {
+    if (reloadOnceForNewVersion()) return new Promise(() => {});
+    throw e;
+  }
 }

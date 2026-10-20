@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { loadStore } from './data/store.js';
-import { TEAM_NAME } from './config.js';
+import { TEAM_NAME, fixName } from './config.js';
 import { JoinScreen, LoadingScreen } from './components/Gate.jsx';
 import Workspace from './components/Workspace.jsx';
 
@@ -43,7 +43,7 @@ export default function App() {
     };
   }, [store, user]);
 
-  const actor = useMemo(() => (user && member ? { uid: user.uid, name: member.name, admin: member.admin } : null), [user, member]);
+  const actor = useMemo(() => (user && member ? { uid: user.uid, name: fixName(member.name), admin: member.admin } : null), [user, member]);
 
   useEffect(() => {
     document.title = `${TEAM_NAME} Task Board`;

@@ -396,7 +396,11 @@ tr:hover .open-btn, .open-btn:focus { opacity: 1; }
 }
 .dialog .panel-head { margin: 0 -20px; padding: 12px 14px 12px 20px; }
 
+.toast-action {
+  border: 0; background: none; color: #a5b4fc; font-weight: 700; padding: 4px 0 4px 12px; white-space: nowrap;
+}
 .toast {
+  display: flex; align-items: center; gap: 4px;
   position: fixed; left: 50%; bottom: max(20px, env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 60;
   background: #1f2230; color: #fff; padding: 10px 16px; border-radius: 10px; box-shadow: var(--shadow-lg); max-width: calc(100% - 32px);
 }
@@ -645,6 +649,27 @@ div.org-member { cursor: default; }
 .task-parts { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .task-parts li { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 10px; }
 .meta-count.all-done { color: var(--st-done); font-weight: 600; }
+
+
+/* ---------- photos ---------- */
+.task-photos { display: flex; flex-direction: column; gap: 8px; }
+.photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+.photo-thumb {
+  aspect-ratio: 1; border: 0; padding: 0; border-radius: 10px; overflow: hidden; background: var(--surface-2);
+  display: grid; place-items: center; font-size: 12px; color: var(--muted);
+}
+.photo-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.photo-thumb.uploading { animation: pulse 1.2s ease-in-out infinite alternate; }
+@keyframes pulse { to { opacity: 0.5; } }
+.photo-viewer {
+  position: fixed; inset: 0; z-index: 70; background: rgb(0 0 0 / 88%);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 16px; gap: 12px;
+}
+.photo-viewer img { max-width: 100%; max-height: calc(100% - 70px); object-fit: contain; border-radius: 8px; }
+.photo-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; width: min(900px, 100%); color: #e5e7eb; font-size: 14px; }
+.photo-bar .btn { color: #fff; border-color: rgb(255 255 255 / 25%); background: rgb(255 255 255 / 8%); text-decoration: none; }
+.photo-bar .danger-text { color: #fca5a5; }
+.card-cover { width: calc(100% + 24px); margin: -10px -12px 2px; height: 120px; object-fit: cover; border-radius: 10px 10px 0 0; display: block; pointer-events: none; }
 
 /* ---------- responsive ---------- */
 @media (max-width: 1100px) {

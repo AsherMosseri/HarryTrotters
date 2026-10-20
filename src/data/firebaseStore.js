@@ -15,12 +15,16 @@ import {
   setDoc,
   updateDoc,
   deleteField,
+  arrayUnion,
+  arrayRemove,
 } from 'firebase/firestore';
+import { getStorage, ref as fileRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { firebaseConfig } from '../config.js';
-import { describeChanges, derivedFields, newTaskDefaults, newMilestoneDefaults, newPartDefaults } from './diff.js';
+import { describeChanges, derivedFields, newTaskDefaults, newMilestoneDefaults, newPartDefaults, itemId } from './diff.js';
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
+const storage = getStorage(app);
 // Offline cache keeps the board usable on spotty shop Wi-Fi.
 const db = initializeFirestore(app, {
   localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
@@ -46,6 +50,16 @@ function readDoc(snap) {
     if (k in out) out[k] = millis(out[k]);
   }
   return out;
+}
+
+async function deletePhotoFiles(photo) {
+  await Promise.all(
+    [`${photo.path}.jpg`, `${photo.path}-thumb.jpg`].map((p) =>
+      deleteObject(fileRef(storage, p)).catch((e) => {
+        if (e.code !== 'storage/object-not-found') throw e;
+      }),
+    ),
+  );
 }
 
 const actorFields = (actor) => ({ by: actor.name, byUid: actor.uid });
@@ -128,8 +142,53 @@ export const firebaseStore = {
     await batch.commit();
   },
 
-  deleteTask(id) {
-    return deleteDoc(doc(tasksCol, id));
+  async deleteTask(id, photos = []) {
+    await deleteDoc(doc(tasksCol, id));
+    await Promise.all(photos.map(deletePhotoFiles));
+  },
+
+  // Photos: a full-size and a thumbnail JPEG in Cloud Storage; the task keeps
+  // their URLs in a `photos` array (arrayUnion, so simultaneous uploads don't clash).
+  async addTaskPhoto(taskId, { full, thumb, width, height }, actor) {
+    const id = itemId();
+    const base = `tasks/${taskId}/${id}`;
+    const [url, thumbUrl] = await Promise.all(
+      [
+        [`${base}.jpg`, full],
+        [`${base}-thumb.jpg`, thumb],
+      ].map(async ([path, blob]) => {
+        const r = fileRef(storage, path);
+        await uploadBytes(r, blob, { contentType: 'image/jpeg' });
+        return getDownloadURL(r);
+      }),
+    );
+    const photo = { id, path: base, url, thumbUrl, width, height, by: actor.name, at: Date.now() };
+    const ref = doc(tasksCol, taskId);
+    const batch = writeBatch(db);
+    batch.update(ref, { photos: arrayUnion(photo), updatedAt: serverTimestamp(), updatedBy: actor.name });
+    batch.set(doc(collection(ref, 'activity')), {
+      type: 'change',
+      field: 'photos',
+      to: 'added',
+      ...actorFields(actor),
+      at: serverTimestamp(),
+    });
+    await batch.commit();
+  },
+
+  async removeTaskPhoto(taskId, photo, actor) {
+    const ref = doc(tasksCol, taskId);
+    const batch = writeBatch(db);
+    batch.update(ref, { photos: arrayRemove(photo), updatedAt: serverTimestamp(), updatedBy: actor.name });
+    batch.set(doc(collection(ref, 'activity')), {
+      type: 'change',
+      field: 'photos',
+      to: 'removed',
+      ...actorFields(actor),
+      at: serverTimestamp(),
+    });
+    await batch.commit();
+    await deletePhotoFiles(photo);
   },
 
   subscribeActivity(taskId, cb, onError) {
