@@ -85,6 +85,21 @@ service cloud.firestore {
       allow delete: if isManager();
     }
 
+    // Robot tab: anyone uploads versions and adds pins/layouts; authors or
+    // managers remove pins and layouts; only managers delete versions.
+    match /robotVersions/{id} {
+      allow read, create, update: if isMember();
+      allow delete: if isManager();
+    }
+    match /robotPins/{id} {
+      allow read, create, update: if isMember();
+      allow delete: if isManager() || (isMember() && resource.data.byUid == request.auth.uid);
+    }
+    match /robotLayouts/{id} {
+      allow read, create: if isMember();
+      allow update, delete: if isManager() || (isMember() && resource.data.byUid == request.auth.uid);
+    }
+
     // Practice and match log: anyone on the team.
     match /runs/{id} {
       allow read, write: if isMember();

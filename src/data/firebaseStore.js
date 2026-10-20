@@ -24,7 +24,7 @@ import {
   getDocs,
   FieldPath,
 } from 'firebase/firestore';
-import { getStorage, ref as fileRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import { getStorage, ref as fileRef, uploadBytes, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
 import { firebaseConfig } from '../config.js';
 import {
   describeChanges,
@@ -59,6 +59,9 @@ const partsCol = collection(db, 'parts');
 const checklistsCol = collection(db, 'checklists');
 const runsCol = collection(db, 'runs');
 const messagesCol = (channel) => collection(db, 'channels', channel, 'messages');
+const robotVersionsCol = collection(db, 'robotVersions');
+const robotPinsCol = collection(db, 'robotPins');
+const robotLayoutsCol = collection(db, 'robotLayouts');
 
 const millis = (v) => (v && typeof v.toMillis === 'function' ? v.toMillis() : (v ?? null));
 
@@ -423,5 +426,68 @@ export const firebaseStore = {
 
   removeReaction(channel, id, emoji) {
     return updateDoc(doc(messagesCol(channel), id), new FieldPath('reactions', emoji), deleteField());
+  },
+
+  // Robot tab: 3D model versions (files in Storage), pins, and sandbox layouts.
+  subscribeRobot(cb, onError) {
+    const state = { versions: [], pins: [], layouts: [] };
+    const sub = (col, field) =>
+      onSnapshot(
+        col,
+        (snap) => {
+          state[field] = snap.docs.map(readDoc);
+          cb({ ...state });
+        },
+        onError,
+      );
+    const stops = [sub(robotVersionsCol, 'versions'), sub(robotPinsCol, 'pins'), sub(robotLayoutsCol, 'layouts')];
+    return () => stops.forEach((s) => s());
+  },
+
+  async uploadRobotVersion(file, meta, actor, onProgress) {
+    const ref = doc(robotVersionsCol);
+    const ext = /\.gltf$/i.test(file.name) ? 'gltf' : 'glb';
+    const path = `robot/${ref.id}.${ext}`;
+    const r = fileRef(storage, path);
+    const task = uploadBytesResumable(r, file, { contentType: ext === 'gltf' ? 'model/gltf+json' : 'model/gltf-binary' });
+    await new Promise((resolve, reject) =>
+      task.on('state_changed', (s) => onProgress?.(s.bytesTransferred / s.totalBytes), reject, resolve),
+    );
+    const url = await getDownloadURL(r);
+    await setDoc(ref, { ...meta, path, url, size: file.size, by: actor.name, byUid: actor.uid, at: Date.now() });
+  },
+
+  async deleteRobotVersion(version, pins, layouts) {
+    const batch = writeBatch(db);
+    batch.delete(doc(robotVersionsCol, version.id));
+    for (const p of pins) batch.delete(doc(robotPinsCol, p.id));
+    for (const l of layouts) batch.delete(doc(robotLayoutsCol, l.id));
+    await batch.commit();
+    if (version.path) await deleteObject(fileRef(storage, version.path)).catch(() => {});
+  },
+
+  createRobotPin(data, actor) {
+    return setDoc(doc(robotPinsCol), {
+      resolved: false,
+      taskId: '',
+      partId: '',
+      ...data,
+      by: actor.name,
+      byUid: actor.uid,
+      at: Date.now(),
+    });
+  },
+  updateRobotPin(id, patch) {
+    return updateDoc(doc(robotPinsCol, id), patch);
+  },
+  deleteRobotPin(id) {
+    return deleteDoc(doc(robotPinsCol, id));
+  },
+
+  saveRobotLayout(data, actor) {
+    return setDoc(doc(robotLayoutsCol), { ...data, by: actor.name, byUid: actor.uid, at: Date.now() });
+  },
+  deleteRobotLayout(id) {
+    return deleteDoc(doc(robotLayoutsCol, id));
   },
 };

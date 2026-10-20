@@ -7,7 +7,7 @@ const QUICK_TIPS = [
   [
     '🗂',
     'Use the tabs',
-    'Chat: team and subteam channels. Milestones: big steps to the competition. Parts: what to buy. Checklists: competition prep. Match Log: practice scores. Team: who does what.',
+    'Chat: team and subteam channels. Milestones: big steps to the competition. Parts: what to buy. Checklists: competition prep. Match Log: practice scores. Robot: the 3D model. Team: who does what.',
   ],
   [
     '📱',
@@ -68,6 +68,16 @@ const SECTIONS = [
       'Type @ to mention someone and # to link a task. Tap 📷 to send a photo.',
       'Tap (or hover over) a message to react, reply, edit or delete your own, or turn it into a task with +Task.',
       'There are no phone notifications yet, so check the Chat tab.',
+    ],
+  ],
+  [
+    'Robot (3D)',
+    [
+      'The CAD team uploads each version from Onshape (Export → GLTF, Coarse or Medium detail).',
+      'Spin with one finger, pinch to zoom, two fingers to pan. Tap a part to select it; the eye in the Parts list hides or shows it.',
+      '📍 Pins: tap the robot to leave a note on a part, link it to a task or part, and resolve it when fixed.',
+      '✋ Sandbox: move or rotate parts to try ideas and save the layout. It never changes the real CAD.',
+      '⇄ Compare: two versions side by side. Green = added, red = removed, orange = moved.',
     ],
   ],
   ['Team', ['The org chart and everyone’s responsibilities and open tasks.']],

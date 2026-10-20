@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CHANNELS, COMPETITION, ROSTER, STATUSES, SUBTEAMS, PRIORITIES, TEAM_NAME } from '../config.js';
 import { daysBetween, todayISO } from '../milestones.js';
 import { newTaskDefaults, personId } from '../data/diff.js';
@@ -16,6 +16,8 @@ import CatParty from './CatParty.jsx';
 import TrashDialog from './TrashDialog.jsx';
 import RunsView from './RunsView.jsx';
 import ChatView from './ChatView.jsx';
+// The 3D viewer pulls in three.js, so it loads only when the Robot tab opens.
+const RobotView = lazy(() => import('./RobotView.jsx'));
 import { HelpDialog, WelcomeCard } from './Help.jsx';
 
 function ThemeIcon({ theme }) {
@@ -76,6 +78,7 @@ const VIEWS = [
   ['parts', 'Parts'],
   ['checklists', 'Checklists'],
   ['runs', 'Match Log'],
+  ['robot', 'Robot'],
   ['team', 'Team'],
 ];
 
@@ -106,6 +109,7 @@ export default function Workspace({ store, actor, rename, renames }) {
   const [parts, setParts] = useState([]);
   const [checklists, setChecklists] = useState([]);
   const [runs, setRuns] = useState([]);
+  const [robot, setRobot] = useState({ versions: [], pins: [], layouts: [] });
   const [chat, setChat] = useState({}); // { [channelId]: newest messages }
   const [chatChannel, setChatChannel] = useLocalStorage('chat-channel', 'general');
   const [chatRead, setChatRead] = useLocalStorage('chat-read', null); // { [channelId]: ms read up to }
@@ -174,6 +178,7 @@ export default function Workspace({ store, actor, rename, renames }) {
   useEffect(() => store.subscribeParts(setParts, loadFail('parts')), [store, loadFail]);
   useEffect(() => store.subscribeChecklists(setChecklists, loadFail('checklists')), [store, loadFail]);
   useEffect(() => store.subscribeRuns(setRuns, loadFail('the match log')), [store, loadFail]);
+  useEffect(() => store.subscribeRobot(setRobot, loadFail('the robot')), [store, loadFail]);
   useEffect(() => {
     const stops = CHANNELS.map((c) =>
       store.subscribeChannel(c.id, CHAT_PAGE, (msgs) => setChat((all) => ({ ...all, [c.id]: msgs })), loadFail('chat')),
@@ -362,6 +367,21 @@ export default function Workspace({ store, actor, rename, renames }) {
       removeChecklistItem: (list, item) => store.removeChecklistItem(list.id, item.id).catch(fail),
       deleteChecklist: (list) => store.deleteChecklist(list.id).catch(fail),
       createRun: (data) => store.createRun(data, actor).catch(fail),
+      uploadRobotVersion: (file, meta, onProgress) =>
+        store.uploadRobotVersion(file, meta, actor, onProgress).catch((e) => {
+          fail(
+            e?.code === 'storage/unauthorized'
+              ? { message: 'Upload was blocked. The Storage rules may need updating (ask team management).' }
+              : e,
+          );
+          return false;
+        }),
+      deleteRobotVersion: (v, pins, layouts) => store.deleteRobotVersion(v, pins, layouts).catch(fail),
+      createRobotPin: (data) => store.createRobotPin(data, actor).catch(fail),
+      updateRobotPin: (id, patch) => store.updateRobotPin(id, patch).catch(fail),
+      deleteRobotPin: (id) => store.deleteRobotPin(id).catch(fail),
+      saveRobotLayout: (data) => store.saveRobotLayout(data, actor).catch(fail),
+      deleteRobotLayout: (id) => store.deleteRobotLayout(id).catch(fail),
       sendMessage: (channel, data, photoFiles) => store.sendMessage(channel, data, actor, photoFiles).catch(fail),
       editMessage: (channel, id, patch) => store.editMessage(channel, id, patch).catch(fail),
       deleteMessage: (channel, m) => store.deleteMessage(channel, m).catch(fail),
@@ -394,7 +414,7 @@ export default function Workspace({ store, actor, rename, renames }) {
   const anyFilter = filters.q || filters.person || filters.subteam || filters.priority || filters.statuses.length || filters.hideDone;
 
   return (
-    <div className={`app${view === 'chat' ? ' chat-mode' : ''}`}>
+    <div className={`app${view === 'chat' || view === 'robot' ? ' chat-mode' : ''}`}>
       {store.mode === 'demo' && (
         <div className="demo-banner">
           Demo mode — sample data saved only in this browser. <a href="./">Go to the real board</a>
@@ -576,6 +596,26 @@ export default function Workspace({ store, actor, rename, renames }) {
             })
           }
         />
+      ) : view === 'robot' ? (
+        <Suspense
+          fallback={
+            <main className="content">
+              <p className="empty">Loading the 3D viewer…</p>
+            </main>
+          }
+        >
+          <RobotView
+            robot={robot}
+            tasks={tasks}
+            parts={parts}
+            actor={actor}
+            isManager={actor.admin}
+            api={api}
+            theme={theme}
+            onOpenTask={setOpenId}
+            onMakeTask={(data) => setNewTask({ status: 'todo', ...data })}
+          />
+        </Suspense>
       ) : view === 'runs' ? (
         <RunsView runs={runs} roster={roster} api={api} />
       ) : view === 'team' ? (

@@ -10,6 +10,7 @@ A live, shared task board for the team — replaces the old Google Sheet task lo
 - **Match Log** tab: practice runs and competition matches with Auto / TeleOp / Endgame points, a points-per-run chart, and problems (optionally turned into a fix task).
 - **Recently deleted**: deleting a task moves it here (with Undo) for 30 days; managers can delete for good, and a manager's device purges entries older than 30 days.
 - **Chat** tab: #general plus a channel per subteam, with photos, reactions (any emoji), replies, @mentions, # task links, editing, and turning a message into a task. Unread counts per device.
+- **Robot** tab: 3D viewer for Onshape GLTF exports (three.js, loaded only on this tab) with a parts tree, hide/show/isolate, exploded view, pinned notes linked to tasks and parts, a sandbox to move/rotate parts and save layouts, and side-by-side version compare (added/removed/moved). Model files need CORS enabled on the Storage bucket to download (see the in-app message).
 - **Team** tab: organization chart by subteam plus each person's role and responsibilities (editable on the site; starting values in `ORG_DEFAULTS` in `src/config.js`).
 - **Task details**: multiple assignees, subteam, priority, due date, blocker notes, links, comments, and an automatic history of every change.
 - Join by picking your name and entering the team code (once per device). The code is checked by the Firestore security rules, so a wrong code can't read or change anything.
@@ -52,6 +53,7 @@ Pushing to `main` deploys to GitHub Pages via `.github/workflows/deploy.yml`.
 - `runs/{id}` — `{ date, type, matchNumber, result, drivers[], auto, teleop, endgame, penalties, issues, notes }`.
 - Deleted tasks keep `deletedAt` / `deletedBy` until restored or purged.
 - `channels/{channelId}/messages/{id}` — `{ text, by, byUid, at, mentions[], taskIds[], replyTo, photo, reactions: { [emoji]: { [uid]: name } }, editedAt, deleted }`. Chat photos live in Storage under `chat/{channelId}/`.
+- `robotVersions/{id}` (file in Storage at `robot/{id}.glb`), `robotPins/{id}` `{ versionId, key, point, text, taskId, partId, resolved }`, `robotLayouts/{id}` `{ versionId, name, transforms, hidden }`.
 - `checklists/{id}` — `{ title, items: { [itemId]: { text, done, doneBy, doneAt, order } } }` (a map so simultaneous ticks don't collide).
 - `members/{uid}` — `{ name, code, joinedAt }` — one per device that entered the right code; only readable by that device.
 - `people/{uid}` — `{ name, joinedAt }` — names for the assignee picker, readable by the team.

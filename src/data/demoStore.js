@@ -11,7 +11,7 @@ import {
 } from './diff.js';
 import { STARTER_CHECKLISTS, starterItems } from '../checklists.js';
 
-const KEY = 'ftc32313-demo-v8';
+const KEY = 'ftc32313-demo-v9';
 const listeners = new Set();
 const uid = () => Math.random().toString(36).slice(2, 11);
 
@@ -141,8 +141,33 @@ function seed() {
     ],
     assembly: [msg(60, 'Ira Kumar', 'Intake side plates are printed')],
   };
-  return { tasks, activity, people: [], milestones, roles: [], parts, checklists, runs, chat };
+  const robot = {
+    versions: [
+      { id: 'sample-1', name: 'v1 – original robot', notes: 'Built-in sample model', sample: 1, by: 'Shrey Kumar', at: now - 6 * day },
+      { id: 'sample-2', name: 'v2 – raised intake + claw', notes: 'Built-in sample model', sample: 2, by: 'Matthew Kuehl', at: now - day },
+    ],
+    pins: [
+      {
+        id: uid(),
+        versionId: 'sample-2',
+        key: 'Intake/Intake Roller',
+        point: [0, 0.028, 0],
+        text: 'Roller slips on the hex shaft, add a set screw',
+        taskId: tasks[0].id,
+        partId: '',
+        resolved: false,
+        by: 'Cooper Mlezcko',
+        byUid: 'Cooper Mlezcko',
+        at: now - 3 * 3600000,
+      },
+    ],
+    layouts: [],
+  };
+  return { tasks, activity, people: [], milestones, roles: [], parts, checklists, runs, chat, robot };
 }
+
+// Demo uploads: version id -> object URL (not saved across reloads).
+const demoFiles = new Map();
 
 let state;
 try {
@@ -457,6 +482,54 @@ export const demoStore = {
       delete reactions[emoji];
       return { ...m, reactions };
     });
+    commit();
+  },
+
+  // Robot: uploaded files stay in memory only (they disappear on reload).
+  subscribeRobot(cb) {
+    return listen(() => {
+      const r = state.robot || { versions: [], pins: [], layouts: [] };
+      cb({
+        versions: r.versions.filter((v) => v.sample || demoFiles.has(v.id)).map((v) => ({ ...v, url: demoFiles.get(v.id) })),
+        pins: [...r.pins],
+        layouts: [...r.layouts],
+      });
+    });
+  },
+  async uploadRobotVersion(file, meta, actor, onProgress) {
+    const id = uid();
+    demoFiles.set(id, URL.createObjectURL(file));
+    onProgress?.(1);
+    state.robot.versions = [...state.robot.versions, { id, ...meta, size: file.size, by: actor.name, byUid: actor.uid, at: Date.now() }];
+    commit();
+  },
+  async deleteRobotVersion(version) {
+    state.robot.versions = state.robot.versions.filter((v) => v.id !== version.id);
+    state.robot.pins = state.robot.pins.filter((p) => p.versionId !== version.id);
+    state.robot.layouts = state.robot.layouts.filter((l) => l.versionId !== version.id);
+    commit();
+  },
+  async createRobotPin(data, actor) {
+    state.robot.pins = [
+      ...state.robot.pins,
+      { id: uid(), resolved: false, taskId: '', partId: '', ...data, by: actor.name, byUid: actor.uid, at: Date.now() },
+    ];
+    commit();
+  },
+  async updateRobotPin(id, patch) {
+    state.robot.pins = state.robot.pins.map((p) => (p.id === id ? { ...p, ...patch } : p));
+    commit();
+  },
+  async deleteRobotPin(id) {
+    state.robot.pins = state.robot.pins.filter((p) => p.id !== id);
+    commit();
+  },
+  async saveRobotLayout(data, actor) {
+    state.robot.layouts = [...state.robot.layouts, { id: uid(), ...data, by: actor.name, byUid: actor.uid, at: Date.now() }];
+    commit();
+  },
+  async deleteRobotLayout(id) {
+    state.robot.layouts = state.robot.layouts.filter((l) => l.id !== id);
     commit();
   },
 };
