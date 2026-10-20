@@ -1,9 +1,17 @@
 // In-browser backend used with ?demo in the URL: no sign-in, data kept in
 // localStorage. Handy for trying the UI before Firebase is set up.
-import { describeChanges, derivedFields, newTaskDefaults, newMilestoneDefaults, newPartDefaults, personId } from './diff.js';
+import {
+  describeChanges,
+  derivedFields,
+  newTaskDefaults,
+  newMilestoneDefaults,
+  newPartDefaults,
+  newRunDefaults,
+  personId,
+} from './diff.js';
 import { STARTER_CHECKLISTS, starterItems } from '../checklists.js';
 
-const KEY = 'ftc32313-demo-v6';
+const KEY = 'ftc32313-demo-v7';
 const listeners = new Set();
 const uid = () => Math.random().toString(36).slice(2, 11);
 
@@ -95,7 +103,21 @@ function seed() {
     p('1/4" ID polycarbonate tubing, 1 ft', 'McMaster-Carr', 4, 6.5, 'arrived', { subteam: 'Mechanical' }),
   ];
   const checklists = STARTER_CHECKLISTS.slice(0, 2).map((c) => ({ id: uid(), title: c.title, items: starterItems(c) }));
-  return { tasks, activity, people: [], milestones, roles: [], parts, checklists };
+  const r = (offset, type, auto, teleop, endgame, extra = {}) => ({
+    id: uid(),
+    ...newRunDefaults({ date: iso(offset), type, auto, teleop, endgame, drivers: ['Sebastian Tolbert', 'Jackson Lucks'], ...extra }),
+    createdAt: now + offset * day,
+  });
+  const runs = [
+    r(-9, 'practice', 10, 42, 8, { issues: 'Intake jammed twice' }),
+    r(-8, 'practice', 15, 48, 10),
+    r(-6, 'practice', 15, 40, 0, { issues: 'Lift string snapped' }),
+    r(-5, 'practice', 20, 55, 15),
+    r(-3, 'practice', 25, 58, 15),
+    r(-2, 'match', 20, 61, 20, { matchNumber: 'Q4', result: 'win' }),
+    r(-1, 'practice', 30, 64, 20),
+  ];
+  return { tasks, activity, people: [], milestones, roles: [], parts, checklists, runs };
 }
 
 let state;
@@ -174,6 +196,20 @@ export const demoStore = {
     commit();
   },
 
+  async trashTask(id, actor, restore = false) {
+    state.tasks = state.tasks.map((t) =>
+      t.id === id ? { ...t, deletedAt: restore ? null : Date.now(), deletedBy: restore ? '' : actor.name } : t,
+    );
+    (state.activity[id] ||= []).push({
+      id: uid(),
+      type: 'change',
+      field: 'deleted',
+      to: restore ? 'restored' : 'deleted',
+      by: actor.name,
+      at: Date.now(),
+    });
+    commit();
+  },
   async deleteTask(id) {
     state.tasks = state.tasks.filter((t) => t.id !== id);
     delete state.activity[id];
@@ -315,6 +351,22 @@ export const demoStore = {
   },
   async deleteChecklist(id) {
     state.checklists = state.checklists.filter((c) => c.id !== id);
+    commit();
+  },
+
+  subscribeRuns(cb) {
+    return listen(() => cb([...(state.runs || [])]));
+  },
+  async createRun(data, actor) {
+    state.runs = [...(state.runs || []), { id: uid(), ...newRunDefaults(data), createdAt: Date.now(), createdBy: actor.name }];
+    commit();
+  },
+  async updateRun(id, patch, actor) {
+    state.runs = state.runs.map((r) => (r.id === id ? { ...r, ...patch, updatedBy: actor.name } : r));
+    commit();
+  },
+  async deleteRun(id) {
+    state.runs = state.runs.filter((r) => r.id !== id);
     commit();
   },
 };

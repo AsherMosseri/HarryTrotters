@@ -13,6 +13,8 @@ import TeamView from './TeamView.jsx';
 import PartsView from './PartsView.jsx';
 import ChecklistsView from './ChecklistsView.jsx';
 import CatParty from './CatParty.jsx';
+import TrashDialog from './TrashDialog.jsx';
+import RunsView from './RunsView.jsx';
 
 function ThemeIcon({ theme }) {
   const common = {
@@ -70,6 +72,7 @@ const VIEWS = [
   ['milestones', 'Milestones'],
   ['parts', 'Parts'],
   ['checklists', 'Checklists'],
+  ['runs', 'Match Log'],
   ['team', 'Team'],
 ];
 
@@ -87,6 +90,8 @@ function matchesFilters(t, filters, me, view) {
   return true;
 }
 
+const TRASH_DAYS = 30;
+
 const EMPTY_FILTERS = { q: '', person: '', subteam: '', priority: '', statuses: [], hideDone: false };
 
 export default function Workspace({ store, actor, rename, renames }) {
@@ -96,6 +101,7 @@ export default function Workspace({ store, actor, rename, renames }) {
   const [roles, setRoles] = useState([]);
   const [parts, setParts] = useState([]);
   const [checklists, setChecklists] = useState([]);
+  const [runs, setRuns] = useState([]);
   const [settings, setSettings] = useState({});
   const [cat, setCat] = useState(false);
   const [savedView, setView] = useLocalStorage('view', 'board');
@@ -158,6 +164,7 @@ export default function Workspace({ store, actor, rename, renames }) {
   useEffect(() => store.subscribeSettings(setSettings, loadFail('settings')), [store, loadFail]);
   useEffect(() => store.subscribeParts(setParts, loadFail('parts')), [store, loadFail]);
   useEffect(() => store.subscribeChecklists(setChecklists, loadFail('checklists')), [store, loadFail]);
+  useEffect(() => store.subscribeRuns(setRuns, loadFail('the match log')), [store, loadFail]);
   const competitionDate = settings.competitionDate || COMPETITION.date;
 
   useEffect(() => {
@@ -172,12 +179,29 @@ export default function Workspace({ store, actor, rename, renames }) {
   }, [toast]);
 
   // Show everyone under their current name, even on tasks saved before a rename.
-  const tasks = useMemo(
+  const allTasks = useMemo(
     () =>
       rawTasks &&
       rawTasks.map((t) => (t.assignees?.some((n) => rename(n) !== n) ? { ...t, assignees: [...new Set(t.assignees.map(rename))] } : t)),
     [rawTasks, rename],
   );
+  const tasks = useMemo(() => allTasks && allTasks.filter((t) => !t.deletedAt), [allTasks]);
+  const trash = useMemo(() => (allTasks || []).filter((t) => t.deletedAt).sort((a, b) => b.deletedAt - a.deletedAt), [allTasks]);
+  const [showTrash, setShowTrash] = useState(false);
+
+  // Tasks stay in Recently deleted for 30 days; a manager's device then removes them for good.
+  const purged = useRef(new Set());
+  useEffect(() => {
+    if (!actor.admin) return;
+    const cutoff = Date.now() - TRASH_DAYS * 86400000;
+    for (const t of trash) {
+      if (t.deletedAt < cutoff && !purged.current.has(t.id)) {
+        purged.current.add(t.id);
+        store.deleteTask(t.id, t.photos || []).catch((e) => console.warn('purge', e));
+      }
+    }
+  }, [trash, actor.admin, store]);
+
   const milestones = useMemo(
     () => rawMilestones.map((m) => (m.owners?.some((n) => rename(n) !== n) ? { ...m, owners: [...new Set(m.owners.map(rename))] } : m)),
     [rawMilestones, rename],
@@ -196,8 +220,8 @@ export default function Workspace({ store, actor, rename, renames }) {
   // Lets api.create see the current filters without rebuilding api on every change.
   const filterState = useRef();
   filterState.current = { filters, view, taskView };
-  const tasksRef = useRef(tasks);
-  tasksRef.current = tasks;
+  const tasksRef = useRef(allTasks);
+  tasksRef.current = allTasks;
   const milestonesRef = useRef(milestones);
   milestonesRef.current = milestones;
 
@@ -220,7 +244,19 @@ export default function Workspace({ store, actor, rename, renames }) {
         }
       },
       update: (task, patch) => store.updateTask(task.id, patch, actor, task).catch(fail),
-      remove: (task) => store.deleteTask(task.id, task.photos || []).catch(fail),
+      remove: async (task) => {
+        try {
+          await store.trashTask(task.id, actor);
+        } catch (e) {
+          return fail(e);
+        }
+        setToast({
+          text: `Deleted “${task.title || 'Untitled'}”.`,
+          action: { label: 'Undo', run: () => store.trashTask(task.id, actor, true).catch(fail) },
+        });
+      },
+      restore: (task) => store.trashTask(task.id, actor, true).catch(fail),
+      deleteForever: (task) => store.deleteTask(task.id, task.photos || []).catch(fail),
       addPhoto: async (task, file) => {
         try {
           await store.addTaskPhoto(task.id, await preparePhoto(file), actor);
@@ -279,6 +315,9 @@ export default function Workspace({ store, actor, rename, renames }) {
           .catch(fail),
       removeChecklistItem: (list, item) => store.removeChecklistItem(list.id, item.id).catch(fail),
       deleteChecklist: (list) => store.deleteChecklist(list.id).catch(fail),
+      createRun: (data) => store.createRun(data, actor).catch(fail),
+      updateRun: (r, patch) => store.updateRun(r.id, patch, actor).catch(fail),
+      deleteRun: (r) => store.deleteRun(r.id).catch(fail),
     }),
     [store, actor, fail, setFilters, renames],
   );
@@ -390,6 +429,11 @@ export default function Workspace({ store, actor, rename, renames }) {
                 Clear
               </button>
             ) : null}
+            {trash.length > 0 && (
+              <button className="chip trash-chip" onClick={() => setShowTrash(true)}>
+                🗑 Recently deleted ({trash.length})
+              </button>
+            )}
           </div>
           <span className="spacer" />
           <button className="btn primary" onClick={() => setNewTask({ status: 'todo' })}>
@@ -447,6 +491,8 @@ export default function Workspace({ store, actor, rename, renames }) {
         <PartsView parts={parts} tasks={tasks} api={api} onOpenTask={setOpenId} />
       ) : view === 'checklists' ? (
         <ChecklistsView checklists={checklists} api={api} isManager={actor.admin} />
+      ) : view === 'runs' ? (
+        <RunsView runs={runs} roster={roster} api={api} />
       ) : view === 'team' ? (
         <TeamView roster={roster} roles={roles} tasks={tasks} api={api} isManager={actor.admin} rename={rename} />
       ) : (
@@ -475,6 +521,7 @@ export default function Workspace({ store, actor, rename, renames }) {
           }}
         />
       )}
+      {showTrash && <TrashDialog trash={trash} days={TRASH_DAYS} isManager={actor.admin} api={api} onClose={() => setShowTrash(false)} />}
       {cat && <CatParty onClose={() => setCat(false)} />}
       {toast && (
         <div className="toast" role="alert" onClick={() => setToast(null)}>

@@ -20,7 +20,16 @@ import {
 } from 'firebase/firestore';
 import { getStorage, ref as fileRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { firebaseConfig } from '../config.js';
-import { describeChanges, derivedFields, newTaskDefaults, newMilestoneDefaults, newPartDefaults, itemId, personId } from './diff.js';
+import {
+  describeChanges,
+  derivedFields,
+  newTaskDefaults,
+  newMilestoneDefaults,
+  newPartDefaults,
+  newRunDefaults,
+  itemId,
+  personId,
+} from './diff.js';
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -42,13 +51,14 @@ const settingsDoc = doc(db, 'settings', 'team');
 const namesDoc = doc(db, 'settings', 'names');
 const partsCol = collection(db, 'parts');
 const checklistsCol = collection(db, 'checklists');
+const runsCol = collection(db, 'runs');
 
 const millis = (v) => (v && typeof v.toMillis === 'function' ? v.toMillis() : (v ?? null));
 
 function readDoc(snap) {
   const data = snap.data({ serverTimestamps: 'estimate' });
   const out = { id: snap.id, ...data };
-  for (const k of ['createdAt', 'updatedAt', 'completedAt', 'at', 'joinedAt']) {
+  for (const k of ['createdAt', 'updatedAt', 'completedAt', 'at', 'joinedAt', 'deletedAt']) {
     if (k in out) out[k] = millis(out[k]);
   }
   return out;
@@ -144,6 +154,22 @@ export const firebaseStore = {
     await batch.commit();
   },
 
+  // "Deleting" moves a task to Recently deleted; it can be restored for 30 days.
+  async trashTask(id, actor, restore = false) {
+    const ref = doc(tasksCol, id);
+    const batch = writeBatch(db);
+    batch.update(ref, { deletedAt: restore ? null : serverTimestamp(), deletedBy: restore ? '' : actor.name });
+    batch.set(doc(collection(ref, 'activity')), {
+      type: 'change',
+      field: 'deleted',
+      to: restore ? 'restored' : 'deleted',
+      ...actorFields(actor),
+      at: serverTimestamp(),
+    });
+    await batch.commit();
+  },
+
+  // Permanent delete (managers only, per the rules), including photo files.
   async deleteTask(id, photos = []) {
     await deleteDoc(doc(tasksCol, id));
     await Promise.all(photos.map(deletePhotoFiles));
@@ -331,5 +357,21 @@ export const firebaseStore = {
 
   deleteChecklist(id) {
     return deleteDoc(doc(checklistsCol, id));
+  },
+
+  subscribeRuns(cb, onError) {
+    return onSnapshot(runsCol, (snap) => cb(snap.docs.map(readDoc)), onError);
+  },
+
+  createRun(data, actor) {
+    return setDoc(doc(runsCol), { ...newRunDefaults(data), createdAt: serverTimestamp(), createdBy: actor.name });
+  },
+
+  updateRun(id, patch, actor) {
+    return updateDoc(doc(runsCol, id), { ...patch, updatedAt: serverTimestamp(), updatedBy: actor.name });
+  },
+
+  deleteRun(id) {
+    return deleteDoc(doc(runsCol, id));
   },
 };

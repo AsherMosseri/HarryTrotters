@@ -70,8 +70,15 @@ service cloud.firestore {
       allow delete: if isManager();
     }
 
-    match /tasks/{taskId} {
+    // Practice and match log: anyone on the team.
+    match /runs/{id} {
       allow read, write: if isMember();
+    }
+
+    // Deleting moves a task to Recently deleted (an update); only managers delete for good.
+    match /tasks/{taskId} {
+      allow read, create, update: if isMember();
+      allow delete: if isManager();
 
       // Comments + change history: anyone on the team can add; nobody can rewrite history.
       match /activity/{activityId} {

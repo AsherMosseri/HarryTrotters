@@ -70,6 +70,8 @@ function describe(a, milestoneName) {
       return to ? <>noted the blocker: “{to}”</> : 'cleared the blocker';
     case 'links':
       return 'updated the links';
+    case 'deleted':
+      return to === 'restored' ? 'restored this task' : 'deleted this task';
     case 'photos':
       return to === 'removed' ? 'removed a photo' : 'added a photo';
     case 'checklist': {
@@ -328,10 +330,9 @@ export default function TaskPanel({ task, api, roster, milestones = [], parts = 
           <button
             className="link-btn danger"
             onClick={() => {
-              if (confirm(`Delete “${task.title || 'Untitled'}”? This can't be undone.`)) {
-                api.remove(task);
-                onClose();
-              }
+              // Goes to Recently deleted, with an Undo button, so no confirm needed.
+              api.remove(task);
+              onClose();
             }}
           >
             Delete

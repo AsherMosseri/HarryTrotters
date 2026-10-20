@@ -98,3 +98,21 @@ export function newPartDefaults(data) {
 
 // Short random id for list items stored inside a document.
 export const itemId = () => Math.random().toString(36).slice(2, 10);
+
+// One practice run or competition match. Total = auto + teleop + endgame.
+export function newRunDefaults(data) {
+  return {
+    date: '',
+    type: 'practice',
+    matchNumber: '',
+    result: '',
+    drivers: [],
+    auto: 0,
+    teleop: 0,
+    endgame: 0,
+    penalties: 0,
+    issues: '',
+    notes: '',
+    ...data,
+  };
+}
