@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react';
-import { MANAGER_NAME, ORG_DEFAULTS, SUBTEAMS, SUBTEAM_COLORS, TEAM_NAME, TEAM_NICKNAME } from '../config.js';
+import { MANAGER_NAME, ORG_DEFAULTS, ORG_GROUPS, SUBTEAM_COLORS, TEAM_NAME, TEAM_NICKNAME } from '../config.js';
 import { PlusIcon } from './common.jsx';
 import { personId } from '../data/diff.js';
 import { todayISO } from '../milestones.js';
 import { Avatar, CloseIcon } from './common.jsx';
 
-const LEAD_TEAM = 'Team Management';
+// Shown side by side under the team name; everything else branches below.
+const LEAD_GROUPS = ['Team Management', 'Secretary'];
 const EMPTY_ROLE = { title: '', subteams: [], responsibilities: [] };
 
 function SubteamPill({ name }) {
@@ -37,7 +38,7 @@ function PersonDialog({ person, taken, onClose, onSave, onRemove }) {
             name: person.isNew ? name.trim() : person.name,
             removed: false,
             title: title.trim(),
-            subteams: SUBTEAMS.filter((s) => subteams.includes(s)),
+            subteams: ORG_GROUPS.filter((s) => subteams.includes(s)),
             responsibilities: resp
               .split('\n')
               .map((r) => r.replace(/^[-•*]\s*/, '').trim())
@@ -77,7 +78,7 @@ function PersonDialog({ person, taken, onClose, onSave, onRemove }) {
           />
           <span className="field-label">Subteams</span>
           <div className="assignee-picker">
-            {SUBTEAMS.map((s) => (
+            {ORG_GROUPS.map((s) => (
               <button
                 type="button"
                 key={s}
@@ -161,8 +162,9 @@ export default function TeamView({ roster, roles, tasks, api, isManager }) {
   }, [roster, roles, tasks, today]);
 
   const inTeam = (s) => people.filter((p) => p.subteams.includes(s));
-  const leads = inTeam(LEAD_TEAM);
-  const groups = SUBTEAMS.filter((s) => s !== LEAD_TEAM).map((s) => ({ name: s, members: inTeam(s) }));
+  const onEdit = isManager ? setEditing : null;
+  const leadGroups = LEAD_GROUPS.map((s) => ({ name: s, members: inTeam(s) }));
+  const groups = ORG_GROUPS.filter((s) => !LEAD_GROUPS.includes(s)).map((s) => ({ name: s, members: inTeam(s) }));
   const unassigned = people.filter((p) => !p.subteams.length);
 
   return (
@@ -173,14 +175,18 @@ export default function TeamView({ roster, roles, tasks, api, isManager }) {
           <span>{TEAM_NICKNAME}</span>
         </div>
         <div className="org-stem" />
-        <div className="org-box org-lead" style={{ '--c': SUBTEAM_COLORS[LEAD_TEAM] }}>
-          <h3>{LEAD_TEAM}</h3>
-          <div className="org-members">
-            {leads.map((p) => (
-              <MemberChip key={p.name} p={p} onEdit={setEditing} />
-            ))}
-            {!leads.length && <span className="muted small">No one yet</span>}
-          </div>
+        <div className="org-lead-row">
+          {leadGroups.map((g) => (
+            <div key={g.name} className="org-box org-lead" style={{ '--c': SUBTEAM_COLORS[g.name] }}>
+              <h3>{g.name}</h3>
+              <div className="org-members">
+                {g.members.map((p) => (
+                  <MemberChip key={p.name} p={p} onEdit={onEdit} />
+                ))}
+                {!g.members.length && <span className="muted small">No one yet</span>}
+              </div>
+            </div>
+          ))}
         </div>
         <div className="org-stem" />
         <div className="org-branches">
@@ -189,7 +195,7 @@ export default function TeamView({ roster, roles, tasks, api, isManager }) {
               <h3>{g.name}</h3>
               <div className="org-members">
                 {g.members.map((p) => (
-                  <MemberChip key={p.name} p={p} onEdit={setEditing} />
+                  <MemberChip key={p.name} p={p} onEdit={onEdit} />
                 ))}
                 {!g.members.length && <span className="muted small">No one yet</span>}
               </div>
@@ -201,7 +207,7 @@ export default function TeamView({ roster, roles, tasks, api, isManager }) {
             <h3>No subteam yet</h3>
             <div className="org-members">
               {unassigned.map((p) => (
-                <MemberChip key={p.name} p={p} onEdit={setEditing} />
+                <MemberChip key={p.name} p={p} onEdit={onEdit} />
               ))}
             </div>
           </div>

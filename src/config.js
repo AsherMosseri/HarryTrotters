@@ -50,7 +50,11 @@ export const SUBTEAM_COLORS = {
   Assembly: '#ea580c',
   Electrical: '#ca8a04',
   Programming: '#16a34a',
+  Secretary: '#db2777',
 };
+
+// Groups shown in the org chart. Secretary is a role there, not a subteam for tasks.
+export const ORG_GROUPS = [...SUBTEAMS, 'Secretary'];
 
 // Default; the manager can change the date on the Milestones tab.
 export const COMPETITION = { name: 'Competition', date: '2026-11-14' };
@@ -60,7 +64,7 @@ export const COMPETITION = { name: 'Competition', date: '2026-11-14' };
 export const ORG_DEFAULTS = {
   'Asher Mosseri': {
     title: 'Secretary',
-    subteams: ['Programming', 'Team Management'],
+    subteams: ['Team Management', 'Programming', 'Secretary'],
     responsibilities: ['Programming', 'Secretary', 'Team management'],
   },
   'Sebastian Tolbert': {

@@ -509,7 +509,8 @@ button.brand:active .logo-mark { transform: rotate(-12deg) scale(0.95); }
 }
 .org-box h3 { margin: 0 0 8px; font-size: 14px; display: flex; align-items: center; gap: 6px; }
 .org-box h3::before { content: ''; width: 9px; height: 9px; border-radius: 50%; background: var(--c, var(--muted)); }
-.org-lead { min-width: min(520px, 100%); }
+.org-lead-row { position: relative; display: flex; justify-content: center; gap: 16px; width: 100%; }
+.org-lead { min-width: min(360px, 100%); }
 .org-lead .org-members { flex-direction: row; flex-wrap: wrap; justify-content: center; }
 .org-branches {
   position: relative; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; width: 100%; padding-top: 18px;
@@ -629,6 +630,7 @@ div.org-member { cursor: default; }
   .tl-label .ms-state { display: none; }
   .org-branches { grid-template-columns: 1fr 1fr; padding-top: 0; }
   .org-branches::before, .org-branches > .org-box::before { display: none; }
+  .org-lead-row { flex-direction: column; gap: 10px; }
   .org-lead { min-width: 0; width: 100%; }
   .ms-header .btn.primary { width: 100%; justify-content: center; }
   input, select, textarea { font-size: 16px; }
