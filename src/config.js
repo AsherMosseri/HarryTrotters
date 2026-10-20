@@ -64,7 +64,7 @@ export const COMPETITION = { name: 'Competition', date: '2026-11-14' };
 // and overrides these.
 export const ORG_DEFAULTS = {
   'Asher Mosseri': {
-    title: 'Secretary',
+    title: '',
     subteams: ['Team Management', 'Programming', 'Secretary'],
     responsibilities: ['Programming', 'Secretary', 'Team management'],
   },
