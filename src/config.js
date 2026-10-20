@@ -73,6 +73,12 @@ export const SUBTEAM_COLORS = {
 export const ORG_GROUPS = [...SUBTEAMS, 'Secretary'];
 
 // Default; the manager can change the date on the Milestones tab.
+// Chat: #general plus one channel per subteam.
+export const CHANNELS = [
+  { id: 'general', subteam: '' },
+  ...SUBTEAMS.map((s) => ({ id: s.toLowerCase().replace(/[^a-z0-9]+/g, '-'), subteam: s })),
+];
+
 export const COMPETITION = { name: 'Competition', date: '2026-11-14' };
 
 // Starting org chart. Anything edited on the Team tab is saved to the database

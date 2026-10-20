@@ -70,6 +70,21 @@ service cloud.firestore {
       allow delete: if isManager();
     }
 
+    // Chat. Post only as yourself. Authors edit/delete their own messages
+    // (delete leaves a placeholder); anyone can add or remove reactions;
+    // managers can change or remove any message.
+    match /channels/{channelId}/messages/{msgId} {
+      allow read: if isMember();
+      allow create: if isMember() && request.resource.data.byUid == request.auth.uid
+        && request.resource.data.text is string && request.resource.data.text.size() <= 4000;
+      allow update: if isMember() && (
+        resource.data.byUid == request.auth.uid
+        || isManager()
+        || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactions'])
+      );
+      allow delete: if isManager();
+    }
+
     // Practice and match log: anyone on the team.
     match /runs/{id} {
       allow read, write: if isMember();

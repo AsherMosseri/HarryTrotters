@@ -7,7 +7,7 @@ const QUICK_TIPS = [
   [
     '🗂',
     'Use the tabs',
-    'Milestones: big steps to the competition. Parts: what to buy. Checklists: competition prep. Match Log: practice scores. Team: who does what.',
+    'Chat: team and subteam channels. Milestones: big steps to the competition. Parts: what to buy. Checklists: competition prep. Match Log: practice scores. Team: who does what.',
   ],
   [
     '📱',
@@ -61,6 +61,15 @@ const SECTIONS = [
       'The chart shows whether scores are going up.',
     ],
   ],
+  [
+    'Chat',
+    [
+      '#general is for everyone; each subteam has its own channel. A number on the Chat tab means unread messages (red means someone @mentioned you).',
+      'Type @ to mention someone and # to link a task. Tap 📷 to send a photo.',
+      'Tap (or hover over) a message to react, reply, edit or delete your own, or turn it into a task with +Task.',
+      'There are no phone notifications yet, so check the Chat tab.',
+    ],
+  ],
   ['Team', ['The org chart and everyone’s responsibilities and open tasks.']],
   [
     'Your account',
@@ -77,6 +86,7 @@ const MANAGER_TIPS = [
   'Team tab: Edit anyone’s role, subteams, responsibilities, and name. Add or remove people.',
   'Milestones tab: Change the competition date, and delete milestones.',
   'Delete checklists, and permanently delete tasks from Recently deleted.',
+  'Chat: delete any message, and remove reactions (🚫☺ on a message).',
 ];
 
 function TipList() {

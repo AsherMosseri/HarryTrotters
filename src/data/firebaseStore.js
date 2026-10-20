@@ -17,6 +17,12 @@ import {
   deleteField,
   arrayUnion,
   arrayRemove,
+  query,
+  orderBy,
+  limit,
+  startAfter,
+  getDocs,
+  FieldPath,
 } from 'firebase/firestore';
 import { getStorage, ref as fileRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { firebaseConfig } from '../config.js';
@@ -52,6 +58,7 @@ const namesDoc = doc(db, 'settings', 'names');
 const partsCol = collection(db, 'parts');
 const checklistsCol = collection(db, 'checklists');
 const runsCol = collection(db, 'runs');
+const messagesCol = (channel) => collection(db, 'channels', channel, 'messages');
 
 const millis = (v) => (v && typeof v.toMillis === 'function' ? v.toMillis() : (v ?? null));
 
@@ -62,6 +69,23 @@ function readDoc(snap) {
     if (k in out) out[k] = millis(out[k]);
   }
   return out;
+}
+
+// Uploads a full-size and thumbnail JPEG under folder/; returns where they live.
+async function uploadPhoto(folder, { full, thumb }) {
+  const id = itemId();
+  const base = `${folder}/${id}`;
+  const [url, thumbUrl] = await Promise.all(
+    [
+      [`${base}.jpg`, full],
+      [`${base}-thumb.jpg`, thumb],
+    ].map(async ([path, blob]) => {
+      const r = fileRef(storage, path);
+      await uploadBytes(r, blob, { contentType: 'image/jpeg' });
+      return getDownloadURL(r);
+    }),
+  );
+  return { id, path: base, url, thumbUrl };
 }
 
 async function deletePhotoFiles(photo) {
@@ -178,19 +202,7 @@ export const firebaseStore = {
   // Photos: a full-size and a thumbnail JPEG in Cloud Storage; the task keeps
   // their URLs in a `photos` array (arrayUnion, so simultaneous uploads don't clash).
   async addTaskPhoto(taskId, { full, thumb, width, height }, actor) {
-    const id = itemId();
-    const base = `tasks/${taskId}/${id}`;
-    const [url, thumbUrl] = await Promise.all(
-      [
-        [`${base}.jpg`, full],
-        [`${base}-thumb.jpg`, thumb],
-      ].map(async ([path, blob]) => {
-        const r = fileRef(storage, path);
-        await uploadBytes(r, blob, { contentType: 'image/jpeg' });
-        return getDownloadURL(r);
-      }),
-    );
-    const photo = { id, path: base, url, thumbUrl, width, height, by: actor.name, at: Date.now() };
+    const photo = { ...(await uploadPhoto(`tasks/${taskId}`, { full, thumb })), width, height, by: actor.name, at: Date.now() };
     const ref = doc(tasksCol, taskId);
     const batch = writeBatch(db);
     batch.update(ref, { photos: arrayUnion(photo), updatedAt: serverTimestamp(), updatedBy: actor.name });
@@ -373,5 +385,43 @@ export const firebaseStore = {
 
   deleteRun(id) {
     return deleteDoc(doc(runsCol, id));
+  },
+
+  // Chat. Messages are ordered by the sender's clock (`at`, ms) so a message
+  // shows in place immediately, before the server confirms it.
+  subscribeChannel(channel, count, cb, onError) {
+    const q = query(messagesCol(channel), orderBy('at', 'desc'), limit(count));
+    return onSnapshot(q, (snap) => cb(snap.docs.map(readDoc).reverse()), onError);
+  },
+
+  async loadOlderMessages(channel, beforeAt, count) {
+    const snap = await getDocs(query(messagesCol(channel), orderBy('at', 'desc'), startAfter(beforeAt), limit(count)));
+    return snap.docs.map(readDoc).reverse();
+  },
+
+  async sendMessage(channel, data, actor, photoFiles) {
+    const msg = { text: '', mentions: [], taskIds: [], replyTo: null, photo: null, reactions: {}, ...data };
+    if (photoFiles)
+      msg.photo = { ...(await uploadPhoto(`chat/${channel}`, photoFiles)), width: photoFiles.width, height: photoFiles.height };
+    return setDoc(doc(messagesCol(channel)), { ...msg, by: actor.name, byUid: actor.uid, at: Date.now() });
+  },
+
+  editMessage(channel, id, patch) {
+    return updateDoc(doc(messagesCol(channel), id), { ...patch, editedAt: Date.now() });
+  },
+
+  // Leaves a "Message deleted" placeholder so replies still make sense.
+  async deleteMessage(channel, msg) {
+    await updateDoc(doc(messagesCol(channel), msg.id), { deleted: true, text: '', photo: null, taskIds: [], mentions: [], reactions: {} });
+    if (msg.photo) await deletePhotoFiles(msg.photo);
+  },
+
+  // reactions: { [emoji]: { [uid]: name } }, updated per person so taps don't collide.
+  react(channel, id, emoji, actor, on) {
+    return updateDoc(doc(messagesCol(channel), id), new FieldPath('reactions', emoji, actor.uid), on ? actor.name : deleteField());
+  },
+
+  removeReaction(channel, id, emoji) {
+    return updateDoc(doc(messagesCol(channel), id), new FieldPath('reactions', emoji), deleteField());
   },
 };

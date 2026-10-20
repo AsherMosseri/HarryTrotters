@@ -11,7 +11,7 @@ import {
 } from './diff.js';
 import { STARTER_CHECKLISTS, starterItems } from '../checklists.js';
 
-const KEY = 'ftc32313-demo-v7';
+const KEY = 'ftc32313-demo-v8';
 const listeners = new Set();
 const uid = () => Math.random().toString(36).slice(2, 11);
 
@@ -117,7 +117,31 @@ function seed() {
     r(-2, 'match', 20, 61, 20, { matchNumber: 'Q4', result: 'win' }),
     r(-1, 'practice', 30, 64, 20),
   ];
-  return { tasks, activity, people: [], milestones, roles: [], parts, checklists, runs };
+  const msg = (minsAgo, by, text, extra = {}) => ({
+    id: uid(),
+    text,
+    by,
+    byUid: by,
+    at: now - minsAgo * 60000,
+    mentions: [],
+    taskIds: [],
+    replyTo: null,
+    photo: null,
+    reactions: {},
+    ...extra,
+  });
+  const chat = {
+    general: [
+      msg(180, 'Sebastian Tolbert', 'Practice moved to 4pm tomorrow, everyone bring safety glasses'),
+      msg(170, 'Sophia Bermudez', 'got it 👍', { reactions: { '👍': { 'Jackson Lucks': 'Jackson Lucks' } } }),
+      msg(30, 'Cooper Mlezcko', '@Asher Mosseri can you check the auto path before practice?', {
+        mentions: ['Asher Mosseri'],
+        taskIds: [tasks[1].id],
+      }),
+    ],
+    assembly: [msg(60, 'Ira Kumar', 'Intake side plates are printed')],
+  };
+  return { tasks, activity, people: [], milestones, roles: [], parts, checklists, runs, chat };
 }
 
 let state;
@@ -367,6 +391,72 @@ export const demoStore = {
   },
   async deleteRun(id) {
     state.runs = state.runs.filter((r) => r.id !== id);
+    commit();
+  },
+
+  // Chat: messages kept per channel; photos stored as small data URLs.
+  subscribeChannel(channel, count, cb) {
+    return listen(() => cb([...((state.chat || {})[channel] || [])].sort((a, b) => a.at - b.at).slice(-count)));
+  },
+  async loadOlderMessages(channel, beforeAt, count) {
+    return [...((state.chat || {})[channel] || [])]
+      .filter((m) => m.at < beforeAt)
+      .sort((a, b) => a.at - b.at)
+      .slice(-count);
+  },
+  async sendMessage(channel, data, actor, photoFiles) {
+    let photo = null;
+    if (photoFiles) {
+      const url = await new Promise((resolve) => {
+        const r = new FileReader();
+        r.onload = () => resolve(r.result);
+        r.readAsDataURL(photoFiles.thumb);
+      });
+      photo = { id: uid(), url, thumbUrl: url, width: photoFiles.width, height: photoFiles.height };
+    }
+    const m = {
+      id: uid(),
+      text: '',
+      mentions: [],
+      taskIds: [],
+      replyTo: null,
+      reactions: {},
+      ...data,
+      photo,
+      by: actor.name,
+      byUid: actor.uid,
+      at: Date.now(),
+    };
+    state.chat = { ...(state.chat || {}), [channel]: [...((state.chat || {})[channel] || []), m] };
+    commit();
+  },
+  async editMessage(channel, id, patch) {
+    state.chat[channel] = state.chat[channel].map((m) => (m.id === id ? { ...m, ...patch, editedAt: Date.now() } : m));
+    commit();
+  },
+  async deleteMessage(channel, msg) {
+    state.chat[channel] = state.chat[channel].map((m) =>
+      m.id === msg.id ? { ...m, deleted: true, text: '', photo: null, taskIds: [], mentions: [], reactions: {} } : m,
+    );
+    commit();
+  },
+  async react(channel, id, emoji, actor, on) {
+    state.chat[channel] = state.chat[channel].map((m) => {
+      if (m.id !== id) return m;
+      const who = { ...((m.reactions || {})[emoji] || {}) };
+      if (on) who[actor.uid] = actor.name;
+      else delete who[actor.uid];
+      return { ...m, reactions: { ...m.reactions, [emoji]: who } };
+    });
+    commit();
+  },
+  async removeReaction(channel, id, emoji) {
+    state.chat[channel] = state.chat[channel].map((m) => {
+      if (m.id !== id) return m;
+      const reactions = { ...m.reactions };
+      delete reactions[emoji];
+      return { ...m, reactions };
+    });
     commit();
   },
 };

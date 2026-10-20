@@ -4,14 +4,14 @@ import { Avatar, CloseIcon } from './common.jsx';
 
 export default function NewTaskDialog({ initial, roster, milestones = [], me, onClose, onCreate }) {
   const [form, setForm] = useState({
-    title: '',
+    title: initial.title || '',
     status: initial.status || 'todo',
     assignees: [],
     subteam: initial.subteam || '',
     milestoneId: initial.milestoneId || '',
     priority: 'medium',
     dueDate: '',
-    description: '',
+    description: initial.description || '',
   });
   const set = (patch) => setForm((f) => ({ ...f, ...patch }));
   const toggle = (n) => set({ assignees: form.assignees.includes(n) ? form.assignees.filter((x) => x !== n) : [...form.assignees, n] });

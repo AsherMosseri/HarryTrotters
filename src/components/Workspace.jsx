@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { COMPETITION, ROSTER, STATUSES, SUBTEAMS, PRIORITIES, TEAM_NAME } from '../config.js';
+import { CHANNELS, COMPETITION, ROSTER, STATUSES, SUBTEAMS, PRIORITIES, TEAM_NAME } from '../config.js';
 import { daysBetween, todayISO } from '../milestones.js';
 import { newTaskDefaults, personId } from '../data/diff.js';
 import { preparePhoto, useLocalStorage } from '../util.js';
@@ -15,6 +15,7 @@ import ChecklistsView from './ChecklistsView.jsx';
 import CatParty from './CatParty.jsx';
 import TrashDialog from './TrashDialog.jsx';
 import RunsView from './RunsView.jsx';
+import ChatView from './ChatView.jsx';
 import { HelpDialog, WelcomeCard } from './Help.jsx';
 
 function ThemeIcon({ theme }) {
@@ -70,6 +71,7 @@ function Countdown({ date }) {
 const VIEWS = [
   ['board', 'Board'],
   ['table', 'Table'],
+  ['chat', 'Chat'],
   ['milestones', 'Milestones'],
   ['parts', 'Parts'],
   ['checklists', 'Checklists'],
@@ -92,6 +94,7 @@ function matchesFilters(t, filters, me, view) {
 }
 
 const TRASH_DAYS = 30;
+const CHAT_PAGE = 60;
 
 const EMPTY_FILTERS = { q: '', person: '', subteam: '', priority: '', statuses: [], hideDone: false };
 
@@ -103,6 +106,9 @@ export default function Workspace({ store, actor, rename, renames }) {
   const [parts, setParts] = useState([]);
   const [checklists, setChecklists] = useState([]);
   const [runs, setRuns] = useState([]);
+  const [chat, setChat] = useState({}); // { [channelId]: newest messages }
+  const [chatChannel, setChatChannel] = useLocalStorage('chat-channel', 'general');
+  const [chatRead, setChatRead] = useLocalStorage('chat-read', null); // { [channelId]: ms read up to }
   const [settings, setSettings] = useState({});
   const [cat, setCat] = useState(false);
   const [welcomed, setWelcomed] = useLocalStorage('welcome-seen-v1', false);
@@ -168,6 +174,12 @@ export default function Workspace({ store, actor, rename, renames }) {
   useEffect(() => store.subscribeParts(setParts, loadFail('parts')), [store, loadFail]);
   useEffect(() => store.subscribeChecklists(setChecklists, loadFail('checklists')), [store, loadFail]);
   useEffect(() => store.subscribeRuns(setRuns, loadFail('the match log')), [store, loadFail]);
+  useEffect(() => {
+    const stops = CHANNELS.map((c) =>
+      store.subscribeChannel(c.id, CHAT_PAGE, (msgs) => setChat((all) => ({ ...all, [c.id]: msgs })), loadFail('chat')),
+    );
+    return () => stops.forEach((stop) => stop());
+  }, [store, loadFail]);
   const competitionDate = settings.competitionDate || COMPETITION.date;
 
   useEffect(() => {
@@ -204,6 +216,37 @@ export default function Workspace({ store, actor, rename, renames }) {
       }
     }
   }, [trash, actor.admin, store]);
+
+  // Unread chat: other people's messages newer than what this device has read.
+  // On first use everything already there counts as read.
+  useEffect(() => {
+    if (chatRead === null) setChatRead(Object.fromEntries(CHANNELS.map((c) => [c.id, Date.now()])));
+  }, [chatRead, setChatRead]);
+  const unread = useMemo(() => {
+    const out = {};
+    for (const c of CHANNELS) {
+      const since = chatRead?.[c.id] ?? Date.now();
+      const fresh = (chat[c.id] || []).filter((m) => m.at > since && m.byUid !== actor.uid && !m.deleted);
+      out[c.id] = { count: fresh.length, mentions: fresh.filter((m) => (m.mentions || []).includes(actor.name)).length };
+    }
+    return out;
+  }, [chat, chatRead, actor.uid, actor.name]);
+  const unreadTotal = Object.values(unread).reduce((s, u) => s + u.count, 0);
+  const unreadMentions = Object.values(unread).reduce((s, u) => s + u.mentions, 0);
+
+  // Mark the open channel read while it's on screen.
+  useEffect(() => {
+    if (view !== 'chat' || !chatRead) return;
+    const markRead = () => {
+      if (document.visibilityState !== 'visible') return;
+      const msgs = chat[chatChannel] || [];
+      const newest = msgs.length ? msgs[msgs.length - 1].at : 0;
+      if (newest > (chatRead[chatChannel] || 0)) setChatRead({ ...chatRead, [chatChannel]: newest });
+    };
+    markRead();
+    document.addEventListener('visibilitychange', markRead);
+    return () => document.removeEventListener('visibilitychange', markRead);
+  }, [view, chat, chatChannel, chatRead, setChatRead]);
 
   const milestones = useMemo(
     () => rawMilestones.map((m) => (m.owners?.some((n) => rename(n) !== n) ? { ...m, owners: [...new Set(m.owners.map(rename))] } : m)),
@@ -319,6 +362,16 @@ export default function Workspace({ store, actor, rename, renames }) {
       removeChecklistItem: (list, item) => store.removeChecklistItem(list.id, item.id).catch(fail),
       deleteChecklist: (list) => store.deleteChecklist(list.id).catch(fail),
       createRun: (data) => store.createRun(data, actor).catch(fail),
+      sendMessage: (channel, data, photoFiles) => store.sendMessage(channel, data, actor, photoFiles).catch(fail),
+      editMessage: (channel, id, patch) => store.editMessage(channel, id, patch).catch(fail),
+      deleteMessage: (channel, m) => store.deleteMessage(channel, m).catch(fail),
+      react: (channel, id, emoji, on) => store.react(channel, id, emoji, actor, on).catch(fail),
+      removeReaction: (channel, id, emoji) => store.removeReaction(channel, id, emoji).catch(fail),
+      loadOlderMessages: (channel, beforeAt) =>
+        store.loadOlderMessages(channel, beforeAt, CHAT_PAGE).catch((e) => {
+          fail(e);
+          return [];
+        }),
       updateRun: (r, patch) => store.updateRun(r.id, patch, actor).catch(fail),
       deleteRun: (r) => store.deleteRun(r.id).catch(fail),
     }),
@@ -341,7 +394,7 @@ export default function Workspace({ store, actor, rename, renames }) {
   const anyFilter = filters.q || filters.person || filters.subteam || filters.priority || filters.statuses.length || filters.hideDone;
 
   return (
-    <div className="app">
+    <div className={`app${view === 'chat' ? ' chat-mode' : ''}`}>
       {store.mode === 'demo' && (
         <div className="demo-banner">
           Demo mode — sample data saved only in this browser. <a href="./">Go to the real board</a>
@@ -358,6 +411,11 @@ export default function Workspace({ store, actor, rename, renames }) {
           {VIEWS.map(([id, label]) => (
             <button key={id} role="tab" aria-selected={view === id} className={view === id ? 'active' : ''} onClick={() => setView(id)}>
               {label}
+              {id === 'chat' && unreadTotal > 0 && (
+                <span className={`tab-badge${unreadMentions ? ' mention' : ''}`} aria-label={`${unreadTotal} unread`}>
+                  {unreadTotal > 99 ? '99+' : unreadTotal}
+                </span>
+              )}
             </button>
           ))}
         </nav>
@@ -497,6 +555,27 @@ export default function Workspace({ store, actor, rename, renames }) {
         <PartsView parts={parts} tasks={tasks} api={api} onOpenTask={setOpenId} />
       ) : view === 'checklists' ? (
         <ChecklistsView checklists={checklists} api={api} isManager={actor.admin} />
+      ) : view === 'chat' ? (
+        <ChatView
+          channel={CHANNELS.some((c) => c.id === chatChannel) ? chatChannel : 'general'}
+          setChannel={setChatChannel}
+          messages={chat}
+          unread={unread}
+          actor={actor}
+          isManager={actor.admin}
+          roster={roster}
+          tasks={tasks}
+          api={api}
+          onOpenTask={setOpenId}
+          onMakeTask={(m, ch) =>
+            setNewTask({
+              status: 'todo',
+              subteam: ch.subteam || '',
+              title: (m.text || 'Follow up on chat photo').replace(/\s+/g, ' ').slice(0, 90),
+              description: `From #${ch.id}, ${m.by}: ${m.text || '(photo)'}`,
+            })
+          }
+        />
       ) : view === 'runs' ? (
         <RunsView runs={runs} roster={roster} api={api} />
       ) : view === 'team' ? (
