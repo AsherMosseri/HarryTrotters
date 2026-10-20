@@ -193,7 +193,14 @@ export default function Workspace({ store, actor, rename, renames }) {
   // Notifications: the bell's list, and phone notifications on this device.
   const [inbox, setInbox] = useState([]);
   const [pushStatus, setPushStatus] = useState(() => store.pushStatus());
-  useEffect(() => store.subscribeInbox(actor.name, setInbox, loadFail('notifications')), [store, actor.name, loadFail]);
+  // Quiet if the rules for notifications aren't published yet: the bell just stays empty.
+  useEffect(
+    () =>
+      store.subscribeInbox(actor.name, setInbox, (e) =>
+        e?.code === 'permission-denied' ? console.warn('inbox', e) : loadFail('notifications')(e),
+      ),
+    [store, actor.name, loadFail],
+  );
   useEffect(() => {
     store.refreshPush(actor).catch((e) => console.warn('push refresh', e));
   }, [store, actor]);
