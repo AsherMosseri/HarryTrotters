@@ -11,7 +11,9 @@ export function reloadOnceForNewVersion() {
   } catch {
     return false;
   }
-  location.reload();
+  const url = new URL(location.href);
+  url.searchParams.set('v', Date.now().toString(36));
+  location.replace(url.toString());
   return true;
 }
 

@@ -23,6 +23,8 @@ npm run build
 
 Add it to an iPad or phone Home Screen (Share → Add to Home Screen) to open it like an app.
 
+Each build publishes `version.json`; open pages check it every minute and block with an "Update now" prompt when a newer version is live.
+
 Pushing to `main` deploys to GitHub Pages via `.github/workflows/deploy.yml`.
 
 ## Configuration

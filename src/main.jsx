@@ -2,6 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.jsx';
 import { reloadOnceForNewVersion } from './data/store.js';
+import UpdateGate from './components/UpdateGate.jsx';
 import './styles.css';
 
 window.addEventListener('vite:preloadError', (e) => {
@@ -10,6 +11,8 @@ window.addEventListener('vite:preloadError', (e) => {
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <App />
+    <UpdateGate>
+      <App />
+    </UpdateGate>
   </StrictMode>,
 );
