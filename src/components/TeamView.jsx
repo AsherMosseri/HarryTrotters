@@ -232,7 +232,7 @@ export default function TeamView({ roster, roles, tasks, api, isManager }) {
             <PlusIcon /> Add person
           </button>
         ) : (
-          <span className="muted small">Only the team manager can change roles.</span>
+          <span className="muted small">Only team management can change roles.</span>
         )}
       </div>
       <section className="people-grid">
