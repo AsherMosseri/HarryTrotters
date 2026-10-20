@@ -137,7 +137,6 @@ a { color: var(--accent); }
 }
 .gate-card h1 { margin: 6px 0 0; font-size: 22px; }
 .gate-card p { margin: 0; }
-.demo-link { margin-top: 6px; }
 .join-form { display: flex; flex-direction: column; gap: 10px; width: 100%; }
 .join-form .btn { justify-content: center; min-height: 44px; }
 .join-form .input { font-size: 16px; min-height: 44px; }

@@ -110,9 +110,6 @@ export function JoinScreen({ onJoin, rename }) {
         </button>
       </form>
       {err && <p className="form-error">{err}</p>}
-      <a className="small muted demo-link" href="?demo">
-        Just looking? Try the demo with sample tasks
-      </a>
     </Shell>
   );
 }
