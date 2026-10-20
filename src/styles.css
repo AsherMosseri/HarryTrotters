@@ -159,8 +159,9 @@ a { color: var(--accent); }
   position: sticky; top: 0; z-index: 20;
   display: flex; align-items: center; gap: 16px;
   padding: 10px 16px; padding-top: max(10px, env(safe-area-inset-top));
-  background: color-mix(in srgb, var(--surface) 88%, transparent);
-  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  /* Solid, not a frosted-glass blur: Safari on iPad renders parts of a
+     backdrop-filter header at low resolution, so its text looks blurry. */
+  background: var(--surface);
   border-bottom: 1px solid var(--border);
 }
 .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 17px; white-space: nowrap; }
