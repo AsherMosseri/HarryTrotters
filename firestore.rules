@@ -31,6 +31,14 @@ service cloud.firestore {
       allow delete: if signedIn() && request.auth.uid == uid;
     }
 
+    // Milestone chart and org chart: shared, editable by anyone on the team.
+    match /milestones/{id} {
+      allow read, write: if isMember();
+    }
+    match /roles/{id} {
+      allow read, write: if isMember();
+    }
+
     match /tasks/{taskId} {
       allow read, write: if isMember();
 

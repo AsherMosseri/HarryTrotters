@@ -4,6 +4,8 @@ A live, shared task board for the team — replaces the old Google Sheet task lo
 
 - **Board** view: drag cards between Backlog → To Do → In Progress → Blocked / Waiting on Parts → Testing / Review → Done (on iPad, press and hold a card to drag).
 - **Table** view: spreadsheet-style list with sorting, inline editing, and quick add.
+- **Milestones** tab: timeline to the Nov 14 competition. Tasks link to a milestone, and its bar fills in as those tasks are done; status shows Not started / On track / At risk / Late / Done.
+- **Team** tab: organization chart by subteam plus each person's role and responsibilities (editable on the site; starting values in `ORG_DEFAULTS` in `src/config.js`).
 - **Task details**: multiple assignees, subteam, priority, due date, blocker notes, links, comments, and an automatic history of every change.
 - Join by picking your name and entering the team code (once per device). The code is checked by the Firestore security rules, so a wrong code can't read or change anything.
 
@@ -30,6 +32,8 @@ Pushing to `main` deploys to GitHub Pages via `.github/workflows/deploy.yml`.
 
 ## Data model (Firestore)
 
+- `milestones/{id}` — `{ title, subteam, owners[], start, end, notes, done }`; tasks link via `milestoneId`.
+- `roles/{personId}` — `{ name, title, subteams[], responsibilities[] }` — org chart edits.
 - `members/{uid}` — `{ name, code, joinedAt }` — one per device that entered the right code; only readable by that device.
 - `people/{uid}` — `{ name, joinedAt }` — names for the assignee picker, readable by the team.
 - `tasks/{id}` — `{ title, description, status, assignees[], subteam, priority, dueDate, blockedReason, links[], commentCount, createdAt/By, updatedAt/By, completedAt }`

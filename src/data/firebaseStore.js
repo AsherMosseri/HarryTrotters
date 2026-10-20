@@ -12,9 +12,10 @@ import {
   writeBatch,
   increment,
   deleteDoc,
+  setDoc,
 } from 'firebase/firestore';
 import { firebaseConfig } from '../config.js';
-import { describeChanges, derivedFields, newTaskDefaults } from './diff.js';
+import { describeChanges, derivedFields, newTaskDefaults, newMilestoneDefaults } from './diff.js';
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -28,6 +29,8 @@ const tasksCol = collection(db, 'tasks');
 // device); people/{uid} is the public name list everyone on the team can read.
 const membersCol = collection(db, 'members');
 const peopleCol = collection(db, 'people');
+const milestonesCol = collection(db, 'milestones');
+const rolesCol = collection(db, 'roles');
 
 const millis = (v) => (v && typeof v.toMillis === 'function' ? v.toMillis() : (v ?? null));
 
@@ -136,5 +139,41 @@ export const firebaseStore = {
     batch.set(doc(collection(ref, 'activity')), { type: 'comment', text, ...actorFields(actor), at: serverTimestamp() });
     batch.update(ref, { commentCount: increment(1) });
     await batch.commit();
+  },
+
+  subscribeMilestones(cb, onError) {
+    return onSnapshot(milestonesCol, (snap) => cb(snap.docs.map(readDoc)), onError);
+  },
+
+  async createMilestone(data, actor) {
+    const ref = doc(milestonesCol);
+    await setDoc(ref, {
+      ...newMilestoneDefaults(data),
+      createdAt: serverTimestamp(),
+      createdBy: actor.name,
+      updatedAt: serverTimestamp(),
+      updatedBy: actor.name,
+    });
+    return ref.id;
+  },
+
+  updateMilestone(id, patch, actor) {
+    return setDoc(doc(milestonesCol, id), { ...patch, updatedAt: serverTimestamp(), updatedBy: actor.name }, { merge: true });
+  },
+
+  // Also unlinks the milestone's tasks so they don't point at nothing.
+  async deleteMilestone(id, taskIds) {
+    const batch = writeBatch(db);
+    batch.delete(doc(milestonesCol, id));
+    for (const t of taskIds) batch.update(doc(tasksCol, t), { milestoneId: '' });
+    await batch.commit();
+  },
+
+  subscribeRoles(cb, onError) {
+    return onSnapshot(rolesCol, (snap) => cb(snap.docs.map(readDoc)), onError);
+  },
+
+  saveRole(id, data, actor) {
+    return setDoc(doc(rolesCol, id), { ...data, updatedAt: serverTimestamp(), updatedBy: actor.name });
   },
 };

@@ -2,12 +2,13 @@ import { useState } from 'react';
 import { STATUSES, SUBTEAMS, PRIORITIES } from '../config.js';
 import { Avatar, CloseIcon } from './common.jsx';
 
-export default function NewTaskDialog({ initial, roster, me, onClose, onCreate }) {
+export default function NewTaskDialog({ initial, roster, milestones = [], me, onClose, onCreate }) {
   const [form, setForm] = useState({
     title: '',
     status: initial.status || 'todo',
     assignees: [],
-    subteam: '',
+    subteam: initial.subteam || '',
+    milestoneId: initial.milestoneId || '',
     priority: 'medium',
     dueDate: '',
     description: '',
@@ -87,6 +88,18 @@ export default function NewTaskDialog({ initial, roster, me, onClose, onCreate }
             Due
           </label>
           <input id="n-due" className="input" type="date" value={form.dueDate} onChange={(e) => set({ dueDate: e.target.value })} />
+
+          <label className="field-label" htmlFor="n-ms">
+            Milestone
+          </label>
+          <select id="n-ms" className="input" value={form.milestoneId} onChange={(e) => set({ milestoneId: e.target.value })}>
+            <option value="">None</option>
+            {milestones.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.title}
+              </option>
+            ))}
+          </select>
         </div>
         <textarea
           className="input description"

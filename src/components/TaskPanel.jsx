@@ -17,7 +17,7 @@ function hostOf(url) {
   }
 }
 
-function describe(a) {
+function describe(a, milestoneName) {
   const { field, from, to } = a;
   switch (field) {
     case 'status':
@@ -67,12 +67,20 @@ function describe(a) {
       return to ? <>noted the blocker: “{to}”</> : 'cleared the blocker';
     case 'links':
       return 'updated the links';
+    case 'milestoneId':
+      return to ? (
+        <>
+          added this to milestone <b>{milestoneName(to)}</b>
+        </>
+      ) : (
+        'removed this from its milestone'
+      );
     default:
       return `changed ${field}`;
   }
 }
 
-function Activity({ items }) {
+function Activity({ items, milestoneName }) {
   return (
     <ol className="activity">
       {items.map((a) =>
@@ -93,7 +101,7 @@ function Activity({ items }) {
           <li key={a.id} className="event">
             <span className="event-dot" />
             <span>
-              <b>{a.by?.split(' ')[0]}</b> {a.type === 'created' ? 'created this task' : describe(a)}{' '}
+              <b>{a.by?.split(' ')[0]}</b> {a.type === 'created' ? 'created this task' : describe(a, milestoneName)}{' '}
               <span className="muted tiny" title={fullTime(a.at)}>
                 · {relTime(a.at)}
               </span>
@@ -105,7 +113,8 @@ function Activity({ items }) {
   );
 }
 
-export default function TaskPanel({ task, api, roster, onClose }) {
+export default function TaskPanel({ task, api, roster, milestones = [], onClose }) {
+  const milestoneName = (id) => milestones.find((m) => m.id === id)?.title || 'a deleted milestone';
   const [activity, setActivity] = useState([]);
   const [comment, setComment] = useState('');
   const [link, setLink] = useState('');
@@ -239,6 +248,18 @@ export default function TaskPanel({ task, api, roster, onClose }) {
                 </button>
               )}
             </div>
+
+            <label className="field-label" htmlFor="f-ms">
+              Milestone
+            </label>
+            <select id="f-ms" className="input" value={task.milestoneId || ''} onChange={(e) => set({ milestoneId: e.target.value })}>
+              <option value="">None</option>
+              {milestones.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.title}
+                </option>
+              ))}
+            </select>
           </div>
 
           <label className="field-label">Description</label>
@@ -281,7 +302,7 @@ export default function TaskPanel({ task, api, roster, onClose }) {
           </p>
 
           <h3 className="section-title">Activity</h3>
-          <Activity items={activity} />
+          <Activity items={activity} milestoneName={milestoneName} />
           <div ref={feedEnd} />
         </div>
 

@@ -1,0 +1,230 @@
+import { useMemo, useState } from 'react';
+import { ORG_DEFAULTS, SUBTEAMS, SUBTEAM_COLORS, TEAM_NAME, TEAM_NICKNAME } from '../config.js';
+import { personId } from '../data/diff.js';
+import { todayISO } from '../milestones.js';
+import { Avatar, CloseIcon } from './common.jsx';
+
+const LEAD_TEAM = 'Team Management';
+const EMPTY_ROLE = { title: '', subteams: [], responsibilities: [] };
+
+function SubteamPill({ name }) {
+  return (
+    <span className="sub-pill" style={{ '--c': SUBTEAM_COLORS[name] || 'var(--accent)' }}>
+      {name}
+    </span>
+  );
+}
+
+function PersonDialog({ person, onClose, onSave }) {
+  const [title, setTitle] = useState(person.title || '');
+  const [subteams, setSubteams] = useState(person.subteams || []);
+  const [resp, setResp] = useState((person.responsibilities || []).join('\n'));
+  const toggle = (s) => setSubteams(subteams.includes(s) ? subteams.filter((x) => x !== s) : [...subteams, s]);
+
+  return (
+    <div className="panel-backdrop center" onClick={onClose}>
+      <form
+        className="dialog"
+        onClick={(e) => e.stopPropagation()}
+        onSubmit={(e) => {
+          e.preventDefault();
+          onSave({
+            name: person.name,
+            title: title.trim(),
+            subteams: SUBTEAMS.filter((s) => subteams.includes(s)),
+            responsibilities: resp
+              .split('\n')
+              .map((r) => r.replace(/^[-•*]\s*/, '').trim())
+              .filter(Boolean),
+          });
+        }}
+      >
+        <div className="panel-head">
+          <Avatar name={person.name} size={30} />
+          <h2>{person.name}</h2>
+          <span className="spacer" />
+          <button type="button" className="icon-btn" onClick={onClose} aria-label="Close">
+            <CloseIcon />
+          </button>
+        </div>
+        <div className="fields">
+          <label className="field-label" htmlFor="p-title">
+            Role
+          </label>
+          <input
+            id="p-title"
+            className="input"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="e.g. Captain, CAD Lead, Secretary"
+          />
+          <span className="field-label">Subteams</span>
+          <div className="assignee-picker">
+            {SUBTEAMS.map((s) => (
+              <button
+                type="button"
+                key={s}
+                className={`person sub-toggle${subteams.includes(s) ? ' on' : ''}`}
+                style={{ '--c': SUBTEAM_COLORS[s] }}
+                onClick={() => toggle(s)}
+              >
+                <span className="dot" /> {s}
+              </button>
+            ))}
+          </div>
+        </div>
+        <label className="field-label" htmlFor="p-resp">
+          Responsibilities — one per line
+        </label>
+        <textarea
+          id="p-resp"
+          className="input description"
+          rows={5}
+          value={resp}
+          onChange={(e) => setResp(e.target.value)}
+          placeholder={'Builds and maintains the intake\nKeeps the parts inventory'}
+        />
+        <div className="row gap end">
+          <button type="button" className="btn ghost" onClick={onClose}>
+            Cancel
+          </button>
+          <button className="btn primary">Save</button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function MemberChip({ p, onEdit }) {
+  return (
+    <button className="org-member" onClick={() => onEdit(p)}>
+      <Avatar name={p.name} size={26} />
+      <span>
+        <b>{p.name}</b>
+        {p.title && <small>{p.title}</small>}
+      </span>
+    </button>
+  );
+}
+
+export default function TeamView({ roster, roles, tasks, api }) {
+  const [editing, setEditing] = useState(null);
+  const today = todayISO();
+
+  const people = useMemo(() => {
+    const saved = Object.fromEntries(roles.map((r) => [r.id, r]));
+    const names = new Set(roster);
+    for (const r of roles) if (r.name) names.add(r.name);
+    return [...names].map((name) => {
+      const role = saved[personId(name)] || ORG_DEFAULTS[name] || EMPTY_ROLE;
+      const mine = tasks.filter((t) => t.status !== 'done' && (t.assignees || []).includes(name));
+      return {
+        name,
+        title: role.title || '',
+        subteams: role.subteams || [],
+        responsibilities: role.responsibilities || [],
+        open: mine.length,
+        overdue: mine.filter((t) => t.dueDate && t.dueDate < today).length,
+      };
+    });
+  }, [roster, roles, tasks, today]);
+
+  const inTeam = (s) => people.filter((p) => p.subteams.includes(s));
+  const leads = inTeam(LEAD_TEAM);
+  const groups = SUBTEAMS.filter((s) => s !== LEAD_TEAM).map((s) => ({ name: s, members: inTeam(s) }));
+  const unassigned = people.filter((p) => !p.subteams.length);
+
+  return (
+    <main className="content team">
+      <section className="org">
+        <div className="org-root">
+          <b>{TEAM_NAME}</b>
+          <span>{TEAM_NICKNAME}</span>
+        </div>
+        <div className="org-stem" />
+        <div className="org-box org-lead" style={{ '--c': SUBTEAM_COLORS[LEAD_TEAM] }}>
+          <h3>{LEAD_TEAM}</h3>
+          <div className="org-members">
+            {leads.map((p) => (
+              <MemberChip key={p.name} p={p} onEdit={setEditing} />
+            ))}
+            {!leads.length && <span className="muted small">No one yet</span>}
+          </div>
+        </div>
+        <div className="org-stem" />
+        <div className="org-branches">
+          {groups.map((g) => (
+            <div key={g.name} className="org-box" style={{ '--c': SUBTEAM_COLORS[g.name] }}>
+              <h3>{g.name}</h3>
+              <div className="org-members">
+                {g.members.map((p) => (
+                  <MemberChip key={p.name} p={p} onEdit={setEditing} />
+                ))}
+                {!g.members.length && <span className="muted small">No one yet</span>}
+              </div>
+            </div>
+          ))}
+        </div>
+        {unassigned.length > 0 && (
+          <div className="org-box org-unassigned">
+            <h3>No subteam yet</h3>
+            <div className="org-members">
+              {unassigned.map((p) => (
+                <MemberChip key={p.name} p={p} onEdit={setEditing} />
+              ))}
+            </div>
+          </div>
+        )}
+      </section>
+
+      <h2 className="team-heading">Responsibilities</h2>
+      <section className="people-grid">
+        {people.map((p) => (
+          <article key={p.name} className="person-card">
+            <header>
+              <Avatar name={p.name} size={40} />
+              <div className="grow">
+                <h3>{p.name}</h3>
+                <div className="muted small">{p.title || 'Team member'}</div>
+              </div>
+              <button className="link-btn" onClick={() => setEditing(p)}>
+                Edit
+              </button>
+            </header>
+            <div className="sub-pills">
+              {p.subteams.map((s) => (
+                <SubteamPill key={s} name={s} />
+              ))}
+            </div>
+            {p.responsibilities.length ? (
+              <ul className="resp">
+                {p.responsibilities.map((r, i) => (
+                  <li key={i}>{r}</li>
+                ))}
+              </ul>
+            ) : (
+              <p className="muted small">No responsibilities listed yet.</p>
+            )}
+            <footer className="small">
+              <span className="muted">
+                {p.open} open task{p.open === 1 ? '' : 's'}
+              </span>
+              {p.overdue > 0 && <span className="overdue-count">{p.overdue} overdue</span>}
+            </footer>
+          </article>
+        ))}
+      </section>
+
+      {editing && (
+        <PersonDialog
+          person={editing}
+          onClose={() => setEditing(null)}
+          onSave={async (data) => {
+            setEditing(null);
+            await api.saveRole(data);
+          }}
+        />
+      )}
+    </main>
+  );
+}

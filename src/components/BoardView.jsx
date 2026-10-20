@@ -36,6 +36,7 @@ function CardBody({ task }) {
         {task.subteam && <span className="tag">{task.subteam}</span>}
       </div>
       <div className="card-title">{task.title || <span className="muted">Untitled</span>}</div>
+      {task.milestoneTitle && <div className="card-ms">◆ {task.milestoneTitle}</div>}
       {task.status === 'blocked' && task.blockedReason && <div className="blocked-note">⛔ {task.blockedReason}</div>}
       <div className="card-foot">
         <AvatarStack names={task.assignees} size={22} />
@@ -88,7 +89,7 @@ function Column({ status, tasks, onOpen, onAdd }) {
   );
 }
 
-export default function BoardView({ tasks, api, onOpen, onAdd }) {
+export default function BoardView({ tasks, milestones = [], api, onOpen, onAdd }) {
   const [activeId, setActiveId] = useState(null);
   // Mouse drags right away; touch needs a short press so the board still scrolls.
   const sensors = useSensors(
@@ -98,10 +99,11 @@ export default function BoardView({ tasks, api, onOpen, onAdd }) {
 
   const columns = useMemo(() => {
     const map = Object.fromEntries(STATUSES.map((s) => [s.id, []]));
-    for (const t of tasks) (map[t.status] || map.todo).push(t);
+    const msTitle = Object.fromEntries(milestones.map((m) => [m.id, m.title]));
+    for (const t of tasks) (map[t.status] || map.todo).push({ ...t, milestoneTitle: msTitle[t.milestoneId] || '' });
     for (const k in map) map[k].sort(byPriorityThenDue);
     return map;
-  }, [tasks]);
+  }, [tasks, milestones]);
 
   const active = tasks.find((t) => t.id === activeId);
 

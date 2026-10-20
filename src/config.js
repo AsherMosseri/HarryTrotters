@@ -10,6 +10,7 @@ export const firebaseConfig = {
 };
 
 export const TEAM_NAME = 'FTC 32313';
+export const TEAM_NICKNAME = 'Harry Trotters';
 
 // Names shown on the join screen and in the assignee picker. Anyone who joins
 // as "Someone else" is added to the picker automatically.
@@ -20,8 +21,10 @@ export const ROSTER = [
   'Cooper Mlezcko',
   'Michael Meidan',
   'Matthew Kuhle',
-  'Katrina Jurasic',
+  'Kasha Jurasic',
   'Sophia Bermudez',
+  'Shrey',
+  'Ira',
 ];
 
 export const STATUSES = [
@@ -33,7 +36,45 @@ export const STATUSES = [
   { id: 'done', label: 'Done', color: 'var(--st-done)' },
 ];
 
-export const SUBTEAMS = ['Assembly', 'Mechanical', 'Electrical', 'Team Management', 'CAD'];
+// "Design" means CAD. Colors are used for milestone bars and the org chart.
+export const SUBTEAMS = ['Team Management', 'CAD', 'Mechanical', 'Assembly', 'Electrical', 'Programming'];
+export const SUBTEAM_COLORS = {
+  'Team Management': '#0d9488',
+  CAD: '#8b5cf6',
+  Mechanical: '#64748b',
+  Assembly: '#ea580c',
+  Electrical: '#ca8a04',
+  Programming: '#16a34a',
+};
+
+export const COMPETITION = { name: 'Competition', date: '2026-11-14' };
+
+// Starting org chart. Anything edited on the Team tab is saved to the database
+// and overrides these.
+export const ORG_DEFAULTS = {
+  'Asher Mosseri': {
+    title: 'Secretary',
+    subteams: ['Programming', 'Team Management'],
+    responsibilities: ['Programming', 'Secretary', 'Team management'],
+  },
+  'Sebastian Tolbert': {
+    title: '',
+    subteams: ['Team Management', 'Assembly'],
+    responsibilities: ['Team management', 'Logistics', 'Assembly'],
+  },
+  'Kasha Jurasic': { title: '', subteams: ['Programming'], responsibilities: ['Programming'] },
+  'Sophia Bermudez': {
+    title: '',
+    subteams: ['Mechanical', 'Assembly', 'Electrical'],
+    responsibilities: ['Fabrication', 'Assembly', 'Logistics', 'Electrical'],
+  },
+  Shrey: { title: '', subteams: ['CAD'], responsibilities: ['Design (CAD)'] },
+  'Jackson Lucks': { title: '', subteams: ['Assembly', 'Electrical'], responsibilities: ['Assembly', 'Electrical'] },
+  'Matthew Kuhle': { title: '', subteams: ['CAD'], responsibilities: ['Design (CAD)'] },
+  'Cooper Mlezcko': { title: '', subteams: ['Assembly'], responsibilities: ['Assembly'] },
+  Ira: { title: '', subteams: ['Assembly'], responsibilities: ['Assembly'] },
+  'Michael Meidan': { title: '', subteams: ['Programming', 'CAD'], responsibilities: ['Programming', 'Design (CAD)'] },
+};
 
 export const PRIORITIES = [
   { id: 'urgent', label: 'Urgent', rank: 0 },

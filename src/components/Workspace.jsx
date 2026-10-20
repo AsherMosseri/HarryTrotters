@@ -1,11 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ROSTER, STATUSES, SUBTEAMS, PRIORITIES, TEAM_NAME } from '../config.js';
+import { COMPETITION, ROSTER, STATUSES, SUBTEAMS, PRIORITIES, TEAM_NAME } from '../config.js';
+import { daysBetween, todayISO } from '../milestones.js';
+import { personId } from '../data/diff.js';
 import { useLocalStorage } from '../util.js';
 import { Avatar, PlusIcon } from './common.jsx';
 import TableView from './TableView.jsx';
 import BoardView from './BoardView.jsx';
 import TaskPanel from './TaskPanel.jsx';
 import NewTaskDialog from './NewTaskDialog.jsx';
+import MilestonesView from './MilestonesView.jsx';
+import TeamView from './TeamView.jsx';
+import CatParty from './CatParty.jsx';
 
 function ThemeIcon({ theme }) {
   const common = {
@@ -38,13 +43,43 @@ function ThemeIcon({ theme }) {
   );
 }
 
+function Countdown() {
+  const left = daysBetween(todayISO(), COMPETITION.date);
+  if (left < 0) return null;
+  return (
+    <span className="countdown" title={`${COMPETITION.name}: ${COMPETITION.date}`}>
+      🏁{' '}
+      {left === 0 ? (
+        'Competition day!'
+      ) : (
+        <>
+          <b>{left}</b>
+          <span className="countdown-long"> day{left === 1 ? '' : 's'} to go</span>
+          <span className="countdown-short">d</span>
+        </>
+      )}
+    </span>
+  );
+}
+
+const VIEWS = [
+  ['board', 'Board'],
+  ['table', 'Table'],
+  ['milestones', 'Milestones'],
+  ['team', 'Team'],
+];
+
 const EMPTY_FILTERS = { q: '', person: '', subteam: '', priority: '', statuses: [], hideDone: false };
 
 export default function Workspace({ store, actor }) {
   const [tasks, setTasks] = useState(null);
   const [people, setPeople] = useState([]);
+  const [milestones, setMilestones] = useState([]);
+  const [roles, setRoles] = useState([]);
+  const [cat, setCat] = useState(false);
   const [savedView, setView] = useLocalStorage('view', 'board');
-  const view = savedView === 'table' ? 'table' : 'board';
+  const view = VIEWS.some(([id]) => id === savedView) ? savedView : 'board';
+  const taskView = view === 'board' || view === 'table';
   const [filters, setFilters] = useLocalStorage('filters', EMPTY_FILTERS);
   const [theme, setTheme] = useLocalStorage('theme', 'system');
   const [openId, setOpenId] = useState(null);
@@ -58,6 +93,8 @@ export default function Workspace({ store, actor }) {
 
   useEffect(() => store.subscribeTasks(setTasks, fail), [store, fail]);
   useEffect(() => store.subscribePeople(setPeople, fail), [store, fail]);
+  useEffect(() => store.subscribeMilestones(setMilestones, fail), [store, fail]);
+  useEffect(() => store.subscribeRoles(setRoles, fail), [store, fail]);
 
   useEffect(() => {
     if (theme === 'system') document.documentElement.removeAttribute('data-theme');
@@ -85,6 +122,16 @@ export default function Workspace({ store, actor }) {
       remove: (task) => store.deleteTask(task.id).catch(fail),
       comment: (task, text) => store.addComment(task.id, text, actor).catch(fail),
       subscribeActivity: (id, cb) => store.subscribeActivity(id, cb, fail),
+      createMilestone: (data) => store.createMilestone(data, actor).catch(fail),
+      updateMilestone: (m, patch) => store.updateMilestone(m.id, patch, actor).catch(fail),
+      deleteMilestone: (m, linked) =>
+        store
+          .deleteMilestone(
+            m.id,
+            linked.map((t) => t.id),
+          )
+          .catch(fail),
+      saveRole: (data) => store.saveRole(personId(data.name), data, actor).catch(fail),
     }),
     [store, actor, fail],
   );
@@ -114,10 +161,6 @@ export default function Workspace({ store, actor }) {
   const openTask = tasks?.find((t) => t.id === openId) || null;
   const setF = (patch) => setFilters({ ...EMPTY_FILTERS, ...filters, ...patch });
   const anyFilter = filters.q || filters.person || filters.subteam || filters.priority || filters.statuses.length || filters.hideDone;
-  const views = [
-    ['board', 'Board'],
-    ['table', 'Table'],
-  ];
 
   return (
     <div className="app">
@@ -127,20 +170,21 @@ export default function Workspace({ store, actor }) {
         </div>
       )}
       <header className="topbar">
-        <div className="brand">
+        <button className="brand" onClick={() => setCat(true)}>
           <span className="logo-mark">✓</span>
           <span className="brand-text">
             {TEAM_NAME} <span className="muted">Tasks</span>
           </span>
-        </div>
+        </button>
         <nav className="tabs" role="tablist">
-          {views.map(([id, label]) => (
+          {VIEWS.map(([id, label]) => (
             <button key={id} role="tab" aria-selected={view === id} className={view === id ? 'active' : ''} onClick={() => setView(id)}>
               {label}
             </button>
           ))}
         </nav>
         <div className="topbar-right">
+          <Countdown />
           <button
             className="icon-btn"
             title={`Theme: ${theme}`}
@@ -162,59 +206,61 @@ export default function Workspace({ store, actor }) {
         </div>
       </header>
 
-      <div className="toolbar">
-        <input
-          className="search"
-          type="search"
-          placeholder="Search tasks…"
-          value={filters.q}
-          onChange={(e) => setF({ q: e.target.value })}
-        />
-        <div className="filters">
-          <button
-            className={`chip${filters.person === '__me' ? ' on' : ''}`}
-            onClick={() => setF({ person: filters.person === '__me' ? '' : '__me' })}
-          >
-            My tasks
-          </button>
-          <select className="filter" value={filters.person} onChange={(e) => setF({ person: e.target.value })} aria-label="Person">
-            <option value="">Everyone</option>
-            <option value="__me">Me ({actor.name.split(' ')[0]})</option>
-            <option value="__none">Unassigned</option>
-            {roster.map((n) => (
-              <option key={n} value={n}>
-                {n}
-              </option>
-            ))}
-          </select>
-          <select className="filter" value={filters.subteam} onChange={(e) => setF({ subteam: e.target.value })} aria-label="Subteam">
-            <option value="">All subteams</option>
-            {SUBTEAMS.map((s) => (
-              <option key={s}>{s}</option>
-            ))}
-          </select>
-          <select className="filter" value={filters.priority} onChange={(e) => setF({ priority: e.target.value })} aria-label="Priority">
-            <option value="">Any priority</option>
-            {PRIORITIES.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.label}
-              </option>
-            ))}
-          </select>
-          <button className={`chip${filters.hideDone ? ' on' : ''}`} onClick={() => setF({ hideDone: !filters.hideDone })}>
-            Hide done
-          </button>
-          {anyFilter ? (
-            <button className="link-btn" onClick={() => setFilters(EMPTY_FILTERS)}>
-              Clear
+      {taskView && (
+        <div className="toolbar">
+          <input
+            className="search"
+            type="search"
+            placeholder="Search tasks…"
+            value={filters.q}
+            onChange={(e) => setF({ q: e.target.value })}
+          />
+          <div className="filters">
+            <button
+              className={`chip${filters.person === '__me' ? ' on' : ''}`}
+              onClick={() => setF({ person: filters.person === '__me' ? '' : '__me' })}
+            >
+              My tasks
             </button>
-          ) : null}
+            <select className="filter" value={filters.person} onChange={(e) => setF({ person: e.target.value })} aria-label="Person">
+              <option value="">Everyone</option>
+              <option value="__me">Me ({actor.name.split(' ')[0]})</option>
+              <option value="__none">Unassigned</option>
+              {roster.map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+            <select className="filter" value={filters.subteam} onChange={(e) => setF({ subteam: e.target.value })} aria-label="Subteam">
+              <option value="">All subteams</option>
+              {SUBTEAMS.map((s) => (
+                <option key={s}>{s}</option>
+              ))}
+            </select>
+            <select className="filter" value={filters.priority} onChange={(e) => setF({ priority: e.target.value })} aria-label="Priority">
+              <option value="">Any priority</option>
+              {PRIORITIES.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
+            <button className={`chip${filters.hideDone ? ' on' : ''}`} onClick={() => setF({ hideDone: !filters.hideDone })}>
+              Hide done
+            </button>
+            {anyFilter ? (
+              <button className="link-btn" onClick={() => setFilters(EMPTY_FILTERS)}>
+                Clear
+              </button>
+            ) : null}
+          </div>
+          <span className="spacer" />
+          <button className="btn primary" onClick={() => setNewTask({ status: 'todo' })}>
+            <PlusIcon /> New task
+          </button>
         </div>
-        <span className="spacer" />
-        <button className="btn primary" onClick={() => setNewTask({ status: 'todo' })}>
-          <PlusIcon /> New task
-        </button>
-      </div>
+      )}
 
       {view === 'table' && (
         <div className="status-strip">
@@ -236,21 +282,37 @@ export default function Workspace({ store, actor }) {
         </div>
       )}
 
-      <main className="content">
-        {tasks === null ? (
-          <p className="empty">Loading tasks…</p>
-        ) : view === 'table' ? (
-          <TableView tasks={filtered} api={api} onOpen={setOpenId} total={tasks.length} />
-        ) : (
-          <BoardView tasks={filtered} api={api} onOpen={setOpenId} onAdd={(status) => setNewTask({ status })} />
-        )}
-      </main>
+      {tasks === null ? (
+        <main className="content">
+          <p className="empty">Loading…</p>
+        </main>
+      ) : view === 'milestones' ? (
+        <MilestonesView
+          milestones={milestones}
+          tasks={tasks}
+          roster={roster}
+          api={api}
+          onOpenTask={setOpenId}
+          onAddTask={(m) => setNewTask({ status: 'todo', milestoneId: m.id, subteam: m.subteam || '' })}
+        />
+      ) : view === 'team' ? (
+        <TeamView roster={roster} roles={roles} tasks={tasks} api={api} />
+      ) : (
+        <main className="content">
+          {view === 'table' ? (
+            <TableView tasks={filtered} api={api} onOpen={setOpenId} total={tasks.length} />
+          ) : (
+            <BoardView tasks={filtered} milestones={milestones} api={api} onOpen={setOpenId} onAdd={(status) => setNewTask({ status })} />
+          )}
+        </main>
+      )}
 
-      {openTask && <TaskPanel task={openTask} api={api} roster={roster} onClose={() => setOpenId(null)} />}
+      {openTask && <TaskPanel task={openTask} api={api} roster={roster} milestones={milestones} onClose={() => setOpenId(null)} />}
       {newTask && (
         <NewTaskDialog
           initial={newTask}
           roster={roster}
+          milestones={milestones}
           me={actor.name}
           onClose={() => setNewTask(null)}
           onCreate={async (data) => {
@@ -259,6 +321,7 @@ export default function Workspace({ store, actor }) {
           }}
         />
       )}
+      {cat && <CatParty onClose={() => setCat(false)} />}
       {toast && (
         <div className="toast" role="alert" onClick={() => setToast('')}>
           {toast}

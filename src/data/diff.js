@@ -1,6 +1,6 @@
 // Shared helpers for both data backends.
 
-const TRACKED = ['title', 'description', 'status', 'assignees', 'subteam', 'priority', 'dueDate', 'blockedReason', 'links'];
+const TRACKED = ['title', 'description', 'status', 'assignees', 'subteam', 'priority', 'dueDate', 'blockedReason', 'links', 'milestoneId'];
 
 export function sameValue(a, b) {
   return JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
@@ -43,7 +43,19 @@ export function newTaskDefaults(data) {
     dueDate: '',
     blockedReason: '',
     links: [],
+    milestoneId: '',
     commentCount: 0,
     ...data,
   };
 }
+
+export function newMilestoneDefaults(data) {
+  return { title: '', subteam: '', owners: [], start: '', end: '', notes: '', done: false, ...data };
+}
+
+// Stable doc id for a person's org-chart entry.
+export const personId = (name) =>
+  name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
