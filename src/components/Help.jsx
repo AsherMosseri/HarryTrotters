@@ -99,7 +99,7 @@ const MANAGER_TIPS = [
   'Chat: delete any message, and remove reactions (🚫☺ on a message).',
 ];
 
-function TipList() {
+function TipList({ showRobot }) {
   return (
     <ul className="tips">
       {QUICK_TIPS.map(([icon, title, text]) => (
@@ -109,7 +109,7 @@ function TipList() {
           </span>
           <div>
             <b>{title}</b>
-            <p>{text}</p>
+            <p>{showRobot ? text : text.replace(' Robot: the 3D model.', '')}</p>
           </div>
         </li>
       ))}
@@ -131,13 +131,13 @@ function Rules() {
 }
 
 // Shown once per device after joining.
-export function WelcomeCard({ name, onClose }) {
+export function WelcomeCard({ name, showRobot, onClose }) {
   return (
     <div className="panel-backdrop center" onClick={onClose}>
       <div className="dialog welcome" onClick={(e) => e.stopPropagation()} role="dialog" aria-labelledby="welcome-title">
         <h2 id="welcome-title">Welcome, {name.split(' ')[0]}! 👋</h2>
         <p className="muted">Here’s how the {TEAM_NAME} task board works.</p>
-        <TipList />
+        <TipList showRobot={showRobot} />
         <Rules />
         <p className="muted small">You can see these tips again anytime with the ? button at the top.</p>
         <button className="btn primary big-btn" onClick={onClose} autoFocus>
@@ -148,7 +148,7 @@ export function WelcomeCard({ name, onClose }) {
   );
 }
 
-export function HelpDialog({ isManager, onClose }) {
+export function HelpDialog({ isManager, showRobot, onClose }) {
   return (
     <div className="panel-backdrop center" onClick={onClose}>
       <div className="dialog help" onClick={(e) => e.stopPropagation()} role="dialog" aria-labelledby="help-title">
@@ -159,10 +159,10 @@ export function HelpDialog({ isManager, onClose }) {
             <CloseIcon />
           </button>
         </div>
-        <TipList />
+        <TipList showRobot={showRobot} />
         <Rules />
         <div className="help-sections">
-          {SECTIONS.map(([title, items]) => (
+          {SECTIONS.filter(([title]) => showRobot || title !== 'Robot (3D)').map(([title, items]) => (
             <details key={title}>
               <summary>{title}</summary>
               <ul>

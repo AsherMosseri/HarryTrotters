@@ -31,6 +31,9 @@ export function makeRenamer(renames = {}) {
   };
 }
 
+// The Robot (3D) tab is in preview: only these people see it for now.
+export const ROBOT_TAB_PEOPLE = ['Asher Mosseri'];
+
 export const isManagerName = (name) => MANAGER_NAMES.some((n) => n.toLowerCase() === name.trim().toLowerCase());
 
 // Names shown on the join screen and in the assignee picker. People the manager

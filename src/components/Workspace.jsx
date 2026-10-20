@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { CHANNELS, COMPETITION, ROSTER, STATUSES, SUBTEAMS, PRIORITIES, TEAM_NAME } from '../config.js';
+import { CHANNELS, COMPETITION, ROBOT_TAB_PEOPLE, ROSTER, STATUSES, SUBTEAMS, PRIORITIES, TEAM_NAME } from '../config.js';
 import { daysBetween, todayISO } from '../milestones.js';
 import { newTaskDefaults, personId } from '../data/diff.js';
 import { preparePhoto, useLocalStorage } from '../util.js';
@@ -118,7 +118,9 @@ export default function Workspace({ store, actor, rename, renames }) {
   const [welcomed, setWelcomed] = useLocalStorage('welcome-seen-v1', false);
   const [showHelp, setShowHelp] = useState(false);
   const [savedView, setView] = useLocalStorage('view', 'board');
-  const view = VIEWS.some(([id]) => id === savedView) ? savedView : 'board';
+  const showRobot = ROBOT_TAB_PEOPLE.includes(actor.name);
+  const views = showRobot ? VIEWS : VIEWS.filter(([id]) => id !== 'robot');
+  const view = views.some(([id]) => id === savedView) ? savedView : 'board';
   const taskView = view === 'board' || view === 'table';
   const tabsRef = useRef(null);
   // On narrow screens the tab strip scrolls sideways; keep the current tab visible.
@@ -428,7 +430,7 @@ export default function Workspace({ store, actor, rename, renames }) {
           </span>
         </button>
         <nav className="tabs" role="tablist" ref={tabsRef}>
-          {VIEWS.map(([id, label]) => (
+          {views.map(([id, label]) => (
             <button key={id} role="tab" aria-selected={view === id} className={view === id ? 'active' : ''} onClick={() => setView(id)}>
               {label}
               {id === 'chat' && unreadTotal > 0 && (
@@ -647,8 +649,8 @@ export default function Workspace({ store, actor, rename, renames }) {
         />
       )}
       {showTrash && <TrashDialog trash={trash} days={TRASH_DAYS} isManager={actor.admin} api={api} onClose={() => setShowTrash(false)} />}
-      {!welcomed && <WelcomeCard name={actor.name} onClose={() => setWelcomed(true)} />}
-      {showHelp && <HelpDialog isManager={actor.admin} onClose={() => setShowHelp(false)} />}
+      {!welcomed && <WelcomeCard name={actor.name} showRobot={showRobot} onClose={() => setWelcomed(true)} />}
+      {showHelp && <HelpDialog isManager={actor.admin} showRobot={showRobot} onClose={() => setShowHelp(false)} />}
       {cat && <CatParty onClose={() => setCat(false)} />}
       {toast && (
         <div className="toast" role="alert" onClick={() => setToast(null)}>
