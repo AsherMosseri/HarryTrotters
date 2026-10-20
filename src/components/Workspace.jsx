@@ -15,6 +15,7 @@ import ChecklistsView from './ChecklistsView.jsx';
 import CatParty from './CatParty.jsx';
 import TrashDialog from './TrashDialog.jsx';
 import RunsView from './RunsView.jsx';
+import { HelpDialog, WelcomeCard } from './Help.jsx';
 
 function ThemeIcon({ theme }) {
   const common = {
@@ -104,6 +105,8 @@ export default function Workspace({ store, actor, rename, renames }) {
   const [runs, setRuns] = useState([]);
   const [settings, setSettings] = useState({});
   const [cat, setCat] = useState(false);
+  const [welcomed, setWelcomed] = useLocalStorage('welcome-seen-v1', false);
+  const [showHelp, setShowHelp] = useState(false);
   const [savedView, setView] = useLocalStorage('view', 'board');
   const view = VIEWS.some(([id]) => id === savedView) ? savedView : 'board';
   const taskView = view === 'board' || view === 'table';
@@ -360,6 +363,9 @@ export default function Workspace({ store, actor, rename, renames }) {
         </nav>
         <div className="topbar-right">
           <Countdown date={competitionDate} />
+          <button className="icon-btn help-btn" title="Help" aria-label="Help" onClick={() => setShowHelp(true)}>
+            ?
+          </button>
           <button
             className="icon-btn"
             title={`Theme: ${theme}`}
@@ -522,6 +528,8 @@ export default function Workspace({ store, actor, rename, renames }) {
         />
       )}
       {showTrash && <TrashDialog trash={trash} days={TRASH_DAYS} isManager={actor.admin} api={api} onClose={() => setShowTrash(false)} />}
+      {!welcomed && <WelcomeCard name={actor.name} onClose={() => setWelcomed(true)} />}
+      {showHelp && <HelpDialog isManager={actor.admin} onClose={() => setShowHelp(false)} />}
       {cat && <CatParty onClose={() => setCat(false)} />}
       {toast && (
         <div className="toast" role="alert" onClick={() => setToast(null)}>

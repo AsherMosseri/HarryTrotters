@@ -740,6 +740,30 @@ div.org-member { cursor: default; }
 .input.match-no { max-width: 120px; }
 .row.wrap { flex-wrap: wrap; }
 
+/* ---------- welcome & help ---------- */
+.help-btn {
+  width: 32px; height: 32px; border-radius: 50%; border: 2px solid currentColor;
+  font-weight: 800; font-size: 16px; line-height: 1;
+}
+.dialog.welcome h2 { margin: 18px 0 0; font-size: 22px; }
+.dialog.welcome > p { margin: 0; }
+.tips { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.tips li { display: flex; gap: 12px; align-items: flex-start; }
+.tip-icon { flex: none; width: 36px; height: 36px; border-radius: 10px; background: var(--accent-soft); display: grid; place-items: center; font-size: 18px; }
+.tips b { display: block; }
+.tips p { margin: 2px 0 0; color: var(--muted); font-size: 14px; line-height: 1.4; }
+.rules { background: var(--surface-2); border-radius: 12px; padding: 10px 14px; }
+.rules h3 { margin: 0 0 4px; font-size: 14px; }
+.rules ol { margin: 0; padding-left: 20px; font-size: 14px; }
+.rules li + li { margin-top: 2px; }
+.big-btn { justify-content: center; min-height: 46px; font-size: 16px; }
+.dialog.help { gap: 14px; }
+.help-sections { display: flex; flex-direction: column; border-top: 1px solid var(--border); }
+.help-sections details { border-bottom: 1px solid var(--border); }
+.help-sections summary { cursor: pointer; padding: 12px 2px; font-weight: 700; list-style-position: inside; }
+.help-sections ul { margin: 0 0 12px; padding-left: 20px; font-size: 14px; color: var(--muted); }
+.help-sections li + li { margin-top: 4px; }
+
 /* ---------- responsive ---------- */
 @media (max-width: 1280px) {
   .topbar { flex-wrap: wrap; row-gap: 8px; }
