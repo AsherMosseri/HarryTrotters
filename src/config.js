@@ -17,8 +17,19 @@ export const TEAM_NICKNAME = 'Harry Trotters';
 // adding and removing people, deleting milestones, and changing the competition date.
 export const MANAGER_NAMES = ['Asher Mosseri', 'Sebastian Tolbert'];
 // Old spellings still stored on devices or tasks, mapped to the right name.
+// Renames made on the Team tab are stored in the database (settings/names).
 export const RENAMED = { 'Matthew Kuhle': 'Matthew Kuehl' };
-export const fixName = (name) => RENAMED[name] || name;
+
+// Builds a function that maps any old name to the person's current name,
+// following chains (A renamed to B, later B renamed to C).
+export function makeRenamer(renames = {}) {
+  const all = { ...RENAMED, ...renames };
+  return (name) => {
+    let n = name;
+    for (let i = 0; i < 10 && all[n] && all[n] !== n; i++) n = all[n];
+    return n;
+  };
+}
 
 export const isManagerName = (name) => MANAGER_NAMES.some((n) => n.toLowerCase() === name.trim().toLowerCase());
 

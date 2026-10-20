@@ -1,6 +1,6 @@
 // In-browser backend used with ?demo in the URL: no sign-in, data kept in
 // localStorage. Handy for trying the UI before Firebase is set up.
-import { describeChanges, derivedFields, newTaskDefaults, newMilestoneDefaults, newPartDefaults } from './diff.js';
+import { describeChanges, derivedFields, newTaskDefaults, newMilestoneDefaults, newPartDefaults, personId } from './diff.js';
 import { STARTER_CHECKLISTS, starterItems } from '../checklists.js';
 
 const KEY = 'ftc32313-demo-v6';
@@ -233,6 +233,23 @@ export const demoStore = {
   },
   async saveRole(id, data, actor) {
     state.roles = [...(state.roles || []).filter((r) => r.id !== id), { id, ...data, updatedAt: Date.now(), updatedBy: actor.name }];
+    commit();
+  },
+
+  subscribeNames(cb) {
+    return listen(() => cb({ ...(state.renames || {}) }));
+  },
+  async renamePerson(oldName, newName, { renames, tasks, milestones, role }, actor) {
+    const swap = (list) => list.map((n) => (n === oldName ? newName : n));
+    const taskIds = new Set(tasks.map((t) => t.id));
+    const msIds = new Set(milestones.map((m) => m.id));
+    state.renames = { ...(state.renames || {}), ...renames };
+    state.tasks = state.tasks.map((t) => (taskIds.has(t.id) ? { ...t, assignees: swap(t.assignees) } : t));
+    state.milestones = state.milestones.map((m) => (msIds.has(m.id) ? { ...m, owners: swap(m.owners) } : m));
+    state.roles = [
+      ...(state.roles || []).filter((r) => r.id !== personId(oldName) && r.id !== personId(newName)),
+      { id: personId(newName), ...role, name: newName, removed: false, updatedBy: actor.name },
+    ];
     commit();
   },
 

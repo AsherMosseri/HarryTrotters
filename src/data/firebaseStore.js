@@ -20,7 +20,7 @@ import {
 } from 'firebase/firestore';
 import { getStorage, ref as fileRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { firebaseConfig } from '../config.js';
-import { describeChanges, derivedFields, newTaskDefaults, newMilestoneDefaults, newPartDefaults, itemId } from './diff.js';
+import { describeChanges, derivedFields, newTaskDefaults, newMilestoneDefaults, newPartDefaults, itemId, personId } from './diff.js';
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -38,6 +38,8 @@ const peopleCol = collection(db, 'people');
 const milestonesCol = collection(db, 'milestones');
 const rolesCol = collection(db, 'roles');
 const settingsDoc = doc(db, 'settings', 'team');
+// Name changes made by managers; readable before joining so the join screen is current.
+const namesDoc = doc(db, 'settings', 'names');
 const partsCol = collection(db, 'parts');
 const checklistsCol = collection(db, 'checklists');
 
@@ -242,6 +244,29 @@ export const firebaseStore = {
 
   saveRole(id, data, actor) {
     return setDoc(doc(rolesCol, id), { ...data, updatedAt: serverTimestamp(), updatedBy: actor.name });
+  },
+
+  subscribeNames(cb, onError) {
+    return onSnapshot(namesDoc, (snap) => cb((snap.exists() && snap.data().renames) || {}), onError);
+  },
+
+  // One batch: record the rename, fix assignees and milestone owners, and move
+  // the person's org-chart entry to the new name.
+  async renamePerson(oldName, newName, { renames, tasks, milestones, role }, actor) {
+    const swap = (list) => list.map((n) => (n === oldName ? newName : n));
+    const batch = writeBatch(db);
+    batch.set(namesDoc, { renames, updatedAt: serverTimestamp(), updatedBy: actor.name }, { merge: true });
+    for (const t of tasks) batch.update(doc(tasksCol, t.id), { assignees: swap(t.assignees) });
+    for (const m of milestones) batch.update(doc(milestonesCol, m.id), { owners: swap(m.owners) });
+    batch.delete(doc(rolesCol, personId(oldName)));
+    batch.set(doc(rolesCol, personId(newName)), {
+      ...role,
+      name: newName,
+      removed: false,
+      updatedAt: serverTimestamp(),
+      updatedBy: actor.name,
+    });
+    await batch.commit();
   },
 
   subscribeSettings(cb, onError) {

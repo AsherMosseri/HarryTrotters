@@ -20,9 +20,15 @@ function SubteamPill({ name }) {
 }
 
 // person.isNew = adding someone to the team (asks for their name).
+// Managers' names are tied to their manager codes in the security rules, so
+// they can't be renamed here.
 function PersonDialog({ person, taken, onClose, onSave, onRemove }) {
   const [name, setName] = useState(person.name || '');
-  const nameTaken = person.isNew && taken.some((n) => n.toLowerCase() === name.trim().toLowerCase());
+  const canRename = !person.isNew && !isManagerName(person.name);
+  const nameChanged = person.isNew || name.trim() !== person.name;
+  const nameTaken = nameChanged && taken.some((n) => n !== person.name && n.toLowerCase() === name.trim().toLowerCase());
+  const managerName = nameChanged && isManagerName(name);
+  const nameError = nameTaken ? `${name.trim()} is already on the team.` : managerName ? 'That name belongs to a team manager.' : '';
   const [title, setTitle] = useState(person.title || '');
   const [subteams, setSubteams] = useState(person.subteams || []);
   const [resp, setResp] = useState((person.responsibilities || []).join('\n'));
@@ -35,9 +41,9 @@ function PersonDialog({ person, taken, onClose, onSave, onRemove }) {
         onClick={(e) => e.stopPropagation()}
         onSubmit={(e) => {
           e.preventDefault();
-          if (!name.trim() || nameTaken) return;
+          if (!name.trim() || nameError) return;
           onSave({
-            name: person.isNew ? name.trim() : person.name,
+            name: person.isNew || canRename ? name.trim() : person.name,
             removed: false,
             title: title.trim(),
             subteams: ORG_GROUPS.filter((s) => subteams.includes(s)),
@@ -56,17 +62,28 @@ function PersonDialog({ person, taken, onClose, onSave, onRemove }) {
             <CloseIcon />
           </button>
         </div>
-        {person.isNew && (
-          <input
-            className="input big"
-            autoFocus
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Full name"
-            maxLength={60}
-          />
+        {(person.isNew || canRename) && (
+          <>
+            {canRename && (
+              <label className="field-label" htmlFor="p-name">
+                Name
+              </label>
+            )}
+            <input
+              id="p-name"
+              className="input big"
+              autoFocus={person.isNew}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Full name"
+              maxLength={60}
+            />
+          </>
         )}
-        {nameTaken && <p className="form-error">{name.trim()} is already on the team.</p>}
+        {canRename && name.trim() && name.trim() !== person.name && !nameError && (
+          <p className="muted small">Their tasks, milestones, and org chart entry will switch to “{name.trim()}”.</p>
+        )}
+        {nameError && <p className="form-error">{nameError}</p>}
         <div className="fields">
           <label className="field-label" htmlFor="p-title">
             Role
@@ -114,7 +131,7 @@ function PersonDialog({ person, taken, onClose, onSave, onRemove }) {
           <button type="button" className="btn ghost" onClick={onClose}>
             Cancel
           </button>
-          <button className="btn primary" disabled={!name.trim() || nameTaken}>
+          <button className="btn primary" disabled={!name.trim() || !!nameError}>
             {person.isNew ? 'Add to team' : 'Save'}
           </button>
         </div>
@@ -143,14 +160,17 @@ function MemberChip({ p, onEdit }) {
   );
 }
 
-export default function TeamView({ roster, roles, tasks, api, isManager }) {
+export default function TeamView({ roster, roles, tasks, api, isManager, rename }) {
   const [editing, setEditing] = useState(null);
   const today = todayISO();
+
+  // Starting roles, keyed by each person's current name.
+  const defaults = useMemo(() => Object.fromEntries(Object.entries(ORG_DEFAULTS).map(([k, v]) => [rename(k), v])), [rename]);
 
   const people = useMemo(() => {
     const saved = Object.fromEntries(roles.map((r) => [r.id, r]));
     return roster.map((name) => {
-      const role = saved[personId(name)] || ORG_DEFAULTS[name] || EMPTY_ROLE;
+      const role = saved[personId(name)] || defaults[name] || EMPTY_ROLE;
       const mine = tasks.filter((t) => t.status !== 'done' && (t.assignees || []).includes(name));
       return {
         name,
@@ -161,7 +181,7 @@ export default function TeamView({ roster, roles, tasks, api, isManager }) {
         overdue: mine.filter((t) => t.dueDate && t.dueDate < today).length,
       };
     });
-  }, [roster, roles, tasks, today]);
+  }, [roster, roles, tasks, today, defaults]);
 
   const inTeam = (s) => people.filter((p) => p.subteams.includes(s));
   const onEdit = isManager ? setEditing : null;
@@ -299,8 +319,10 @@ export default function TeamView({ roster, roles, tasks, api, isManager }) {
                 }
           }
           onSave={async (data) => {
+            const p = editing;
             setEditing(null);
-            await api.saveRole(data);
+            if (p.isNew || data.name === p.name) await api.saveRole(data);
+            else await api.renamePerson(p.name, data.name, data);
           }}
         />
       )}

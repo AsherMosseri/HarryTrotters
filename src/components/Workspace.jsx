@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { COMPETITION, ROSTER, STATUSES, SUBTEAMS, PRIORITIES, TEAM_NAME, fixName } from '../config.js';
+import { COMPETITION, ROSTER, STATUSES, SUBTEAMS, PRIORITIES, TEAM_NAME } from '../config.js';
 import { daysBetween, todayISO } from '../milestones.js';
 import { newTaskDefaults, personId } from '../data/diff.js';
 import { preparePhoto, useLocalStorage } from '../util.js';
@@ -87,14 +87,12 @@ function matchesFilters(t, filters, me, view) {
   return true;
 }
 
-const withFixedNames = (t) => (t.assignees?.some((n) => fixName(n) !== n) ? { ...t, assignees: t.assignees.map(fixName) } : t);
-
 const EMPTY_FILTERS = { q: '', person: '', subteam: '', priority: '', statuses: [], hideDone: false };
 
-export default function Workspace({ store, actor }) {
-  const [tasks, setTasks] = useState(null);
+export default function Workspace({ store, actor, rename, renames }) {
+  const [rawTasks, setRawTasks] = useState(null);
   const [people, setPeople] = useState([]);
-  const [milestones, setMilestones] = useState([]);
+  const [rawMilestones, setMilestones] = useState([]);
   const [roles, setRoles] = useState([]);
   const [parts, setParts] = useState([]);
   const [checklists, setChecklists] = useState([]);
@@ -135,7 +133,7 @@ export default function Workspace({ store, actor }) {
       store.subscribeTasks(
         (ts) => {
           setTasksError('');
-          setTasks(ts.map(withFixedNames));
+          setRawTasks(ts);
         },
         (e) => {
           console.error('tasks', e);
@@ -167,19 +165,35 @@ export default function Workspace({ store, actor }) {
     return () => clearTimeout(t);
   }, [toast]);
 
+  // Show everyone under their current name, even on tasks saved before a rename.
+  const tasks = useMemo(
+    () =>
+      rawTasks &&
+      rawTasks.map((t) => (t.assignees?.some((n) => rename(n) !== n) ? { ...t, assignees: [...new Set(t.assignees.map(rename))] } : t)),
+    [rawTasks, rename],
+  );
+  const milestones = useMemo(
+    () => rawMilestones.map((m) => (m.owners?.some((n) => rename(n) !== n) ? { ...m, owners: [...new Set(m.owners.map(rename))] } : m)),
+    [rawMilestones, rename],
+  );
+
   // Default roster + people the manager added + anyone who joined under their
   // own name, minus people the manager removed.
   const roster = useMemo(() => {
-    const removed = new Set(roles.filter((r) => r.removed).map((r) => r.name));
-    const names = new Set(ROSTER);
-    for (const r of roles) if (r.name) names.add(fixName(r.name));
-    for (const p of people) if (p.name) names.add(fixName(p.name));
+    const removed = new Set(roles.filter((r) => r.removed).map((r) => rename(r.name)));
+    const names = new Set(ROSTER.map(rename));
+    for (const r of roles) if (r.name && !r.removed) names.add(rename(r.name));
+    for (const p of people) if (p.name) names.add(rename(p.name));
     return [...names].filter((n) => !removed.has(n) || n === actor.name);
-  }, [people, roles, actor.name]);
+  }, [people, roles, actor.name, rename]);
 
   // Lets api.create see the current filters without rebuilding api on every change.
   const filterState = useRef();
   filterState.current = { filters, view, taskView };
+  const tasksRef = useRef(tasks);
+  tasksRef.current = tasks;
+  const milestonesRef = useRef(milestones);
+  milestonesRef.current = milestones;
 
   // Store calls wrapped with the signed-in person and error reporting.
   const api = useMemo(
@@ -225,6 +239,23 @@ export default function Workspace({ store, actor }) {
           )
           .catch(fail),
       saveRole: (data) => store.saveRole(personId(data.name), data, actor).catch(fail),
+      renamePerson: (oldName, newName, role) => {
+        // Point earlier names for this person at the new one too.
+        const updated = Object.fromEntries(Object.entries(renames).map(([from, to]) => [from, to === oldName ? newName : to]));
+        return store
+          .renamePerson(
+            oldName,
+            newName,
+            {
+              renames: { ...updated, [oldName]: newName },
+              tasks: (tasksRef.current || []).filter((t) => t.assignees?.includes(oldName)),
+              milestones: milestonesRef.current.filter((m) => m.owners?.includes(oldName)),
+              role,
+            },
+            actor,
+          )
+          .catch(fail);
+      },
       saveSettings: (patch) => store.saveSettings(patch, actor).catch(fail),
       createPart: (data) => store.createPart(data, actor).catch(fail),
       updatePart: (p, patch) => store.updatePart(p.id, patch, actor).catch(fail),
@@ -243,7 +274,7 @@ export default function Workspace({ store, actor }) {
       removeChecklistItem: (list, item) => store.removeChecklistItem(list.id, item.id).catch(fail),
       deleteChecklist: (list) => store.deleteChecklist(list.id).catch(fail),
     }),
-    [store, actor, fail, setFilters],
+    [store, actor, fail, setFilters, renames],
   );
 
   const filtered = useMemo(
@@ -411,7 +442,7 @@ export default function Workspace({ store, actor }) {
       ) : view === 'checklists' ? (
         <ChecklistsView checklists={checklists} api={api} isManager={actor.admin} />
       ) : view === 'team' ? (
-        <TeamView roster={roster} roles={roles} tasks={tasks} api={api} isManager={actor.admin} />
+        <TeamView roster={roster} roles={roles} tasks={tasks} api={api} isManager={actor.admin} rename={rename} />
       ) : (
         <main className="content">
           {view === 'table' ? (

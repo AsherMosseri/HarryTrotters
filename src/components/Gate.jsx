@@ -33,7 +33,8 @@ export function LoadingScreen({ error }) {
 
 const OTHER = '__other';
 
-export function JoinScreen({ onJoin }) {
+export function JoinScreen({ onJoin, rename }) {
+  const names = [...new Set(ROSTER.map(rename))];
   const [picked, setPicked] = useState('');
   const [other, setOther] = useState('');
   const [code, setCode] = useState('');
@@ -65,7 +66,7 @@ export function JoinScreen({ onJoin }) {
       <p className="muted">Pick your name and enter the team code. You only have to do this once on each device.</p>
       <form className="join-form" onSubmit={submit}>
         <div className="join-names">
-          {ROSTER.map((n) => (
+          {names.map((n) => (
             <button type="button" key={n} className={`person${picked === n ? ' on' : ''}`} onClick={() => setPicked(n)}>
               <Avatar name={n} size={22} /> {n}
             </button>

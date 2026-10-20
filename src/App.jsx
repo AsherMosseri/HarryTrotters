@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { loadStore } from './data/store.js';
-import { TEAM_NAME, fixName } from './config.js';
+import { TEAM_NAME, makeRenamer } from './config.js';
 import { JoinScreen, LoadingScreen } from './components/Gate.jsx';
 import Workspace from './components/Workspace.jsx';
 
@@ -15,6 +15,8 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [member, setMember] = useState(undefined); // undefined = checking, null = hasn't joined
   const [error, setError] = useState('');
+  const [renames, setRenames] = useState({});
+  const rename = useMemo(() => makeRenamer(renames), [renames]);
 
   useEffect(() => {
     loadStore().then(setStore, (e) => setError(String(e)));
@@ -43,7 +45,15 @@ export default function App() {
     };
   }, [store, user]);
 
-  const actor = useMemo(() => (user && member ? { uid: user.uid, name: fixName(member.name), admin: member.admin } : null), [user, member]);
+  useEffect(() => {
+    if (!store || !user) return;
+    return store.subscribeNames(setRenames, (e) => console.warn('names', e));
+  }, [store, user]);
+
+  const actor = useMemo(
+    () => (user && member ? { uid: user.uid, name: rename(member.name), admin: member.admin } : null),
+    [user, member, rename],
+  );
 
   useEffect(() => {
     document.title = `${TEAM_NAME} Task Board`;
@@ -54,11 +64,12 @@ export default function App() {
   if (!actor)
     return (
       <JoinScreen
+        rename={rename}
         onJoin={async (name, code, managerCode) => {
           await store.join(user.uid, name, code, managerCode);
           setMember({ name, admin: !!managerCode });
         }}
       />
     );
-  return <Workspace store={store} actor={actor} />;
+  return <Workspace store={store} actor={actor} rename={rename} renames={renames} />;
 }

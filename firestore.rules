@@ -55,8 +55,9 @@ service cloud.firestore {
       allow read: if isMember();
       allow write: if isManager();
     }
+    // settings/names (renames) is readable before joining so the join screen shows current names.
     match /settings/{id} {
-      allow read: if isMember();
+      allow read: if isMember() || (id == 'names' && signedIn());
       allow write: if isManager();
     }
 
