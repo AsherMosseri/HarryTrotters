@@ -1,0 +1,44 @@
+name: Deploy rules and notifications
+
+# Publishes firestore.rules, storage.rules, and the notification functions to
+# Firebase. One-time setup: scripts/setup-firebase-deploy.sh (see README).
+on:
+  push:
+    branches: [main]
+    paths: [firestore.rules, storage.rules, firebase.json, 'functions/**', 'scripts/keep-live-codes.mjs', .github/workflows/firebase.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: firebase
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/779656354333/locations/global/workloadIdentityPools/github/providers/harrytrotters
+          service_account: github-deploy@ftc-32313-tasks.iam.gserviceaccount.com
+          token_format: access_token
+      - name: Keep the live team codes
+        env:
+          TOKEN: ${{ steps.auth.outputs.access_token }}
+        run: node scripts/keep-live-codes.mjs
+      - name: Find the database location
+        env:
+          TOKEN: ${{ steps.auth.outputs.access_token }}
+        run: |
+          curl -sf -H "Authorization: Bearer $TOKEN" "https://firestore.googleapis.com/v1/projects/ftc-32313-tasks/databases/(default)" \
+            | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const l=JSON.parse(s).locationId;console.log(l);require("fs").writeFileSync("functions/location.json",JSON.stringify({firestore:l}))})'
+      - run: npm ci --prefix functions
+      - run: npx -y firebase-tools@15.34.0 deploy --only firestore:rules,storage,functions --project ftc-32313-tasks --non-interactive --force

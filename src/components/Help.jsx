@@ -14,6 +14,11 @@ const QUICK_TIPS = [
     'Add it to your Home Screen',
     'In Safari, tap Share → Add to Home Screen. It opens like an app. You’ll enter the team code once more there.',
   ],
+  [
+    '🔔',
+    'Turn on notifications',
+    'The bell shows announcements, @mentions, tasks given to you, and what’s due tomorrow. On an iPad or iPhone, add the site to your Home Screen first, then tap 🔔 → Turn on.',
+  ],
   ['🗑', 'Deleted something by mistake?', 'Tap Undo, or find it under Recently deleted in the filter row for 30 days.'],
 ];
 
@@ -64,10 +69,10 @@ const SECTIONS = [
   [
     'Chat',
     [
-      '#general is for everyone; each subteam has its own channel. A number on the Chat tab means unread messages (red means someone @mentioned you).',
-      'Type @ to mention someone and # to link a task. Tap 📷 to send a photo.',
+      '📣 #announcements is for news from team management; everyone can read it, only they can post. New announcements also show at the top of the board.',
+      '#general is for everyone; each subteam has its own channel. A number on the Chat tab means unread messages (red means someone @mentioned you or there’s a new announcement).',
+      'Type @ to mention someone and # to link a task. Tap 📷 to send a photo, or GIF to search for a GIF or upload your own.',
       'Tap (or hover over) a message to react, reply, edit or delete your own, or turn it into a task with +Task.',
-      'There are no phone notifications yet, so check the Chat tab.',
     ],
   ],
   [
@@ -81,6 +86,15 @@ const SECTIONS = [
     ],
   ],
   ['Team', ['The org chart and everyone’s responsibilities and open tasks.']],
+  [
+    'Notifications',
+    [
+      'The 🔔 at the top lists announcements, @mentions, tasks someone gave you, and a 7:30 AM reminder of what’s due tomorrow. Tap one to go there.',
+      'Phone notifications: tap 🔔 → Turn on, and allow them. Turn them on for each device you use.',
+      'iPad and iPhone (iOS 16.4 or later) only allow them from the Home Screen app: in Safari, tap Share → Add to Home Screen, open it from there, and turn them on.',
+      'Switch (top right) stops sending your notifications to that device.',
+    ],
+  ],
   [
     'Your account',
     [
@@ -96,7 +110,7 @@ const MANAGER_TIPS = [
   'Team tab: Edit anyone’s role, subteams, responsibilities, and name. Add or remove people.',
   'Milestones tab: Change the competition date, and delete milestones.',
   'Delete checklists, and permanently delete tasks from Recently deleted.',
-  'Chat: delete any message, and remove reactions (🚫☺ on a message).',
+  'Chat: post in #announcements (everyone gets a notification), delete any message, and remove reactions (🚫☺ on a message).',
 ];
 
 function TipList({ showRobot }) {

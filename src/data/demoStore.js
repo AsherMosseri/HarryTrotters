@@ -11,7 +11,7 @@ import {
 } from './diff.js';
 import { STARTER_CHECKLISTS, starterItems } from '../checklists.js';
 
-const KEY = 'ftc32313-demo-v9';
+const KEY = 'ftc32313-demo-v11';
 const listeners = new Set();
 const uid = () => Math.random().toString(36).slice(2, 11);
 
@@ -131,6 +131,9 @@ function seed() {
     ...extra,
   });
   const chat = {
+    announcements: [
+      msg(45, 'Sebastian Tolbert', 'Inspection practice Thursday at 4pm. Everyone bring safety glasses 🥽', { byUid: 'sebastian' }),
+    ],
     general: [
       msg(180, 'Sebastian Tolbert', 'Practice moved to 4pm tomorrow, everyone bring safety glasses'),
       msg(170, 'Sophia Bermudez', 'got it 👍', { reactions: { '👍': { 'Jackson Lucks': 'Jackson Lucks' } } }),
@@ -163,7 +166,38 @@ function seed() {
     ],
     layouts: [],
   };
-  return { tasks, activity, people: [], milestones, roles: [], parts, checklists, runs, chat, robot };
+  // Sample notifications, the same for whoever the demo signs in as.
+  const inbox = [
+    {
+      id: uid(),
+      type: 'announcement',
+      title: 'Announcement from Sebastian',
+      body: chat.announcements?.[0]?.text || 'Team meeting Friday',
+      open: 'chat:announcements',
+      at: now - 2 * 3600000,
+      read: false,
+    },
+    {
+      id: uid(),
+      type: 'assigned',
+      title: 'Asher gave you a task',
+      body: tasks[0].title,
+      open: `task:${tasks[0].id}`,
+      at: now - 5 * 3600000,
+      read: false,
+    },
+    {
+      id: uid(),
+      type: 'mention',
+      title: 'Jackson mentioned you in #assembly',
+      body: 'Can you check the drivetrain bolts?',
+      open: 'chat:assembly',
+      at: now - day,
+      read: true,
+    },
+    { id: uid(), type: 'due', title: 'Due tomorrow', body: tasks[1].title, open: `task:${tasks[1].id}`, at: now - 1.5 * day, read: true },
+  ];
+  return { tasks, activity, people: [], milestones, roles: [], parts, checklists, runs, chat, robot, inbox };
 }
 
 // Demo uploads: version id -> object URL (not saved across reloads).
@@ -208,6 +242,26 @@ export const demoStore = {
     localStorage.removeItem(KEY);
     location.search = '';
   },
+  subscribeInbox(name, cb) {
+    return listen(() => cb([...(state.inbox || [])].sort((a, b) => b.at - a.at)));
+  },
+  async markInboxRead(name, ids) {
+    state.inbox = (state.inbox || []).map((n) => (ids.includes(n.id) ? { ...n, read: true } : n));
+    commit();
+  },
+  async clearInbox(name, ids) {
+    state.inbox = (state.inbox || []).filter((n) => !ids.includes(n.id));
+    commit();
+  },
+  pushStatus: () => 'demo',
+  async enablePush() {
+    return 'demo';
+  },
+  async disablePush() {
+    return 'demo';
+  },
+  async refreshPush() {},
+
   subscribePeople(cb) {
     return listen(() => cb([...(state.people || [])]));
   },
@@ -455,13 +509,22 @@ export const demoStore = {
     state.chat = { ...(state.chat || {}), [channel]: [...((state.chat || {})[channel] || []), m] };
     commit();
   },
+  async uploadChatGif(channel, file) {
+    if (file.size > 1.5e6) throw new Error('Demo mode only keeps GIFs under 1.5 MB.');
+    const url = await new Promise((resolve) => {
+      const r = new FileReader();
+      r.onload = () => resolve(r.result);
+      r.readAsDataURL(file);
+    });
+    return { url };
+  },
   async editMessage(channel, id, patch) {
     state.chat[channel] = state.chat[channel].map((m) => (m.id === id ? { ...m, ...patch, editedAt: Date.now() } : m));
     commit();
   },
   async deleteMessage(channel, msg) {
     state.chat[channel] = state.chat[channel].map((m) =>
-      m.id === msg.id ? { ...m, deleted: true, text: '', photo: null, taskIds: [], mentions: [], reactions: {} } : m,
+      m.id === msg.id ? { ...m, deleted: true, text: '', photo: null, gif: null, taskIds: [], mentions: [], reactions: {} } : m,
     );
     commit();
   },

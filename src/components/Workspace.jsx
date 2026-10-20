@@ -19,6 +19,7 @@ import ChatView from './ChatView.jsx';
 // The 3D viewer pulls in three.js, so it loads only when the Robot tab opens.
 const RobotView = lazy(() => import('./RobotView.jsx'));
 import { HelpDialog, WelcomeCard } from './Help.jsx';
+import Inbox from './Inbox.jsx';
 
 function ThemeIcon({ theme }) {
   const common = {
@@ -189,6 +190,38 @@ export default function Workspace({ store, actor, rename, renames }) {
   }, [store, loadFail]);
   const competitionDate = settings.competitionDate || COMPETITION.date;
 
+  // Notifications: the bell's list, and phone notifications on this device.
+  const [inbox, setInbox] = useState([]);
+  const [pushStatus, setPushStatus] = useState(() => store.pushStatus());
+  useEffect(() => store.subscribeInbox(actor.name, setInbox, loadFail('notifications')), [store, actor.name, loadFail]);
+  useEffect(() => {
+    store.refreshPush(actor).catch((e) => console.warn('push refresh', e));
+  }, [store, actor]);
+  const inboxUnread = inbox.filter((n) => !n.read).length;
+  // The red number on the Home Screen icon.
+  useEffect(() => {
+    if (!navigator.setAppBadge) return;
+    (inboxUnread ? navigator.setAppBadge(inboxUnread) : navigator.clearAppBadge()).catch(() => {});
+  }, [inboxUnread]);
+  const enablePush = async () => {
+    try {
+      const status = await store.enablePush(actor);
+      setPushStatus(status);
+      if (status === 'on') setToast({ text: 'Notifications are on for this device.' });
+    } catch (e) {
+      console.error(e);
+      setPushStatus(store.pushStatus());
+      setToast({ text: `Couldn't turn on notifications: ${e?.message || e}` });
+    }
+  };
+  const disablePush = async () => {
+    try {
+      setPushStatus(await store.disablePush());
+    } catch (e) {
+      fail(e);
+    }
+  };
+
   useEffect(() => {
     if (theme === 'system') document.documentElement.removeAttribute('data-theme');
     else document.documentElement.setAttribute('data-theme', theme);
@@ -227,18 +260,30 @@ export default function Workspace({ store, actor, rename, renames }) {
   // Unread chat: other people's messages newer than what this device has read.
   // On first use everything already there counts as read.
   useEffect(() => {
+    // First use, or a channel added since: start it as "read up to now".
     if (chatRead === null) setChatRead(Object.fromEntries(CHANNELS.map((c) => [c.id, Date.now()])));
+    else if (CHANNELS.some((c) => !(c.id in chatRead))) {
+      setChatRead({ ...Object.fromEntries(CHANNELS.map((c) => [c.id, Date.now()])), ...chatRead });
+    }
   }, [chatRead, setChatRead]);
   const unread = useMemo(() => {
     const out = {};
     for (const c of CHANNELS) {
       const since = chatRead?.[c.id] ?? Date.now();
       const fresh = (chat[c.id] || []).filter((m) => m.at > since && m.byUid !== actor.uid && !m.deleted);
-      out[c.id] = { count: fresh.length, mentions: fresh.filter((m) => (m.mentions || []).includes(actor.name)).length };
+      // Announcements always count as important (red), like a mention.
+      const important = c.announce ? fresh.length : fresh.filter((m) => (m.mentions || []).includes(actor.name)).length;
+      out[c.id] = { count: fresh.length, mentions: important };
     }
     return out;
   }, [chat, chatRead, actor.uid, actor.name]);
   const unreadTotal = Object.values(unread).reduce((s, u) => s + u.count, 0);
+  // Newest unread announcement from someone else, shown as a banner on the board.
+  const announcement = useMemo(() => {
+    const since = chatRead?.announcements ?? Date.now();
+    const fresh = (chat.announcements || []).filter((m) => m.at > since && m.byUid !== actor.uid && !m.deleted);
+    return fresh[fresh.length - 1] || null;
+  }, [chat, chatRead, actor.uid]);
   const unreadMentions = Object.values(unread).reduce((s, u) => s + u.mentions, 0);
 
   // Mark the open channel read while it's on screen.
@@ -386,6 +431,7 @@ export default function Workspace({ store, actor, rename, renames }) {
       deleteRobotLayout: (id) => store.deleteRobotLayout(id).catch(fail),
       sendMessage: (channel, data, photoFiles) => store.sendMessage(channel, data, actor, photoFiles).catch(fail),
       editMessage: (channel, id, patch) => store.editMessage(channel, id, patch).catch(fail),
+      uploadChatGif: (channel, file) => store.uploadChatGif(channel, file).catch((e) => (fail(e), null)),
       deleteMessage: (channel, m) => store.deleteMessage(channel, m).catch(fail),
       react: (channel, id, emoji, on) => store.react(channel, id, emoji, actor, on).catch(fail),
       removeReaction: (channel, id, emoji) => store.removeReaction(channel, id, emoji).catch(fail),
@@ -412,6 +458,39 @@ export default function Workspace({ store, actor, rename, renames }) {
   }, [tasks]);
 
   const openTask = tasks?.find((t) => t.id === openId) || null;
+
+  // Where a notification points: 'task:<id>', 'chat:<channel>', or 'view:<tab>'.
+  const goTo = useCallback(
+    (target) => {
+      const [kind, id] = (target || '').split(/:(.*)/s);
+      if (kind === 'task') setOpenId(id);
+      else if (kind === 'chat') {
+        setChatChannel(id);
+        setView('chat');
+      } else if (kind === 'view') setView(id);
+    },
+    [setChatChannel, setView],
+  );
+  // Tapped a phone notification: it opens the site with ?open=…, or messages an open tab.
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const target = params.get('open');
+    if (target) {
+      goTo(target);
+      const rest = location.search
+        .slice(1)
+        .split('&')
+        .filter((p) => p && !p.startsWith('open='))
+        .join('&');
+      history.replaceState(null, '', `${location.pathname}${rest ? `?${rest}` : ''}${location.hash}`);
+    }
+    const sw = navigator.serviceWorker;
+    if (!sw) return;
+    const onMessage = (e) => e.data?.type === 'open' && goTo(e.data.open);
+    sw.addEventListener('message', onMessage);
+    sw.startMessages?.();
+    return () => sw.removeEventListener('message', onMessage);
+  }, [goTo]);
   const setF = (patch) => setFilters({ ...EMPTY_FILTERS, ...filters, ...patch });
   const anyFilter = filters.q || filters.person || filters.subteam || filters.priority || filters.statuses.length || filters.hideDone;
 
@@ -443,6 +522,15 @@ export default function Workspace({ store, actor, rename, renames }) {
         </nav>
         <div className="topbar-right">
           <Countdown date={competitionDate} />
+          <Inbox
+            items={inbox}
+            pushStatus={pushStatus}
+            onEnablePush={enablePush}
+            onDisablePush={disablePush}
+            onOpen={goTo}
+            onMarkRead={(ids) => store.markInboxRead(actor.name, ids).catch(fail)}
+            onClear={(ids) => store.clearInbox(actor.name, ids).catch(fail)}
+          />
           <button className="icon-btn help-btn" title="Help" aria-label="Help" onClick={() => setShowHelp(true)}>
             ?
           </button>
@@ -466,6 +554,31 @@ export default function Workspace({ store, actor, rename, renames }) {
           </div>
         </div>
       </header>
+
+      {taskView && announcement && (
+        <div className="announce-banner" role="status">
+          <span className="announce-icon">📣</span>
+          <div className="grow">
+            <b>{announcement.by.split(' ')[0]}:</b> {announcement.text || 'shared a photo'}
+          </div>
+          <button
+            className="btn small-btn"
+            onClick={() => {
+              setChatChannel('announcements');
+              setView('chat');
+            }}
+          >
+            Open
+          </button>
+          <button
+            className="icon-btn small"
+            aria-label="Dismiss"
+            onClick={() => setChatRead({ ...chatRead, announcements: announcement.at })}
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {taskView && (
         <div className="toolbar">

@@ -25,7 +25,8 @@ import {
   FieldPath,
 } from 'firebase/firestore';
 import { getStorage, ref as fileRef, uploadBytes, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
-import { firebaseConfig } from '../config.js';
+import { firebaseConfig, VAPID_KEY } from '../config.js';
+import { pushSupport } from './push.js';
 import {
   describeChanges,
   derivedFields,
@@ -62,6 +63,32 @@ const messagesCol = (channel) => collection(db, 'channels', channel, 'messages')
 const robotVersionsCol = collection(db, 'robotVersions');
 const robotPinsCol = collection(db, 'robotPins');
 const robotLayoutsCol = collection(db, 'robotLayouts');
+const inboxCol = (name) => collection(db, 'inbox', personId(name), 'items');
+const pushTokensCol = collection(db, 'pushTokens');
+const PUSH_TOKEN_KEY = 'ftc32313-push-token';
+
+// Registers the service worker and gets this device's push address (token).
+async function pushToken() {
+  const { getMessaging, getToken } = await import('firebase/messaging');
+  const reg = await navigator.serviceWorker.register('./sw.js', { scope: './' });
+  await navigator.serviceWorker.ready;
+  return getToken(getMessaging(app), { serviceWorkerRegistration: reg, ...(VAPID_KEY ? { vapidKey: VAPID_KEY } : {}) });
+}
+const savedToken = () => {
+  try {
+    return localStorage.getItem(PUSH_TOKEN_KEY) || '';
+  } catch {
+    return '';
+  }
+};
+const saveToken = (t) => {
+  try {
+    if (t) localStorage.setItem(PUSH_TOKEN_KEY, t);
+    else localStorage.removeItem(PUSH_TOKEN_KEY);
+  } catch {
+    /* private mode: the token is still saved in the database */
+  }
+};
 
 const millis = (v) => (v && typeof v.toMillis === 'function' ? v.toMillis() : (v ?? null));
 
@@ -136,8 +163,64 @@ export const firebaseStore = {
   },
 
   // Forget this device; it gets a fresh anonymous account and must re-enter the code.
-  leave() {
+  async leave() {
+    // Stop sending this person's notifications to a device they've left.
+    const token = savedToken();
+    if (token) await deleteDoc(doc(pushTokensCol, token)).catch(() => {});
+    saveToken('');
     return fbSignOut(auth);
+  },
+
+  // Notifications (written by the Cloud Functions in functions/).
+  subscribeInbox(name, cb, onError) {
+    return onSnapshot(query(inboxCol(name), orderBy('at', 'desc'), limit(40)), (snap) => cb(snap.docs.map(readDoc)), onError);
+  },
+  markInboxRead(name, ids) {
+    const batch = writeBatch(db);
+    for (const id of ids) batch.update(doc(inboxCol(name), id), { read: true });
+    return batch.commit();
+  },
+  clearInbox(name, ids) {
+    const batch = writeBatch(db);
+    for (const id of ids) batch.delete(doc(inboxCol(name), id));
+    return batch.commit();
+  },
+
+  // Phone notifications on this device: 'on', 'off', 'blocked', 'home-screen'
+  // (iPhone/iPad: only works from the Home Screen app), or 'unsupported'.
+  pushStatus() {
+    const support = pushSupport();
+    if (support !== 'ok') return support;
+    if (Notification.permission === 'denied') return 'blocked';
+    return Notification.permission === 'granted' && savedToken() ? 'on' : 'off';
+  },
+  // Call straight from a tap: Safari only shows the permission prompt then.
+  async enablePush(actor) {
+    const permission = await Notification.requestPermission();
+    if (permission !== 'granted') return this.pushStatus();
+    const token = await pushToken();
+    const old = savedToken();
+    if (old && old !== token) await deleteDoc(doc(pushTokensCol, old)).catch(() => {});
+    await setDoc(doc(pushTokensCol, token), { uid: actor.uid, person: actor.name, ua: navigator.userAgent.slice(0, 200), at: Date.now() });
+    saveToken(token);
+    return 'on';
+  },
+  async disablePush() {
+    const token = savedToken();
+    saveToken('');
+    if (!token) return 'off';
+    await deleteDoc(doc(pushTokensCol, token)).catch(() => {});
+    const { getMessaging, deleteToken } = await import('firebase/messaging');
+    await deleteToken(getMessaging(app)).catch(() => {});
+    return 'off';
+  },
+  // On each visit: tokens can change, and the device may now be someone else's.
+  async refreshPush(actor) {
+    if (this.pushStatus() !== 'on') return;
+    const token = await pushToken();
+    if (token !== savedToken()) await deleteDoc(doc(pushTokensCol, savedToken())).catch(() => {});
+    await setDoc(doc(pushTokensCol, token), { uid: actor.uid, person: actor.name, ua: navigator.userAgent.slice(0, 200), at: Date.now() });
+    saveToken(token);
   },
 
   subscribePeople(cb, onError) {
@@ -409,14 +492,31 @@ export const firebaseStore = {
     return setDoc(doc(messagesCol(channel)), { ...msg, by: actor.name, byUid: actor.uid, at: Date.now() });
   },
 
+  // Animated GIFs are uploaded as-is (not shrunk to JPEG, which would freeze them).
+  async uploadChatGif(channel, file) {
+    const path = `chat/${channel}/${itemId()}.gif`;
+    const r = fileRef(storage, path);
+    await uploadBytes(r, file, { contentType: 'image/gif' });
+    return { path, url: await getDownloadURL(r) };
+  },
+
   editMessage(channel, id, patch) {
     return updateDoc(doc(messagesCol(channel), id), { ...patch, editedAt: Date.now() });
   },
 
   // Leaves a "Message deleted" placeholder so replies still make sense.
   async deleteMessage(channel, msg) {
-    await updateDoc(doc(messagesCol(channel), msg.id), { deleted: true, text: '', photo: null, taskIds: [], mentions: [], reactions: {} });
+    await updateDoc(doc(messagesCol(channel), msg.id), {
+      deleted: true,
+      text: '',
+      photo: null,
+      gif: null,
+      taskIds: [],
+      mentions: [],
+      reactions: {},
+    });
     if (msg.photo) await deletePhotoFiles(msg.photo);
+    if (msg.gif?.path) await deleteObject(fileRef(storage, msg.gif.path)).catch(() => {});
   },
 
   // reactions: { [emoji]: { [uid]: name } }, updated per person so taps don't collide.

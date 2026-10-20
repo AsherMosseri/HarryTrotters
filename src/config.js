@@ -76,11 +76,22 @@ export const SUBTEAM_COLORS = {
 export const ORG_GROUPS = [...SUBTEAMS, 'Secretary'];
 
 // Default; the manager can change the date on the Milestones tab.
-// Chat: #general plus one channel per subteam.
+// Chat: #announcements (only team management posts), #general, and one
+// channel per subteam.
 export const CHANNELS = [
+  { id: 'announcements', subteam: '', announce: true },
   { id: 'general', subteam: '' },
   ...SUBTEAMS.map((s) => ({ id: s.toLowerCase().replace(/[^a-z0-9]+/g, '-'), subteam: s })),
 ];
+
+// GIF search in chat. Get a free key at developers.giphy.com (it's public by
+// design, like the Firebase config). Leave empty to allow GIF uploads only.
+export const GIPHY_API_KEY = '';
+
+// Phone notifications (Firebase Cloud Messaging). Optional: the Web Push key
+// from Firebase console → Project settings → Cloud Messaging → Web Push
+// certificates. Empty uses Firebase's built-in key.
+export const VAPID_KEY = '';
 
 export const COMPETITION = { name: 'Competition', date: '2026-11-14' };
 

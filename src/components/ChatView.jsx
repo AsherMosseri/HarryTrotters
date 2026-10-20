@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { CHANNELS, SUBTEAM_COLORS } from '../config.js';
+import { CHANNELS, GIPHY_API_KEY, SUBTEAM_COLORS } from '../config.js';
 import { preparePhoto } from '../util.js';
 import { Avatar, CloseIcon, StatusDot } from './common.jsx';
 import PhotoViewer from './PhotoViewer.jsx';
@@ -152,6 +152,97 @@ function EmojiPicker({ onPick, onClose }) {
   );
 }
 
+// GIF picker: GIPHY search (G-rated) when a key is set, plus uploading your own.
+function GifPicker({ onPick, onUpload, onClose }) {
+  const [q, setQ] = useState('');
+  const [results, setResults] = useState([]);
+  const [status, setStatus] = useState(GIPHY_API_KEY ? 'loading' : 'off');
+  const upload = useRef(null);
+
+  useEffect(() => {
+    if (!GIPHY_API_KEY) return;
+    const ctrl = new AbortController();
+    const t = setTimeout(
+      async () => {
+        setStatus('loading');
+        const params = new URLSearchParams({ api_key: GIPHY_API_KEY, limit: '24', rating: 'g' });
+        if (q.trim()) params.set('q', q.trim());
+        try {
+          const res = await fetch(`https://api.giphy.com/v1/gifs/${q.trim() ? 'search' : 'trending'}?${params}`, { signal: ctrl.signal });
+          if (!res.ok) throw new Error(String(res.status));
+          const { data } = await res.json();
+          setResults(data);
+          setStatus('ready');
+        } catch (e) {
+          if (e.name !== 'AbortError') setStatus('error');
+        }
+      },
+      q ? 350 : 0,
+    );
+    return () => {
+      clearTimeout(t);
+      ctrl.abort();
+    };
+  }, [q]);
+
+  useEffect(() => {
+    const onKey = (e) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  return (
+    <div className="gif-picker">
+      <div className="row gap">
+        {GIPHY_API_KEY ? (
+          <input className="input grow" autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search GIFs" />
+        ) : (
+          <span className="muted small grow">GIF search turns on once team management adds a GIPHY key. You can still upload a GIF.</span>
+        )}
+        <button className="btn" onClick={() => upload.current?.click()}>
+          Upload GIF
+        </button>
+        <input
+          ref={upload}
+          type="file"
+          accept="image/gif"
+          hidden
+          onChange={(e) => {
+            const f = e.target.files[0];
+            e.target.value = '';
+            if (f) onUpload(f);
+          }}
+        />
+        <button className="icon-btn small" onClick={onClose} aria-label="Close GIFs">
+          <CloseIcon />
+        </button>
+      </div>
+      {GIPHY_API_KEY && (
+        <>
+          <div className="gif-grid">
+            {results.map((g) => (
+              <button
+                key={g.id}
+                onClick={() => {
+                  const img = g.images.downsized || g.images.original;
+                  onPick({ source: 'giphy', id: g.id, title: g.title, url: img.url, width: Number(img.width), height: Number(img.height) });
+                }}
+                aria-label={g.title || 'GIF'}
+              >
+                <img src={g.images.fixed_width_small?.url || g.images.fixed_width.url} alt="" loading="lazy" />
+              </button>
+            ))}
+            {status === 'loading' && !results.length && <p className="muted small">Loading…</p>}
+            {status === 'error' && <p className="muted small">Couldn't reach GIPHY. Check the connection or the API key.</p>}
+            {status === 'ready' && !results.length && <p className="muted small">No GIFs found.</p>}
+          </div>
+          <p className="giphy-credit">Powered by GIPHY</p>
+        </>
+      )}
+    </div>
+  );
+}
+
 function Message({
   m,
   first,
@@ -168,6 +259,7 @@ function Message({
   onMakeTask,
   onOpenTask,
   onPhoto,
+  canReply,
 }) {
   const [picker, setPicker] = useState(false);
   const [removing, setRemoving] = useState(false);
@@ -216,6 +308,7 @@ function Message({
                 {m.editedAt && <span className="muted tiny"> (edited)</span>}
               </div>
             )}
+            {m.gif && <img className="msg-gif" src={m.gif.url} alt={m.gif.title || 'GIF'} loading="lazy" />}
             {m.photo && (
               <button className="msg-photo" onClick={() => onPhoto(m)} aria-label="Open photo">
                 <img src={m.photo.thumbUrl || m.photo.url} alt="" loading="lazy" />
@@ -279,9 +372,11 @@ function Message({
           <button onClick={() => setPicker((p) => !p)} aria-label="More reactions" title="More reactions">
             ☺+
           </button>
-          <button onClick={() => onReply(m)} title="Reply">
-            ↩
-          </button>
+          {canReply && (
+            <button onClick={() => onReply(m)} title="Reply">
+              ↩
+            </button>
+          )}
           <button onClick={() => onMakeTask(m)} title="Make a task from this message">
             ＋Task
           </button>
@@ -313,6 +408,7 @@ function Composer({ channel, actor, roster, tasks, api, replyTo, editing, onDone
   const [photo, setPhoto] = useState(null); // { file, preview }
   const [suggest, setSuggest] = useState(null); // { kind: '@' | '#', query, start }
   const [sending, setSending] = useState(false);
+  const [gifs, setGifs] = useState(false);
   const box = useRef(null);
   const fileInput = useRef(null);
   const caretAfterUpdate = useRef(null);
@@ -385,6 +481,33 @@ function Composer({ channel, actor, roster, tasks, api, replyTo, editing, onDone
     onDone();
   };
 
+  const replyInfo = () => (replyTo ? { id: replyTo.id, by: replyTo.by, text: (replyTo.text || '').slice(0, 120) } : null);
+
+  // A GIF goes out as its own message (keeping any reply context).
+  const sendGif = async (gif) => {
+    setGifs(false);
+    setSending(true);
+    try {
+      await api.sendMessage(channel, { text: '', mentions: [], taskIds: [], replyTo: replyInfo(), gif });
+      if (replyTo) onDone();
+    } finally {
+      setSending(false);
+    }
+  };
+  const uploadGif = async (file) => {
+    if (file.type !== 'image/gif') return alert('That file is not a GIF.');
+    if (file.size > 8e6) return alert('That GIF is too big (8 MB max).');
+    setGifs(false);
+    setSending(true);
+    try {
+      const img = await createImageBitmap(file).catch(() => null);
+      const stored = await api.uploadChatGif(channel, file);
+      if (stored) await sendGif({ source: 'upload', ...stored, width: img?.width || 0, height: img?.height || 0 });
+    } finally {
+      setSending(false);
+    }
+  };
+
   const send = async () => {
     const body = text.trim();
     if ((!body && !photo) || sending) return;
@@ -395,8 +518,7 @@ function Composer({ channel, actor, roster, tasks, api, replyTo, editing, onDone
       if (editing) {
         await api.editMessage(channel, editing.id, { text: body, mentions, taskIds: linked });
       } else {
-        const replyInfo = replyTo ? { id: replyTo.id, by: replyTo.by, text: (replyTo.text || '').slice(0, 120) } : null;
-        await api.sendMessage(channel, { text: body, mentions, taskIds: linked, replyTo: replyInfo }, photo?.file);
+        await api.sendMessage(channel, { text: body, mentions, taskIds: linked, replyTo: replyInfo() }, photo?.file);
       }
       reset();
     } finally {
@@ -428,6 +550,7 @@ function Composer({ channel, actor, roster, tasks, api, replyTo, editing, onDone
           </button>
         </div>
       )}
+      {gifs && <GifPicker onPick={sendGif} onUpload={uploadGif} onClose={() => setGifs(false)} />}
       {suggest && options.length > 0 && (
         <ul className="suggest">
           {options.map((o) => (
@@ -452,6 +575,9 @@ function Composer({ channel, actor, roster, tasks, api, replyTo, editing, onDone
           <>
             <button className="icon-btn" onClick={() => fileInput.current?.click()} aria-label="Add a photo" title="Add a photo">
               📷
+            </button>
+            <button className="icon-btn gif-btn" onClick={() => setGifs((g) => !g)} aria-label="Add a GIF" title="GIFs">
+              GIF
             </button>
             <input
               ref={fileInput}
@@ -554,6 +680,8 @@ export default function ChatView({ channel, setChannel, messages, unread, actor,
   };
 
   const ch = CHANNELS.find((c) => c.id === channel) || CHANNELS[0];
+  // #announcements: only team management posts (the rules enforce it too).
+  const canPost = !ch.announce || isManager;
   let lastDay = '';
 
   return (
@@ -563,7 +691,7 @@ export default function ChatView({ channel, setChannel, messages, unread, actor,
         {CHANNELS.map((c) => (
           <button key={c.id} className={c.id === channel ? 'active' : ''} onClick={() => setChannel(c.id)}>
             <span className="hash" style={{ color: SUBTEAM_COLORS[c.subteam] || 'var(--accent)' }}>
-              #
+              {c.announce ? '📣' : '#'}
             </span>
             <span className="grow">{c.id}</span>
             {unread[c.id]?.count > 0 && <span className={`unread${unread[c.id].mentions ? ' mention' : ''}`}>{unread[c.id].count}</span>}
@@ -581,8 +709,13 @@ export default function ChatView({ channel, setChannel, messages, unread, actor,
 
       <section className="chat-main">
         <header className="chat-head">
-          <h2>#{ch.id}</h2>
-          <span className="muted small">{ch.subteam ? `${ch.subteam} subteam` : 'The whole team'}</span>
+          <h2>
+            {ch.announce ? '📣 ' : '#'}
+            {ch.id}
+          </h2>
+          <span className="muted small">
+            {ch.announce ? 'Only team management posts here' : ch.subteam ? `${ch.subteam} subteam` : 'The whole team'}
+          </span>
         </header>
         <div className="msg-list" ref={list} onScroll={onScroll}>
           {all.length >= 60 && (
@@ -606,6 +739,7 @@ export default function ChatView({ channel, setChannel, messages, unread, actor,
                 )}
                 <Message
                   m={m}
+                  canReply={canPost}
                   first={first}
                   actor={actor}
                   isManager={isManager}
@@ -647,19 +781,23 @@ export default function ChatView({ channel, setChannel, messages, unread, actor,
             New messages ↓
           </button>
         )}
-        <Composer
-          channel={channel}
-          actor={actor}
-          roster={roster}
-          tasks={tasks}
-          api={api}
-          replyTo={replyTo}
-          editing={editing}
-          onDone={() => {
-            setReplyTo(null);
-            setEditing(null);
-          }}
-        />
+        {!canPost ? (
+          <div className="composer read-only">📣 Only team management can post announcements. You can still react.</div>
+        ) : (
+          <Composer
+            channel={channel}
+            actor={actor}
+            roster={roster}
+            tasks={tasks}
+            api={api}
+            replyTo={replyTo}
+            editing={editing}
+            onDone={() => {
+              setReplyTo(null);
+              setEditing(null);
+            }}
+          />
+        )}
       </section>
       {viewing && (
         <PhotoViewer

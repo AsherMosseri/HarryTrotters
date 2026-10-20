@@ -76,7 +76,8 @@ service cloud.firestore {
     match /channels/{channelId}/messages/{msgId} {
       allow read: if isMember();
       allow create: if isMember() && request.resource.data.byUid == request.auth.uid
-        && request.resource.data.text is string && request.resource.data.text.size() <= 4000;
+        && request.resource.data.text is string && request.resource.data.text.size() <= 4000
+        && (channelId != 'announcements' || isManager());
       allow update: if isMember() && (
         resource.data.byUid == request.auth.uid
         || isManager()
@@ -103,6 +104,21 @@ service cloud.firestore {
     // Practice and match log: anyone on the team.
     match /runs/{id} {
       allow read, write: if isMember();
+    }
+
+    // Notifications (the bell). Only the Cloud Functions create them; anyone on
+    // the team can mark them read or clear them.
+    match /inbox/{person}/items/{id} {
+      allow read, delete: if isMember();
+      allow update: if isMember() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+    }
+    // Devices that turned on phone notifications, under the member's own name.
+    // Only the Cloud Functions read them.
+    match /pushTokens/{token} {
+      allow create, update: if isMember()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.person == get(memberPath()).data.name;
+      allow delete: if isMember() && resource.data.uid == request.auth.uid;
     }
 
     // Deleting moves a task to Recently deleted (an update); only managers delete for good.
