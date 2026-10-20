@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { COMPETITION, SUBTEAMS, SUBTEAM_COLORS, STATUSES } from '../config.js';
+import { SUBTEAMS, SUBTEAM_COLORS, STATUSES } from '../config.js';
 import {
   MILESTONE_STATES,
   addDays,
@@ -44,9 +44,9 @@ function OwnerPicker({ roster, value, onChange }) {
   );
 }
 
-function Timeline({ items, onOpen }) {
+function Timeline({ items, competitionDate, onOpen }) {
   const today = todayISO();
-  const comp = COMPETITION.date;
+  const comp = competitionDate;
   const starts = items.map((i) => i.m.start).filter(Boolean);
   const ends = items.map((i) => i.m.end).filter(Boolean);
   const first = mondayOf([today, ...starts].sort()[0]);
@@ -203,7 +203,7 @@ export function MilestoneDialog({ roster, onClose, onCreate }) {
   );
 }
 
-function MilestonePanel({ item, roster, api, onClose, onOpenTask, onAddTask }) {
+function MilestonePanel({ item, roster, api, isManager, onClose, onOpenTask, onAddTask }) {
   const { m, progress, state } = item;
   const set = (patch) => api.updateMilestone(m, patch);
   const statusRank = Object.fromEntries(STATUSES.map((s, i) => [s.id, i]));
@@ -215,17 +215,19 @@ function MilestonePanel({ item, roster, api, onClose, onOpenTask, onAddTask }) {
         <div className="panel-head">
           <StatePill state={state} />
           <span className="spacer" />
-          <button
-            className="link-btn danger"
-            onClick={() => {
-              if (confirm(`Delete milestone “${m.title}”? Its tasks stay on the board, just unlinked.`)) {
-                api.deleteMilestone(m, progress.tasks);
-                onClose();
-              }
-            }}
-          >
-            Delete
-          </button>
+          {isManager && (
+            <button
+              className="link-btn danger"
+              onClick={() => {
+                if (confirm(`Delete milestone “${m.title}”? Its tasks stay on the board, just unlinked.`)) {
+                  api.deleteMilestone(m, progress.tasks);
+                  onClose();
+                }
+              }}
+            >
+              Delete
+            </button>
+          )}
           <button className="icon-btn" onClick={onClose} aria-label="Close">
             <CloseIcon />
           </button>
@@ -330,9 +332,10 @@ function MilestonePanel({ item, roster, api, onClose, onOpenTask, onAddTask }) {
   );
 }
 
-export default function MilestonesView({ milestones, tasks, roster, api, onOpenTask, onAddTask }) {
+export default function MilestonesView({ milestones, competitionDate, isManager, tasks, roster, api, onOpenTask, onAddTask }) {
   const [openId, setOpenId] = useState(null);
   const [creating, setCreating] = useState(false);
+  const [editingDate, setEditingDate] = useState(false);
   const today = todayISO();
 
   const items = useMemo(
@@ -351,13 +354,13 @@ export default function MilestonesView({ milestones, tasks, roster, api, onOpenT
     return c;
   }, [items]);
   const open = items.find((i) => i.m.id === openId);
-  const left = daysBetween(today, COMPETITION.date);
+  const left = daysBetween(today, competitionDate);
 
   return (
     <main className="content milestones">
       <div className="ms-header">
         <div>
-          <h1>Road to {shortDate(COMPETITION.date)}</h1>
+          <h1>Road to {shortDate(competitionDate)}</h1>
           <p className="muted">
             {left > 0
               ? `${left} day${left === 1 ? '' : 's'} until the competition`
@@ -365,8 +368,25 @@ export default function MilestonesView({ milestones, tasks, roster, api, onOpenT
                 ? 'Competition day! Good luck!'
                 : 'Competition is over'}
             {' · '}
-            {parseDay(COMPETITION.date).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
+            {parseDay(competitionDate).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
+            {isManager && !editingDate && (
+              <button className="link-btn" onClick={() => setEditingDate(true)}>
+                Change date
+              </button>
+            )}
           </p>
+          {editingDate && (
+            <input
+              className="input date-edit"
+              type="date"
+              autoFocus
+              defaultValue={competitionDate}
+              onBlur={() => setEditingDate(false)}
+              onChange={(e) => {
+                if (e.target.value) api.saveSettings({ competitionDate: e.target.value });
+              }}
+            />
+          )}
         </div>
         <span className="spacer" />
         <button className="btn primary" onClick={() => setCreating(true)}>
@@ -389,7 +409,7 @@ export default function MilestonesView({ milestones, tasks, roster, api, onOpenT
       )}
 
       {items.length ? (
-        <Timeline items={items} onOpen={setOpenId} />
+        <Timeline items={items} competitionDate={competitionDate} onOpen={setOpenId} />
       ) : (
         <div className="empty-card">
           <h2>No milestones yet</h2>
@@ -405,6 +425,7 @@ export default function MilestonesView({ milestones, tasks, roster, api, onOpenT
 
       {open && (
         <MilestonePanel
+          isManager={isManager}
           item={open}
           roster={roster}
           api={api}

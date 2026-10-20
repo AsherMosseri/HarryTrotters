@@ -43,11 +43,11 @@ function ThemeIcon({ theme }) {
   );
 }
 
-function Countdown() {
-  const left = daysBetween(todayISO(), COMPETITION.date);
+function Countdown({ date }) {
+  const left = daysBetween(todayISO(), date);
   if (left < 0) return null;
   return (
-    <span className="countdown" title={`${COMPETITION.name}: ${COMPETITION.date}`}>
+    <span className="countdown" title={`${COMPETITION.name}: ${date}`}>
       🏁{' '}
       {left === 0 ? (
         'Competition day!'
@@ -76,6 +76,7 @@ export default function Workspace({ store, actor }) {
   const [people, setPeople] = useState([]);
   const [milestones, setMilestones] = useState([]);
   const [roles, setRoles] = useState([]);
+  const [settings, setSettings] = useState({});
   const [cat, setCat] = useState(false);
   const [savedView, setView] = useLocalStorage('view', 'board');
   const view = VIEWS.some(([id]) => id === savedView) ? savedView : 'board';
@@ -95,6 +96,8 @@ export default function Workspace({ store, actor }) {
   useEffect(() => store.subscribePeople(setPeople, fail), [store, fail]);
   useEffect(() => store.subscribeMilestones(setMilestones, fail), [store, fail]);
   useEffect(() => store.subscribeRoles(setRoles, fail), [store, fail]);
+  useEffect(() => store.subscribeSettings(setSettings, fail), [store, fail]);
+  const competitionDate = settings.competitionDate || COMPETITION.date;
 
   useEffect(() => {
     if (theme === 'system') document.documentElement.removeAttribute('data-theme');
@@ -107,12 +110,15 @@ export default function Workspace({ store, actor }) {
     return () => clearTimeout(t);
   }, [toast]);
 
+  // Default roster + people the manager added + anyone who joined under their
+  // own name, minus people the manager removed.
   const roster = useMemo(() => {
+    const removed = new Set(roles.filter((r) => r.removed).map((r) => r.name));
     const names = new Set(ROSTER);
+    for (const r of roles) if (r.name) names.add(r.name);
     for (const p of people) if (p.name) names.add(p.name);
-    names.add(actor.name);
-    return [...names];
-  }, [people, actor.name]);
+    return [...names].filter((n) => !removed.has(n) || n === actor.name);
+  }, [people, roles, actor.name]);
 
   // Store calls wrapped with the signed-in person and error reporting.
   const api = useMemo(
@@ -132,6 +138,7 @@ export default function Workspace({ store, actor }) {
           )
           .catch(fail),
       saveRole: (data) => store.saveRole(personId(data.name), data, actor).catch(fail),
+      saveSettings: (patch) => store.saveSettings(patch, actor).catch(fail),
     }),
     [store, actor, fail],
   );
@@ -184,7 +191,7 @@ export default function Workspace({ store, actor }) {
           ))}
         </nav>
         <div className="topbar-right">
-          <Countdown />
+          <Countdown date={competitionDate} />
           <button
             className="icon-btn"
             title={`Theme: ${theme}`}
@@ -195,6 +202,11 @@ export default function Workspace({ store, actor }) {
           <div className="user-chip">
             <Avatar name={actor.name} size={30} />
             <span className="user-name">{actor.name.split(' ')[0]}</span>
+            {actor.admin && (
+              <span className="manager-badge" title="Team manager">
+                Manager
+              </span>
+            )}
             <button
               className="link-btn"
               title="Not you? Switch to a different name (needs the team code again)"
@@ -289,6 +301,8 @@ export default function Workspace({ store, actor }) {
       ) : view === 'milestones' ? (
         <MilestonesView
           milestones={milestones}
+          competitionDate={competitionDate}
+          isManager={actor.admin}
           tasks={tasks}
           roster={roster}
           api={api}
@@ -296,7 +310,7 @@ export default function Workspace({ store, actor }) {
           onAddTask={(m) => setNewTask({ status: 'todo', milestoneId: m.id, subteam: m.subteam || '' })}
         />
       ) : view === 'team' ? (
-        <TeamView roster={roster} roles={roles} tasks={tasks} api={api} />
+        <TeamView roster={roster} roles={roles} tasks={tasks} api={api} isManager={actor.admin} />
       ) : (
         <main className="content">
           {view === 'table' ? (

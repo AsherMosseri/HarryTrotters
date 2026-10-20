@@ -2,7 +2,7 @@
 // localStorage. Handy for trying the UI before Firebase is set up.
 import { describeChanges, derivedFields, newTaskDefaults, newMilestoneDefaults } from './diff.js';
 
-const KEY = 'ftc32313-demo-v3';
+const KEY = 'ftc32313-demo-v4';
 const listeners = new Set();
 const uid = () => Math.random().toString(36).slice(2, 11);
 
@@ -50,7 +50,7 @@ function seed() {
     }),
     t('Write portfolio page on drivetrain design', {
       status: 'backlog',
-      assignees: ['Kasha Jurasic'],
+      assignees: ['Katarina Jurasic'],
       subteam: 'Team Management',
       priority: 'low',
     }),
@@ -71,9 +71,9 @@ function seed() {
   });
   const milestones = [
     m('Review robot and pick revisions', 'Team Management', -1, 1, { owners: ['Sebastian Tolbert'], done: true }),
-    m('CAD revised intake', 'CAD', 0, 6, { owners: ['Shrey', 'Matthew Kuhle'] }),
-    m('Build and assemble revisions', 'Assembly', 7, 15, { owners: ['Cooper Mlezcko', 'Ira'] }),
-    m('Autonomous + TeleOp updates', 'Programming', 10, 19, { owners: ['Kasha Jurasic', 'Asher Mosseri'] }),
+    m('CAD revised intake', 'CAD', 0, 6, { owners: ['Shrey Kumar', 'Matthew Kuhle'] }),
+    m('Build and assemble revisions', 'Assembly', 7, 15, { owners: ['Cooper Mlezcko', 'Ira Kumar'] }),
+    m('Autonomous + TeleOp updates', 'Programming', 10, 19, { owners: ['Katarina Jurasic', 'Asher Mosseri'] }),
     m('Full-robot testing', 'Assembly', 18, 23),
   ];
   tasks[0].milestoneId = milestones[1].id;
@@ -112,7 +112,9 @@ export const demoStore = {
     return () => {};
   },
   async getMember() {
-    return 'Asher Mosseri';
+    // ?demo=member previews the app as a regular teammate.
+    const asMember = new URLSearchParams(location.search).get('demo') === 'member';
+    return asMember ? { name: 'Cooper Mlezcko', admin: false } : { name: 'Asher Mosseri', admin: true };
   },
   async join() {},
   async leave() {
@@ -197,6 +199,14 @@ export const demoStore = {
   },
   async saveRole(id, data, actor) {
     state.roles = [...(state.roles || []).filter((r) => r.id !== id), { id, ...data, updatedAt: Date.now(), updatedBy: actor.name }];
+    commit();
+  },
+
+  subscribeSettings(cb) {
+    return listen(() => cb({ ...(state.settings || {}) }));
+  },
+  async saveSettings(patch) {
+    state.settings = { ...(state.settings || {}), ...patch };
     commit();
   },
 };

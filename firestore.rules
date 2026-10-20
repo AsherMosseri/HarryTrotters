@@ -1,17 +1,26 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // The team code. Replace CHANGE-ME with your real code (lowercase) when you
-    // paste these rules into the Firebase console. Keep the real code out of
-    // this file so it never ends up on GitHub.
+    // Codes: replace the placeholders (lowercase) when you paste these rules into
+    // the Firebase console. Keep the real codes out of this file so they never
+    // end up on GitHub.
     function teamCode() { return 'CHANGE-ME'; }
+    function managerCode() { return 'CHANGE-ME-MANAGER'; }
+    // Joining under this name (lowercase) requires the manager code.
+    function managerName() { return 'asher mosseri'; }
 
     function signedIn() { return request.auth != null; }
-    function isMember() {
-      return signedIn() && exists(/databases/$(database)/documents/members/$(request.auth.uid));
-    }
+    function memberPath() { return /databases/$(database)/documents/members/$(request.auth.uid); }
+    function isMember() { return signedIn() && exists(memberPath()); }
+    function isManager() { return isMember() && get(memberPath()).data.get('admin', false) == true; }
     function validName(data) {
       return data.name is string && data.name.size() > 0 && data.name.size() <= 60;
+    }
+    // Either a normal member who isn't using the manager's name, or the manager
+    // with the right manager code.
+    function validJoin(data) {
+      return (data.get('admin', false) == false && data.name.lower() != managerName())
+        || (data.get('admin', false) == true && data.get('adminCode', '') == managerCode());
     }
 
     // One doc per device that entered the right code. Only that device can read it.
@@ -19,24 +28,33 @@ service cloud.firestore {
       allow read, delete: if signedIn() && request.auth.uid == uid;
       allow create: if signedIn() && request.auth.uid == uid
         && request.resource.data.code == teamCode()
-        && validName(request.resource.data);
+        && validName(request.resource.data)
+        && validJoin(request.resource.data);
     }
 
-    // Public name list for the assignee picker; written together with members/{uid}.
+    // Public name list for the assignee picker; must match the member's name.
     match /people/{uid} {
       allow read: if isMember();
       allow create, update: if signedIn() && request.auth.uid == uid
         && existsAfter(/databases/$(database)/documents/members/$(uid))
-        && validName(request.resource.data);
+        && request.resource.data.name == getAfter(/databases/$(database)/documents/members/$(uid)).data.name;
       allow delete: if signedIn() && request.auth.uid == uid;
     }
 
-    // Milestone chart and org chart: shared, editable by anyone on the team.
+    // Milestones: anyone on the team can add and edit; only the manager deletes.
     match /milestones/{id} {
-      allow read, write: if isMember();
+      allow read, create, update: if isMember();
+      allow delete: if isManager();
     }
+
+    // Org chart and team settings (competition date): manager only.
     match /roles/{id} {
-      allow read, write: if isMember();
+      allow read: if isMember();
+      allow write: if isManager();
+    }
+    match /settings/{id} {
+      allow read: if isMember();
+      allow write: if isManager();
     }
 
     match /tasks/{taskId} {

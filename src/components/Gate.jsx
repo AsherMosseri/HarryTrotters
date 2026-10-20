@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { TEAM_NAME, ROSTER } from '../config.js';
+import { TEAM_NAME, ROSTER, MANAGER_NAME } from '../config.js';
 import { Avatar } from './common.jsx';
 
 function Shell({ children }) {
@@ -37,20 +37,24 @@ export function JoinScreen({ onJoin }) {
   const [picked, setPicked] = useState('');
   const [other, setOther] = useState('');
   const [code, setCode] = useState('');
+  const [managerCode, setManagerCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const name = (picked === OTHER ? other : picked).trim();
+  const isManager = name.toLowerCase() === MANAGER_NAME.toLowerCase();
+  const ready = name && code.trim() && (!isManager || managerCode.trim());
 
   const submit = async (e) => {
     e.preventDefault();
-    if (!name || !code.trim()) return;
+    if (!ready) return;
     setBusy(true);
     setErr('');
     try {
-      await onJoin(name, code);
+      await onJoin(name, code, isManager ? managerCode : '');
     } catch (ex) {
       // The security rules reject the write when the code is wrong.
-      setErr(ex?.code === 'permission-denied' ? "That team code isn't right. Check with a teammate." : ex?.message || String(ex));
+      const wrong = isManager ? "The team code or manager code isn't right." : "That team code isn't right. Check with a teammate.";
+      setErr(ex?.code === 'permission-denied' ? wrong : ex?.message || String(ex));
       setBusy(false);
     }
   };
@@ -89,7 +93,18 @@ export function JoinScreen({ onJoin }) {
           onChange={(e) => setCode(e.target.value)}
           placeholder="Team code"
         />
-        <button className="btn primary" disabled={busy || !name || !code.trim()}>
+        {isManager && (
+          <input
+            className="input"
+            type="password"
+            autoCapitalize="none"
+            autoComplete="off"
+            value={managerCode}
+            onChange={(e) => setManagerCode(e.target.value)}
+            placeholder="Manager code"
+          />
+        )}
+        <button className="btn primary" disabled={busy || !ready}>
           {busy ? 'Checking…' : name ? `Join as ${name.split(' ')[0]}` : 'Pick your name'}
         </button>
       </form>

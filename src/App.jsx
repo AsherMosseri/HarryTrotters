@@ -13,7 +13,7 @@ const AUTH_ERRORS = {
 export default function App() {
   const [store, setStore] = useState(null);
   const [user, setUser] = useState(null);
-  const [name, setName] = useState(undefined); // undefined = checking, null = hasn't joined
+  const [member, setMember] = useState(undefined); // undefined = checking, null = hasn't joined
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -25,7 +25,7 @@ export default function App() {
     return store.onAuth(
       (u) => {
         setUser(u);
-        setName(undefined);
+        setMember(undefined);
       },
       (e) => setError(AUTH_ERRORS[e.code] || e.message || String(e)),
     );
@@ -35,7 +35,7 @@ export default function App() {
     if (!store || !user) return;
     let alive = true;
     store.getMember(user.uid).then(
-      (n) => alive && setName(n),
+      (m) => alive && setMember(m),
       (e) => alive && setError(e.message || String(e)),
     );
     return () => {
@@ -43,20 +43,20 @@ export default function App() {
     };
   }, [store, user]);
 
-  const actor = useMemo(() => (user && name ? { uid: user.uid, name } : null), [user, name]);
+  const actor = useMemo(() => (user && member ? { uid: user.uid, name: member.name, admin: member.admin } : null), [user, member]);
 
   useEffect(() => {
     document.title = `${TEAM_NAME} Task Board`;
   }, []);
 
   if (error) return <LoadingScreen error={error} />;
-  if (!store || !user || name === undefined) return <LoadingScreen />;
+  if (!store || !user || member === undefined) return <LoadingScreen />;
   if (!actor)
     return (
       <JoinScreen
-        onJoin={async (n, code) => {
-          await store.join(user.uid, n, code);
-          setName(n);
+        onJoin={async (name, code, managerCode) => {
+          await store.join(user.uid, name, code, managerCode);
+          setMember({ name, admin: !!managerCode });
         }}
       />
     );

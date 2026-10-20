@@ -31,6 +31,7 @@ const membersCol = collection(db, 'members');
 const peopleCol = collection(db, 'people');
 const milestonesCol = collection(db, 'milestones');
 const rolesCol = collection(db, 'roles');
+const settingsDoc = doc(db, 'settings', 'team');
 
 const millis = (v) => (v && typeof v.toMillis === 'function' ? v.toMillis() : (v ?? null));
 
@@ -60,16 +61,19 @@ export const firebaseStore = {
   async getMember(uid) {
     try {
       const snap = await getDoc(doc(membersCol, uid));
-      return snap.exists() ? snap.data().name : null;
+      return snap.exists() ? { name: snap.data().name, admin: snap.data().admin === true } : null;
     } catch (err) {
       if (err.code === 'permission-denied') return null;
       throw err;
     }
   },
 
-  async join(uid, name, code) {
+  // adminCode is only sent when joining as the manager; the rules check it.
+  async join(uid, name, code, adminCode) {
+    const member = { name, code: code.trim().toLowerCase(), joinedAt: serverTimestamp() };
+    if (adminCode) Object.assign(member, { admin: true, adminCode: adminCode.trim().toLowerCase() });
     const batch = writeBatch(db);
-    batch.set(doc(membersCol, uid), { name, code: code.trim().toLowerCase(), joinedAt: serverTimestamp() });
+    batch.set(doc(membersCol, uid), member);
     batch.set(doc(peopleCol, uid), { name, joinedAt: serverTimestamp() });
     await batch.commit();
   },
@@ -175,5 +179,13 @@ export const firebaseStore = {
 
   saveRole(id, data, actor) {
     return setDoc(doc(rolesCol, id), { ...data, updatedAt: serverTimestamp(), updatedBy: actor.name });
+  },
+
+  subscribeSettings(cb, onError) {
+    return onSnapshot(settingsDoc, (snap) => cb(snap.exists() ? snap.data() : {}), onError);
+  },
+
+  saveSettings(patch, actor) {
+    return setDoc(settingsDoc, { ...patch, updatedAt: serverTimestamp(), updatedBy: actor.name }, { merge: true });
   },
 };

@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { ORG_DEFAULTS, SUBTEAMS, SUBTEAM_COLORS, TEAM_NAME, TEAM_NICKNAME } from '../config.js';
+import { MANAGER_NAME, ORG_DEFAULTS, SUBTEAMS, SUBTEAM_COLORS, TEAM_NAME, TEAM_NICKNAME } from '../config.js';
+import { PlusIcon } from './common.jsx';
 import { personId } from '../data/diff.js';
 import { todayISO } from '../milestones.js';
 import { Avatar, CloseIcon } from './common.jsx';
@@ -15,7 +16,10 @@ function SubteamPill({ name }) {
   );
 }
 
-function PersonDialog({ person, onClose, onSave }) {
+// person.isNew = adding someone to the team (asks for their name).
+function PersonDialog({ person, taken, onClose, onSave, onRemove }) {
+  const [name, setName] = useState(person.name || '');
+  const nameTaken = person.isNew && taken.some((n) => n.toLowerCase() === name.trim().toLowerCase());
   const [title, setTitle] = useState(person.title || '');
   const [subteams, setSubteams] = useState(person.subteams || []);
   const [resp, setResp] = useState((person.responsibilities || []).join('\n'));
@@ -28,8 +32,10 @@ function PersonDialog({ person, onClose, onSave }) {
         onClick={(e) => e.stopPropagation()}
         onSubmit={(e) => {
           e.preventDefault();
+          if (!name.trim() || nameTaken) return;
           onSave({
-            name: person.name,
+            name: person.isNew ? name.trim() : person.name,
+            removed: false,
             title: title.trim(),
             subteams: SUBTEAMS.filter((s) => subteams.includes(s)),
             responsibilities: resp
@@ -40,13 +46,24 @@ function PersonDialog({ person, onClose, onSave }) {
         }}
       >
         <div className="panel-head">
-          <Avatar name={person.name} size={30} />
-          <h2>{person.name}</h2>
+          {person.isNew ? <h2>Add a person</h2> : <Avatar name={person.name} size={30} />}
+          {!person.isNew && <h2>{person.name}</h2>}
           <span className="spacer" />
           <button type="button" className="icon-btn" onClick={onClose} aria-label="Close">
             <CloseIcon />
           </button>
         </div>
+        {person.isNew && (
+          <input
+            className="input big"
+            autoFocus
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Full name"
+            maxLength={60}
+          />
+        )}
+        {nameTaken && <p className="form-error">{name.trim()} is already on the team.</p>}
         <div className="fields">
           <label className="field-label" htmlFor="p-title">
             Role
@@ -85,10 +102,18 @@ function PersonDialog({ person, onClose, onSave }) {
           placeholder={'Builds and maintains the intake\nKeeps the parts inventory'}
         />
         <div className="row gap end">
+          {onRemove && (
+            <button type="button" className="link-btn danger" onClick={onRemove}>
+              Remove from team
+            </button>
+          )}
+          <span className="spacer" />
           <button type="button" className="btn ghost" onClick={onClose}>
             Cancel
           </button>
-          <button className="btn primary">Save</button>
+          <button className="btn primary" disabled={!name.trim() || nameTaken}>
+            {person.isNew ? 'Add to team' : 'Save'}
+          </button>
         </div>
       </form>
     </div>
@@ -96,26 +121,32 @@ function PersonDialog({ person, onClose, onSave }) {
 }
 
 function MemberChip({ p, onEdit }) {
-  return (
-    <button className="org-member" onClick={() => onEdit(p)}>
+  const inner = (
+    <>
       <Avatar name={p.name} size={26} />
       <span>
         <b>{p.name}</b>
         {p.title && <small>{p.title}</small>}
       </span>
+    </>
+  );
+  // Only the manager can open the editor.
+  return onEdit ? (
+    <button className="org-member" onClick={() => onEdit(p)}>
+      {inner}
     </button>
+  ) : (
+    <div className="org-member">{inner}</div>
   );
 }
 
-export default function TeamView({ roster, roles, tasks, api }) {
+export default function TeamView({ roster, roles, tasks, api, isManager }) {
   const [editing, setEditing] = useState(null);
   const today = todayISO();
 
   const people = useMemo(() => {
     const saved = Object.fromEntries(roles.map((r) => [r.id, r]));
-    const names = new Set(roster);
-    for (const r of roles) if (r.name) names.add(r.name);
-    return [...names].map((name) => {
+    return roster.map((name) => {
       const role = saved[personId(name)] || ORG_DEFAULTS[name] || EMPTY_ROLE;
       const mine = tasks.filter((t) => t.status !== 'done' && (t.assignees || []).includes(name));
       return {
@@ -177,7 +208,16 @@ export default function TeamView({ roster, roles, tasks, api }) {
         )}
       </section>
 
-      <h2 className="team-heading">Responsibilities</h2>
+      <div className="row gap team-heading-row">
+        <h2 className="team-heading grow">Responsibilities</h2>
+        {isManager ? (
+          <button className="btn primary" onClick={() => setEditing({ isNew: true, title: '', subteams: [], responsibilities: [] })}>
+            <PlusIcon /> Add person
+          </button>
+        ) : (
+          <span className="muted small">Only the team manager can change roles.</span>
+        )}
+      </div>
       <section className="people-grid">
         {people.map((p) => (
           <article key={p.name} className="person-card">
@@ -187,9 +227,11 @@ export default function TeamView({ roster, roles, tasks, api }) {
                 <h3>{p.name}</h3>
                 <div className="muted small">{p.title || 'Team member'}</div>
               </div>
-              <button className="link-btn" onClick={() => setEditing(p)}>
-                Edit
-              </button>
+              {isManager && (
+                <button className="link-btn" onClick={() => setEditing(p)}>
+                  Edit
+                </button>
+              )}
             </header>
             <div className="sub-pills">
               {p.subteams.map((s) => (
@@ -218,7 +260,27 @@ export default function TeamView({ roster, roles, tasks, api }) {
       {editing && (
         <PersonDialog
           person={editing}
+          taken={roster}
           onClose={() => setEditing(null)}
+          onRemove={
+            editing.isNew || editing.name === MANAGER_NAME
+              ? null
+              : async () => {
+                  if (
+                    !confirm(`Remove ${editing.name} from the team? Their tasks stay, but they disappear from the org chart and pickers.`)
+                  )
+                    return;
+                  const p = editing;
+                  setEditing(null);
+                  await api.saveRole({
+                    name: p.name,
+                    title: p.title,
+                    subteams: p.subteams,
+                    responsibilities: p.responsibilities,
+                    removed: true,
+                  });
+                }
+          }
           onSave={async (data) => {
             setEditing(null);
             await api.saveRole(data);
