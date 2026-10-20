@@ -43,6 +43,8 @@ It needs a one-time setup in Google Cloud Shell (no keys or secrets are created)
 bash <(curl -sL https://raw.githubusercontent.com/AsherMosseri/HarryTrotters/main/scripts/setup-firebase-deploy.sh)
 ```
 
+The script also sets CORS on the Storage bucket so the Robot tab can download model files.
+
 Test locally with the emulators: `npx firebase-tools emulators:start --only firestore,auth,functions`.
 
 ## Configuration
