@@ -3,7 +3,7 @@
 # functions by itself. Run it in Google Cloud Shell (it's already signed in as
 # you), from console.cloud.google.com with the ftc-32313-tasks project:
 #
-#   curl -sL https://raw.githubusercontent.com/AsherMosseri/HarryTrotters/main/scripts/setup-firebase-deploy.sh | bash
+#   bash <(curl -sL https://raw.githubusercontent.com/AsherMosseri/HarryTrotters/main/scripts/setup-firebase-deploy.sh)
 #
 # No keys or passwords are created: GitHub proves it's this repo's main branch
 # (Workload Identity Federation) and gets short-lived access.
@@ -23,7 +23,7 @@ gcloud services enable \
   iam.googleapis.com iamcredentials.googleapis.com sts.googleapis.com cloudresourcemanager.googleapis.com \
   compute.googleapis.com cloudfunctions.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com \
   run.googleapis.com eventarc.googleapis.com pubsub.googleapis.com cloudscheduler.googleapis.com \
-  firebaserules.googleapis.com fcm.googleapis.com firebaseextensions.googleapis.com
+  firebaserules.googleapis.com fcm.googleapis.com fcmregistrations.googleapis.com firebaseinstallations.googleapis.com
 
 echo "2/4 Creating the deploy account…"
 gcloud iam service-accounts describe "$SA" >/dev/null 2>&1 \

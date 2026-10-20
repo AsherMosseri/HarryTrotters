@@ -72,7 +72,15 @@ async function pushToken() {
   const { getMessaging, getToken } = await import('firebase/messaging');
   const reg = await navigator.serviceWorker.register('./sw.js', { scope: './' });
   await navigator.serviceWorker.ready;
-  return getToken(getMessaging(app), { serviceWorkerRegistration: reg, ...(VAPID_KEY ? { vapidKey: VAPID_KEY } : {}) });
+  const opts = { serviceWorkerRegistration: reg, ...(VAPID_KEY ? { vapidKey: VAPID_KEY } : {}) };
+  try {
+    return await getToken(getMessaging(app), opts);
+  } catch (e) {
+    // Safari sometimes fails the very first registration; once more usually works.
+    console.warn('getToken, retrying', e);
+    await new Promise((r) => setTimeout(r, 1500));
+    return getToken(getMessaging(app), opts);
+  }
 }
 const savedToken = () => {
   try {

@@ -1,7 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { loadStore } from './data/store.js';
 import { TEAM_NAME, makeRenamer } from './config.js';
-import { JoinScreen, LoadingScreen } from './components/Gate.jsx';
+import { InstallScreen, JoinScreen, LoadingScreen } from './components/Gate.jsx';
+import { installNeeded } from './data/push.js';
+import { isDemo } from './data/store.js';
+
+// Checked once: the Home Screen app is a separate launch, so this never changes mid-visit.
+const install = isDemo ? null : installNeeded();
 import Workspace from './components/Workspace.jsx';
 
 const AUTH_ERRORS = {
@@ -19,6 +24,7 @@ export default function App() {
   const rename = useMemo(() => makeRenamer(renames), [renames]);
 
   useEffect(() => {
+    if (install) return;
     loadStore().then(setStore, (e) => setError(String(e)));
   }, []);
 
@@ -59,6 +65,7 @@ export default function App() {
     document.title = `${TEAM_NAME} Task Board`;
   }, []);
 
+  if (install) return <InstallScreen {...install} />;
   if (error) return <LoadingScreen error={error} />;
   if (!store || !user || member === undefined) return <LoadingScreen />;
   if (!actor)

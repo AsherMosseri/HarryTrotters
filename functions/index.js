@@ -15,7 +15,7 @@ import { getMessaging } from 'firebase-admin/messaging';
 function region() {
   try {
     const { firestore } = JSON.parse(readFileSync(new URL('./location.json', import.meta.url)));
-    return { nam5: 'us-central1', eur3: 'europe-west1' }[firestore] || firestore;
+    return { nam5: 'us-central1', nam7: 'us-central1', eur3: 'europe-west1' }[firestore] || firestore;
   } catch {
     return 'us-central1';
   }
@@ -75,13 +75,24 @@ async function notify(notes) {
   }
   await batch.commit();
 
+  // Whose phone is it? Trust the device's member record (the name it joined
+  // with, mapped to the current spelling), not the name the device sent.
   const tokens = await db.collection('pushTokens').get();
+  const uids = [...new Set(tokens.docs.map((t) => t.get('uid')).filter(Boolean))];
+  const members = uids.length ? await db.getAll(...uids.map((uid) => db.doc(`members/${uid}`))) : [];
+  const nameByUid = new Map(members.filter((m) => m.exists).map((m) => [m.id, m.get('name')]));
   const byPerson = new Map();
+  const stale = [];
   for (const t of tokens.docs) {
-    const person = rename(t.get('person') || '');
+    const name = nameByUid.get(t.get('uid'));
+    // The device left the team (Switch): stop sending to it.
+    if (!name) {
+      stale.push(t.id);
+      continue;
+    }
+    const person = rename(name);
     byPerson.set(person, [...(byPerson.get(person) || []), t.id]);
   }
-  const stale = [];
   for (const n of notes) {
     const list = byPerson.get(rename(n.to)) || [];
     if (!list.length) continue;

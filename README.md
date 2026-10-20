@@ -26,7 +26,7 @@ npm run dev        # http://localhost:5173 (add ?demo for sample data)
 npm run build
 ```
 
-Add it to an iPad or phone Home Screen (Share → Add to Home Screen) to open it like an app.
+On iPhone and iPad the board only runs from the Home Screen (Share → Add to Home Screen); Safari shows install steps instead, since that's the only way notifications work there. Computers and Android use it in the browser.
 
 Each build publishes `version.json`; open pages check it every minute and block with an "Update now" prompt when a newer version is live.
 
@@ -40,7 +40,7 @@ team and manager codes from the live rules first, so they never need to be on Gi
 It needs a one-time setup in Google Cloud Shell (no keys or secrets are created):
 
 ```bash
-curl -sL https://raw.githubusercontent.com/AsherMosseri/HarryTrotters/main/scripts/setup-firebase-deploy.sh | bash
+bash <(curl -sL https://raw.githubusercontent.com/AsherMosseri/HarryTrotters/main/scripts/setup-firebase-deploy.sh)
 ```
 
 Test locally with the emulators: `npx firebase-tools emulators:start --only firestore,auth,functions`.

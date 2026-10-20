@@ -467,11 +467,15 @@ export default function Workspace({ store, actor, rename, renames }) {
   const openTask = tasks?.find((t) => t.id === openId) || null;
 
   // Where a notification points: 'task:<id>', 'chat:<channel>', or 'view:<tab>'.
+  const liveTasks = useRef(tasks);
+  liveTasks.current = tasks;
   const goTo = useCallback(
     (target) => {
       const [kind, id] = (target || '').split(/:(.*)/s);
-      if (kind === 'task') setOpenId(id);
-      else if (kind === 'chat') {
+      if (kind === 'task') {
+        if (liveTasks.current && !liveTasks.current.some((t) => t.id === id)) setToast({ text: 'That task was deleted.' });
+        else setOpenId(id);
+      } else if (kind === 'chat') {
         setChatChannel(id);
         setView('chat');
       } else if (kind === 'view') setView(id);
@@ -566,7 +570,7 @@ export default function Workspace({ store, actor, rename, renames }) {
         <div className="announce-banner" role="status">
           <span className="announce-icon">📣</span>
           <div className="grow">
-            <b>{announcement.by.split(' ')[0]}:</b> {announcement.text || 'shared a photo'}
+            <b>{announcement.by.split(' ')[0]}:</b> {announcement.text || (announcement.gif ? 'sent a GIF' : 'shared a photo')}
           </div>
           <button
             className="btn small-btn"
@@ -769,7 +773,15 @@ export default function Workspace({ store, actor, rename, renames }) {
         />
       )}
       {showTrash && <TrashDialog trash={trash} days={TRASH_DAYS} isManager={actor.admin} api={api} onClose={() => setShowTrash(false)} />}
-      {!welcomed && <WelcomeCard name={actor.name} showRobot={showRobot} onClose={() => setWelcomed(true)} />}
+      {!welcomed && (
+        <WelcomeCard
+          name={actor.name}
+          showRobot={showRobot}
+          pushStatus={pushStatus}
+          onEnablePush={enablePush}
+          onClose={() => setWelcomed(true)}
+        />
+      )}
       {showHelp && <HelpDialog isManager={actor.admin} showRobot={showRobot} onClose={() => setShowHelp(false)} />}
       {cat && <CatParty onClose={() => setCat(false)} />}
       {toast && (

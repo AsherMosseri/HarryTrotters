@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { TEAM_NAME } from '../config.js';
 import { CloseIcon } from './common.jsx';
 
@@ -10,14 +11,9 @@ const QUICK_TIPS = [
     'Chat: team and subteam channels. Milestones: big steps to the competition. Parts: what to buy. Checklists: competition prep. Match Log: practice scores. Robot: the 3D model. Team: who does what.',
   ],
   [
-    '📱',
-    'Add it to your Home Screen',
-    'In Safari, tap Share → Add to Home Screen. It opens like an app. You’ll enter the team code once more there.',
-  ],
-  [
     '🔔',
     'Turn on notifications',
-    'The bell shows announcements, @mentions, tasks given to you, and what’s due tomorrow. On an iPad or iPhone, add the site to your Home Screen first, then tap 🔔 → Turn on.',
+    'The bell shows announcements, @mentions, tasks given to you, and what’s due tomorrow. Tap 🔔 → Turn on to get them on this device even when the app is closed.',
   ],
   ['🗑', 'Deleted something by mistake?', 'Tap Undo, or find it under Recently deleted in the filter row for 30 days.'],
 ];
@@ -91,7 +87,8 @@ const SECTIONS = [
     [
       'The 🔔 at the top lists announcements, @mentions, tasks someone gave you, and a 7:30 AM reminder of what’s due tomorrow. Tap one to go there.',
       'Phone notifications: tap 🔔 → Turn on, and allow them. Turn them on for each device you use.',
-      'iPad and iPhone (iOS 16.4 or later) only allow them from the Home Screen app: in Safari, tap Share → Add to Home Screen, open it from there, and turn them on.',
+      'On iPad and iPhone the board opens only from the Home Screen app, which is what lets notifications work (iOS 16.4 or later). On a computer, it works in the browser.',
+      'Turned them off by mistake? On iPad/iPhone: Settings → Notifications → 32313 Tasks.',
       'Switch (top right) stops sending your notifications to that device.',
     ],
   ],
@@ -145,7 +142,8 @@ function Rules() {
 }
 
 // Shown once per device after joining.
-export function WelcomeCard({ name, showRobot, onClose }) {
+export function WelcomeCard({ name, showRobot, pushStatus, onEnablePush, onClose }) {
+  const [busy, setBusy] = useState(false);
   return (
     <div className="panel-backdrop center" onClick={onClose}>
       <div className="dialog welcome" onClick={(e) => e.stopPropagation()} role="dialog" aria-labelledby="welcome-title">
@@ -154,9 +152,28 @@ export function WelcomeCard({ name, showRobot, onClose }) {
         <TipList showRobot={showRobot} />
         <Rules />
         <p className="muted small">You can see these tips again anytime with the ? button at the top.</p>
-        <button className="btn primary big-btn" onClick={onClose} autoFocus>
-          Got it
-        </button>
+        {pushStatus === 'off' ? (
+          <>
+            <button
+              className="btn primary big-btn"
+              disabled={busy}
+              onClick={async () => {
+                setBusy(true);
+                await onEnablePush();
+                onClose();
+              }}
+            >
+              {busy ? 'Turning on…' : '🔔 Turn on notifications'}
+            </button>
+            <button className="link-btn" onClick={onClose}>
+              Not now
+            </button>
+          </>
+        ) : (
+          <button className="btn primary big-btn" onClick={onClose} autoFocus>
+            Got it
+          </button>
+        )}
       </div>
     </div>
   );

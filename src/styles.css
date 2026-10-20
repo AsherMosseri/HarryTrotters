@@ -941,6 +941,11 @@ div.org-member { cursor: default; }
 .announce-icon { font-size: 20px; }
 .composer.read-only { color: var(--muted); font-size: 14px; text-align: center; padding: 14px; }
 
+/* ---------- home screen install ---------- */
+.install-steps { text-align: left; margin: 4px 0 0; padding-left: 22px; display: flex; flex-direction: column; gap: 10px; line-height: 1.45; }
+.install-steps li::marker { font-weight: 800; color: var(--accent); }
+.share-icon { vertical-align: -3px; color: var(--accent); }
+
 /* ---------- notifications ---------- */
 .inbox { position: relative; }
 .bell { position: relative; }

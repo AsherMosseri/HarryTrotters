@@ -31,6 +31,104 @@ export function LoadingScreen({ error }) {
   );
 }
 
+function ShareIcon() {
+  return (
+    <svg
+      className="share-icon"
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-label="Share"
+    >
+      <path d="M12 3v12M8 7l4-4 4 4" />
+      <path d="M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1" />
+    </svg>
+  );
+}
+
+// On iPhone and iPad the board only runs as the Home Screen app, so everyone
+// can get notifications. Shown in Safari (or another browser) until then.
+export function InstallScreen({ device, browser }) {
+  const [copied, setCopied] = useState(false);
+  const link = `${location.origin}${location.pathname}`;
+  const steps =
+    browser === 'safari'
+      ? [
+          <>
+            Tap the <b>Share</b> button <ShareIcon />{' '}
+            {device === 'iPad' ? (
+              'at the top right, next to the address bar.'
+            ) : (
+              <>
+                in the bar at the bottom. If you don’t see it, tap <b>•••</b> first.
+              </>
+            )}
+          </>,
+          <>
+            Scroll down and tap <b>Add to Home Screen</b>. (Don’t see it? Tap <b>View More</b>.)
+          </>,
+          <>
+            If you see <b>Open as Web App</b>, leave it on. Then tap <b>Add</b>.
+          </>,
+          <>
+            Go to your Home Screen and open <b>32313 Tasks</b>. You’ll pick your name and enter the team code there.
+          </>,
+        ]
+      : browser === 'chrome'
+        ? [
+            <>
+              Tap the <b>Share</b> button <ShareIcon /> in the address bar.
+            </>,
+            <>
+              Tap <b>Add to Home Screen</b> (scroll down or tap <b>View More</b> if needed), then <b>Add</b>.
+            </>,
+            <>
+              Go to your Home Screen and open <b>32313 Tasks</b>. You’ll pick your name and enter the team code there.
+            </>,
+          ]
+        : [
+            <>
+              Copy the link below and open it in <b>Safari</b>.
+            </>,
+            <>Follow the steps there to add it to your Home Screen.</>,
+          ];
+  return (
+    <Shell>
+      <h1>Add the app to your Home Screen</h1>
+      <p className="muted">
+        On {device === 'iPad' ? 'an iPad' : 'an iPhone'}, the {TEAM_NAME} board runs as an app from your Home Screen. That’s how you get
+        notifications for announcements, @mentions, and your tasks.
+      </p>
+      <ol className="install-steps">
+        {steps.map((s, i) => (
+          <li key={i}>{s}</li>
+        ))}
+      </ol>
+      {browser !== 'safari' && (
+        <button
+          className="btn"
+          onClick={async () => {
+            try {
+              await navigator.clipboard.writeText(link);
+              setCopied(true);
+            } catch {
+              prompt('Copy this link:', link);
+            }
+          }}
+        >
+          {copied ? 'Copied ✓' : 'Copy link'}
+        </button>
+      )}
+      <p className="muted small">Needs iOS 16.4 or later for notifications (Settings → General → About → iOS Version).</p>
+    </Shell>
+  );
+}
+
 const OTHER = '__other';
 
 export function JoinScreen({ onJoin, rename }) {

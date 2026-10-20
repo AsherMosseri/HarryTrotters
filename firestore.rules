@@ -112,12 +112,10 @@ service cloud.firestore {
       allow read, delete: if isMember();
       allow update: if isMember() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
     }
-    // Devices that turned on phone notifications, under the member's own name.
-    // Only the Cloud Functions read them.
+    // Devices that turned on phone notifications. Only the Cloud Functions read
+    // them, and they send to the name in the device's members doc.
     match /pushTokens/{token} {
-      allow create, update: if isMember()
-        && request.resource.data.uid == request.auth.uid
-        && request.resource.data.person == get(memberPath()).data.name;
+      allow create, update: if isMember() && request.resource.data.uid == request.auth.uid;
       allow delete: if isMember() && resource.data.uid == request.auth.uid;
     }
 
