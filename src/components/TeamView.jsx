@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { MANAGER_NAME, ORG_DEFAULTS, ORG_GROUPS, SUBTEAM_COLORS, TEAM_NAME, TEAM_NICKNAME } from '../config.js';
+import { isManagerName, ORG_DEFAULTS, ORG_GROUPS, SUBTEAM_COLORS, TEAM_NAME, TEAM_NICKNAME } from '../config.js';
 import { PlusIcon } from './common.jsx';
 import { personId } from '../data/diff.js';
 import { todayISO } from '../milestones.js';
@@ -269,7 +269,7 @@ export default function TeamView({ roster, roles, tasks, api, isManager }) {
           taken={roster}
           onClose={() => setEditing(null)}
           onRemove={
-            editing.isNew || editing.name === MANAGER_NAME
+            editing.isNew || isManagerName(editing.name)
               ? null
               : async () => {
                   if (

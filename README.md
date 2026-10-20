@@ -25,7 +25,7 @@ Pushing to `main` deploys to GitHub Pages via `.github/workflows/deploy.yml`.
 
 - `src/config.js` — Firebase config, roster, statuses, subteams, priorities.
 - `firestore.rules` — database security rules, including the team code and the
-  manager code (joining as `MANAGER_NAME` requires it; the manager can edit the
+  manager codes (joining as one of `MANAGER_NAMES` requires that person's code; managers can edit the
   org chart, add/remove people, delete milestones, and change the competition
   date). The file in this repo has `CHANGE-ME` placeholders; the real codes only live in
   Firebase console → Firestore Database → Rules. To change the code, edit it

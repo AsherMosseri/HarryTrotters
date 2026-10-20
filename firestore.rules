@@ -5,9 +5,11 @@ service cloud.firestore {
     // the Firebase console. Keep the real codes out of this file so they never
     // end up on GitHub.
     function teamCode() { return 'CHANGE-ME'; }
-    function managerCode() { return 'CHANGE-ME-MANAGER'; }
-    // Joining under this name (lowercase) requires the manager code.
-    function managerName() { return 'asher mosseri'; }
+    // Each manager's name (lowercase) and their own manager code. Joining under
+    // one of these names requires that code.
+    function managerCodes() {
+      return { 'asher mosseri': 'CHANGE-ME-ASHER', 'sebastian tolbert': 'CHANGE-ME-SEBASTIAN' };
+    }
 
     function signedIn() { return request.auth != null; }
     function memberPath() { return /databases/$(database)/documents/members/$(request.auth.uid); }
@@ -16,11 +18,12 @@ service cloud.firestore {
     function validName(data) {
       return data.name is string && data.name.size() > 0 && data.name.size() <= 60;
     }
-    // Either a normal member who isn't using the manager's name, or the manager
-    // with the right manager code.
+    // Either a normal member who isn't using a manager's name, or a manager
+    // with their own manager code.
     function validJoin(data) {
-      return (data.get('admin', false) == false && data.name.lower() != managerName())
-        || (data.get('admin', false) == true && data.get('adminCode', '') == managerCode());
+      return (data.get('admin', false) == false && !(data.name.lower() in managerCodes()))
+        || (data.get('admin', false) == true && data.name.lower() in managerCodes()
+            && data.get('adminCode', '') == managerCodes()[data.name.lower()]);
     }
 
     // One doc per device that entered the right code. Only that device can read it.

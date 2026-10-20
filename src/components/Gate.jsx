@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { TEAM_NAME, ROSTER, MANAGER_NAME } from '../config.js';
+import { TEAM_NAME, ROSTER, isManagerName } from '../config.js';
 import { Avatar } from './common.jsx';
 
 function Shell({ children }) {
@@ -41,7 +41,7 @@ export function JoinScreen({ onJoin }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const name = (picked === OTHER ? other : picked).trim();
-  const isManager = name.toLowerCase() === MANAGER_NAME.toLowerCase();
+  const isManager = isManagerName(name);
   const ready = name && code.trim() && (!isManager || managerCode.trim());
 
   const submit = async (e) => {

@@ -12,10 +12,11 @@ export const firebaseConfig = {
 export const TEAM_NAME = 'FTC 32313';
 export const TEAM_NICKNAME = 'Harry Trotters';
 
-// The team manager. Joining under this name also needs the manager code
-// (checked by firestore.rules), and unlocks editing the org chart, adding and
-// removing people, deleting milestones, and changing the competition date.
-export const MANAGER_NAME = 'Asher Mosseri';
+// Team managers. Joining under one of these names also needs that person's
+// manager code (checked by firestore.rules), and unlocks editing the org chart,
+// adding and removing people, deleting milestones, and changing the competition date.
+export const MANAGER_NAMES = ['Asher Mosseri', 'Sebastian Tolbert'];
+export const isManagerName = (name) => MANAGER_NAMES.some((n) => n.toLowerCase() === name.trim().toLowerCase());
 
 // Names shown on the join screen and in the assignee picker. People the manager
 // adds on the Team tab, and anyone who joins as "Someone else", are added too.
