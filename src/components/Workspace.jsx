@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { COMPETITION, ROSTER, STATUSES, SUBTEAMS, PRIORITIES, TEAM_NAME } from '../config.js';
 import { daysBetween, todayISO } from '../milestones.js';
 import { personId } from '../data/diff.js';
@@ -10,6 +10,8 @@ import TaskPanel from './TaskPanel.jsx';
 import NewTaskDialog from './NewTaskDialog.jsx';
 import MilestonesView from './MilestonesView.jsx';
 import TeamView from './TeamView.jsx';
+import PartsView from './PartsView.jsx';
+import ChecklistsView from './ChecklistsView.jsx';
 import CatParty from './CatParty.jsx';
 
 function ThemeIcon({ theme }) {
@@ -66,6 +68,8 @@ const VIEWS = [
   ['board', 'Board'],
   ['table', 'Table'],
   ['milestones', 'Milestones'],
+  ['parts', 'Parts'],
+  ['checklists', 'Checklists'],
   ['team', 'Team'],
 ];
 
@@ -76,11 +80,18 @@ export default function Workspace({ store, actor }) {
   const [people, setPeople] = useState([]);
   const [milestones, setMilestones] = useState([]);
   const [roles, setRoles] = useState([]);
+  const [parts, setParts] = useState([]);
+  const [checklists, setChecklists] = useState([]);
   const [settings, setSettings] = useState({});
   const [cat, setCat] = useState(false);
   const [savedView, setView] = useLocalStorage('view', 'board');
   const view = VIEWS.some(([id]) => id === savedView) ? savedView : 'board';
   const taskView = view === 'board' || view === 'table';
+  const tabsRef = useRef(null);
+  // On narrow screens the tab strip scrolls sideways; keep the current tab visible.
+  useEffect(() => {
+    tabsRef.current?.querySelector('.active')?.scrollIntoView({ inline: 'nearest', block: 'nearest' });
+  }, [view]);
   const [filters, setFilters] = useLocalStorage('filters', EMPTY_FILTERS);
   const [theme, setTheme] = useLocalStorage('theme', 'system');
   const [openId, setOpenId] = useState(null);
@@ -97,6 +108,8 @@ export default function Workspace({ store, actor }) {
   useEffect(() => store.subscribeMilestones(setMilestones, fail), [store, fail]);
   useEffect(() => store.subscribeRoles(setRoles, fail), [store, fail]);
   useEffect(() => store.subscribeSettings(setSettings, fail), [store, fail]);
+  useEffect(() => store.subscribeParts(setParts, fail), [store, fail]);
+  useEffect(() => store.subscribeChecklists(setChecklists, fail), [store, fail]);
   const competitionDate = settings.competitionDate || COMPETITION.date;
 
   useEffect(() => {
@@ -139,6 +152,22 @@ export default function Workspace({ store, actor }) {
           .catch(fail),
       saveRole: (data) => store.saveRole(personId(data.name), data, actor).catch(fail),
       saveSettings: (patch) => store.saveSettings(patch, actor).catch(fail),
+      createPart: (data) => store.createPart(data, actor).catch(fail),
+      updatePart: (p, patch) => store.updatePart(p.id, patch, actor).catch(fail),
+      deletePart: (p) => store.deletePart(p.id).catch(fail),
+      createChecklist: (data) => store.createChecklist(data, actor).catch(fail),
+      renameChecklist: (list, title) => store.renameChecklist(list.id, title).catch(fail),
+      setChecklistItem: (list, item) => store.setChecklistItem(list.id, item).catch(fail),
+      toggleChecklistItem: (list, item, done) =>
+        store
+          .patchChecklistItems(list.id, { [item.id]: { done, doneBy: done ? actor.name : '', doneAt: done ? Date.now() : null } })
+          .catch(fail),
+      uncheckAll: (list, items) =>
+        store
+          .patchChecklistItems(list.id, Object.fromEntries(items.map((i) => [i.id, { done: false, doneBy: '', doneAt: null }])))
+          .catch(fail),
+      removeChecklistItem: (list, item) => store.removeChecklistItem(list.id, item.id).catch(fail),
+      deleteChecklist: (list) => store.deleteChecklist(list.id).catch(fail),
     }),
     [store, actor, fail],
   );
@@ -183,7 +212,7 @@ export default function Workspace({ store, actor }) {
             {TEAM_NAME} <span className="muted">Tasks</span>
           </span>
         </button>
-        <nav className="tabs" role="tablist">
+        <nav className="tabs" role="tablist" ref={tabsRef}>
           {VIEWS.map(([id, label]) => (
             <button key={id} role="tab" aria-selected={view === id} className={view === id ? 'active' : ''} onClick={() => setView(id)}>
               {label}
@@ -304,6 +333,10 @@ export default function Workspace({ store, actor }) {
           onOpenTask={setOpenId}
           onAddTask={(m) => setNewTask({ status: 'todo', milestoneId: m.id, subteam: m.subteam || '' })}
         />
+      ) : view === 'parts' ? (
+        <PartsView parts={parts} tasks={tasks} api={api} onOpenTask={setOpenId} />
+      ) : view === 'checklists' ? (
+        <ChecklistsView checklists={checklists} api={api} isManager={actor.admin} />
       ) : view === 'team' ? (
         <TeamView roster={roster} roles={roles} tasks={tasks} api={api} isManager={actor.admin} />
       ) : (
@@ -316,7 +349,9 @@ export default function Workspace({ store, actor }) {
         </main>
       )}
 
-      {openTask && <TaskPanel task={openTask} api={api} roster={roster} milestones={milestones} onClose={() => setOpenId(null)} />}
+      {openTask && (
+        <TaskPanel task={openTask} api={api} roster={roster} milestones={milestones} parts={parts} onClose={() => setOpenId(null)} />
+      )}
       {newTask && (
         <NewTaskDialog
           initial={newTask}

@@ -1,6 +1,18 @@
 // Shared helpers for both data backends.
 
-const TRACKED = ['title', 'description', 'status', 'assignees', 'subteam', 'priority', 'dueDate', 'blockedReason', 'links', 'milestoneId'];
+const TRACKED = [
+  'title',
+  'description',
+  'status',
+  'assignees',
+  'subteam',
+  'priority',
+  'dueDate',
+  'blockedReason',
+  'links',
+  'milestoneId',
+  'checklist',
+];
 
 export function sameValue(a, b) {
   return JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
@@ -44,6 +56,7 @@ export function newTaskDefaults(data) {
     blockedReason: '',
     links: [],
     milestoneId: '',
+    checklist: [],
     commentCount: 0,
     ...data,
   };
@@ -59,3 +72,28 @@ export const personId = (name) =>
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '');
+
+export const PART_STATUSES = [
+  { id: 'needed', label: 'Needed', color: 'var(--st-progress)' },
+  { id: 'ordered', label: 'Ordered', color: 'var(--st-todo)' },
+  { id: 'arrived', label: 'Arrived', color: 'var(--st-done)' },
+];
+
+export function newPartDefaults(data) {
+  return {
+    name: '',
+    vendor: '',
+    partNumber: '',
+    qty: 1,
+    unitCost: 0,
+    url: '',
+    status: 'needed',
+    subteam: '',
+    taskId: '',
+    notes: '',
+    ...data,
+  };
+}
+
+// Short random id for list items stored inside a document.
+export const itemId = () => Math.random().toString(36).slice(2, 10);

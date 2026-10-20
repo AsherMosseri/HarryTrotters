@@ -1,8 +1,9 @@
 // In-browser backend used with ?demo in the URL: no sign-in, data kept in
 // localStorage. Handy for trying the UI before Firebase is set up.
-import { describeChanges, derivedFields, newTaskDefaults, newMilestoneDefaults } from './diff.js';
+import { describeChanges, derivedFields, newTaskDefaults, newMilestoneDefaults, newPartDefaults } from './diff.js';
+import { STARTER_CHECKLISTS, starterItems } from '../checklists.js';
 
-const KEY = 'ftc32313-demo-v4';
+const KEY = 'ftc32313-demo-v5';
 const listeners = new Set();
 const uid = () => Math.random().toString(36).slice(2, 11);
 
@@ -79,7 +80,22 @@ function seed() {
   tasks[0].milestoneId = milestones[1].id;
   tasks[1].milestoneId = milestones[3].id;
   tasks[3].milestoneId = milestones[2].id;
-  return { tasks, activity, people: [], milestones, roles: [] };
+  tasks[0].checklist = [
+    { id: 'c1', text: 'Sketch roller layout', done: true },
+    { id: 'c2', text: 'Model side plates', done: true },
+    { id: 'c3', text: 'Check clearance with drivetrain', done: false },
+  ];
+  const p = (name, vendor, qty, unitCost, status, extra = {}) => ({
+    id: uid(),
+    ...newPartDefaults({ name, vendor, qty, unitCost, status, ...extra }),
+  });
+  const parts = [
+    p('5203 Yellow Jacket motor, 312 RPM', 'goBILDA', 2, 39.99, 'needed', { subteam: 'Mechanical', taskId: tasks[2].id }),
+    p('Smart Robot Servo', 'REV Robotics', 3, 34.0, 'ordered', { subteam: 'Assembly' }),
+    p('1/4" ID polycarbonate tubing, 1 ft', 'McMaster-Carr', 4, 6.5, 'arrived', { subteam: 'Mechanical' }),
+  ];
+  const checklists = STARTER_CHECKLISTS.slice(0, 2).map((c) => ({ id: uid(), title: c.title, items: starterItems(c) }));
+  return { tasks, activity, people: [], milestones, roles: [], parts, checklists };
 }
 
 let state;
@@ -207,6 +223,63 @@ export const demoStore = {
   },
   async saveSettings(patch) {
     state.settings = { ...(state.settings || {}), ...patch };
+    commit();
+  },
+
+  subscribeParts(cb) {
+    return listen(() => cb([...(state.parts || [])]));
+  },
+  async createPart(data, actor) {
+    state.parts = [...(state.parts || []), { id: uid(), ...newPartDefaults(data), createdBy: actor.name, updatedAt: Date.now() }];
+    commit();
+  },
+  async updatePart(id, patch, actor) {
+    state.parts = state.parts.map((p) => (p.id === id ? { ...p, ...patch, updatedAt: Date.now(), updatedBy: actor.name } : p));
+    commit();
+  },
+  async deletePart(id) {
+    state.parts = state.parts.filter((p) => p.id !== id);
+    commit();
+  },
+
+  subscribeChecklists(cb) {
+    return listen(() => cb((state.checklists || []).map((c) => ({ ...c, items: { ...c.items } }))));
+  },
+  async createChecklist(data, actor) {
+    state.checklists = [
+      ...(state.checklists || []),
+      { id: uid(), title: '', items: {}, ...data, createdAt: Date.now(), createdBy: actor.name },
+    ];
+    commit();
+  },
+  async renameChecklist(id, title) {
+    state.checklists = state.checklists.map((c) => (c.id === id ? { ...c, title } : c));
+    commit();
+  },
+  async setChecklistItem(id, item) {
+    state.checklists = state.checklists.map((c) => (c.id === id ? { ...c, items: { ...c.items, [item.id]: item } } : c));
+    commit();
+  },
+  async patchChecklistItems(id, patches) {
+    state.checklists = state.checklists.map((c) => {
+      if (c.id !== id) return c;
+      const items = { ...c.items };
+      for (const [itemId, patch] of Object.entries(patches)) items[itemId] = { ...items[itemId], ...patch };
+      return { ...c, items };
+    });
+    commit();
+  },
+  async removeChecklistItem(id, itemId) {
+    state.checklists = state.checklists.map((c) => {
+      if (c.id !== id) return c;
+      const items = { ...c.items };
+      delete items[itemId];
+      return { ...c, items };
+    });
+    commit();
+  },
+  async deleteChecklist(id) {
+    state.checklists = state.checklists.filter((c) => c.id !== id);
     commit();
   },
 };

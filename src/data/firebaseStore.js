@@ -13,9 +13,11 @@ import {
   increment,
   deleteDoc,
   setDoc,
+  updateDoc,
+  deleteField,
 } from 'firebase/firestore';
 import { firebaseConfig } from '../config.js';
-import { describeChanges, derivedFields, newTaskDefaults, newMilestoneDefaults } from './diff.js';
+import { describeChanges, derivedFields, newTaskDefaults, newMilestoneDefaults, newPartDefaults } from './diff.js';
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -32,6 +34,8 @@ const peopleCol = collection(db, 'people');
 const milestonesCol = collection(db, 'milestones');
 const rolesCol = collection(db, 'roles');
 const settingsDoc = doc(db, 'settings', 'team');
+const partsCol = collection(db, 'parts');
+const checklistsCol = collection(db, 'checklists');
 
 const millis = (v) => (v && typeof v.toMillis === 'function' ? v.toMillis() : (v ?? null));
 
@@ -187,5 +191,61 @@ export const firebaseStore = {
 
   saveSettings(patch, actor) {
     return setDoc(settingsDoc, { ...patch, updatedAt: serverTimestamp(), updatedBy: actor.name }, { merge: true });
+  },
+
+  subscribeParts(cb, onError) {
+    return onSnapshot(partsCol, (snap) => cb(snap.docs.map(readDoc)), onError);
+  },
+
+  createPart(data, actor) {
+    return setDoc(doc(partsCol), {
+      ...newPartDefaults(data),
+      createdAt: serverTimestamp(),
+      createdBy: actor.name,
+      updatedAt: serverTimestamp(),
+      updatedBy: actor.name,
+    });
+  },
+
+  updatePart(id, patch, actor) {
+    return updateDoc(doc(partsCol, id), { ...patch, updatedAt: serverTimestamp(), updatedBy: actor.name });
+  },
+
+  deletePart(id) {
+    return deleteDoc(doc(partsCol, id));
+  },
+
+  // Checklist items live in an `items` map keyed by item id, so two people
+  // ticking different boxes at once don't overwrite each other.
+  subscribeChecklists(cb, onError) {
+    return onSnapshot(checklistsCol, (snap) => cb(snap.docs.map(readDoc)), onError);
+  },
+
+  createChecklist(data, actor) {
+    return setDoc(doc(checklistsCol), { title: '', items: {}, ...data, createdAt: serverTimestamp(), createdBy: actor.name });
+  },
+
+  renameChecklist(id, title) {
+    return updateDoc(doc(checklistsCol, id), { title });
+  },
+
+  setChecklistItem(id, item) {
+    return updateDoc(doc(checklistsCol, id), { [`items.${item.id}`]: item });
+  },
+
+  patchChecklistItems(id, patches) {
+    const update = {};
+    for (const [itemId, patch] of Object.entries(patches)) {
+      for (const [k, v] of Object.entries(patch)) update[`items.${itemId}.${k}`] = v;
+    }
+    return updateDoc(doc(checklistsCol, id), update);
+  },
+
+  removeChecklistItem(id, itemId) {
+    return updateDoc(doc(checklistsCol, id), { [`items.${itemId}`]: deleteField() });
+  },
+
+  deleteChecklist(id) {
+    return deleteDoc(doc(checklistsCol, id));
   },
 };

@@ -41,6 +41,11 @@ function CardBody({ task }) {
       <div className="card-foot">
         <AvatarStack names={task.assignees} size={22} />
         <span className="spacer" />
+        {task.checklist?.length > 0 && (
+          <span className={`meta-count${task.checklist.every((i) => i.done) ? ' all-done' : ''}`} title="Checklist">
+            ☑ {task.checklist.filter((i) => i.done).length}/{task.checklist.length}
+          </span>
+        )}
         {task.commentCount > 0 && (
           <span className="meta-count">
             <CommentIcon /> {task.commentCount}

@@ -60,6 +60,15 @@ service cloud.firestore {
       allow write: if isManager();
     }
 
+    // Parts tracker: anyone on the team. Checklists: anyone edits, managers delete.
+    match /parts/{id} {
+      allow read, write: if isMember();
+    }
+    match /checklists/{id} {
+      allow read, create, update: if isMember();
+      allow delete: if isManager();
+    }
+
     match /tasks/{taskId} {
       allow read, write: if isMember();
 

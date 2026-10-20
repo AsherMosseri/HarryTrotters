@@ -70,6 +70,11 @@ export default function TableView({ tasks, api, onOpen, total }) {
               <td className="col-title">
                 <div className="title-cell">
                   <DraftInput value={t.title} onSave={(title) => title && api.update(t, { title })} placeholder="Untitled" />
+                  {t.checklist?.length > 0 && (
+                    <span className="meta-count" title="Checklist">
+                      ☑ {t.checklist.filter((i) => i.done).length}/{t.checklist.length}
+                    </span>
+                  )}
                   {t.commentCount > 0 && (
                     <span className="meta-count" title={`${t.commentCount} comments`}>
                       <CommentIcon /> {t.commentCount}

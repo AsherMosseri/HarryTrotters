@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { SUBTEAMS, PRIORITIES, statusById, priorityById } from '../config.js';
 import { fullTime, relTime } from '../util.js';
 import { Avatar, CloseIcon, DraftInput, StatusSelect } from './common.jsx';
+import { PartStatusSelect } from './PartsView.jsx';
+import { itemId } from '../data/diff.js';
 
 function fmtDate(iso) {
   if (!iso) return '';
@@ -67,6 +69,22 @@ function describe(a, milestoneName) {
       return to ? <>noted the blocker: “{to}”</> : 'cleared the blocker';
     case 'links':
       return 'updated the links';
+    case 'checklist': {
+      const before = Object.fromEntries((from || []).map((i) => [i.id, i]));
+      const after = Object.fromEntries((to || []).map((i) => [i.id, i]));
+      const names = (list) => list.map((i) => `“${i.text}”`).join(', ');
+      const checked = (to || []).filter((i) => before[i.id] && i.done && !before[i.id].done);
+      const unchecked = (to || []).filter((i) => before[i.id] && !i.done && before[i.id].done);
+      const added = (to || []).filter((i) => !before[i.id]);
+      const removed = (from || []).filter((i) => !after[i.id]);
+      const bits = [
+        checked.length && `checked off ${names(checked)}`,
+        unchecked.length && `unchecked ${names(unchecked)}`,
+        added.length && `added ${names(added)} to the checklist`,
+        removed.length && `removed ${names(removed)} from the checklist`,
+      ].filter(Boolean);
+      return bits.join(' and ') || 'updated the checklist';
+    }
     case 'milestoneId':
       return to ? (
         <>
@@ -78,6 +96,49 @@ function describe(a, milestoneName) {
     default:
       return `changed ${field}`;
   }
+}
+
+// Steps inside a task, e.g. "cut plate", "drill holes", "mount".
+function TaskChecklist({ items, onChange }) {
+  const [text, setText] = useState('');
+  const done = items.filter((i) => i.done).length;
+  const add = (e) => {
+    e.preventDefault();
+    const t = text.trim();
+    if (!t) return;
+    onChange([...items, { id: itemId(), text: t, done: false }]);
+    setText('');
+  };
+  return (
+    <div className="task-checklist">
+      <label className="field-label">Checklist{items.length ? ` · ${done}/${items.length}` : ''}</label>
+      {items.length > 0 && (
+        <div className="ms-progress-bar" style={{ '--c': done === items.length ? 'var(--st-done)' : 'var(--accent)' }}>
+          <span style={{ width: `${(done / items.length) * 100}%` }} />
+        </div>
+      )}
+      <ul className="check-items">
+        {items.map((i) => (
+          <li key={i.id} className={i.done ? 'done' : ''}>
+            <label>
+              <input
+                type="checkbox"
+                checked={!!i.done}
+                onChange={(e) => onChange(items.map((x) => (x.id === i.id ? { ...x, done: e.target.checked } : x)))}
+              />
+              <span className="check-text">{i.text}</span>
+            </label>
+            <button className="check-remove" aria-label={`Remove ${i.text}`} onClick={() => onChange(items.filter((x) => x.id !== i.id))}>
+              ×
+            </button>
+          </li>
+        ))}
+      </ul>
+      <form className="check-add" onSubmit={add}>
+        <input className="input" value={text} onChange={(e) => setText(e.target.value)} placeholder="+ Add a step" />
+      </form>
+    </div>
+  );
 }
 
 function Activity({ items, milestoneName }) {
@@ -113,7 +174,8 @@ function Activity({ items, milestoneName }) {
   );
 }
 
-export default function TaskPanel({ task, api, roster, milestones = [], onClose }) {
+export default function TaskPanel({ task, api, roster, milestones = [], parts = [], onClose }) {
+  const myParts = parts.filter((p) => p.taskId === task.id);
   const milestoneName = (id) => milestones.find((m) => m.id === id)?.title || 'a deleted milestone';
   const [activity, setActivity] = useState([]);
   const [comment, setComment] = useState('');
@@ -270,6 +332,26 @@ export default function TaskPanel({ task, api, roster, milestones = [], onClose 
             placeholder="Details, steps, measurements… (saves when you tap away)"
             onSave={(description) => set({ description })}
           />
+
+          <TaskChecklist items={task.checklist || []} onChange={(checklist) => set({ checklist })} />
+
+          {myParts.length > 0 && (
+            <>
+              <label className="field-label">Parts for this task</label>
+              <ul className="task-parts">
+                {myParts.map((p) => (
+                  <li key={p.id}>
+                    <span className="grow">
+                      {p.name}
+                      {p.qty > 1 ? ` × ${p.qty}` : ''}
+                      {p.vendor && <span className="muted small"> · {p.vendor}</span>}
+                    </span>
+                    <PartStatusSelect value={p.status} onChange={(status) => api.updatePart(p, { status })} />
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
 
           <label className="field-label">Links</label>
           <ul className="links">
