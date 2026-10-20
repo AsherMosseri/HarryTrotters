@@ -202,11 +202,6 @@ export default function Workspace({ store, actor }) {
           <div className="user-chip">
             <Avatar name={actor.name} size={30} />
             <span className="user-name">{actor.name.split(' ')[0]}</span>
-            {actor.admin && (
-              <span className="manager-badge" title="Team manager">
-                Manager
-              </span>
-            )}
             <button
               className="link-btn"
               title="Not you? Switch to a different name (needs the team code again)"
