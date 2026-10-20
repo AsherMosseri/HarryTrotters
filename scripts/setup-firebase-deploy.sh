@@ -28,7 +28,7 @@ gcloud services enable \
 echo "2/5 Creating the deploy account…"
 gcloud iam service-accounts describe "$SA" >/dev/null 2>&1 \
   || quiet gcloud iam service-accounts create "$SA_NAME" --display-name="GitHub deploy (HarryTrotters)"
-for role in roles/editor roles/resourcemanager.projectIamAdmin; do
+for role in roles/editor roles/resourcemanager.projectIamAdmin roles/run.admin roles/cloudfunctions.admin; do
   quiet gcloud projects add-iam-policy-binding "$PROJECT" --member="serviceAccount:$SA" --role="$role" --condition=None
 done
 

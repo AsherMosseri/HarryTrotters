@@ -40,5 +40,20 @@ jobs:
         run: |
           curl -sf -H "Authorization: Bearer $TOKEN" "https://firestore.googleapis.com/v1/projects/ftc-32313-tasks/databases/(default)" \
             | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const l=JSON.parse(s).locationId;console.log(l);require("fs").writeFileSync("functions/location.json",JSON.stringify({firestore:l}))})'
+      # Scheduled functions need permission to set who may run them. Granted
+      # here once (the setup script gives this account IAM admin for this).
+      - name: Make sure the deploy account can set function permissions
+        run: |
+          SA=github-deploy@ftc-32313-tasks.iam.gserviceaccount.com
+          added=
+          for role in roles/run.admin roles/cloudfunctions.admin; do
+            if ! gcloud projects get-iam-policy ftc-32313-tasks --flatten='bindings[].members' \
+                --filter="bindings.role=$role AND bindings.members=serviceAccount:$SA" --format='value(bindings.role)' | grep -q .; then
+              gcloud projects add-iam-policy-binding ftc-32313-tasks --member="serviceAccount:$SA" --role="$role" --condition=None --quiet >/dev/null
+              added=1
+            fi
+          done
+          # New permissions take a minute to apply.
+          if [ -n "$added" ]; then sleep 90; fi
       - run: npm ci --prefix functions
       - run: npx -y firebase-tools@15.34.0 deploy --only firestore:rules,storage,functions --project ftc-32313-tasks --non-interactive --force
