@@ -86,7 +86,7 @@ export const CHANNELS = [
 
 // GIF search in chat. Get a free key at developers.giphy.com (it's public by
 // design, like the Firebase config). Leave empty to allow GIF uploads only.
-export const GIPHY_API_KEY = '';
+export const GIPHY_API_KEY = 'vWoP1yFu6olIEx05kHqPgD3PIWSfZR0P';
 
 // Phone notifications (Firebase Cloud Messaging). Optional: the Web Push key
 // from Firebase console → Project settings → Cloud Messaging → Web Push
