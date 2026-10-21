@@ -74,7 +74,7 @@ const SECTIONS = [
       'Tap 📷 for a photo, GIF for GIFs, 📊 for a poll, 📎 for any file up to 25 MB (videos play right in the chat), 🎫 for team stickers, and 😊 for every emoji (on a phone or iPad these are under ＋). Pasting a picture or file works too. Links show a preview, and YouTube videos play in the chat.',
       'Tap (or hover over) a message to react (✨ for an animated super reaction), reply, 📌 pin it, edit or delete your own, or turn it into a task with +Task. 📌 at the top shows the channel’s pinned messages; 🔍 searches messages.',
       '🔔 at the top of a channel: All messages, Only @mentions (the default), or Nothing. Announcements and DMs default to All.',
-      'Direct messages: tap ＋ next to Direct messages (or Message on someone’s profile) to message one person or a group. Team management can read DMs.',
+      'Direct messages: tap ＋ next to Direct messages (or Message on someone’s profile) to message one person or a group.',
       'Tap anyone’s name or picture for their profile. Tap your own picture (top right) → Edit profile for a picture (GIFs stay animated), a banner, pronouns, about me, your name’s font and colors, an avatar decoration, a profile effect (or a custom one that rains, rises, or floats any emoji, GIF, or picture you pick), profile colors, and a status like “🔧 At the shop”. A green dot means they have the app open; you’ll see when someone is typing.',
     ],
   ],

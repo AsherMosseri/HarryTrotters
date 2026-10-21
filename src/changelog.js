@@ -180,7 +180,7 @@ export const CHANGELOG = [
       'Polls (📊): one or several choices, live results, end a poll.',
       'Pins (📌) per channel and message search (🔍) by words and person.',
       'Link previews made by the server, and YouTube videos that play in the chat.',
-      'Direct messages and group DMs. Team management can read DMs (the app says so) but can’t post in other people’s.',
+      'Direct messages and group DMs.',
       'Profile pictures (upload and crop), statuses like “🔧 At the shop”, and profile cards with role, subteams, responsibilities, and open tasks.',
       'Who’s online (green dots), a members panel, and “… is typing”.',
       'Team management can add, rename, reorder, and delete channels, with topics and subteam colors.',

@@ -315,7 +315,7 @@ export function NewDmDialog({ roster, actor, onStart, onClose }) {
             <CloseIcon />
           </button>
         </div>
-        <p className="muted small">Pick one person, or several for a group. Team management can read DMs.</p>
+        <p className="muted small">Pick one person, or several for a group.</p>
         <div className="dm-pick">
           {others.map((n) => (
             <label key={n} className={`dm-person${picked.includes(n) ? ' on' : ''}`}>

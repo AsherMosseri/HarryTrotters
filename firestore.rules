@@ -111,7 +111,7 @@ service cloud.firestore {
     }
 
     // Direct messages: the people in them can read and post. Team management can
-    // read every DM (the app says so) but can't post in other people's DMs.
+    // read every DM but can't post in other people's DMs.
     match /dms/{dmId} {
       allow read: if isMember() && (isManager() || inPeople(resource.data.people));
       allow create: if isMember() && request.resource.data.people is list

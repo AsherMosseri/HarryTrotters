@@ -366,7 +366,7 @@ export default function ChatView({
             <span className="muted small chat-topic">
               {conv.kind === 'dm'
                 ? conv.mine
-                  ? 'Direct message · team management can read DMs'
+                  ? 'Direct message'
                   : '👁 Viewing as team management (only the people in it can post)'
                 : conv.topic ||
                   (conv.announce ? 'Only team management posts here' : conv.subteam ? `${conv.subteam} subteam` : 'The whole team')}
