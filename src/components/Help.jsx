@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { REQUESTS_TO, TEAM_NAME } from '../config.js';
 import { CHANGELOG, VERSION } from '../changelog.js';
 import { CloseIcon } from './common.jsx';
+import { checkForUpdate } from './UpdateGate.jsx';
 
 const QUICK_TIPS = [
   ['➕', 'Add a task', 'Tap + New task, or the + at the top of a column. Give it an owner and a due date.'],
@@ -189,6 +190,27 @@ export function WelcomeCard({ name, showRobot, pushStatus, onEnablePush, onClose
   );
 }
 
+// Asks the site for the newest version now. A newer one opens the update screen.
+function UpdateCheck() {
+  const [state, setState] = useState(null); // null | 'checking' | result
+  const run = async () => {
+    setState('checking');
+    setState(await checkForUpdate());
+  };
+  return (
+    <div className="update-check">
+      <button className="btn" onClick={run} disabled={state === 'checking'}>
+        {state === 'checking' ? 'Checking…' : '↻ Check for updates'}
+      </button>
+      <span className="muted small" role="status">
+        {state?.status === 'latest' && `✓ You’re on the newest version (${state.release || VERSION}).`}
+        {state?.status === 'new' && `Version ${state.release} is ready.`}
+        {state?.status === 'offline' && 'Couldn’t check. Are you online?'}
+      </span>
+    </div>
+  );
+}
+
 export function HelpDialog({ isManager, showRobot, onClose, onVersionLog, onRequests }) {
   return (
     <div className="panel-backdrop center" onClick={onClose}>
@@ -206,6 +228,7 @@ export function HelpDialog({ isManager, showRobot, onClose, onVersionLog, onRequ
           </span>
           <span className="link-btn">Version log →</span>
         </button>
+        <UpdateCheck />
         <button className="version-chip idea-chip" onClick={onRequests}>
           <span>
             💡 <b>Request a feature</b> · ideas go straight to {REQUESTS_TO.split(' ')[0]}

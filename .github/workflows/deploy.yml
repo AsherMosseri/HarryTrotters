@@ -10,9 +10,12 @@ permissions:
   pages: write
   id-token: write
 
+# A deploy that has started always finishes; GitHub skips older queued ones
+# and runs the newest next. (Cancelling in progress meant quick pushes in a
+# row could cancel every deploy and leave the site on an old version.)
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build:

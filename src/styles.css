@@ -1492,6 +1492,7 @@ h3.md-h { font-size: 16.5px; }
 /* ---------- feature requests ---------- */
 .idea-btn { position: relative; font-size: 18px; }
 .idea-chip { margin-top: -4px; }
+.update-check { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: -4px; }
 .request-box { display: flex; flex-direction: column; gap: 8px; }
 .request-box textarea {
   width: 100%; resize: vertical; min-height: 64px; font: inherit; font-size: 15px; padding: 10px 12px;

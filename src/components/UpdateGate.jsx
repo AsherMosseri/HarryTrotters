@@ -10,6 +10,27 @@ export function loadNewVersion(version) {
   location.replace(url.toString());
 }
 
+// What's live right now: { version, release, changelog }, or null if it
+// can't be reached (offline, or the local dev server).
+async function fetchLive() {
+  try {
+    const res = await fetch(`version.json?t=${Date.now()}`, { cache: 'no-store' });
+    return res.ok ? await res.json() : null;
+  } catch {
+    return null;
+  }
+}
+
+// The "Check for updates" button: 'new' (the update screen opens), 'latest',
+// or 'offline'.
+export async function checkForUpdate() {
+  const live = await fetchLive();
+  if (!live?.version) return { status: 'offline' };
+  if (live.version === __BUILD_ID__) return { status: 'latest', release: live.release };
+  window.dispatchEvent(new CustomEvent('update-found', { detail: live }));
+  return { status: 'new', release: live.release };
+}
+
 // Checks version.json every minute (and whenever the app comes back to the
 // foreground). If a newer version is live, blocks the page until it's reloaded.
 export default function UpdateGate({ children }) {
@@ -26,29 +47,25 @@ export default function UpdateGate({ children }) {
     }
 
     let stopped = false;
-    const check = async () => {
-      if (document.visibilityState !== 'visible') return;
-      try {
-        const res = await fetch(`version.json?t=${Date.now()}`, { cache: 'no-store' });
-        if (!res.ok) return; // e.g. local dev server
-        const data = await res.json();
-        if (!stopped && data.version && data.version !== __BUILD_ID__) {
-          setNewVersion(data.version);
-          if (Array.isArray(data.changelog)) setInfo({ release: data.release, changelog: data.changelog });
-        }
-      } catch {
-        /* offline: try again later */
-      }
+    const show = (data) => {
+      if (stopped || !data?.version || data.version === __BUILD_ID__) return;
+      setNewVersion(data.version);
+      if (Array.isArray(data.changelog)) setInfo({ release: data.release, changelog: data.changelog });
     };
+    // Offline or the local dev server: try again later.
+    const check = async () => document.visibilityState === 'visible' && show(await fetchLive());
+    const onFound = (e) => show(e.detail);
     check();
     const timer = setInterval(check, CHECK_EVERY);
     document.addEventListener('visibilitychange', check);
     window.addEventListener('online', check);
+    window.addEventListener('update-found', onFound);
     return () => {
       stopped = true;
       clearInterval(timer);
       document.removeEventListener('visibilitychange', check);
       window.removeEventListener('online', check);
+      window.removeEventListener('update-found', onFound);
     };
   }, []);
 

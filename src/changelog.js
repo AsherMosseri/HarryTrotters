@@ -4,6 +4,15 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '2.20',
+    date: '2026-10-21',
+    title: 'Check for updates',
+    items: [
+      'Help (?) has a “Check for updates” button right under the version number. If there’s a newer version, the update screen opens; if not, it tells you you’re up to date.',
+      'Fixed updates getting stuck: several quick changes in a row could keep the newest version from going live.',
+    ],
+  },
+  {
     version: '2.19',
     date: '2026-10-21',
     title: 'Avatar decorations fixed',
