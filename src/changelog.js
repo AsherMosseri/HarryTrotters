@@ -4,6 +4,17 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '2.29',
+    date: '2026-10-21',
+    title: 'Custom avatar decorations',
+    items: [
+      'Edit profile → Style → Avatar decoration → Custom…: build your own.',
+      'Ring: none, solid, gradient, two-tone, rainbow, glow, dashed, or dots, in any colors, any thickness, still or spinning either way at any speed.',
+      'Up to 3 stickers: any emoji, a GIF, or your own picture. Tap or drag on the big preview to put one anywhere (on the edge, inside, or outside), then set its size and rotation.',
+      'Animate each sticker: orbit around the edge, spin, bob, pulse, wiggle, or float, clockwise or counterclockwise, at any speed. 🎲 Surprise me makes a random one.',
+    ],
+  },
+  {
     version: '2.28',
     date: '2026-10-21',
     title: 'Chat follows along',

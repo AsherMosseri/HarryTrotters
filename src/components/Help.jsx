@@ -88,7 +88,7 @@ const SECTIONS = [
       'Tap (or hover over) a message to react (✨ for an animated super reaction), reply, 📌 pin it, edit or delete your own, or turn it into a task with +Task. 📌 at the top shows the channel’s pinned messages; 🔍 searches messages.',
       '🔔 at the top of a channel: All messages, Only @mentions (the default), or Nothing. Announcements and DMs default to All.',
       'Direct messages: tap ＋ next to Direct messages (or Message on someone’s profile) to message one person or a group.',
-      'Tap anyone’s name or picture for their profile. Tap your own picture (top right) → Edit profile for a picture (GIFs stay animated), a banner, pronouns, about me, your name’s font and colors, an avatar decoration, a profile effect (or a custom one that rains, rises, or floats any emoji, GIF, or picture you pick), profile colors, and a status like “🔧 At the lab”. A green dot means they have the app open; you’ll see when someone is typing.',
+      'Tap anyone’s name or picture for their profile. Tap your own picture (top right) → Edit profile for a picture (GIFs stay animated), a banner, pronouns, about me, your name’s font and colors, an avatar decoration (or a custom one: any ring, colors, and spin, plus stickers you place, size, rotate, and animate), a profile effect (or a custom one that rains, rises, or floats any emoji, GIF, or picture you pick), profile colors, and a status like “🔧 At the lab”. A green dot means they have the app open; you’ll see when someone is typing.',
     ],
   ],
   [

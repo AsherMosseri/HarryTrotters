@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { STATUSES, PRIORITIES, statusById, priorityById } from '../config.js';
 import { colorFor, initials, dueInfo } from '../util.js';
 import { decorationById, nameStyle } from '../nitro.js';
+import { CustomDecoration } from './decoRender.jsx';
 
 // Profiles, who's online, and each person's subteams, for any component that
 // shows people (set up in Workspace; empty on the join screen).
@@ -11,7 +12,7 @@ export const usePeople = () => useContext(PeopleContext);
 // A profile picture (GIFs stay animated), or colored initials, with the
 // person's avatar decoration. showOnline adds a green dot when the person has
 // the app open.
-export function Avatar({ name, size = 26, photo, showOnline = false, decoration }) {
+export function Avatar({ name, size = 26, photo, showOnline = false, decoration, decorationCustom }) {
   const people = usePeople();
   const src = photo || people?.photoOf(name);
   const deco = decoration ?? people?.profileOf(name)?.decoration ?? '';
@@ -22,7 +23,14 @@ export function Avatar({ name, size = 26, photo, showOnline = false, decoration 
       {initials(name)}
     </span>
   );
-  if (deco && decorationById[deco]) {
+  const custom = deco === 'custom' ? (decorationCustom ?? people?.profileOf(name)?.decorationCustom) : null;
+  if (custom) {
+    pic = (
+      <CustomDecoration size={size} custom={custom}>
+        {pic}
+      </CustomDecoration>
+    );
+  } else if (deco && deco !== 'custom' && decorationById[deco]) {
     const badge = size >= 28 && decorationById[deco].badge;
     pic = (
       <span className={`deco deco-${deco}`} style={{ width: size, height: size, '--s': `${size}px` }}>

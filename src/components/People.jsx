@@ -6,6 +6,8 @@ import { DECORATIONS, EFFECTS, MOTIONS, NAME_FONTS, SWATCHES, effectById, nameSt
 import { EmojiPicker, GifPicker } from './chat/Pickers.jsx';
 import { activeStatus } from '../people.js';
 import { Avatar, CloseIcon, usePeople } from './common.jsx';
+import DecorationEditor from './DecorationEditor.jsx';
+import { DEFAULT_DECO } from './decoRender.jsx';
 
 const STATUS_IDEAS = [
   ['🔧', 'At the lab'],
@@ -151,7 +153,7 @@ export function CustomEffect({ value, onChange, upload }) {
 }
 
 // Still pictures become 96px PNGs (transparency kept) so 14 of them stay light.
-async function shrinkParticle(file) {
+export async function shrinkParticle(file) {
   const bmp = await createImageBitmap(file);
   const k = Math.min(1, 96 / Math.max(bmp.width, bmp.height));
   const canvas = document.createElement('canvas');
@@ -184,7 +186,7 @@ function CardBody({ name, look, actor, tasks, children }) {
         style={banner ? { backgroundImage: `url("${banner}")` } : { background: profile.bannerColor || info.color || 'var(--accent)' }}
       />
       <div className="profile-avatar">
-        <Avatar name={name} size={84} showOnline decoration={profile.decoration} />
+        <Avatar name={name} size={84} showOnline decoration={profile.decoration} decorationCustom={profile.decorationCustom} />
       </div>
       <div className="profile-inner">
         <h2 className="display-name" style={nameStyle(profile, info.color)}>
@@ -415,6 +417,7 @@ export function ProfileEditor({ name, actor, api, tasks = [], onClose }) {
     about: profile.about || '',
     pronouns: profile.pronouns || '',
     decoration: profile.decoration || '',
+    decorationCustom: profile.decorationCustom || null,
     effect: profile.effect || '',
     effectCustom: profile.effectCustom || null,
     nameStyle: profile.nameStyle || { font: '', colors: [] },
@@ -597,14 +600,33 @@ export function ProfileEditor({ name, actor, api, tasks = [], onClose }) {
                       <button
                         key={d.id}
                         className={`choice${look.decoration === d.id ? ' on' : ''}`}
-                        onClick={() => set({ decoration: d.id })}
+                        onClick={() =>
+                          set(
+                            d.id === 'custom' && !look.decorationCustom
+                              ? { decoration: d.id, decorationCustom: DEFAULT_DECO }
+                              : { decoration: d.id },
+                          )
+                        }
                         title={d.label}
                       >
-                        <Avatar name={name} size={36} decoration={d.id} />
+                        <Avatar
+                          name={name}
+                          size={36}
+                          decoration={d.id}
+                          decorationCustom={d.id === 'custom' ? look.decorationCustom || DEFAULT_DECO : undefined}
+                        />
                         <span className="tiny">{d.label}</span>
                       </button>
                     ))}
                   </div>
+                  {look.decoration === 'custom' && (
+                    <DecorationEditor
+                      name={name}
+                      value={look.decorationCustom || DEFAULT_DECO}
+                      onChange={(c) => set({ decorationCustom: c })}
+                      upload={(file, oldPath) => api.uploadEffectImage(name, file, oldPath)}
+                    />
+                  )}
                   <h3 className="field-label">Profile effect</h3>
                   <div className="choice-grid">
                     {EFFECTS.map((f) => (

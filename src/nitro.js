@@ -11,6 +11,7 @@ export const DECORATIONS = [
   { id: 'robot', label: 'Robot', badge: '🤖' },
   { id: 'stars', label: 'Stars', badge: '⭐' },
   { id: 'cat', label: 'Cat', badge: '🐱' },
+  { id: 'custom', label: 'Custom…' },
 ];
 export const decorationById = Object.fromEntries(DECORATIONS.map((d) => [d.id, d]));
 

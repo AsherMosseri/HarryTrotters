@@ -1668,3 +1668,36 @@ h3.md-h { font-size: 16.5px; }
 .btn.on-btn { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
 .studio-bg-now { width: 40px; height: 40px; border-radius: 10px; overflow: hidden; display: grid; place-items: center; font-size: 24px; background: var(--surface-2); }
 .studio-bg-now img { width: 100%; height: 100%; object-fit: cover; }
+
+/* ---------- custom avatar decoration (decoRender.jsx) ---------- */
+.deco-ring { position: absolute; border-radius: 50%; z-index: 0; }
+.deco-ring.spin { animation: deco-spin var(--spd, 4s) linear infinite; }
+.deco-ring.spin.ccw { animation-direction: reverse; }
+.deco-ring.ring-glow { box-shadow: 0 0 calc(var(--s) * 0.16) var(--glow); animation: deco-glow 1.8s ease-in-out infinite; }
+@keyframes deco-glow { 50% { box-shadow: 0 0 calc(var(--s) * 0.32) calc(var(--s) * 0.04) var(--glow); } }
+.deco-b-at { position: absolute; z-index: 2; transform: translate(-50%, -50%); pointer-events: none; line-height: 1; }
+.deco-b { display: block; font-size: calc(var(--s) * var(--bs)); transform: rotate(var(--r)); }
+.deco-b img { width: calc(var(--s) * var(--bs) * 1.15); height: calc(var(--s) * var(--bs) * 1.15); object-fit: contain; display: block; }
+.deco-orbit { position: absolute; inset: 0; z-index: 2; pointer-events: none; animation: deco-spin var(--spd) linear infinite; }
+.deco-orbit.ccw { animation-direction: reverse; }
+.deco-b.anim-spin { animation: deco-b-spin var(--spd) linear infinite; }
+.deco-b.anim-spin.ccw { animation-direction: reverse; }
+.deco-b.anim-bob { animation: deco-b-bob var(--spd) ease-in-out infinite; }
+.deco-b.anim-pulse { animation: deco-b-pulse var(--spd) ease-in-out infinite; }
+.deco-b.anim-wiggle { animation: deco-b-wiggle var(--spd) ease-in-out infinite; }
+.deco-b.anim-float { animation: deco-b-float var(--spd) ease-in-out infinite; }
+@keyframes deco-b-spin { from { transform: rotate(var(--r)); } to { transform: rotate(calc(var(--r) + 360deg)); } }
+@keyframes deco-b-bob { 50% { transform: translateY(-18%) rotate(var(--r)); } }
+@keyframes deco-b-pulse { 50% { transform: scale(1.25) rotate(var(--r)); } }
+@keyframes deco-b-wiggle { 25% { transform: rotate(calc(var(--r) - 16deg)); } 75% { transform: rotate(calc(var(--r) + 16deg)); } }
+@keyframes deco-b-float { 33% { transform: translate(12%, -14%) rotate(var(--r)); } 66% { transform: translate(-12%, 8%) rotate(var(--r)); } }
+@media (prefers-reduced-motion: reduce) { .deco-ring, .deco-orbit, .deco-b { animation: none !important; } }
+.deco-editor { display: flex; flex-direction: column; gap: 10px; padding: 12px; border: 1px dashed var(--border); border-radius: 12px; }
+.deco-top { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.deco-stage { width: 190px; height: 190px; display: grid; place-items: center; border-radius: 16px; background: var(--surface-2); touch-action: none; cursor: crosshair; user-select: none; -webkit-user-select: none; }
+.deco-top-side { flex: 1; min-width: 160px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.deco-chips { flex-wrap: wrap; }
+.deco-sticker-tab { width: 44px; height: 44px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); font-size: 24px; display: grid; place-items: center; padding: 0; }
+.deco-sticker-tab.on { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+.deco-sticker-tab img { width: 30px; height: 30px; object-fit: contain; }
+.deco-sticker { display: flex; flex-direction: column; gap: 8px; }
