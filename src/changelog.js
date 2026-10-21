@@ -4,6 +4,14 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '2.11',
+    date: '2026-10-21',
+    title: 'Header blur fix for iPad',
+    items: [
+      'Fixed: iPadOS 26 blurs the strip under the status bar in Home Screen apps unless the page gives it a solid color to use. The site now does (with an invisible strip at the top), so the header’s top row stays sharp.',
+    ],
+  },
+  {
     version: '2.10',
     date: '2026-10-21',
     title: 'Typing test removed',

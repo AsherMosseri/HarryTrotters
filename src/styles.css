@@ -1458,3 +1458,11 @@ h3.md-h { font-size: 16.5px; }
 .update-whats-new { text-align: left; width: 100%; background: var(--surface-2); border-radius: 10px; padding: 10px 12px; font-size: 14px; }
 .update-whats-new .version-items { padding: 6px 0 0 18px; }
 
+
+/* See index.html: gives iPadOS a solid color for the strip under the status
+   bar (instead of blurring the header). background-clip: text with no text
+   means it paints nothing; Safari still reads its background color. */
+.status-bar-band {
+  position: fixed; top: 0; left: 0; right: 0; height: 12px; z-index: 2147483647; pointer-events: none;
+  background-color: var(--surface); -webkit-background-clip: text; background-clip: text;
+}

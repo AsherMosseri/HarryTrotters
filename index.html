@@ -14,6 +14,10 @@
     <title>FTC 32313 Task Board</title>
   </head>
   <body>
+    <!-- iPadOS 26 blurs whatever sits under the status bar in Home Screen apps,
+         unless a fixed strip at least 10px tall and 90% wide is at the top for
+         Safari to take a solid color from. This one paints nothing itself. -->
+    <div class="status-bar-band" aria-hidden="true"></div>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
