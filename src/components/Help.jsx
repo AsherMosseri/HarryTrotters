@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { TEAM_NAME } from '../config.js';
+import { REQUESTS_TO, TEAM_NAME } from '../config.js';
 import { CHANGELOG, VERSION } from '../changelog.js';
 import { CloseIcon } from './common.jsx';
 
@@ -16,6 +16,7 @@ const QUICK_TIPS = [
     'Turn on notifications',
     'The bell shows announcements, @mentions, tasks given to you, and what’s due tomorrow. Tap 🔔 → Turn on to get them on this device even when the app is closed.',
   ],
+  ['💡', 'Have an idea for the app?', `Tap 💡 at the top, type it, and tap Send idea. It goes straight to ${REQUESTS_TO.split(' ')[0]}.`],
   ['🗑', 'Deleted something by mistake?', 'Tap Undo, or find it under Recently deleted in the filter row for 30 days.'],
 ];
 
@@ -188,7 +189,7 @@ export function WelcomeCard({ name, showRobot, pushStatus, onEnablePush, onClose
   );
 }
 
-export function HelpDialog({ isManager, showRobot, onClose, onVersionLog }) {
+export function HelpDialog({ isManager, showRobot, onClose, onVersionLog, onRequests }) {
   return (
     <div className="panel-backdrop center" onClick={onClose}>
       <div className="dialog help" onClick={(e) => e.stopPropagation()} role="dialog" aria-labelledby="help-title">
@@ -204,6 +205,12 @@ export function HelpDialog({ isManager, showRobot, onClose, onVersionLog }) {
             Version <b>{VERSION}</b> · {CHANGELOG[0].title}
           </span>
           <span className="link-btn">Version log →</span>
+        </button>
+        <button className="version-chip idea-chip" onClick={onRequests}>
+          <span>
+            💡 <b>Request a feature</b> · ideas go straight to {REQUESTS_TO.split(' ')[0]}
+          </span>
+          <span className="link-btn">Send →</span>
         </button>
         <TipList showRobot={showRobot} />
         <Rules />

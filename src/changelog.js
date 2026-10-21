@@ -4,6 +4,18 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '2.15',
+    date: '2026-10-21',
+    title: 'Feature requests',
+    items: [
+      'Tap 💡 at the top to send an idea for the app. It goes straight to Asher’s notifications.',
+      'The “What’s new” card after each update has an idea box too.',
+      'See everyone’s ideas and tap 👍 on the ones you want.',
+      'You get a notification when your idea is planned, added, or gets a reply.',
+      'Team management can set each idea’s status, reply, and turn it into a task.',
+    ],
+  },
+  {
     version: '2.14',
     date: '2026-10-21',
     title: 'Custom profile effects',

@@ -47,6 +47,9 @@ async function renamer() {
   };
 }
 
+// Same as REQUESTS_TO in src/config.js: who feature requests go to.
+const REQUESTS_TO = 'Asher Mosseri';
+
 const first = (name) => (name || 'Someone').split(' ')[0];
 const clip = (text, n = 180) => (text.length > n ? `${text.slice(0, n - 1)}…` : text);
 
@@ -192,6 +195,42 @@ export const onDmMessage = onDocumentCreated('dms/{dmId}/messages/{messageId}', 
       .filter((to) => to && to !== sender && level(to, conv, 'all') !== 'none')
       .map((to) => ({ to, type: 'dm', title, body: messagePreview(m), open: `chat:${conv}`, by: sender, tag: conv })),
   );
+});
+
+// Feature requests go to REQUESTS_TO. The person who asked hears back when
+// the status changes or someone replies.
+const REQUEST_NEWS = {
+  planned: 'Your idea is planned',
+  working: 'Your idea is being worked on',
+  done: 'Your idea was added',
+  declined: 'Your idea is on hold for now',
+};
+export const onFeatureRequest = onDocumentWritten('requests/{id}', async (event) => {
+  const after = event.data?.after?.data();
+  if (!after) return;
+  const before = event.data?.before?.data();
+  const rename = await renamer();
+  const by = rename(after.by || '');
+  const open = `requests:${event.params.id}`;
+  if (!before) {
+    const to = rename(REQUESTS_TO);
+    if (to !== by) await notify([{ to, type: 'request', title: `${first(by)} requested a feature`, body: clip(after.text), open, by }]);
+    return;
+  }
+  const actor = rename(after.updatedBy || '');
+  const replied = after.reply && after.reply !== before.reply;
+  const moved = after.status !== before.status && REQUEST_NEWS[after.status];
+  if ((!replied && !moved) || !by || actor === by) return;
+  await notify([
+    {
+      to: by,
+      type: 'request',
+      title: moved ? REQUEST_NEWS[after.status] : `${first(actor)} replied to your idea`,
+      body: clip(replied ? `${first(actor)}: ${plainText(after.reply)}` : after.text),
+      open,
+      by: actor,
+    },
+  ]);
 });
 
 // Link previews: the server fetches the first link's title, description, and

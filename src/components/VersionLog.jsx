@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { CHANGELOG } from '../changelog.js';
 import { CloseIcon } from './common.jsx';
+import { RequestBox } from './Requests.jsx';
 
 const fmtDate = (iso) => new Date(`${iso}T12:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 
@@ -75,7 +76,7 @@ export function VersionLogDialog({ log = CHANGELOG, current, currentLabel = 'Cur
 }
 
 // Shown once after updating: what changed since the version this device last saw.
-export function WhatsNew({ versions, onClose, onFullLog }) {
+export function WhatsNew({ versions, onClose, onFullLog, onRequest }) {
   useEscape(onClose);
   const latest = versions[0];
   return (
@@ -98,6 +99,12 @@ export function WhatsNew({ versions, onClose, onFullLog }) {
             </ul>
           </div>
         ))}
+        {onRequest && (
+          <div className="whats-new-idea">
+            <h3>💡 What should we add next?</h3>
+            <RequestBox onSend={onRequest} />
+          </div>
+        )}
         <div className="row gap">
           <button className="btn" onClick={onFullLog}>
             Full version log

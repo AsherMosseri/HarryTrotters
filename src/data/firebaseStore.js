@@ -66,6 +66,7 @@ const profilesCol = collection(db, 'profiles');
 const presenceCol = collection(db, 'presence');
 const emojiCol = collection(db, 'emoji');
 const stickersCol = collection(db, 'stickers');
+const requestsCol = collection(db, 'requests');
 const isDm = (conv) => conv.startsWith('dm:');
 const convCol = (conv) => (isDm(conv) ? collection(dmsCol, conv.slice(3), 'messages') : collection(channelsCol, conv, 'messages'));
 const convFolder = (conv) => `chat/${conv.replace(':', '-')}`;
@@ -729,6 +730,24 @@ export const firebaseStore = {
   async deleteSticker(s) {
     await deleteDoc(doc(stickersCol, s.id));
     await deleteObject(fileRef(storage, s.path)).catch(() => {});
+  },
+
+  // Feature requests: anyone sends one and adds 👍; team management sets the
+  // status and replies.
+  subscribeRequests(cb, onError) {
+    return onSnapshot(requestsCol, (snap) => cb(snap.docs.map(readDoc).sort((a, b) => b.at - a.at)), onError);
+  },
+  addRequest(text, actor) {
+    return setDoc(doc(requestsCol), { text, ...actorFields(actor), at: Date.now(), status: 'new', votes: {} });
+  },
+  updateRequest(id, patch, actor) {
+    return updateDoc(doc(requestsCol, id), { ...patch, updatedBy: actor.name, updatedAt: Date.now() });
+  },
+  voteRequest(id, name, on) {
+    return updateDoc(doc(requestsCol, id), new FieldPath('votes', name), on ? true : deleteField());
+  },
+  deleteRequest(id) {
+    return deleteDoc(doc(requestsCol, id));
   },
 
   // Team emoji, used as :name: in messages and reactions.

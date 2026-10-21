@@ -31,6 +31,10 @@ export function makeRenamer(renames = {}) {
   };
 }
 
+// Feature requests (💡) go to this person's bell and phone. Same as
+// REQUESTS_TO in functions/index.js.
+export const REQUESTS_TO = 'Asher Mosseri';
+
 // The Robot (3D) tab is in preview: only these people see it for now.
 export const ROBOT_TAB_PEOPLE = ['Asher Mosseri'];
 

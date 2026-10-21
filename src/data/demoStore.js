@@ -10,6 +10,7 @@ import {
   personId,
 } from './diff.js';
 import { STARTER_CHECKLISTS, starterItems } from '../checklists.js';
+import { REQUESTS_TO } from '../config.js';
 
 const KEY = 'ftc32313-demo-v13';
 const listeners = new Set();
@@ -285,6 +286,28 @@ function seed() {
     channels: [],
     emoji: [],
     stickers: [],
+    requests: [
+      {
+        id: uid(),
+        text: 'A timer for driver practice that logs the run in the Match Log when it ends.',
+        by: 'Sophia Bermudez',
+        at: now - 26 * 3600000,
+        status: 'planned',
+        votes: { 'Sophia Bermudez': true, 'Jackson Lucks': true, 'Michael Meidan': true },
+        reply: 'Good one. Adding it after the next competition.',
+        updatedBy: 'Asher Mosseri',
+      },
+      {
+        id: uid(),
+        text: 'Dark mode for the robot viewer',
+        by: 'Jackson Lucks',
+        at: now - 4 * 86400000,
+        status: 'done',
+        votes: { 'Jackson Lucks': true },
+        reply: 'Added in 2.2.',
+        updatedBy: 'Asher Mosseri',
+      },
+    ],
   };
 }
 
@@ -788,6 +811,39 @@ export const demoStore = {
   },
   async deleteSticker(s) {
     state.stickers = (state.stickers || []).filter((x) => x.id !== s.id);
+    commit();
+  },
+
+  subscribeRequests(cb) {
+    return listen(() => cb([...(state.requests || [])].sort((a, b) => b.at - a.at)));
+  },
+  async addRequest(text, actor) {
+    const r = { id: uid(), text, by: actor.name, at: Date.now(), status: 'new', votes: {} };
+    state.requests = [r, ...(state.requests || [])];
+    // What the Cloud Function does: let REQUESTS_TO know (not about their own).
+    if (actor.name !== REQUESTS_TO)
+      state.inbox = [
+        { id: uid(), type: 'request', title: `${actor.name.split(' ')[0]} requested a feature`, body: text, open: `requests:${r.id}`, at: r.at, read: false },
+        ...(state.inbox || []),
+      ];
+    commit();
+  },
+  async updateRequest(id, patch, actor) {
+    state.requests = (state.requests || []).map((r) => (r.id === id ? { ...r, ...patch, updatedBy: actor.name, updatedAt: Date.now() } : r));
+    commit();
+  },
+  async voteRequest(id, name, on) {
+    state.requests = (state.requests || []).map((r) => {
+      if (r.id !== id) return r;
+      const votes = { ...r.votes };
+      if (on) votes[name] = true;
+      else delete votes[name];
+      return { ...r, votes };
+    });
+    commit();
+  },
+  async deleteRequest(id) {
+    state.requests = (state.requests || []).filter((r) => r.id !== id);
     commit();
   },
 

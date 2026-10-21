@@ -174,6 +174,20 @@ service cloud.firestore {
       allow update, delete: if isManager() || (isMember() && resource.data.byUid == request.auth.uid);
     }
 
+    // Feature requests: anyone on the team sends one as themselves and adds 👍;
+    // team management sets the status and replies. Authors can delete theirs.
+    match /requests/{id} {
+      allow read: if isMember();
+      allow create: if isMember() && request.resource.data.byUid == request.auth.uid
+        && isMe(request.resource.data.by)
+        && request.resource.data.text is string && request.resource.data.text.size() > 0
+        && request.resource.data.text.size() <= 2000
+        && request.resource.data.status == 'new';
+      allow update: if isManager() || (isMember()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['votes']));
+      allow delete: if isManager() || (isMember() && resource.data.byUid == request.auth.uid);
+    }
+
     // Practice and match log: anyone on the team.
     match /runs/{id} {
       allow read, write: if isMember();

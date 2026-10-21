@@ -23,6 +23,7 @@ import ChatView from './ChatView.jsx';
 const RobotView = lazy(() => import('./RobotView.jsx'));
 import { HelpDialog, WelcomeCard } from './Help.jsx';
 import { VersionLogDialog, WhatsNew } from './VersionLog.jsx';
+import { RequestsDialog } from './Requests.jsx';
 import { VERSION, versionsSince } from '../changelog.js';
 import Inbox from './Inbox.jsx';
 
@@ -249,6 +250,11 @@ export default function Workspace({ store, actor, rename, renames }) {
   useEffect(() => store.subscribePresence(setPresence, quiet('presence')), [store, quiet]);
   useEffect(() => store.subscribeEmoji(setTeamEmoji, quiet('emoji')), [store, quiet]);
   useEffect(() => store.subscribeStickers(setStickers, quiet('stickers')), [store, quiet]);
+  // Feature requests (💡). showRequests is true, or the id of one to point at.
+  const [requests, setRequests] = useState([]);
+  const [showRequests, setShowRequests] = useState(null);
+  useEffect(() => store.subscribeRequests(setRequests, quiet('requests')), [store, quiet]);
+  const newRequests = actor.admin ? requests.filter((r) => r.status === 'new').length : 0;
   const competitionDate = settings.competitionDate || COMPETITION.date;
 
   // Notifications: the bell's list, and phone notifications on this device.
@@ -687,6 +693,17 @@ export default function Workspace({ store, actor, rename, renames }) {
       uploadBanner: (name, blob, oldPath) => store.uploadBanner(name, blob, oldPath),
       removeBanner: (name, oldPath) => store.removeBanner(name, oldPath).catch(fail),
       uploadEffectImage: (name, file, oldPath) => store.uploadEffectImage(name, file, oldPath),
+      addRequest: (text) =>
+        store.addRequest(text, actor).then(
+          () => true,
+          (e) => {
+            fail(e);
+            return false;
+          },
+        ),
+      updateRequest: (id, patch) => store.updateRequest(id, patch, actor).catch(fail),
+      voteRequest: (id, on) => store.voteRequest(id, actor.name, on).catch(fail),
+      deleteRequest: (id) => store.deleteRequest(id).catch(fail),
       editMessage: (channel, id, patch) => store.editMessage(channel, id, patch).catch(fail),
       uploadChatGif: (channel, file) => store.uploadChatGif(channel, file).catch((e) => (fail(e), null)),
       deleteMessage: (channel, m) => store.deleteMessage(channel, m).catch(fail),
@@ -730,8 +747,9 @@ export default function Workspace({ store, actor, rename, renames }) {
     if (openId) out.push(`task:${openId}`);
     if (view === 'chat' && currentConv) out.push(`chat:${currentConv.key}`);
     if (view === 'board') out.push('view:board');
+    if (showRequests) out.push(...requests.map((r) => `requests:${r.id}`));
     return out;
-  }, [pageVisible, openId, view, currentConv]);
+  }, [pageVisible, openId, view, currentConv, showRequests, requests]);
   useEffect(() => {
     if (!seenTarget.length) return;
     const ids = inbox.filter((n) => !n.read && seenTarget.includes(n.open)).map((n) => n.id);
@@ -756,6 +774,7 @@ export default function Workspace({ store, actor, rename, renames }) {
         setChatChannel(id);
         setView('chat');
       } else if (kind === 'view') setView(id);
+      else if (kind === 'requests') setShowRequests(id || true);
     },
     [setChatChannel, setView],
   );
@@ -820,6 +839,15 @@ export default function Workspace({ store, actor, rename, renames }) {
               onMarkRead={(ids) => store.markInboxRead(actor.name, ids).catch(fail)}
               onClear={(ids) => store.clearInbox(actor.name, ids).catch(fail)}
             />
+            <button
+              className="icon-btn idea-btn"
+              title="Request a feature"
+              aria-label={newRequests ? `Feature requests, ${newRequests} new` : 'Request a feature'}
+              onClick={() => setShowRequests(true)}
+            >
+              💡
+              {newRequests > 0 && <span className="bell-badge">{newRequests > 9 ? '9+' : newRequests}</span>}
+            </button>
             <button className="icon-btn help-btn" title="Help" aria-label="Help" onClick={() => setShowHelp(true)}>
               ?
             </button>
@@ -1105,6 +1133,10 @@ export default function Workspace({ store, actor, rename, renames }) {
                 setShowHelp(false);
                 setShowLog(true);
               }}
+              onRequests={() => {
+                setShowHelp(false);
+                setShowRequests(true);
+              }}
             />
           )}
           {whatsNew?.length > 0 && !showLog && (
@@ -1114,6 +1146,25 @@ export default function Workspace({ store, actor, rename, renames }) {
               onFullLog={() => {
                 setSeenVersion(VERSION);
                 setShowLog(true);
+              }}
+              onRequest={api.addRequest}
+            />
+          )}
+          {showRequests && (
+            <RequestsDialog
+              requests={requests}
+              actor={actor}
+              api={api}
+              focusId={showRequests === true ? null : showRequests}
+              onClose={() => setShowRequests(null)}
+              onMakeTask={(r) => {
+                setShowRequests(null);
+                if (r.status === 'new') api.updateRequest(r.id, { status: 'planned' });
+                setNewTask({
+                  status: 'todo',
+                  title: r.text.replace(/\s+/g, ' ').slice(0, 90),
+                  description: `Feature request from ${r.by}:\n${r.text}`,
+                });
               }}
             />
           )}
