@@ -203,6 +203,23 @@ export default function Workspace({ store, actor, rename, renames }) {
   const phone = useMedia('(max-width: 760px)');
   const [phoneSheet, setPhoneSheet] = useState(null); // 'me' | 'more' | 'filters'
   const closeSheet = useCallback(() => setPhoneSheet(null), []);
+  // iPhone: opening the keyboard scrolls the whole page to show the text box,
+  // and nothing scrolls it back, so the header ends up off screen. Put the
+  // page back once the keyboard is gone.
+  useEffect(() => {
+    const vv = window.visualViewport;
+    const reset = () =>
+      setTimeout(() => {
+        const keyboardOpen = vv && vv.height < window.innerHeight - 80;
+        if (!keyboardOpen && (window.scrollY || document.documentElement.scrollTop)) window.scrollTo(0, 0);
+      }, 120);
+    document.addEventListener('focusout', reset);
+    vv?.addEventListener('resize', reset);
+    return () => {
+      document.removeEventListener('focusout', reset);
+      vv?.removeEventListener('resize', reset);
+    };
+  }, []);
   const tabsRef = useRef(null);
   // On narrow screens the tab strip scrolls sideways; keep the current tab visible.
   useEffect(() => {

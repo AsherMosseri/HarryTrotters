@@ -4,6 +4,17 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '2.32',
+    date: '2026-10-21',
+    title: 'Phone fixes',
+    items: [
+      'Pop-ups (like Edit profile) now show above the top bar and tab bar instead of underneath them.',
+      'The top bar no longer scrolls away after you type; the page snaps back when the keyboard closes.',
+      'Messages at the bottom and chat side panels sit above the tab bar, so you can always switch tabs.',
+      'Shift schedule rows fit on narrow screens, and Help closes with Escape.',
+    ],
+  },
+  {
     version: '2.31',
     date: '2026-10-21',
     title: 'A real phone layout',

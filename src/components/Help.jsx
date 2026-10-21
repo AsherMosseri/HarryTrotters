@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { REQUESTS_TO, TEAM_NAME } from '../config.js';
 import { CHANGELOG, VERSION } from '../changelog.js';
 import { CloseIcon } from './common.jsx';
@@ -228,6 +228,11 @@ export function UpdateCheck() {
 }
 
 export function HelpDialog({ isManager, showRobot, onClose, onVersionLog, onRequests }) {
+  useEffect(() => {
+    const esc = (e) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', esc);
+    return () => window.removeEventListener('keydown', esc);
+  }, [onClose]);
   return (
     <div className="panel-backdrop center" onClick={onClose}>
       <div className="dialog help" onClick={(e) => e.stopPropagation()} role="dialog" aria-labelledby="help-title">
