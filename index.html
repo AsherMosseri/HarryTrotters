@@ -16,9 +16,10 @@
   <body>
     <!-- iPadOS 26 blurs whatever sits under the status bar in Home Screen apps,
          unless a fixed strip at least 10px tall and 90% wide is at the top for
-         Safari to take a solid color from. Safari finds it the way it finds
-         taps, so it must be solid and must not ignore taps. It's the header's
-         color, so it looks like part of the header. -->
+         Safari to take a solid color from. It must be solid, there from the
+         first paint, and on top of everything (dialogs too): the first time
+         the element at the top edge changes, iPadOS blurs until a reload.
+         It's the header's color, so it looks like part of the header. -->
     <div class="status-bar-band" aria-hidden="true"></div>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>

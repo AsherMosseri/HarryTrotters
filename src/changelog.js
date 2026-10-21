@@ -4,6 +4,12 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '2.24',
+    date: '2026-10-21',
+    title: 'Header blur, third try',
+    items: ['The header is back to its normal size, with another fix for the blur under the iPad status bar.'],
+  },
+  {
     version: '2.23',
     date: '2026-10-21',
     title: 'Header blur, another try',

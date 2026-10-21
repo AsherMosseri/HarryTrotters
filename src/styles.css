@@ -167,7 +167,7 @@ a { color: var(--accent); }
 .topbar {
   position: relative; z-index: 20; flex: none;
   display: flex; align-items: center; gap: 16px;
-  padding: 10px 16px; padding-top: max(12px, env(safe-area-inset-top)); /* clear of .status-bar-band */
+  padding: 10px 16px; padding-top: max(11px, env(safe-area-inset-top)); /* clear of .status-bar-band */
   /* Solid, not a frosted-glass blur: Safari on iPad renders parts of a
      backdrop-filter header at low resolution, so its text looks blurry. */
   background: var(--surface);
@@ -1473,12 +1473,24 @@ h3.md-h { font-size: 16.5px; }
 
 
 /* See index.html: gives iPadOS a solid color for the strip under the status
-   bar (instead of blurring the header). Solid and tappable on purpose: an
-   invisible (background-clip: text) or pointer-events: none strip was skipped.
-   It covers only the header's top padding, in the header's color; dialogs
-   (z-index 40) still cover it. */
-.status-bar-band { position: fixed; top: 0; left: 0; right: 0; height: 11px; z-index: 30; background: var(--surface); }
+   bar (instead of blurring the header). iPadOS switches to blur for good the
+   first time the element it samples there changes (e.g. a dialog's backdrop
+   covering it), so this one strip stays on top of everything, always; only
+   its color changes, to match what's showing beneath it. It covers just the
+   header's top padding. */
+.status-bar-band { position: fixed; top: 0; left: 0; right: 0; height: 11px; z-index: 2147483647; background: var(--surface); }
 body:has(.demo-banner) .status-bar-band { background: #fef3c7; }
+/* Dialog backdrops dim with rgb(10 12 20 / 40%). */
+body:has(.panel-backdrop) .status-bar-band { background: color-mix(in srgb, var(--surface) 60%, rgb(10 12 20)); }
+body:has(.demo-banner):has(.panel-backdrop) .status-bar-band { background: color-mix(in srgb, #fef3c7 60%, rgb(10 12 20)); }
+/* The task side panel: undimmed on the right, where the panel is. The
+   background-color stays the dimmed one; only the painted image splits. */
+body:has(.panel-backdrop > .panel) .status-bar-band {
+  background-image: linear-gradient(to left, var(--surface) min(560px, 100%), transparent 0);
+}
+body:has(.photo-viewer) .status-bar-band { background: color-mix(in srgb, var(--surface) 12%, #000); }
+body:has(.update-gate) .status-bar-band { background: var(--bg); }
+body:has(.cat-party) .status-bar-band { background: #120a2a; }
 
 /* custom profile effect */
 .profile-effect img { width: 22px; height: 22px; object-fit: contain; display: block; }
