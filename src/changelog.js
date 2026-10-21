@@ -4,6 +4,16 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '2.12',
+    date: '2026-10-21',
+    title: 'Chat opens where you left off',
+    items: [
+      'Opening a channel or DM with unread messages starts at the red “New” line near the top, so you read down from where you left off (like Discord). With nothing new, it opens at the newest message.',
+      'Fixed: switching channels used the previous channel’s “last read” time, so the jump and the “New” line landed in the wrong place.',
+      'Jumping to a message (replies, pins, search) scrolls only the chat, never the screen around it.',
+    ],
+  },
+  {
     version: '2.11',
     date: '2026-10-21',
     title: 'Header blur fix for iPad',

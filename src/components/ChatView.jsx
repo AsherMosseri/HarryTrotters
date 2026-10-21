@@ -130,19 +130,48 @@ export default function ChatView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [actor.name, roster, all, emojiMap, onPerson, myRoles.join()],
   );
-  // Where "new" starts: what was read when this conversation was opened.
-  const [newSince, setNewSince] = useState(readAt[conv.key] ?? Date.now());
+  // Where "new" starts: what this device had read when the conversation was
+  // opened. Taken while rendering, so the "New" line and the jump use this
+  // conversation's time right away (the parent marks it read right after).
+  const opened = useRef({ key: null, since: 0 });
+  if (opened.current.key !== conv.key) opened.current = { key: conv.key, since: readAt[conv.key] ?? Date.now() };
+  const newSince = opened.current.since;
 
-  // Start at the newest message when switching conversations.
+  // Scrolls only the message list (never the page around it) so `node` sits
+  // `offset` px below the top.
+  const scrollListTo = (node, offset, smooth = false) => {
+    const el = list.current;
+    if (!el || !node) return;
+    const top = el.scrollTop + node.getBoundingClientRect().top - el.getBoundingClientRect().top - offset;
+    el.scrollTo({ top: Math.max(0, top), behavior: smooth ? 'smooth' : 'auto' });
+  };
+
+  // Opening a conversation: unread messages start at the red "New" line near
+  // the top, so you read down from where you left off (like Discord).
+  // Nothing new: the newest message, at the bottom.
+  const showStart = () => {
+    const el = list.current;
+    if (!el) return;
+    const sep = el.querySelector('.new-sep');
+    if (sep) {
+      scrollListTo(sep, 56);
+      const below = el.scrollHeight - el.scrollTop - el.clientHeight > 120;
+      atBottom.current = !below;
+      setNewBelow(below);
+    } else {
+      el.scrollTop = el.scrollHeight;
+      atBottom.current = true;
+    }
+  };
+
   useLayoutEffect(() => {
     setSelected(null);
     setReplyTo(null);
     setEditing(null);
     setNewBelow(false);
     setNotifyOpen(false);
-    setNewSince(readAt[conv.key] ?? Date.now());
-    lastCount.current = 0;
-    if (list.current) list.current.scrollTop = list.current.scrollHeight;
+    lastCount.current = all.length;
+    if (all.length) showStart();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conv.key]);
 
@@ -155,13 +184,9 @@ export default function ChatView({
     const firstLoad = lastCount.current === 0;
     lastCount.current = all.length;
     if (!grew) return;
-    // On opening, show the first unread message near the top (Discord-style).
-    if (firstLoad) {
-      const firstNew = all.find((m) => m.at > newSince && m.byUid !== actor.uid);
-      const node = firstNew && document.getElementById(`msg-${firstNew.id}`);
-      if (node) node.scrollIntoView({ block: 'center' });
-      else el.scrollTop = el.scrollHeight;
-    } else if (atBottom.current || newest?.byUid === actor.uid) {
+    // Messages arriving for a conversation that just opened empty.
+    if (firstLoad) showStart();
+    else if (atBottom.current || newest?.byUid === actor.uid) {
       el.scrollTop = el.scrollHeight;
       setNewBelow(false);
     } else setNewBelow(true);
@@ -192,7 +217,7 @@ export default function ChatView({
     const node = document.getElementById(`msg-${id}`);
     if (node) {
       pendingJump.current = null;
-      node.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      scrollListTo(node, list.current ? list.current.clientHeight / 3 : 0, true);
       setFlash(id);
       setTimeout(() => setFlash((f) => (f === id ? null : f)), 1800);
       return;
