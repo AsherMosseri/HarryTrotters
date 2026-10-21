@@ -4,6 +4,15 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '2.19',
+    date: '2026-10-21',
+    title: 'Avatar decorations fixed',
+    items: [
+      'Initials sit in the middle of decorated avatars again (Neon, Flames, Crown, and the rest) instead of being cut off at the top.',
+      'Edit profile fits on the screen, and its title and ✕ stay at the top while you scroll.',
+    ],
+  },
+  {
     version: '2.18',
     date: '2026-10-21',
     title: 'Type an emoji to pick it',

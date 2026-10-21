@@ -1316,7 +1316,8 @@ h3.md-h { font-size: 16.5px; }
 @keyframes deco-pulse { 50% { box-shadow: 0 0 calc(var(--s) * 0.25) calc(var(--s) * 0.06) var(--accent); } }
 @keyframes deco-bob { 50% { transform: translateY(-2px) rotate(-6deg); } }
 .deco { position: relative; display: inline-block; flex: none; border-radius: 50%; }
-.deco > .avatar { position: relative; z-index: 1; display: block; }
+/* Grid, like .avatar itself, so initials stay centered inside a decoration. */
+.deco > .avatar { position: relative; z-index: 1; display: grid; }
 .deco::before { content: ''; position: absolute; inset: calc(var(--s) * -0.09); border-radius: 50%; z-index: 0; }
 .deco-rainbow::before { background: conic-gradient(#ef4444, #f97316, #eab308, #22c55e, #06b6d4, #6366f1, #d946ef, #ef4444); animation: deco-spin 3s linear infinite; }
 .deco-gold::before { background: conic-gradient(#fde68a, #f59e0b, #fef3c7, #b45309, #fde68a); box-shadow: 0 0 6px #f59e0b88; }
@@ -1353,12 +1354,14 @@ h3.md-h { font-size: 16.5px; }
 @media (prefers-reduced-motion: reduce) { .profile-effect { display: none; } }
 
 /* profile editor */
-.dialog.profile-editor { width: min(820px, calc(100vw - 32px)); max-height: calc(100dvh - 40px); overflow-y: auto; }
+.dialog.profile-editor { width: min(820px, calc(100vw - 32px)); max-height: calc(100dvh - 6vh - 16px); overflow-y: auto; }
+/* The title and ✕ stay put while the editor scrolls under them. */
+.dialog.profile-editor > .panel-head { position: sticky; top: 0; z-index: 5; background: var(--surface); }
 .editor-grid { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 18px; align-items: start; }
 .editor-form { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .editor-form .field-label { margin: 8px 0 0; }
 .editor-tabs { align-self: flex-start; }
-.editor-preview { position: sticky; top: 0; }
+.editor-preview { position: sticky; top: 72px; }
 .preview-card { border: 1px solid var(--border); border-radius: 14px; overflow: hidden; background: var(--surface); box-shadow: var(--shadow); }
 .about-input { resize: vertical; min-height: 70px; font: inherit; }
 .right { text-align: right; }
