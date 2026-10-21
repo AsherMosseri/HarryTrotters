@@ -4,6 +4,14 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '2.18',
+    date: '2026-10-21',
+    title: 'Type an emoji to pick it',
+    items: [
+      'Emoji pickers: type an emoji (emoji keyboard or Globe + E) in the search box and it’s picked right away, instead of “No emoji found.” Works for reactions, chat, your status, and custom profile effects.',
+    ],
+  },
+  {
     version: '2.17',
     date: '2026-10-21',
     title: 'See which tab you’re on',

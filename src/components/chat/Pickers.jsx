@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { GIPHY_API_KEY } from '../../config.js';
 import { CloseIcon } from '../common.jsx';
-import { GROUPS, GROUP_ICONS, emojiList, loadEmoji, recentEmoji, searchEmoji, rememberEmoji } from './emoji.js';
+import { GROUPS, GROUP_ICONS, emojiList, firstEmoji, loadEmoji, recentEmoji, searchEmoji, rememberEmoji } from './emoji.js';
 
 function useEscape(onClose) {
   useEffect(() => {
@@ -43,7 +43,20 @@ export function EmojiPicker({ onPick, onClose, teamEmoji = [], canManage, onMana
     <div className={`emoji-picker big ${className}`} onClick={(e) => e.stopPropagation()}>
       {title && <div className="picker-title">{title}</div>}
       <div className="row gap-sm">
-        <input className="input grow" autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search emoji" />
+        <input
+          className="input grow"
+          autoFocus
+          value={q}
+          onChange={(e) => {
+            // Typed an actual emoji (emoji keyboard, Globe + E): that's the pick.
+            const typed = firstEmoji(e.target.value);
+            if (typed) {
+              setQ('');
+              pick(typed);
+            } else setQ(e.target.value);
+          }}
+          placeholder="Search, or type an emoji"
+        />
         <button className="icon-btn small" onClick={onClose} aria-label="Close">
           <CloseIcon />
         </button>

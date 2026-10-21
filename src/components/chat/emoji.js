@@ -29,6 +29,18 @@ export function searchEmoji(q, max = 40) {
   return scored.sort((a, b) => b.score - a.score || a.code.length - b.code.length).slice(0, max);
 }
 
+// The first emoji typed into a box (from the emoji keyboard or Globe + E),
+// whole, with skin tones, flags, and ZWJ sequences kept together.
+const EMOJI_RE = /\p{Extended_Pictographic}|\p{Regional_Indicator}|[#*0-9]️?⃣/u;
+export function firstEmoji(text) {
+  if (!text || !EMOJI_RE.test(text)) return null;
+  const parts =
+    typeof Intl !== 'undefined' && Intl.Segmenter
+      ? Array.from(new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(text), (s) => s.segment)
+      : Array.from(text);
+  return parts.find((g) => EMOJI_RE.test(g)) || null;
+}
+
 // Recently used, per device.
 const RECENT_KEY = 'ftc32313-recent-emoji';
 export function recentEmoji() {
