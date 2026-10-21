@@ -831,304 +831,314 @@ export default function Workspace({ store, actor, rename, renames }) {
             </div>
           </div>
         </header>
-
-        {taskView && announcement && (
-          <div className="announce-banner" role="status">
-            <span className="announce-icon">📣</span>
-            <div className="grow">
-              <b>{announcement.by.split(' ')[0]}:</b> {announcement.text || (announcement.gif ? 'sent a GIF' : 'shared a photo')}
-            </div>
-            <button
-              className="btn small-btn"
-              onClick={() => {
-                setChatChannel('announcements');
-                setView('chat');
-              }}
-            >
-              Open
-            </button>
-            <button
-              className="icon-btn small"
-              aria-label="Dismiss"
-              onClick={() => setChatRead({ ...chatRead, announcements: announcement.at })}
-            >
-              ✕
-            </button>
-          </div>
-        )}
-
-        {taskView && (
-          <div className="toolbar">
-            <input
-              className="search"
-              type="search"
-              placeholder="Search tasks…"
-              value={filters.q}
-              onChange={(e) => setF({ q: e.target.value })}
-            />
-            <div className="filters">
+        {/* Only this area scrolls; the header stays put above it. */}
+        <div className="app-scroll">
+          {taskView && announcement && (
+            <div className="announce-banner" role="status">
+              <span className="announce-icon">📣</span>
+              <div className="grow">
+                <b>{announcement.by.split(' ')[0]}:</b> {announcement.text || (announcement.gif ? 'sent a GIF' : 'shared a photo')}
+              </div>
               <button
-                className={`chip${filters.person === '__me' ? ' on' : ''}`}
-                onClick={() => setF({ person: filters.person === '__me' ? '' : '__me' })}
+                className="btn small-btn"
+                onClick={() => {
+                  setChatChannel('announcements');
+                  setView('chat');
+                }}
               >
-                My tasks
+                Open
               </button>
-              <select className="filter" value={filters.person} onChange={(e) => setF({ person: e.target.value })} aria-label="Person">
-                <option value="">Everyone</option>
-                <option value="__me">Me ({actor.name.split(' ')[0]})</option>
-                <option value="__none">Unassigned</option>
-                {roster.map((n) => (
-                  <option key={n} value={n}>
-                    {n}
-                  </option>
-                ))}
-              </select>
-              <select className="filter" value={filters.subteam} onChange={(e) => setF({ subteam: e.target.value })} aria-label="Subteam">
-                <option value="">All subteams</option>
-                {SUBTEAMS.map((s) => (
-                  <option key={s}>{s}</option>
-                ))}
-              </select>
-              <select
-                className="filter"
-                value={filters.priority}
-                onChange={(e) => setF({ priority: e.target.value })}
-                aria-label="Priority"
+              <button
+                className="icon-btn small"
+                aria-label="Dismiss"
+                onClick={() => setChatRead({ ...chatRead, announcements: announcement.at })}
               >
-                <option value="">Any priority</option>
-                {PRIORITIES.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.label}
-                  </option>
-                ))}
-              </select>
-              <button className={`chip${filters.hideDone ? ' on' : ''}`} onClick={() => setF({ hideDone: !filters.hideDone })}>
-                Hide done
+                ✕
               </button>
-              {anyFilter ? (
-                <button className="link-btn" onClick={() => setFilters(EMPTY_FILTERS)}>
-                  Clear
+            </div>
+          )}
+
+          {taskView && (
+            <div className="toolbar">
+              <input
+                className="search"
+                type="search"
+                placeholder="Search tasks…"
+                value={filters.q}
+                onChange={(e) => setF({ q: e.target.value })}
+              />
+              <div className="filters">
+                <button
+                  className={`chip${filters.person === '__me' ? ' on' : ''}`}
+                  onClick={() => setF({ person: filters.person === '__me' ? '' : '__me' })}
+                >
+                  My tasks
                 </button>
-              ) : null}
-              {trash.length > 0 && (
-                <button className="chip trash-chip" onClick={() => setShowTrash(true)}>
-                  🗑 Recently deleted ({trash.length})
+                <select className="filter" value={filters.person} onChange={(e) => setF({ person: e.target.value })} aria-label="Person">
+                  <option value="">Everyone</option>
+                  <option value="__me">Me ({actor.name.split(' ')[0]})</option>
+                  <option value="__none">Unassigned</option>
+                  {roster.map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+                </select>
+                <select className="filter" value={filters.subteam} onChange={(e) => setF({ subteam: e.target.value })} aria-label="Subteam">
+                  <option value="">All subteams</option>
+                  {SUBTEAMS.map((s) => (
+                    <option key={s}>{s}</option>
+                  ))}
+                </select>
+                <select
+                  className="filter"
+                  value={filters.priority}
+                  onChange={(e) => setF({ priority: e.target.value })}
+                  aria-label="Priority"
+                >
+                  <option value="">Any priority</option>
+                  {PRIORITIES.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.label}
+                    </option>
+                  ))}
+                </select>
+                <button className={`chip${filters.hideDone ? ' on' : ''}`} onClick={() => setF({ hideDone: !filters.hideDone })}>
+                  Hide done
+                </button>
+                {anyFilter ? (
+                  <button className="link-btn" onClick={() => setFilters(EMPTY_FILTERS)}>
+                    Clear
+                  </button>
+                ) : null}
+                {trash.length > 0 && (
+                  <button className="chip trash-chip" onClick={() => setShowTrash(true)}>
+                    🗑 Recently deleted ({trash.length})
+                  </button>
+                )}
+              </div>
+              <span className="spacer" />
+              <button className="btn primary" onClick={() => setNewTask({ status: 'todo' })}>
+                <PlusIcon /> New task
+              </button>
+            </div>
+          )}
+
+          {view === 'table' && (
+            <div className="status-strip">
+              {STATUSES.map((s) => {
+                const on = filters.statuses.includes(s.id);
+                return (
+                  <button
+                    key={s.id}
+                    className={`status-count${on ? ' on' : ''}`}
+                    style={{ '--c': s.color }}
+                    onClick={() => setF({ statuses: on ? filters.statuses.filter((x) => x !== s.id) : [...filters.statuses, s.id] })}
+                  >
+                    <span className="dot" />
+                    {s.short || s.label}
+                    <strong>{counts[s.id]}</strong>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {tasks === null ? (
+            <main className="content">
+              {tasksError ? (
+                <div className="empty-card">
+                  <h2>Couldn't load tasks</h2>
+                  <p className="muted">{tasksError}</p>
+                  <button className="btn primary" onClick={() => location.reload()}>
+                    Reload
+                  </button>
+                </div>
+              ) : (
+                <p className="empty">Loading…</p>
+              )}
+            </main>
+          ) : view === 'milestones' ? (
+            <MilestonesView
+              milestones={milestones}
+              competitionDate={competitionDate}
+              isManager={actor.admin}
+              tasks={tasks}
+              roster={roster}
+              api={api}
+              onOpenTask={setOpenId}
+              onAddTask={(m) => setNewTask({ status: 'todo', milestoneId: m.id, subteam: m.subteam || '' })}
+            />
+          ) : view === 'parts' ? (
+            <PartsView parts={parts} tasks={tasks} api={api} onOpenTask={setOpenId} />
+          ) : view === 'checklists' ? (
+            <ChecklistsView checklists={checklists} api={api} isManager={actor.admin} />
+          ) : view === 'chat' ? (
+            <ChatView
+              convs={convs}
+              current={currentConv}
+              setCurrent={setChatChannel}
+              messages={chat}
+              unread={unread}
+              readAt={chatRead || {}}
+              actor={actor}
+              isManager={actor.admin}
+              roster={roster}
+              tasks={tasks}
+              api={api}
+              teamEmoji={teamEmoji}
+              stickers={stickers}
+              typing={typingIn(currentConv.key)}
+              levelOf={levelOf}
+              setLevel={(c, v) => api.saveProfile(actor.name, { notify: { [c.key]: v } })}
+              onPerson={openPerson}
+              onOpenTask={setOpenId}
+              onMakeTask={(m, c) =>
+                setNewTask({
+                  status: 'todo',
+                  subteam: c.subteam || '',
+                  title: (m.text || m.poll?.question || 'Follow up on chat photo').replace(/\s+/g, ' ').slice(0, 90),
+                  description: `From ${c.label}, ${m.by}: ${m.text || m.poll?.question || '(photo)'}`,
+                })
+              }
+            />
+          ) : view === 'robot' ? (
+            <Suspense
+              fallback={
+                <main className="content">
+                  <p className="empty">Loading the 3D viewer…</p>
+                </main>
+              }
+            >
+              <RobotView
+                robot={robot}
+                tasks={tasks}
+                parts={parts}
+                actor={actor}
+                isManager={actor.admin}
+                api={api}
+                theme={theme}
+                onOpenTask={setOpenId}
+                onMakeTask={(data) => setNewTask({ status: 'todo', ...data })}
+              />
+            </Suspense>
+          ) : view === 'runs' ? (
+            <RunsView runs={runs} roster={roster} api={api} />
+          ) : view === 'team' ? (
+            <TeamView roster={roster} roles={roles} tasks={tasks} api={api} isManager={actor.admin} rename={rename} />
+          ) : (
+            <main className="content">
+              {view === 'table' ? (
+                <TableView tasks={filtered} api={api} onOpen={setOpenId} total={tasks.length} />
+              ) : (
+                <BoardView
+                  tasks={filtered}
+                  milestones={milestones}
+                  api={api}
+                  onOpen={setOpenId}
+                  onAdd={(status) => setNewTask({ status })}
+                />
+              )}
+            </main>
+          )}
+
+          {openTask && (
+            <TaskPanel task={openTask} api={api} roster={roster} milestones={milestones} parts={parts} onClose={() => setOpenId(null)} />
+          )}
+          {newTask && (
+            <NewTaskDialog
+              initial={newTask}
+              roster={roster}
+              milestones={milestones}
+              me={actor.name}
+              onClose={() => setNewTask(null)}
+              onCreate={async (data) => {
+                setNewTask(null);
+                await api.create(data);
+              }}
+            />
+          )}
+          {showTrash && (
+            <TrashDialog trash={trash} days={TRASH_DAYS} isManager={actor.admin} api={api} onClose={() => setShowTrash(false)} />
+          )}
+          {!welcomed && (
+            <WelcomeCard
+              name={actor.name}
+              showRobot={showRobot}
+              pushStatus={pushStatus}
+              onEnablePush={enablePush}
+              onClose={() => setWelcomed(true)}
+            />
+          )}
+          {showHelp && (
+            <HelpDialog
+              isManager={actor.admin}
+              showRobot={showRobot}
+              onClose={() => setShowHelp(false)}
+              onVersionLog={() => {
+                setShowHelp(false);
+                setShowLog(true);
+              }}
+              onTypingTest={() => {
+                setShowHelp(false);
+                setTypingTest(true);
+              }}
+            />
+          )}
+          {whatsNew?.length > 0 && !showLog && (
+            <WhatsNew
+              versions={whatsNew}
+              onClose={() => setSeenVersion(VERSION)}
+              onFullLog={() => {
+                setSeenVersion(VERSION);
+                setShowLog(true);
+              }}
+            />
+          )}
+          {typingTest && <TypingTest onClose={() => setTypingTest(false)} />}
+          {showLog && <VersionLogDialog current={VERSION} onClose={() => setShowLog(false)} />}
+          {cat && <CatParty onClose={() => setCat(false)} />}
+          {toast && (
+            <div className="toast" role="alert" onClick={() => setToast(null)}>
+              <span>{toast.text}</span>
+              {toast.action && (
+                <button
+                  className="toast-action"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toast.action.run();
+                    setToast(null);
+                  }}
+                >
+                  {toast.action.label}
                 </button>
               )}
             </div>
-            <span className="spacer" />
-            <button className="btn primary" onClick={() => setNewTask({ status: 'todo' })}>
-              <PlusIcon /> New task
-            </button>
-          </div>
-        )}
-
-        {view === 'table' && (
-          <div className="status-strip">
-            {STATUSES.map((s) => {
-              const on = filters.statuses.includes(s.id);
-              return (
-                <button
-                  key={s.id}
-                  className={`status-count${on ? ' on' : ''}`}
-                  style={{ '--c': s.color }}
-                  onClick={() => setF({ statuses: on ? filters.statuses.filter((x) => x !== s.id) : [...filters.statuses, s.id] })}
-                >
-                  <span className="dot" />
-                  {s.short || s.label}
-                  <strong>{counts[s.id]}</strong>
-                </button>
-              );
-            })}
-          </div>
-        )}
-
-        {tasks === null ? (
-          <main className="content">
-            {tasksError ? (
-              <div className="empty-card">
-                <h2>Couldn't load tasks</h2>
-                <p className="muted">{tasksError}</p>
-                <button className="btn primary" onClick={() => location.reload()}>
-                  Reload
-                </button>
-              </div>
-            ) : (
-              <p className="empty">Loading…</p>
-            )}
-          </main>
-        ) : view === 'milestones' ? (
-          <MilestonesView
-            milestones={milestones}
-            competitionDate={competitionDate}
-            isManager={actor.admin}
-            tasks={tasks}
-            roster={roster}
-            api={api}
-            onOpenTask={setOpenId}
-            onAddTask={(m) => setNewTask({ status: 'todo', milestoneId: m.id, subteam: m.subteam || '' })}
-          />
-        ) : view === 'parts' ? (
-          <PartsView parts={parts} tasks={tasks} api={api} onOpenTask={setOpenId} />
-        ) : view === 'checklists' ? (
-          <ChecklistsView checklists={checklists} api={api} isManager={actor.admin} />
-        ) : view === 'chat' ? (
-          <ChatView
-            convs={convs}
-            current={currentConv}
-            setCurrent={setChatChannel}
-            messages={chat}
-            unread={unread}
-            readAt={chatRead || {}}
-            actor={actor}
-            isManager={actor.admin}
-            roster={roster}
-            tasks={tasks}
-            api={api}
-            teamEmoji={teamEmoji}
-            stickers={stickers}
-            typing={typingIn(currentConv.key)}
-            levelOf={levelOf}
-            setLevel={(c, v) => api.saveProfile(actor.name, { notify: { [c.key]: v } })}
-            onPerson={openPerson}
-            onOpenTask={setOpenId}
-            onMakeTask={(m, c) =>
-              setNewTask({
-                status: 'todo',
-                subteam: c.subteam || '',
-                title: (m.text || m.poll?.question || 'Follow up on chat photo').replace(/\s+/g, ' ').slice(0, 90),
-                description: `From ${c.label}, ${m.by}: ${m.text || m.poll?.question || '(photo)'}`,
-              })
-            }
-          />
-        ) : view === 'robot' ? (
-          <Suspense
-            fallback={
-              <main className="content">
-                <p className="empty">Loading the 3D viewer…</p>
-              </main>
-            }
-          >
-            <RobotView
-              robot={robot}
-              tasks={tasks}
-              parts={parts}
+          )}
+          {profileFor && (
+            <ProfileCard
+              name={profileFor}
               actor={actor}
-              isManager={actor.admin}
-              api={api}
-              theme={theme}
-              onOpenTask={setOpenId}
-              onMakeTask={(data) => setNewTask({ status: 'todo', ...data })}
+              tasks={tasks || []}
+              onClose={() => setProfileFor(null)}
+              onEdit={() => {
+                setEditProfileFor(profileFor);
+                setProfileFor(null);
+              }}
+              onMessage={async () => {
+                const key = await api.openDm([actor.name, profileFor]);
+                setProfileFor(null);
+                if (key) {
+                  setChatChannel(key);
+                  setView('chat');
+                }
+              }}
             />
-          </Suspense>
-        ) : view === 'runs' ? (
-          <RunsView runs={runs} roster={roster} api={api} />
-        ) : view === 'team' ? (
-          <TeamView roster={roster} roles={roles} tasks={tasks} api={api} isManager={actor.admin} rename={rename} />
-        ) : (
-          <main className="content">
-            {view === 'table' ? (
-              <TableView tasks={filtered} api={api} onOpen={setOpenId} total={tasks.length} />
-            ) : (
-              <BoardView tasks={filtered} milestones={milestones} api={api} onOpen={setOpenId} onAdd={(status) => setNewTask({ status })} />
-            )}
-          </main>
-        )}
-
-        {openTask && (
-          <TaskPanel task={openTask} api={api} roster={roster} milestones={milestones} parts={parts} onClose={() => setOpenId(null)} />
-        )}
-        {newTask && (
-          <NewTaskDialog
-            initial={newTask}
-            roster={roster}
-            milestones={milestones}
-            me={actor.name}
-            onClose={() => setNewTask(null)}
-            onCreate={async (data) => {
-              setNewTask(null);
-              await api.create(data);
-            }}
-          />
-        )}
-        {showTrash && <TrashDialog trash={trash} days={TRASH_DAYS} isManager={actor.admin} api={api} onClose={() => setShowTrash(false)} />}
-        {!welcomed && (
-          <WelcomeCard
-            name={actor.name}
-            showRobot={showRobot}
-            pushStatus={pushStatus}
-            onEnablePush={enablePush}
-            onClose={() => setWelcomed(true)}
-          />
-        )}
-        {showHelp && (
-          <HelpDialog
-            isManager={actor.admin}
-            showRobot={showRobot}
-            onClose={() => setShowHelp(false)}
-            onVersionLog={() => {
-              setShowHelp(false);
-              setShowLog(true);
-            }}
-            onTypingTest={() => {
-              setShowHelp(false);
-              setTypingTest(true);
-            }}
-          />
-        )}
-        {whatsNew?.length > 0 && !showLog && (
-          <WhatsNew
-            versions={whatsNew}
-            onClose={() => setSeenVersion(VERSION)}
-            onFullLog={() => {
-              setSeenVersion(VERSION);
-              setShowLog(true);
-            }}
-          />
-        )}
-        {typingTest && <TypingTest onClose={() => setTypingTest(false)} />}
-        {showLog && <VersionLogDialog current={VERSION} onClose={() => setShowLog(false)} />}
-        {cat && <CatParty onClose={() => setCat(false)} />}
-        {toast && (
-          <div className="toast" role="alert" onClick={() => setToast(null)}>
-            <span>{toast.text}</span>
-            {toast.action && (
-              <button
-                className="toast-action"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  toast.action.run();
-                  setToast(null);
-                }}
-              >
-                {toast.action.label}
-              </button>
-            )}
-          </div>
-        )}
-        {profileFor && (
-          <ProfileCard
-            name={profileFor}
-            actor={actor}
-            tasks={tasks || []}
-            onClose={() => setProfileFor(null)}
-            onEdit={() => {
-              setEditProfileFor(profileFor);
-              setProfileFor(null);
-            }}
-            onMessage={async () => {
-              const key = await api.openDm([actor.name, profileFor]);
-              setProfileFor(null);
-              if (key) {
-                setChatChannel(key);
-                setView('chat');
-              }
-            }}
-          />
-        )}
-        {editProfileFor && (
-          <ProfileEditor name={editProfileFor} actor={actor} api={api} tasks={tasks || []} onClose={() => setEditProfileFor(null)} />
-        )}
+          )}
+          {editProfileFor && (
+            <ProfileEditor name={editProfileFor} actor={actor} api={api} tasks={tasks || []} onClose={() => setEditProfileFor(null)} />
+          )}
+        </div>
       </div>
     </PeopleContext.Provider>
   );

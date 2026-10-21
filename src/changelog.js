@@ -4,6 +4,14 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '2.9',
+    date: '2026-10-21',
+    title: 'Crisp header for good',
+    items: [
+      'Fixed: the top of the iPad app (logo, title, countdown) still looked blurry. The header is now a plain bar and only the area below it scrolls, so nothing passes under it or the status bar.',
+    ],
+  },
+  {
     version: '2.8',
     date: '2026-10-21',
     title: 'Emoji from Globe + E work the first time',

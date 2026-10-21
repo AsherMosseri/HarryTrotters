@@ -77,12 +77,13 @@
 }
 
 * { box-sizing: border-box; }
-/* The page itself never scrolls; #root does. Safari on iPad (as a Home Screen
-   app) misplaces fixed and sticky elements when the whole document scrolls,
-   which pushed dialogs off the top of the screen. */
+/* The page never scrolls. The header is a plain bar and only .app-scroll
+   (everything under it) scrolls. Safari on iPad (as a Home Screen app)
+   misplaces fixed/sticky elements when the document scrolls, and blurs a
+   header that content scrolls underneath. */
 html, body, #root { height: 100%; }
 html, body { overflow: hidden; }
-#root { overflow-y: auto; overscroll-behavior-y: contain; -webkit-overflow-scrolling: touch; }
+#root { overflow-y: auto; }
 body {
   margin: 0;
   background: var(--bg);
@@ -157,11 +158,14 @@ a { color: var(--accent); }
 
 /* ---------- layout ---------- */
 .app { display: flex; flex-direction: column; min-height: 100%; }
+#root > .app:has(> .app-scroll) { height: 100%; min-height: 0; }
+.app-scroll { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow-y: auto; overscroll-behavior-y: contain; -webkit-overflow-scrolling: touch; }
+.app.chat-mode .app-scroll { overflow: hidden; }
 .demo-banner { background: #fef3c7; color: #78350f; text-align: center; padding: 6px 16px; font-size: 13px; }
 .demo-banner a { color: inherit; font-weight: 700; }
 
 .topbar {
-  position: sticky; top: 0; z-index: 20;
+  position: relative; z-index: 20; flex: none;
   display: flex; align-items: center; gap: 16px;
   padding: 10px 16px; padding-top: max(10px, env(safe-area-inset-top));
   /* Solid, not a frosted-glass blur: Safari on iPad renders parts of a
@@ -1266,7 +1270,7 @@ h3.md-h { font-size: 16.5px; }
   .mode-switch { flex: 1 1 100%; }
   .mode-switch button { flex: 1; padding: 6px 2px; white-space: nowrap; font-size: 13px; }
   .explode input { width: 110px; }
-  .app.chat-mode:has(.content.robot) { height: auto; }
+  .app.chat-mode:has(.content.robot) .app-scroll { overflow-y: auto; }
   .content.chat { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); gap: 8px; }
   .channel-list { display: none; }
   .channel-select { display: block; flex: 1; min-width: 0; }
