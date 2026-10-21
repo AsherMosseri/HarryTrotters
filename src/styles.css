@@ -77,7 +77,12 @@
 }
 
 * { box-sizing: border-box; }
+/* The page itself never scrolls; #root does. Safari on iPad (as a Home Screen
+   app) misplaces fixed and sticky elements when the whole document scrolls,
+   which pushed dialogs off the top of the screen. */
 html, body, #root { height: 100%; }
+html, body { overflow: hidden; }
+#root { overflow-y: auto; overscroll-behavior-y: contain; -webkit-overflow-scrolling: touch; }
 body {
   margin: 0;
   background: var(--bg);
@@ -322,7 +327,7 @@ tr:hover .open-btn, .open-btn:focus { opacity: 1; }
 
 /* ---------- panel & dialog ---------- */
 .panel-backdrop {
-  position: fixed; inset: 0; z-index: 40; background: rgb(10 12 20 / 40%);
+  position: fixed; inset: 0; z-index: 40; background: rgb(10 12 20 / 40%); overscroll-behavior: contain;
   display: flex; justify-content: flex-end; animation: fade 0.15s ease;
 }
 .panel-backdrop.center { justify-content: center; align-items: flex-start; padding: 6vh 16px 16px; overflow-y: auto; }
