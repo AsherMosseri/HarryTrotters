@@ -4,6 +4,9 @@ import App from './App.jsx';
 import { reloadOnceForNewVersion } from './data/store.js';
 import UpdateGate from './components/UpdateGate.jsx';
 import './styles.css';
+import { installEmojiKeyFix } from './emojiKeyFix.js';
+
+installEmojiKeyFix();
 
 window.addEventListener('vite:preloadError', (e) => {
   if (reloadOnceForNewVersion()) e.preventDefault();

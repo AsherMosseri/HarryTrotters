@@ -4,6 +4,14 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '2.8',
+    date: '2026-10-21',
+    title: 'Emoji from Globe + E work the first time',
+    items: [
+      'Fixed: on the iPad app, the first emoji picked with Globe + E didn’t appear in text boxes (chat, names, task titles, everywhere). The iPad sent it only as a key press; the site now types it in when that happens.',
+    ],
+  },
+  {
     version: '2.7',
     date: '2026-10-21',
     title: 'Typing test',
