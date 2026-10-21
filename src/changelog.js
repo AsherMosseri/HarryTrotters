@@ -4,6 +4,14 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '2.7',
+    date: '2026-10-21',
+    title: 'Typing test',
+    items: [
+      'Help → Troubleshooting → Typing test: shows exactly what the iPad sends when you type, to track down why the first emoji from Globe + E doesn’t appear.',
+    ],
+  },
+  {
     version: '2.6',
     date: '2026-10-21',
     title: 'One tap is enough on iPad',

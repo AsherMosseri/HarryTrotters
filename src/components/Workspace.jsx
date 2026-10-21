@@ -23,6 +23,7 @@ import ChatView from './ChatView.jsx';
 const RobotView = lazy(() => import('./RobotView.jsx'));
 import { HelpDialog, WelcomeCard } from './Help.jsx';
 import { VersionLogDialog, WhatsNew } from './VersionLog.jsx';
+import TypingTest from './TypingTest.jsx';
 import { VERSION, versionsSince } from '../changelog.js';
 import Inbox from './Inbox.jsx';
 
@@ -163,6 +164,7 @@ export default function Workspace({ store, actor, rename, renames }) {
   // "What's new" shows once per device after an update (not on a brand-new device).
   const [seenVersion, setSeenVersion] = useLocalStorage('seen-version', null);
   const [showLog, setShowLog] = useState(false);
+  const [typingTest, setTypingTest] = useState(false);
   useEffect(() => {
     if (!welcomed && seenVersion !== VERSION) setSeenVersion(VERSION);
   }, [welcomed, seenVersion, setSeenVersion]);
@@ -1068,6 +1070,10 @@ export default function Workspace({ store, actor, rename, renames }) {
               setShowHelp(false);
               setShowLog(true);
             }}
+            onTypingTest={() => {
+              setShowHelp(false);
+              setTypingTest(true);
+            }}
           />
         )}
         {whatsNew?.length > 0 && !showLog && (
@@ -1080,6 +1086,7 @@ export default function Workspace({ store, actor, rename, renames }) {
             }}
           />
         )}
+        {typingTest && <TypingTest onClose={() => setTypingTest(false)} />}
         {showLog && <VersionLogDialog current={VERSION} onClose={() => setShowLog(false)} />}
         {cat && <CatParty onClose={() => setCat(false)} />}
         {toast && (

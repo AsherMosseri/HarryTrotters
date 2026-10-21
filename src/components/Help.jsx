@@ -188,7 +188,7 @@ export function WelcomeCard({ name, showRobot, pushStatus, onEnablePush, onClose
   );
 }
 
-export function HelpDialog({ isManager, showRobot, onClose, onVersionLog }) {
+export function HelpDialog({ isManager, showRobot, onClose, onVersionLog, onTypingTest }) {
   return (
     <div className="panel-backdrop center" onClick={onClose}>
       <div className="dialog help" onClick={(e) => e.stopPropagation()} role="dialog" aria-labelledby="help-title">
@@ -218,6 +218,13 @@ export function HelpDialog({ isManager, showRobot, onClose, onVersionLog }) {
               </ul>
             </details>
           ))}
+          <details>
+            <summary>Troubleshooting</summary>
+            <p className="small">Something not typing right on your iPad? Open the typing test and send a screenshot.</p>
+            <button className="btn" onClick={onTypingTest}>
+              Typing test
+            </button>
+          </details>
           {isManager && (
             <details open>
               <summary>Team management only</summary>
