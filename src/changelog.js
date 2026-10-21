@@ -7,7 +7,10 @@ export const CHANGELOG = [
     version: '2.23',
     date: '2026-10-21',
     title: 'Header blur, another try',
-    items: ['Another fix for the blurry strip at the top of the iPad app, under the status bar.'],
+    items: [
+      'Another fix for the blurry strip at the top of the iPad app, under the status bar.',
+      'Notification icons (💡, ⏰, @) sit in the middle of their circles.',
+    ],
   },
   {
     version: '2.22',
