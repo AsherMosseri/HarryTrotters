@@ -188,7 +188,7 @@ export default function DecorationEditor({ name, value, onChange, upload }) {
               <Colors label="Ring color" value={d.ring.colors[0]} onChange={(c) => setRing({ colors: [c, ...d.ring.colors.slice(1)] })} />
             )
           )}
-          <Slider label="Thickness" min={3} max={22} value={d.ring.width} onChange={(width) => setRing({ width })} />
+          <Slider label="Thickness" min={3} max={40} value={d.ring.width} onChange={(width) => setRing({ width })} />
           <Chips
             label="Ring motion"
             options={[

@@ -4,6 +4,14 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '2.33',
+    date: '2026-10-21',
+    title: 'Thicker avatar rings',
+    items: [
+      'Custom avatar rings can be almost twice as thick (Thickness now goes to 40). Past the old max, the ring grows inward over the edge of your picture, so it never crowds names in chat.',
+    ],
+  },
+  {
     version: '2.32',
     date: '2026-10-21',
     title: 'Phone fixes',

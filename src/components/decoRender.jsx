@@ -5,7 +5,7 @@ import { gradientStops } from '../nitro.js';
 // around the avatar, each sized, rotated, and animated.
 //
 // custom = {
-//   ring: { style, colors: [a, b, c?], width (% of avatar), spin: '' | 'cw' | 'ccw', speed (s) },
+//   ring: { style, colors: [a, b, c?], width (% of avatar, up to 40), spin: '' | 'cw' | 'ccw', speed (s) },
 //   badges: [{ kind: 'emoji' | 'image', value, path?, angle (°, 0 = top), dist (0 center … 0.75 outside),
 //              size (× avatar), rotate (°), anim, dir: 'cw' | 'ccw', speed (s) }],
 // }
@@ -79,18 +79,29 @@ function Badge({ b }) {
   );
 }
 
+// A ring grows outward up to this much (× avatar). Thicker than that, it grows
+// inward over the picture, so it never crowds the text next to an avatar.
+const RING_OUT = 0.22;
+
 export function CustomDecoration({ size, custom, children }) {
   const ring = custom?.ring || {};
   const style = ring.style || 'none';
   const w = (ring.width ?? 9) / 100;
+  const out = Math.min(w, RING_OUT);
+  const inward = Math.max(0, w - RING_OUT);
+  const hole = `radial-gradient(circle closest-side, transparent calc(var(--s) * ${0.5 - inward}), #000 calc(var(--s) * ${0.5 - inward} + 0.5px))`;
   const color = ring.colors?.[0] || '#8b5cf6';
   return (
-    <span className="deco deco-custom" style={{ width: size, height: size, '--s': `${size}px` }}>
+    <span
+      className={`deco deco-custom${inward ? ' ring-in' : ''}`}
+      style={{ width: size, height: size, '--s': `${size}px`, '--fit': 1 - 2 * inward }}
+    >
       {style !== 'none' && (
         <span
-          className={`deco-ring ring-${style}${ring.spin ? ` spin${ring.spin === 'ccw' ? ' ccw' : ''}` : ''}`}
+          className={`deco-ring ring-${style}${ring.spin ? ` spin${ring.spin === 'ccw' ? ' ccw' : ''}` : ''}${inward ? ' thick' : ''}`}
           style={{
-            inset: `calc(var(--s) * ${-w})`,
+            inset: `calc(var(--s) * ${-out})`,
+            ...(inward && { maskImage: hole, WebkitMaskImage: hole }),
             background: ringBackground(ring),
             '--spd': `${ring.speed || 4}s`,
             '--glow': color,

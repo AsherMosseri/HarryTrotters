@@ -1678,6 +1678,9 @@ h3.md-h { font-size: 16.5px; }
 
 /* ---------- custom avatar decoration (decoRender.jsx) ---------- */
 .deco-ring { position: absolute; border-radius: 50%; z-index: 0; }
+.deco-ring.thick { z-index: 2; }
+/* Initials shrink to fit inside a ring that grows inward. */
+.deco-custom.ring-in > span.avatar { font-size: calc(var(--s) * 0.4 * var(--fit)) !important; }
 .deco-ring.spin { animation: deco-spin var(--spd, 4s) linear infinite; }
 .deco-ring.spin.ccw { animation-direction: reverse; }
 .deco-ring.ring-glow { box-shadow: 0 0 calc(var(--s) * 0.16) var(--glow); animation: deco-glow 1.8s ease-in-out infinite; }
