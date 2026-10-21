@@ -4,6 +4,15 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '2.34',
+    date: '2026-10-21',
+    title: 'Pop-ups fit phones',
+    items: [
+      'On phones, pop-ups (feature requests, Edit profile, Help, new task, and the rest) fill the screen and scroll inside, so the title and ✕ stay pinned at the top.',
+      'Profile cards fit their content in the middle of the screen, with no empty space below.',
+    ],
+  },
+  {
     version: '2.33',
     date: '2026-10-21',
     title: 'Thicker avatar rings',

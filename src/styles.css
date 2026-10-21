@@ -1828,3 +1828,15 @@ h3.md-h { font-size: 16.5px; }
   .shift-plans li .grow { flex: 1 1 calc(100% - 110px); min-width: 0; }
   .plan-actions { flex: 1 1 100%; justify-content: flex-end; }
 }
+@media (max-width: 760px) {
+  /* Pop-ups fill the screen and scroll inside, so the title and ✕ stay pinned at the top. */
+  .panel-backdrop.center { overflow: hidden; align-items: stretch; }
+  .panel-backdrop.center > .dialog {
+    width: 100%; height: 100%; max-height: none; min-height: 0; border-radius: 0;
+    overflow-y: auto; overscroll-behavior: contain; padding-bottom: max(20px, calc(env(safe-area-inset-bottom) + 12px));
+  }
+  .panel-backdrop.center > .dialog > .panel-head:first-child { position: sticky; top: 0; z-index: 5; background: var(--surface); flex: none; }
+  /* The profile card is a card that fits its content, in the middle of the screen. */
+  .panel-backdrop.center:has(> .dialog.profile-card) { align-items: center; padding: 16px; }
+  .panel-backdrop.center > .dialog.profile-card { width: min(400px, 100%); height: auto; max-height: 100%; border-radius: 16px; padding-bottom: 0; }
+}
