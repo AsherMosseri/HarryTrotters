@@ -4,6 +4,12 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '2.10',
+    date: '2026-10-21',
+    title: 'Typing test removed',
+    items: ['The Troubleshooting → Typing test screen in Help is gone now that the Globe + E emoji fix is in (the fix stays).'],
+  },
+  {
     version: '2.9',
     date: '2026-10-21',
     title: 'Crisp header for good',
