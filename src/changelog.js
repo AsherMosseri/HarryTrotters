@@ -4,6 +4,15 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '2.17',
+    date: '2026-10-21',
+    title: 'See which tab you’re on',
+    items: [
+      'Edit profile: the Profile, Style, and Status tabs now highlight the one you’re on.',
+      'Same for the Light/Dark/Auto theme buttons and the Fall/Rise/Float choice for custom profile effects.',
+    ],
+  },
+  {
     version: '2.16',
     date: '2026-10-21',
     title: 'Status buttons in tasks',
