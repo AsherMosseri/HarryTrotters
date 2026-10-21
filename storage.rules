@@ -57,6 +57,14 @@ service firebase.storage {
       );
     }
 
+    // Pictures for custom profile effects (small; GIFs stay animated).
+    match /effects/{file} {
+      allow get: if isMember();
+      allow delete: if isManager() || (isMember() && file.matches(myPersonId() + '-.*'));
+      allow create: if isMember()
+        && request.resource.contentType.matches('image/(png|gif|jpeg|webp)') && request.resource.size < 2 * 1024 * 1024;
+    }
+
     // Files sent in chat (any kind, up to 25 MB): videos, PDFs, CAD files…
     match /files/{conv}/{file} {
       allow get, delete: if isMember();

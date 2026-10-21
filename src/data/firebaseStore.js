@@ -688,6 +688,15 @@ export const firebaseStore = {
     await this.saveProfile(name, { banner });
     if (oldPath) await deleteObject(fileRef(storage, oldPath)).catch(() => {});
   },
+  // A custom profile effect's picture (PNG/GIF/WebP/JPEG, shrunk first).
+  async uploadEffectImage(name, file, oldPath) {
+    const ext = { 'image/gif': 'gif', 'image/png': 'png', 'image/webp': 'webp' }[file.type] || 'jpg';
+    const path = `effects/${personId(name)}-${itemId()}.${ext}`;
+    const r = fileRef(storage, path);
+    await uploadBytes(r, file, { contentType: file.type || 'image/png' });
+    if (oldPath) await deleteObject(fileRef(storage, oldPath)).catch(() => {});
+    return { url: await getDownloadURL(r), path };
+  },
   async removeBanner(name, oldPath) {
     await this.saveProfile(name, { banner: null });
     if (oldPath) await deleteObject(fileRef(storage, oldPath)).catch(() => {});

@@ -686,6 +686,7 @@ export default function Workspace({ store, actor, rename, renames }) {
         }),
       uploadBanner: (name, blob, oldPath) => store.uploadBanner(name, blob, oldPath),
       removeBanner: (name, oldPath) => store.removeBanner(name, oldPath).catch(fail),
+      uploadEffectImage: (name, file, oldPath) => store.uploadEffectImage(name, file, oldPath),
       editMessage: (channel, id, patch) => store.editMessage(channel, id, patch).catch(fail),
       uploadChatGif: (channel, file) => store.uploadChatGif(channel, file).catch((e) => (fail(e), null)),
       deleteMessage: (channel, m) => store.deleteMessage(channel, m).catch(fail),

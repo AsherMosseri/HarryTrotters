@@ -4,6 +4,15 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '2.14',
+    date: '2026-10-21',
+    title: 'Custom profile effects',
+    items: [
+      'Profile effect “Custom…”: make anything rain on your profile card: any emoji, a GIF from GIPHY, or your own picture or GIF.',
+      'Pick how it moves: Fall, Rise, or Float.',
+    ],
+  },
+  {
     version: '2.13',
     date: '2026-10-21',
     title: 'Reading clears notifications',

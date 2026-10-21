@@ -24,6 +24,14 @@ export const EFFECTS = [
   { id: 'fire', label: 'Fire', icon: '🔥' },
   { id: 'gears', label: 'Gears', icon: '⚙️' },
   { id: 'bubbles', label: 'Bubbles', icon: '🫧' },
+  { id: 'custom', label: 'Custom…', icon: '🎨' },
+];
+
+// How a custom effect moves.
+export const MOTIONS = [
+  { id: 'fall', label: '⬇ Fall' },
+  { id: 'rise', label: '⬆ Rise' },
+  { id: 'twinkle', label: '✨ Float' },
 ];
 export const effectById = Object.fromEntries(EFFECTS.map((e) => [e.id, e]));
 

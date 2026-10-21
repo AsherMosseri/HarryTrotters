@@ -1466,3 +1466,16 @@ h3.md-h { font-size: 16.5px; }
   position: fixed; top: 0; left: 0; right: 0; height: 12px; z-index: 2147483647; pointer-events: none;
   background-color: var(--surface); -webkit-background-clip: text; background-clip: text;
 }
+
+/* custom profile effect */
+.profile-effect img { width: 22px; height: 22px; object-fit: contain; display: block; }
+.fx-custom span { font-size: 17px; }
+.fx-move-rise span { top: auto; bottom: -12%; animation-name: fx-rise; }
+.fx-move-twinkle span { top: calc(var(--i) * 7%); animation-name: fx-twinkle; }
+.custom-effect { display: flex; flex-direction: column; gap: 8px; padding: 10px; border: 1px dashed var(--border); border-radius: 12px; position: relative; }
+.custom-effect-pick { flex-wrap: wrap; align-items: center; }
+.custom-effect-now { width: 40px; height: 40px; border-radius: 10px; background: var(--surface-2); display: grid; place-items: center; font-size: 24px; color: var(--muted); }
+.custom-effect-now img { width: 30px; height: 30px; object-fit: contain; }
+.custom-effect .effect-picker { position: static; width: 100%; box-shadow: none; }
+.effect-gif .gif-picker { position: static; box-shadow: none; }
+.custom-effect .segmented { align-self: flex-start; }

@@ -750,6 +750,9 @@ export const demoStore = {
   async uploadBanner(name, blob) {
     await this.saveProfile(name, { banner: { url: await dataUrl(blob), path: '' } });
   },
+  async uploadEffectImage(name, file) {
+    return { url: await dataUrl(file), path: '' };
+  },
   async removeBanner(name) {
     await this.saveProfile(name, { banner: null });
   },

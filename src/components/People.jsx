@@ -2,7 +2,8 @@
 // (pictures, about me, Nitro-style looks, status).
 import { useEffect, useRef, useState } from 'react';
 import { SUBTEAM_COLORS } from '../config.js';
-import { DECORATIONS, EFFECTS, NAME_FONTS, SWATCHES, effectById, nameStyle } from '../nitro.js';
+import { DECORATIONS, EFFECTS, MOTIONS, NAME_FONTS, SWATCHES, effectById, nameStyle } from '../nitro.js';
+import { EmojiPicker, GifPicker } from './chat/Pickers.jsx';
 import { activeStatus } from '../people.js';
 import { Avatar, CloseIcon, usePeople } from './common.jsx';
 
@@ -49,18 +50,116 @@ function useEscape(onClose) {
 }
 
 // Drifting particles over the profile card.
-function ProfileEffect({ id }) {
+// Drifting particles over the profile card: a preset, or your own emoji,
+// GIF, or picture (custom: { kind: 'emoji' | 'image', value, motion }).
+function ProfileEffect({ id, custom }) {
   const e = effectById[id];
-  if (!e?.icon) return null;
+  const isCustom = id === 'custom' && custom?.value;
+  if (!isCustom && (!e?.icon || id === 'custom')) return null;
+  const cls = isCustom ? `fx-custom fx-move-${custom.motion || 'fall'}` : `fx-${id}`;
   return (
-    <div className={`profile-effect fx-${id}`} aria-hidden="true">
+    <div className={`profile-effect ${cls}`} aria-hidden="true">
       {Array.from({ length: 14 }, (_, i) => (
         <span key={i} style={{ '--i': i, '--x': `${(i * 37) % 100}%`, '--d': `${3 + ((i * 7) % 5)}s` }}>
-          {id === 'confetti' ? '' : e.icon}
+          {isCustom ? custom.kind === 'image' ? <img src={custom.value} alt="" /> : custom.value : id === 'confetti' ? '' : e.icon}
         </span>
       ))}
     </div>
   );
+}
+
+// Picks a custom effect: an emoji, a GIPHY GIF, or your own picture.
+function CustomEffect({ value, onChange, upload }) {
+  const [panel, setPanel] = useState(null); // 'emoji' | 'gif'
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const input = useRef(null);
+  const v = value || { kind: 'emoji', value: '', motion: 'fall' };
+  const pickFile = async (f) => {
+    setErr('');
+    if (!f.type.startsWith('image/')) return setErr('Pick a picture or GIF.');
+    if (f.type === 'image/gif' && f.size > 2e6) return setErr('That GIF is too big (2 MB max).');
+    setBusy(true);
+    try {
+      const small = f.type === 'image/gif' ? f : await shrinkParticle(f);
+      const stored = await upload(small, v.path);
+      onChange({ ...v, kind: 'image', value: stored.url, path: stored.path });
+    } catch (e) {
+      setErr(e?.message || String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="custom-effect">
+      <div className="row gap custom-effect-pick">
+        <span className="custom-effect-now" title="Your effect">
+          {v.value ? v.kind === 'image' ? <img src={v.value} alt="" /> : v.value : '?'}
+        </span>
+        <button className="btn" onClick={() => setPanel(panel === 'emoji' ? null : 'emoji')}>
+          😊 Emoji
+        </button>
+        <button className="btn" onClick={() => setPanel(panel === 'gif' ? null : 'gif')}>
+          GIF
+        </button>
+        <button className="btn" onClick={() => input.current?.click()} disabled={busy}>
+          {busy ? 'Uploading…' : '🖼 Picture'}
+        </button>
+        <input
+          ref={input}
+          type="file"
+          accept="image/*"
+          hidden
+          onChange={(e) => (e.target.files[0] && pickFile(e.target.files[0]), (e.target.value = ''))}
+        />
+      </div>
+      {panel === 'emoji' && (
+        <EmojiPicker
+          className="effect-picker"
+          onPick={(em) => {
+            onChange({ ...v, kind: 'emoji', value: em });
+            setPanel(null);
+          }}
+          onClose={() => setPanel(null)}
+        />
+      )}
+      {panel === 'gif' && (
+        <div className="effect-gif">
+          <GifPicker
+            onPick={(gif) => {
+              onChange({ ...v, kind: 'image', value: gif.url });
+              setPanel(null);
+            }}
+            onUpload={(f) => {
+              setPanel(null);
+              pickFile(f);
+            }}
+            onClose={() => setPanel(null)}
+          />
+        </div>
+      )}
+      <div className="segmented">
+        {MOTIONS.map((m) => (
+          <button key={m.id} className={(v.motion || 'fall') === m.id ? 'active' : ''} onClick={() => onChange({ ...v, motion: m.id })}>
+            {m.label}
+          </button>
+        ))}
+      </div>
+      {err && <p className="form-error">{err}</p>}
+    </div>
+  );
+}
+
+// Still pictures become 96px PNGs (transparency kept) so 14 of them stay light.
+async function shrinkParticle(file) {
+  const bmp = await createImageBitmap(file);
+  const k = Math.min(1, 96 / Math.max(bmp.width, bmp.height));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(bmp.width * k);
+  canvas.height = Math.round(bmp.height * k);
+  canvas.getContext('2d').drawImage(bmp, 0, 0, canvas.width, canvas.height);
+  const blob = await new Promise((r) => canvas.toBlob(r, 'image/png'));
+  return new File([blob], 'effect.png', { type: 'image/png' });
 }
 
 // The card itself, also used as the live preview in the editor (with `look`
@@ -79,7 +178,7 @@ function CardBody({ name, look, actor, tasks, children }) {
       className={`profile-body${themed ? ' themed' : ''}`}
       style={themed ? { '--pa': profile.theme.a, '--pb': profile.theme.b } : undefined}
     >
-      <ProfileEffect id={profile.effect} />
+      <ProfileEffect id={profile.effect} custom={profile.effectCustom} />
       <div
         className="profile-banner"
         style={banner ? { backgroundImage: `url("${banner}")` } : { background: profile.bannerColor || info.color || 'var(--accent)' }}
@@ -308,6 +407,7 @@ export function ProfileEditor({ name, actor, api, tasks = [], onClose }) {
     pronouns: profile.pronouns || '',
     decoration: profile.decoration || '',
     effect: profile.effect || '',
+    effectCustom: profile.effectCustom || null,
     nameStyle: profile.nameStyle || { font: '', colors: [] },
     theme: profile.theme || null,
     bannerColor: profile.bannerColor || '',
@@ -504,6 +604,13 @@ export function ProfileEditor({ name, actor, api, tasks = [], onClose }) {
                       </button>
                     ))}
                   </div>
+                  {look.effect === 'custom' && (
+                    <CustomEffect
+                      value={look.effectCustom}
+                      onChange={(c) => set({ effectCustom: c })}
+                      upload={(file, oldPath) => api.uploadEffectImage(name, file, oldPath)}
+                    />
+                  )}
                   <h3 className="field-label">Profile colors</h3>
                   <div className="row gap">
                     <label className="row gap-sm small">
