@@ -172,6 +172,8 @@ export default function ChatView({
     setNotifyOpen(false);
     lastCount.current = all.length;
     if (all.length) showStart();
+    // Opened from search or a pin in another conversation: go to that message.
+    if (pendingJump.current) jumpTo(pendingJump.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conv.key]);
 
