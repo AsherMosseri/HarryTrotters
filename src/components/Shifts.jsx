@@ -503,7 +503,7 @@ export default function ShiftsView({ shifts, plans, actor, roster, tasks, goal, 
       <div className="ms-header">
         <div>
           <h1>Shifts</h1>
-          <p className="muted">Who’s at the shop, who’s coming, and everyone’s hours.</p>
+          <p className="muted">Who’s at the lab, who’s coming, and everyone’s hours.</p>
         </div>
         <span className="spacer" />
         {mine ? (
@@ -519,7 +519,7 @@ export default function ShiftsView({ shifts, plans, actor, roster, tasks, goal, 
 
       <div className="stat-tiles">
         <div className="stat">
-          <span>At the shop now</span>
+          <span>At the lab now</span>
           <b>{running.length}</b>
         </div>
         <div className="stat">
@@ -542,7 +542,7 @@ export default function ShiftsView({ shifts, plans, actor, roster, tasks, goal, 
       <div className="shift-grid">
         <section className="chart-card">
           <div className="shift-sec-head">
-            <h2>At the shop now</h2>
+            <h2>At the lab now</h2>
             <span className="spacer" />
             {isManager && (
               <button className="btn small-btn" onClick={() => setDialog('clockin')}>

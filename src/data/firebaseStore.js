@@ -42,7 +42,7 @@ import {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const storage = getStorage(app);
-// Offline cache keeps the board usable on spotty shop Wi-Fi.
+// Offline cache keeps the board usable on spotty lab Wi-Fi.
 const db = initializeFirestore(app, {
   localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
 });

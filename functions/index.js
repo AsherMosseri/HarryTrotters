@@ -282,7 +282,7 @@ export const onTaskAssigned = onDocumentWritten('tasks/{taskId}', async (event) 
 });
 
 // Shifts, every 15 minutes:
-// - clocked in 4+ hours: "Still at the shop?" (once per shift)
+// - clocked in 4+ hours: "Still at the lab?" (once per shift)
 // - still running from before today (New York time): ended at the person's
 //   last activity in the app, marked autoEnded, and they're told
 // - a planned shift starting within the hour: reminds everyone who said "I'm in"
@@ -350,7 +350,7 @@ export const shiftChecks = onSchedule({ schedule: 'every 15 minutes', timeZone: 
       notes.push({
         to,
         type: 'shift',
-        title: 'Still at the shop?',
+        title: 'Still at the lab?',
         body: `You've been clocked in for ${span(now - shift.start)}. Tap to end your shift.`,
         open: 'shift:end',
         tag: `shift-${s.id}`,

@@ -8,7 +8,7 @@ import { activeStatus } from '../people.js';
 import { Avatar, CloseIcon, usePeople } from './common.jsx';
 
 const STATUS_IDEAS = [
-  ['🔧', 'At the shop'],
+  ['🔧', 'At the lab'],
   ['💻', 'Coding'],
   ['📐', 'Doing CAD'],
   ['📚', 'Studying'],

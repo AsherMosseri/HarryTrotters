@@ -62,7 +62,7 @@ const SECTIONS = [
     [
       'Tap ⏱ at the top to start a shift. It shows a timer while you’re on shift; tap it to say what you’re working on, fix your start time (−15 min, −30 min, −1 h, or pick a time), or End shift now.',
       'Tapped it by mistake? Tap Undo, or Cancel shift in the first 15 minutes.',
-      'Shifts tab: who’s at the shop now, the schedule (tap I’m in or Can’t), everyone’s hours, and the log of past shifts.',
+      'Shifts tab: who’s at the lab now, the schedule (tap I’m in or Can’t), everyone’s hours, and the log of past shifts.',
       'You get a reminder after 4 hours on shift and an hour before a shift you said you’d come to. A shift left running past midnight ends at the last time you used the app (marked auto-ended).',
       'Edit your own past shifts’ notes, subteam, and tasks. Team management fixes times.',
     ],
@@ -86,7 +86,7 @@ const SECTIONS = [
       'Tap (or hover over) a message to react (✨ for an animated super reaction), reply, 📌 pin it, edit or delete your own, or turn it into a task with +Task. 📌 at the top shows the channel’s pinned messages; 🔍 searches messages.',
       '🔔 at the top of a channel: All messages, Only @mentions (the default), or Nothing. Announcements and DMs default to All.',
       'Direct messages: tap ＋ next to Direct messages (or Message on someone’s profile) to message one person or a group.',
-      'Tap anyone’s name or picture for their profile. Tap your own picture (top right) → Edit profile for a picture (GIFs stay animated), a banner, pronouns, about me, your name’s font and colors, an avatar decoration, a profile effect (or a custom one that rains, rises, or floats any emoji, GIF, or picture you pick), profile colors, and a status like “🔧 At the shop”. A green dot means they have the app open; you’ll see when someone is typing.',
+      'Tap anyone’s name or picture for their profile. Tap your own picture (top right) → Edit profile for a picture (GIFs stay animated), a banner, pronouns, about me, your name’s font and colors, an avatar decoration, a profile effect (or a custom one that rains, rises, or floats any emoji, GIF, or picture you pick), profile colors, and a status like “🔧 At the lab”. A green dot means they have the app open; you’ll see when someone is typing.',
     ],
   ],
   [

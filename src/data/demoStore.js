@@ -197,7 +197,7 @@ function seed() {
     {
       id: 'sebastian-tolbert',
       name: 'Sebastian Tolbert',
-      status: { emoji: '🔧', text: 'at the shop' },
+      status: { emoji: '🔧', text: 'at the lab' },
       decoration: 'crown',
       effect: 'sparkles',
       nameStyle: { font: 'chunky', colors: ['#f97316', '#db2777'] },
@@ -313,7 +313,7 @@ function seed() {
   };
 }
 
-// Sample shifts: a few past ones this week and last, and Cooper at the shop now.
+// Sample shifts: a few past ones this week and last, and Cooper at the lab now.
 function demoShifts(now) {
   const h = 3600000;
   const day = (n, hour) => {

@@ -812,7 +812,7 @@ export default function Workspace({ store, actor, rename, renames }) {
       } else if (kind === 'view') setView(id);
       else if (kind === 'requests') setShowRequests(id || true);
       else if (kind === 'shift') {
-        // "Still at the shop?": the End panel if the shift is still running.
+        // "Still at the lab?": the End panel if the shift is still running.
         if (liveMyShift.current) setShiftPanel(true);
         else setView('shifts');
       }
