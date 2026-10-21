@@ -109,6 +109,9 @@ export async function preparePhoto(file) {
 }
 
 // True while a media query matches (e.g. phone width), updating live.
+// Touch screens (phones, iPads): don't pop the keyboard up on its own.
+export const isTouch = typeof matchMedia === 'function' && matchMedia('(hover: none) and (pointer: coarse)').matches;
+
 // Close a pop-up with the Escape key (when `on`).
 export function useEscape(onClose, on = true) {
   useEffect(() => {

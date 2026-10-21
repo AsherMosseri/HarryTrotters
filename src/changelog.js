@@ -4,6 +4,15 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '2.38',
+    date: '2026-10-21',
+    title: 'Chat pickers on phones',
+    items: [
+      'On phones, Emoji, Sticker, GIF, and reaction pickers open near the top of the screen, so the keyboard no longer hides them.',
+      'On iPads and phones, pickers don’t pop the keyboard up on their own. Tap the search box when you want to type.',
+    ],
+  },
+  {
     version: '2.37',
     date: '2026-10-21',
     title: 'Who reacted, and managers can set status',

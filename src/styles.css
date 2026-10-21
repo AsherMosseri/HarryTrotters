@@ -1860,3 +1860,10 @@ h3.md-h { font-size: 16.5px; }
 .reacted-glyph .custom-emoji { width: 18px; height: 18px; vertical-align: -3px; }
 .reacted-super { font-size: 10px; margin-left: 1px; }
 .request-voters { margin: 0; font-size: 12.5px; color: var(--muted); }
+@media (max-width: 760px) {
+  /* Chat pickers (emoji, stickers, GIFs, reactions) open near the top, so the keyboard never hides them. */
+  .composer :is(.composer-emoji, .sticker-picker, .gif-picker), .msg-actions .reaction-picker {
+    position: fixed; top: calc(env(safe-area-inset-top) + 64px); bottom: auto; left: 8px; right: 8px; width: auto; margin: 0;
+    max-height: min(480px, calc(100dvh - env(safe-area-inset-top) - 160px)); overflow-y: auto; overscroll-behavior: contain; z-index: 45;
+  }
+}

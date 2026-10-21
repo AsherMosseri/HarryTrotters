@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { GIPHY_API_KEY } from '../../config.js';
 import { CloseIcon } from '../common.jsx';
 import { GROUPS, GROUP_ICONS, emojiList, firstEmoji, loadEmoji, recentEmoji, searchEmoji, rememberEmoji } from './emoji.js';
+import { isTouch } from '../../util.js';
 
 function useEscape(onClose) {
   useEffect(() => {
@@ -45,7 +46,7 @@ export function EmojiPicker({ onPick, onClose, teamEmoji = [], canManage, onMana
       <div className="row gap-sm">
         <input
           className="input grow"
-          autoFocus
+          autoFocus={!isTouch}
           value={q}
           onChange={(e) => {
             // Typed an actual emoji (emoji keyboard, Globe + E): that's the pick.
@@ -250,7 +251,7 @@ export function GifPicker({ onPick, onUpload, onClose }) {
     <div className="gif-picker">
       <div className="row gap">
         {GIPHY_API_KEY ? (
-          <input className="input grow" autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search GIFs" />
+          <input className="input grow" autoFocus={!isTouch} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search GIFs" />
         ) : (
           <span className="muted small grow">GIF search turns on once team management adds a GIPHY key. You can still upload a GIF.</span>
         )}
@@ -330,7 +331,7 @@ export function PollDialog({ onCreate, onClose }) {
         </div>
         <input
           className="input big"
-          autoFocus
+          autoFocus={!isTouch}
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
           placeholder="Ask a question"
@@ -379,7 +380,7 @@ export function StickerPicker({ stickers, onPick, onClose, canManage, onManage }
   return (
     <div className="emoji-picker big sticker-picker" onClick={(e) => e.stopPropagation()}>
       <div className="row gap-sm">
-        <input className="input grow" autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search stickers" />
+        <input className="input grow" autoFocus={!isTouch} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search stickers" />
         <button className="icon-btn small" onClick={onClose} aria-label="Close">
           <CloseIcon />
         </button>
