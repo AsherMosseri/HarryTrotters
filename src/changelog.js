@@ -4,6 +4,12 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '2.25',
+    date: '2026-10-21',
+    title: 'Status bar color',
+    items: ['The area behind the iPad status bar matches the header (white, or dark in dark mode) instead of gray.'],
+  },
+  {
     version: '2.24',
     date: '2026-10-21',
     title: 'Header blur, third try',
