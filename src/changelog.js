@@ -4,6 +4,18 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '2.27',
+    date: '2026-10-21',
+    title: 'Custom themes',
+    items: [
+      'Theme menu → 🎨 Custom…: pick any accent color and two background colors (any color), how strong they are, and make them move.',
+      'Background: your own picture, a GIF, or a pattern of any emoji, with a slider for how much shows through.',
+      'Floating: sparkles, snow, hearts, bubbles, confetti, gears, fire, or anything (any emoji, GIF, or picture) falling, rising, or floating behind the app.',
+      '🎲 Surprise me makes a random theme. 🪞 My profile matches the app to your profile’s colors, banner, and effect, and follows when you change them.',
+      'The + in Help is no longer faded.',
+    ],
+  },
+  {
     version: '2.26',
     date: '2026-10-21',
     title: 'Lab check-in, grades, and parts chat',

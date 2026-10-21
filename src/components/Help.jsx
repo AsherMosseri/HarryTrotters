@@ -5,7 +5,7 @@ import { CloseIcon } from './common.jsx';
 import { checkForUpdate } from './UpdateGate.jsx';
 
 const QUICK_TIPS = [
-  ['➕', 'Add a task', 'Tap + New task, or the + at the top of a column. Give it an owner and a due date.'],
+  ['+', 'Add a task', 'Tap + New task, or the + at the top of a column. Give it an owner and a due date.'],
   ['✋', 'Move it as you work', 'Press and hold a card, then drag it to another column. Or tap the card and change its status.'],
   [
     '🗂',
@@ -118,6 +118,7 @@ const SECTIONS = [
       'You only enter the team code once per device.',
       'Switch (top right) signs this device out so someone else can use it. You’ll need the code again.',
       'The sun/moon button picks light, dark, or automatic, and a color theme (Sunset, Ocean, Forest…) for this device.',
+      '🎨 Custom… in that menu makes your own theme: any colors (even moving), a picture, GIF, or emoji pattern behind the app, and floating emoji or GIFs. 🎲 Surprise me picks for you, and 🪞 My profile matches your profile.',
       'When the site is updated, you’ll be asked to tap Update now.',
     ],
   ],
@@ -140,7 +141,7 @@ function TipList({ showRobot }) {
     <ul className="tips">
       {QUICK_TIPS.map(([icon, title, text]) => (
         <li key={title}>
-          <span className="tip-icon" aria-hidden="true">
+          <span className={`tip-icon${icon === '+' ? ' tip-plus' : ''}`} aria-hidden="true">
             {icon}
           </span>
           <div>

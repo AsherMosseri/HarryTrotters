@@ -1435,7 +1435,7 @@ h3.md-h { font-size: 16.5px; }
 
 /* app color themes */
 :root[data-palette] { --accent-soft: color-mix(in srgb, var(--accent) 16%, var(--surface)); }
-:root[data-palette] body { background: linear-gradient(160deg, color-mix(in srgb, var(--p1) 16%, var(--bg)), color-mix(in srgb, var(--p2) 16%, var(--bg))) fixed; }
+:root[data-palette] body { background: linear-gradient(160deg, color-mix(in srgb, var(--p1) var(--tint, 16%), var(--bg)), color-mix(in srgb, var(--p2) var(--tint, 16%), var(--bg))) fixed; }
 :root[data-palette='midnight'] { --accent: #6366f1; --p1: #6366f1; --p2: #0ea5e9; }
 :root[data-palette='sunset'] { --accent: #f97316; --p1: #f97316; --p2: #db2777; }
 :root[data-palette='ocean'] { --accent: #0891b2; --p1: #0891b2; --p2: #2563eb; }
@@ -1635,3 +1635,36 @@ h3.md-h { font-size: 16.5px; }
 .content.chat.embedded .composer .hide-phone { display: none !important; }
 /* Lab check-in results: "Hasn't answered" gets its own full-width row. */
 .checkin-grid > .checkin-waiting { grid-column: 1 / -1; }
+
+/* ---------- custom theme ---------- */
+.tip-icon.tip-plus { color: var(--accent); font-size: 26px; font-weight: 700; line-height: 1; }
+/* #root is its own layer so .app-backdrop (z-index -1) sits behind the app but above the page color. */
+#root { position: relative; isolation: isolate; }
+.app-backdrop { position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; }
+.app-backdrop.shift {
+  background: linear-gradient(120deg,
+    color-mix(in srgb, var(--p1) var(--tint, 16%), var(--bg)), color-mix(in srgb, var(--p2) var(--tint, 16%), var(--bg)),
+    color-mix(in srgb, var(--p1) var(--tint, 16%), var(--bg)));
+  background-size: 300% 300%; animation: bg-shift 16s ease-in-out infinite;
+}
+@keyframes bg-shift { 50% { background-position: 100% 50%; } }
+.app-bg-pic, .app-bg-pattern, .app-bg-veil { position: absolute; inset: 0; }
+.app-bg-pic { background: center / cover no-repeat; }
+.app-bg-pattern { background-repeat: repeat; background-size: 76px 76px; }
+.app-bg-veil { background: var(--bg); }
+.app-fx .profile-effect { opacity: 0.7; }
+.app-fx .profile-effect span { font-size: 26px; animation-duration: calc(var(--d) * 2.5); }
+.app-fx .profile-effect img { width: 40px; height: 40px; }
+@media (prefers-reduced-motion: reduce) { .app-backdrop.shift { animation: none; } }
+.dialog.theme-studio { width: min(560px, calc(100vw - 32px)); max-height: calc(100dvh - 6vh - 16px); overflow-y: auto; }
+.dialog.theme-studio > .panel-head { position: sticky; top: 0; z-index: 5; background: var(--surface); }
+.studio-backdrop { background: rgb(10 12 20 / 12%); }
+.studio-h { margin: 6px 0 0; font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+.studio-two { display: flex; flex-direction: column; gap: 8px; }
+.studio-range { display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 600; }
+.studio-range input { flex: 1; accent-color: var(--accent); }
+.studio-range b { min-width: 40px; text-align: right; font-variant-numeric: tabular-nums; }
+.studio-check { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 14px; }
+.btn.on-btn { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+.studio-bg-now { width: 40px; height: 40px; border-radius: 10px; overflow: hidden; display: grid; place-items: center; font-size: 24px; background: var(--surface-2); }
+.studio-bg-now img { width: 100%; height: 100%; object-fit: cover; }

@@ -26,11 +26,12 @@ import { VersionLogDialog, WhatsNew } from './VersionLog.jsx';
 import { RequestsDialog } from './Requests.jsx';
 import ShiftsView, { ShiftButton } from './Shifts.jsx';
 import { CheckinGate, answerOf } from './Checkin.jsx';
+import ThemeStudio, { AppBackdrop, CUSTOM_DEFAULT, applyThemeVars, themeFromProfile } from './ThemeStudio.jsx';
 import { VERSION, versionsSince } from '../changelog.js';
 import Inbox from './Inbox.jsx';
 
 // Light / dark / automatic, plus the app color themes.
-function ThemeMenu({ theme, setTheme, palette, setPalette, onClose }) {
+function ThemeMenu({ theme, setTheme, palette, setPalette, customColors, profileColors, onCustom, onClose }) {
   useEffect(() => {
     const away = (e) => !e.target.closest('.theme-wrap') && onClose();
     const esc = (e) => e.key === 'Escape' && onClose();
@@ -62,6 +63,14 @@ function ThemeMenu({ theme, setTheme, palette, setPalette, onClose }) {
             {p.label}
           </button>
         ))}
+        <button className={`palette${palette === 'profile' ? ' on' : ''}`} onClick={() => setPalette('profile')}>
+          <span className="palette-dot" style={{ background: `linear-gradient(135deg, ${profileColors[0]}, ${profileColors[1]})` }} />
+          🪞 My profile
+        </button>
+        <button className={`palette${palette === 'custom' ? ' on' : ''}`} onClick={onCustom}>
+          <span className="palette-dot" style={{ background: `linear-gradient(135deg, ${customColors[0]}, ${customColors[1]})` }} />
+          🎨 Custom…
+        </button>
       </div>
     </div>
   );
@@ -316,6 +325,9 @@ export default function Workspace({ store, actor, rename, renames }) {
   // App color theme (per device), on top of light/dark.
   const [palette, setPalette] = useLocalStorage('palette', '');
   const [themeMenu, setThemeMenu] = useState(false);
+  // Custom theme (🎨) and "match my profile" (🪞): colors, background, floating things.
+  const [customTheme, setCustomTheme] = useLocalStorage('custom-theme', CUSTOM_DEFAULT);
+  const [studio, setStudio] = useState(false);
   useEffect(() => {
     if (palette) document.documentElement.setAttribute('data-palette', palette);
     else document.documentElement.removeAttribute('data-palette');
@@ -465,6 +477,14 @@ export default function Workspace({ store, actor, rename, renames }) {
     [profiles, online, peopleInfo],
   );
   const openPerson = useCallback((name) => setProfileFor(name), []);
+  const myProfile = profiles.get(actor.name);
+  const myColor = peopleInfo.get(actor.name)?.color;
+  const profileTheme = useMemo(() => themeFromProfile(myProfile, myColor), [myProfile, myColor]);
+  const activeTheme = palette === 'custom' ? { ...CUSTOM_DEFAULT, ...customTheme } : palette === 'profile' ? profileTheme : null;
+  const themeKey = JSON.stringify(activeTheme);
+  useEffect(() => {
+    applyThemeVars(themeKey === 'null' ? null : JSON.parse(themeKey));
+  }, [themeKey]);
   const gradeOf = useCallback((name) => peopleInfo.get(name)?.grade || 9, [peopleInfo]);
   const today = todayISO();
   const pendingCheckin = checkins.find((c) => c.date === today && (c.slots || []).length && !answerOf(c, actor.name, rename));
@@ -866,6 +886,7 @@ export default function Workspace({ store, actor, rename, renames }) {
             Demo mode — sample data saved only in this browser. <a href="./">Go to the real board</a>
           </div>
         )}
+        <AppBackdrop theme={activeTheme} />
         <header className="topbar">
           <button className="brand" onClick={() => setCat(true)}>
             <span className="logo-mark">✓</span>
@@ -939,6 +960,13 @@ export default function Workspace({ store, actor, rename, renames }) {
                   setTheme={setTheme}
                   palette={palette}
                   setPalette={setPalette}
+                  customColors={customTheme.colors || CUSTOM_DEFAULT.colors}
+                  profileColors={profileTheme.colors}
+                  onCustom={() => {
+                    setPalette('custom');
+                    setThemeMenu(false);
+                    setStudio(true);
+                  }}
                   onClose={() => setThemeMenu(false)}
                 />
               )}
@@ -1299,6 +1327,16 @@ export default function Workspace({ store, actor, rename, renames }) {
           )}
           {showLog && <VersionLogDialog current={VERSION} onClose={() => setShowLog(false)} />}
           {cat && <CatParty onClose={() => setCat(false)} />}
+          {studio && (
+            <ThemeStudio
+              value={customTheme}
+              onChange={setCustomTheme}
+              profile={myProfile}
+              profileColor={myColor}
+              upload={(file, oldPath) => api.uploadEffectImage(actor.name, file, oldPath)}
+              onClose={() => setStudio(false)}
+            />
+          )}
           {pendingCheckin && (
             <CheckinGate checkin={pendingCheckin} rename={rename} onAnswer={(a) => api.answerCheckin(pendingCheckin.id, a)} />
           )}

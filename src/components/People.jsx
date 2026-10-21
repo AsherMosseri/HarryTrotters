@@ -52,7 +52,7 @@ function useEscape(onClose) {
 // Drifting particles over the profile card.
 // Drifting particles over the profile card: a preset, or your own emoji,
 // GIF, or picture (custom: { kind: 'emoji' | 'image', value, motion }).
-function ProfileEffect({ id, custom }) {
+export function ProfileEffect({ id, custom }) {
   const e = effectById[id];
   const isCustom = id === 'custom' && custom?.value;
   if (!isCustom && (!e?.icon || id === 'custom')) return null;
@@ -69,7 +69,7 @@ function ProfileEffect({ id, custom }) {
 }
 
 // Picks a custom effect: an emoji, a GIPHY GIF, or your own picture.
-function CustomEffect({ value, onChange, upload }) {
+export function CustomEffect({ value, onChange, upload }) {
   const [panel, setPanel] = useState(null); // 'emoji' | 'gif'
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
