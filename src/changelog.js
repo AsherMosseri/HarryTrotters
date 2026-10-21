@@ -4,6 +4,15 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '2.6',
+    date: '2026-10-21',
+    title: 'One tap is enough on iPad',
+    items: [
+      'Fixed: switching chat channels on iPad took two taps (the first tap only revealed the ⚙ button).',
+      'Same fix for other things that appeared on hover: message tools, the Table’s Open button, checklist ✕ buttons, and link-preview ✕.',
+    ],
+  },
+  {
     version: '2.5',
     date: '2026-10-21',
     title: 'Version log',

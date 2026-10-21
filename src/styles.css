@@ -279,7 +279,8 @@ textarea.draft { resize: none; overflow: hidden; }
   flex: none; border: 1px solid var(--border); background: var(--surface); border-radius: 7px;
   padding: 2px 8px; font-size: 12px; font-weight: 600; color: var(--muted); opacity: 0;
 }
-tr:hover .open-btn, .open-btn:focus { opacity: 1; }
+.open-btn:focus { opacity: 1; }
+@media (hover: hover) { tr:hover .open-btn { opacity: 1; } }
 @media (hover: none) { .open-btn { opacity: 1; } }
 .cell-select { border: 0; background: transparent; padding: 4px; border-radius: 6px; max-width: 150px; font-size: 14px; }
 .cell-select:hover { background: var(--surface-2); }
@@ -643,7 +644,8 @@ div.org-member { cursor: default; }
 .check-remove {
   flex: none; width: 28px; height: 28px; border: 0; background: none; border-radius: 6px; color: var(--muted); font-size: 18px; opacity: 0;
 }
-.check-items li:hover .check-remove, .check-remove:focus { opacity: 1; }
+.check-remove:focus { opacity: 1; }
+@media (hover: hover) { .check-items li:hover .check-remove { opacity: 1; } }
 @media (hover: none) { .check-remove { opacity: 0.5; } }
 .check-remove:hover { background: var(--surface-2); color: var(--danger); }
 .check-add .input { min-height: 36px; border-style: dashed; background: transparent; }
@@ -809,7 +811,8 @@ div.org-member { cursor: default; }
 .msg.mentions-me { background: color-mix(in srgb, var(--st-progress) 12%, var(--surface)); box-shadow: inset 3px 0 0 var(--st-progress); }
 .msg-gutter { width: 34px; flex: none; display: flex; justify-content: center; }
 .msg-time-hover { font-size: 10.5px; color: var(--muted); padding-top: 3px; opacity: 0; white-space: nowrap; }
-.msg:hover .msg-time-hover, .msg.selected .msg-time-hover { opacity: 1; }
+.msg.selected .msg-time-hover { opacity: 1; }
+@media (hover: hover) { .msg:hover .msg-time-hover { opacity: 1; } }
 .msg-body { flex: 1; min-width: 0; }
 .msg-head { display: flex; align-items: baseline; gap: 8px; }
 .msg-text { white-space: pre-wrap; word-break: break-word; line-height: 1.45; }
@@ -833,8 +836,8 @@ div.org-member { cursor: default; }
   position: absolute; right: 12px; top: -14px; z-index: 3; display: none; gap: 2px; padding: 3px;
   background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow);
 }
-.msg:hover .msg-actions, .msg.selected .msg-actions { display: flex; }
-@media (hover: none) { .msg:hover .msg-actions { display: none; } .msg.selected .msg-actions { display: flex; } }
+.msg.selected .msg-actions { display: flex; }
+@media (hover: hover) { .msg:hover .msg-actions { display: flex; } }
 .msg-actions > button { border: 0; background: transparent; border-radius: 7px; min-width: 32px; height: 30px; padding: 0 6px; font-size: 14px; white-space: nowrap; }
 .msg-actions > button:hover { background: var(--surface-2); }
 .danger-text { color: var(--danger); }
@@ -922,7 +925,10 @@ img.avatar { object-fit: cover; border-radius: 50%; display: inline-block; flex:
 .conv-row.muted .conv-main { opacity: 0.6; }
 .conv-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .channel-list .conv-gear { display: none; border: 0; background: transparent; color: var(--muted); width: 28px; height: 28px; padding: 0; border-radius: 6px; justify-content: center; }
-.channel-list .conv-row:hover .conv-gear, .channel-list .conv-row.active .conv-gear { display: inline-flex; }
+/* Hover-only reveals stay off touch screens: on iPad, a tap that reveals
+   something counts as a hover and needs a second tap to act. */
+.channel-list .conv-row.active .conv-gear { display: inline-flex; }
+@media (hover: hover) { .channel-list .conv-row:hover .conv-gear { display: inline-flex; } }
 
 .conv-gear:hover { background: var(--surface); color: var(--text); }
 .group-dm-icon { width: 24px; text-align: center; }
@@ -1020,7 +1026,7 @@ h3.md-h { font-size: 16.5px; }
 .link-card img { width: 80px; height: 80px; object-fit: cover; border-radius: 6px; flex: none; }
 .link-card-title { font-weight: 700; }
 .link-card-hide { position: absolute; top: 2px; right: 2px; opacity: 0; }
-.link-card:hover .link-card-hide { opacity: 1; }
+@media (hover: hover) { .link-card:hover .link-card-hide { opacity: 1; } }
 @media (hover: none) { .link-card-hide { opacity: 0.6; } }
 .yt { margin: 6px 0 2px; width: min(420px, 100%); aspect-ratio: 16 / 9; border-radius: 10px; overflow: hidden; background: #000; }
 .yt iframe, .yt-thumb { width: 100%; height: 100%; border: 0; }
