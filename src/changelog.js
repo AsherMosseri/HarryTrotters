@@ -4,6 +4,15 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '2.21',
+    date: '2026-10-21',
+    title: 'Online dot fixes',
+    items: [
+      'The green online dot sits on top of decorated profile pictures (Crown, Neon, …) instead of half behind them.',
+      '“Online now” on profile cards has a crisp dot that’s no longer cut off.',
+    ],
+  },
+  {
     version: '2.20',
     date: '2026-10-21',
     title: 'Check for updates',

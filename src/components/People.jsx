@@ -192,7 +192,14 @@ function CardBody({ name, look, actor, tasks, children }) {
         </h2>
         <p className="muted small">
           {profile.pronouns && <span className="pronouns">{profile.pronouns} · </span>}
-          {online ? '🟢 Online now' : 'Offline'}
+          {online ? (
+            <>
+              <span className="online-inline" aria-hidden="true" />
+              Online now
+            </>
+          ) : (
+            'Offline'
+          )}
         </p>
         {status && (
           <p className="profile-status">

@@ -883,7 +883,9 @@ div.org-member { cursor: default; }
 /* ---------- chat: people ---------- */
 .avatar-wrap { position: relative; display: inline-block; flex: none; }
 .avatar-wrap > .avatar { width: 100% !important; height: 100% !important; }
-.online-dot { position: absolute; right: -1px; bottom: -1px; border-radius: 50%; background: var(--st-done); border: 2px solid var(--surface); }
+/* Above the picture, which a decoration lifts to z-index 1. */
+.online-dot { position: absolute; z-index: 3; right: -1px; bottom: -1px; border-radius: 50%; background: var(--st-done); border: 2px solid var(--surface); }
+.online-inline { display: inline-block; width: 9px; height: 9px; margin-right: 5px; border-radius: 50%; background: var(--st-done); vertical-align: 0; }
 img.avatar { object-fit: cover; border-radius: 50%; display: inline-block; flex: none; }
 .avatar-btn { border: 0; padding: 0; background: transparent; border-radius: 50%; display: inline-flex; cursor: pointer; }
 .name-btn { border: 0; padding: 0; background: transparent; font: inherit; font-weight: 700; color: var(--text); cursor: pointer; }
