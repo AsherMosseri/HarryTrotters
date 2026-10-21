@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { relTime } from '../util.js';
 import { isIOS } from '../data/push.js';
 
-const ICONS = { announcement: '📣', mention: '@', assigned: '📋', due: '⏰', message: '💬', dm: '✉️', request: '💡' };
+const ICONS = { announcement: '📣', mention: '@', assigned: '📋', due: '⏰', message: '💬', dm: '✉️', request: '💡', shift: '⏱' };
 
 function BellIcon() {
   return (

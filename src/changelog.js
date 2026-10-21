@@ -4,6 +4,19 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '2.22',
+    date: '2026-10-21',
+    title: 'Shifts',
+    items: [
+      'New Shifts tab: who’s at the shop now, the shift schedule, everyone’s hours, and a log of every shift.',
+      'Tap ⏱ at the top to start a shift in one tap. A timer shows while you’re on shift; tap it to add what you’re working on, your subteam, and tasks, fix your start time, or End shift now.',
+      'Schedule: team management plans shifts (once or weekly); tap I’m in or Can’t. During a planned shift, Clock in now is one tap.',
+      'Hours: a season and this-week leaderboard, with a season goal set by team management. Export every shift as a spreadsheet (CSV).',
+      'Reminders: “Still at the shop?” after 4 hours, and an hour before a shift you said you’re coming to. Shifts left running past midnight end automatically.',
+      'Team management can clock in several people at once, end anyone’s shift, and add or fix shifts.',
+    ],
+  },
+  {
     version: '2.21',
     date: '2026-10-21',
     title: 'Online dot fixes',

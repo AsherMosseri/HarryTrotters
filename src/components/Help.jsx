@@ -10,7 +10,7 @@ const QUICK_TIPS = [
   [
     '🗂',
     'Use the tabs',
-    'Chat: team and subteam channels. Milestones: big steps to the competition. Parts: what to buy. Checklists: competition prep. Match Log: practice scores. Robot: the 3D model. Team: who does what.',
+    'Chat: team and subteam channels. Shifts: clock in and out, the schedule, and hours. Milestones: big steps to the competition. Parts: what to buy. Checklists: competition prep. Match Log: practice scores. Robot: the 3D model. Team: who does what.',
   ],
   [
     '🔔',
@@ -56,6 +56,16 @@ const SECTIONS = [
   [
     'Checklists',
     ['Shared lists for inspection, packing the pit, and competition day.', 'Tick items as you go. Everyone sees the same boxes.'],
+  ],
+  [
+    'Shifts',
+    [
+      'Tap ⏱ at the top to start a shift. It shows a timer while you’re on shift; tap it to say what you’re working on, fix your start time (−15 min, −30 min, −1 h, or pick a time), or End shift now.',
+      'Tapped it by mistake? Tap Undo, or Cancel shift in the first 15 minutes.',
+      'Shifts tab: who’s at the shop now, the schedule (tap I’m in or Can’t), everyone’s hours, and the log of past shifts.',
+      'You get a reminder after 4 hours on shift and an hour before a shift you said you’d come to. A shift left running past midnight ends at the last time you used the app (marked auto-ended).',
+      'Edit your own past shifts’ notes, subteam, and tasks. Team management fixes times.',
+    ],
   ],
   [
     'Match Log',
@@ -118,6 +128,7 @@ const MANAGER_TIPS = [
   'Chat: post in #announcements (everyone gets a notification), use @everyone, delete any message, and remove reactions (🚫☺ on a message).',
   'Channels: ＋ next to Channels adds one; ⚙ on a channel renames it, sets its topic and subteam color, moves it up or down, or deletes it.',
   'Team emoji: open 😊 and tap ＋ under Team emoji to add your own (:name:), or remove them. Stickers: open 🎫 and tap ＋.',
+  'Shifts tab: Clock in… several people at once, End anyone’s shift, Plan a shift (once or weekly), set the season hours goal, add a missed shift, fix or delete any shift, and Export CSV.',
   'DMs: you can read every DM (under Team DMs) but can’t post in other people’s. You can change anyone’s profile picture from their profile.',
 ];
 

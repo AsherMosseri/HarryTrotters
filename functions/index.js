@@ -281,6 +281,105 @@ export const onTaskAssigned = onDocumentWritten('tasks/{taskId}', async (event) 
   );
 });
 
+// Shifts, every 15 minutes:
+// - clocked in 4+ hours: "Still at the shop?" (once per shift)
+// - still running from before today (New York time): ended at the person's
+//   last activity in the app, marked autoEnded, and they're told
+// - a planned shift starting within the hour: reminds everyone who said "I'm in"
+const HOUR = 3600000;
+const zoneParts = (ms) =>
+  Object.fromEntries(
+    new Intl.DateTimeFormat('en-US', {
+      timeZone: TIME_ZONE,
+      hourCycle: 'h23',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+      .formatToParts(ms)
+      .map((p) => [p.type, p.value]),
+  );
+// ms for a wall-clock date ('YYYY-MM-DD') and time ('HH:MM') in TIME_ZONE.
+function zonedMs(date, time) {
+  const [y, mo, d] = date.split('-').map(Number);
+  const [h, mi] = time.split(':').map(Number);
+  const guess = Date.UTC(y, mo - 1, d, h, mi);
+  const p = zoneParts(guess);
+  const shown = Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute);
+  return guess - (shown - guess);
+}
+const clock = (ms) => new Date(ms).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: TIME_ZONE });
+const span = (ms) => `${Math.floor(ms / HOUR)}h ${String(Math.floor((ms % HOUR) / 60000)).padStart(2, '0')}m`;
+
+export const shiftChecks = onSchedule({ schedule: 'every 15 minutes', timeZone: TIME_ZONE }, async () => {
+  const now = Date.now();
+  const rename = await renamer();
+  const notes = [];
+  const today = localDate(0);
+  const midnight = zonedMs(today, '00:00');
+
+  const open = await db.collection('shifts').where('end', '==', null).get();
+  let lastActive = null;
+  for (const s of open.docs) {
+    const shift = s.data();
+    const to = rename(shift.person || '');
+    if (!to) continue;
+    if (shift.start < midnight) {
+      if (!lastActive) {
+        lastActive = new Map();
+        for (const p of (await db.collection('presence').get()).docs) {
+          const name = rename(p.get('name') || '');
+          lastActive.set(name, Math.max(lastActive.get(name) || 0, p.get('at') || 0, p.get('typingAt') || 0));
+        }
+      }
+      const seen = lastActive.get(to) || 0;
+      // Last seen in the app during the shift, else a 4-hour shift (never past midnight).
+      const end = seen > shift.start && seen < midnight ? seen : Math.min(shift.start + 4 * HOUR, midnight);
+      await s.ref.update({ end, autoEnded: true });
+      notes.push({
+        to,
+        type: 'shift',
+        title: 'Your shift was ended automatically',
+        body: `Ended at ${clock(end)} (${span(end - shift.start)}). Tap to fix it if that's wrong.`,
+        open: 'view:shifts',
+      });
+    } else if (now - shift.start >= 4 * HOUR && !shift.reminded) {
+      await s.ref.update({ reminded: true });
+      notes.push({
+        to,
+        type: 'shift',
+        title: 'Still at the shop?',
+        body: `You've been clocked in for ${span(now - shift.start)}. Tap to end your shift.`,
+        open: 'shift:end',
+        tag: `shift-${s.id}`,
+      });
+    }
+  }
+
+  const plans = await db.collection('shiftPlans').where('date', 'in', [today, localDate(1)]).get();
+  for (const p of plans.docs) {
+    const plan = p.data();
+    if (plan.reminded || !plan.start) continue;
+    const at = zonedMs(plan.date, plan.start);
+    if (at - now > HOUR || at < now) continue;
+    await p.ref.update({ reminded: true });
+    const going = Object.entries(plan.people || {})
+      .filter(([, v]) => v === 'in')
+      .map(([n]) => rename(n));
+    for (const to of new Set(going))
+      notes.push({
+        to,
+        type: 'shift',
+        title: `${plan.title || 'Shift'} starts at ${clock(at)}`,
+        body: `${plan.subteam ? `${plan.subteam} · ` : ''}Until ${clock(zonedMs(plan.date, plan.end || plan.start))}`,
+        open: 'view:shifts',
+      });
+  }
+  await notify(notes);
+});
+
 function formatDate(iso) {
   const d = new Date(`${iso}T12:00:00Z`);
   return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' });

@@ -188,6 +188,37 @@ service cloud.firestore {
       allow delete: if isManager() || (isMember() && resource.data.byUid == request.auth.uid);
     }
 
+    // Shifts (clock in/out). You clock yourself in (now, or up to 12 hours
+    // earlier) and out; team management can add, fix, or remove anyone's.
+    // A shift you started in the last 15 minutes can be cancelled.
+    function nowMs() { return request.time.toMillis(); }
+    function validStart(s) { return s is int && s <= nowMs() + 300000 && s >= nowMs() - 12 * 3600000; }
+    match /shifts/{id} {
+      allow read: if isMember();
+      allow create: if isManager() || (isMember() && isMe(request.resource.data.person)
+        && request.resource.data.end == null && validStart(request.resource.data.start)
+        && request.resource.data.byUid == request.auth.uid);
+      allow update: if isManager() || (isMember() && isMe(resource.data.person)
+        && request.resource.data.person == resource.data.person
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['start', 'end', 'note', 'subteam', 'taskIds', 'updatedBy'])
+        && (request.resource.data.start == resource.data.start
+            || (resource.data.end == null && validStart(request.resource.data.start)))
+        && (request.resource.data.end == resource.data.end
+            || (resource.data.end == null && request.resource.data.end is int
+                && request.resource.data.end >= request.resource.data.start
+                && request.resource.data.end <= nowMs() + 300000)));
+      allow delete: if isManager() || (isMember() && isMe(resource.data.person)
+        && resource.data.end == null && resource.data.start > nowMs() - 15 * 60000);
+    }
+    // The schedule: team management plans shifts; anyone answers for themselves.
+    match /shiftPlans/{id} {
+      allow read: if isMember();
+      allow create, delete: if isManager();
+      allow update: if isManager() || (isMember()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['people'])
+        && request.resource.data.people.diff(resource.data.people).affectedKeys().hasOnly([myName(), renamedMe()]));
+    }
+
     // Practice and match log: anyone on the team.
     match /runs/{id} {
       allow read, write: if isMember();

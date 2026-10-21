@@ -67,6 +67,8 @@ const presenceCol = collection(db, 'presence');
 const emojiCol = collection(db, 'emoji');
 const stickersCol = collection(db, 'stickers');
 const requestsCol = collection(db, 'requests');
+const shiftsCol = collection(db, 'shifts');
+const shiftPlansCol = collection(db, 'shiftPlans');
 const isDm = (conv) => conv.startsWith('dm:');
 const convCol = (conv) => (isDm(conv) ? collection(dmsCol, conv.slice(3), 'messages') : collection(channelsCol, conv, 'messages'));
 const convFolder = (conv) => `chat/${conv.replace(':', '-')}`;
@@ -748,6 +750,43 @@ export const firebaseStore = {
   },
   deleteRequest(id) {
     return deleteDoc(doc(requestsCol, id));
+  },
+
+  // Shifts: clock in/out (start and end in ms; end is null while running).
+  subscribeShifts(cb, onError) {
+    return onSnapshot(shiftsCol, (snap) => cb(snap.docs.map(readDoc)), onError);
+  },
+  startShifts(people, start, extra, actor) {
+    const batch = writeBatch(db);
+    for (const person of people)
+      batch.set(doc(shiftsCol), { person, start, end: null, note: '', subteam: '', taskIds: [], ...extra, ...actorFields(actor), at: Date.now() });
+    return batch.commit();
+  },
+  updateShift(id, patch, actor) {
+    return updateDoc(doc(shiftsCol, id), { ...patch, updatedBy: actor.name });
+  },
+  deleteShift(id) {
+    return deleteDoc(doc(shiftsCol, id));
+  },
+  // The schedule: planned shifts people can sign up for.
+  subscribeShiftPlans(cb, onError) {
+    return onSnapshot(shiftPlansCol, (snap) => cb(snap.docs.map(readDoc)), onError);
+  },
+  addShiftPlans(plans, actor) {
+    const batch = writeBatch(db);
+    for (const p of plans) batch.set(doc(shiftPlansCol), { ...p, people: {}, createdBy: actor.name, at: Date.now() });
+    return batch.commit();
+  },
+  updateShiftPlan(id, patch, actor) {
+    return updateDoc(doc(shiftPlansCol, id), { ...patch, updatedBy: actor.name });
+  },
+  rsvpShiftPlan(id, name, answer) {
+    return updateDoc(doc(shiftPlansCol, id), new FieldPath('people', name), answer || deleteField());
+  },
+  deleteShiftPlans(ids) {
+    const batch = writeBatch(db);
+    for (const id of ids) batch.delete(doc(shiftPlansCol, id));
+    return batch.commit();
   },
 
   // Team emoji, used as :name: in messages and reactions.

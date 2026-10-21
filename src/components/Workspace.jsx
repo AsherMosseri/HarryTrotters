@@ -24,6 +24,7 @@ const RobotView = lazy(() => import('./RobotView.jsx'));
 import { HelpDialog, WelcomeCard } from './Help.jsx';
 import { VersionLogDialog, WhatsNew } from './VersionLog.jsx';
 import { RequestsDialog } from './Requests.jsx';
+import ShiftsView, { ShiftButton } from './Shifts.jsx';
 import { VERSION, versionsSince } from '../changelog.js';
 import Inbox from './Inbox.jsx';
 
@@ -119,6 +120,7 @@ const VIEWS = [
   ['board', 'Board'],
   ['table', 'Table'],
   ['chat', 'Chat'],
+  ['shifts', 'Shifts'],
   ['milestones', 'Milestones'],
   ['parts', 'Parts'],
   ['checklists', 'Checklists'],
@@ -255,6 +257,12 @@ export default function Workspace({ store, actor, rename, renames }) {
   const [showRequests, setShowRequests] = useState(null);
   useEffect(() => store.subscribeRequests(setRequests, quiet('requests')), [store, quiet]);
   const newRequests = actor.admin ? requests.filter((r) => r.status === 'new').length : 0;
+  // Shifts (clock in/out) and the planned schedule.
+  const [shifts, setShifts] = useState([]);
+  const [shiftPlans, setShiftPlans] = useState([]);
+  const [shiftPanel, setShiftPanel] = useState(false);
+  useEffect(() => store.subscribeShifts(setShifts, quiet('shifts')), [store, quiet]);
+  useEffect(() => store.subscribeShiftPlans(setShiftPlans, quiet('shift schedule')), [store, quiet]);
   const competitionDate = settings.competitionDate || COMPETITION.date;
 
   // Notifications: the bell's list, and phone notifications on this device.
@@ -693,6 +701,12 @@ export default function Workspace({ store, actor, rename, renames }) {
       uploadBanner: (name, blob, oldPath) => store.uploadBanner(name, blob, oldPath),
       removeBanner: (name, oldPath) => store.removeBanner(name, oldPath).catch(fail),
       uploadEffectImage: (name, file, oldPath) => store.uploadEffectImage(name, file, oldPath),
+      startShifts: (people, start, extra = {}) => store.startShifts(people, start, extra, actor).catch(fail),
+      updateShift: (id, patch) => store.updateShift(id, patch, actor).catch(fail),
+      deleteShift: (id) => store.deleteShift(id).catch(fail),
+      addShiftPlans: (list) => store.addShiftPlans(list, actor).catch(fail),
+      rsvpShiftPlan: (id, answer) => store.rsvpShiftPlan(id, actor.name, answer).catch(fail),
+      deleteShiftPlans: (ids) => store.deleteShiftPlans(ids).catch(fail),
       addRequest: (text) =>
         store.addRequest(text, actor).then(
           () => true,
@@ -748,8 +762,10 @@ export default function Workspace({ store, actor, rename, renames }) {
     if (view === 'chat' && currentConv) out.push(`chat:${currentConv.key}`);
     if (view === 'board') out.push('view:board');
     if (showRequests) out.push(...requests.map((r) => `requests:${r.id}`));
+    if (view === 'shifts') out.push('view:shifts');
+    if (shiftPanel) out.push('shift:end');
     return out;
-  }, [pageVisible, openId, view, currentConv, showRequests, requests]);
+  }, [pageVisible, openId, view, currentConv, showRequests, requests, shiftPanel]);
   useEffect(() => {
     if (!seenTarget.length) return;
     const ids = inbox.filter((n) => !n.read && seenTarget.includes(n.open)).map((n) => n.id);
@@ -760,6 +776,26 @@ export default function Workspace({ store, actor, rename, renames }) {
       .then((list) => list?.forEach((n) => seenTarget.includes(n.data?.open) && n.close()))
       .catch(() => {});
   }, [seenTarget, inbox, store, actor.name]);
+
+  // This person's running shift, and starting one (with Undo for mis-taps).
+  const myShift = useMemo(() => shifts.find((s) => !s.end && rename(s.person || '') === actor.name) || null, [shifts, rename, actor.name]);
+  const liveMyShift = useRef(myShift);
+  liveMyShift.current = myShift;
+  const myOpenTasks = useMemo(
+    () => (tasks || []).filter((t) => t.status !== 'done' && (t.assignees || []).includes(actor.name)),
+    [tasks, actor.name],
+  );
+  const startMyShift = useCallback(
+    async (extra = {}) => {
+      if (liveMyShift.current) return setShiftPanel(true);
+      await api.startShifts([actor.name], Date.now(), extra);
+      setToast({
+        text: '⏱ Shift started',
+        action: { label: 'Undo', run: () => liveMyShift.current && api.deleteShift(liveMyShift.current.id) },
+      });
+    },
+    [api, actor.name],
+  );
 
   // Where a notification points: 'task:<id>', 'chat:<channel>', or 'view:<tab>'.
   const liveTasks = useRef(tasks);
@@ -775,6 +811,11 @@ export default function Workspace({ store, actor, rename, renames }) {
         setView('chat');
       } else if (kind === 'view') setView(id);
       else if (kind === 'requests') setShowRequests(id || true);
+      else if (kind === 'shift') {
+        // "Still at the shop?": the End panel if the shift is still running.
+        if (liveMyShift.current) setShiftPanel(true);
+        else setView('shifts');
+      }
     },
     [setChatChannel, setView],
   );
@@ -830,6 +871,22 @@ export default function Workspace({ store, actor, rename, renames }) {
           </nav>
           <div className="topbar-right">
             <Countdown date={competitionDate} />
+            <ShiftButton
+              shift={myShift}
+              open={shiftPanel}
+              setOpen={setShiftPanel}
+              myTasks={myOpenTasks}
+              onStart={startMyShift}
+              onUpdate={(patch) => myShift && api.updateShift(myShift.id, patch)}
+              onCancel={() => {
+                setShiftPanel(false);
+                if (myShift) api.deleteShift(myShift.id);
+              }}
+              onOpenTab={() => {
+                setShiftPanel(false);
+                setView('shifts');
+              }}
+            />
             <Inbox
               items={inbox}
               pushStatus={pushStatus}
@@ -1076,6 +1133,20 @@ export default function Workspace({ store, actor, rename, renames }) {
                 onMakeTask={(data) => setNewTask({ status: 'todo', ...data })}
               />
             </Suspense>
+          ) : view === 'shifts' ? (
+            <ShiftsView
+              shifts={shifts}
+              plans={shiftPlans}
+              actor={actor}
+              roster={roster}
+              tasks={tasks || []}
+              goal={settings.shiftGoal || 0}
+              api={api}
+              rename={rename}
+              onStartMine={startMyShift}
+              onOpenMine={() => setShiftPanel(true)}
+              onOpenTask={setOpenId}
+            />
           ) : view === 'runs' ? (
             <RunsView runs={runs} roster={roster} api={api} />
           ) : view === 'team' ? (

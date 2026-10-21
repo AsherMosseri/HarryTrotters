@@ -286,6 +286,8 @@ function seed() {
     channels: [],
     emoji: [],
     stickers: [],
+    shifts: demoShifts(now),
+    shiftPlans: demoPlans(),
     requests: [
       {
         id: uid(),
@@ -309,6 +311,47 @@ function seed() {
       },
     ],
   };
+}
+
+// Sample shifts: a few past ones this week and last, and Cooper at the shop now.
+function demoShifts(now) {
+  const h = 3600000;
+  const day = (n, hour) => {
+    const d = new Date(now - n * 86400000);
+    d.setHours(hour, 0, 0, 0);
+    return d.getTime();
+  };
+  const s = (person, start, hours, extra = {}) => ({
+    id: uid(),
+    person,
+    start,
+    end: hours == null ? null : start + hours * h,
+    note: '',
+    subteam: '',
+    taskIds: [],
+    createdBy: person,
+    ...extra,
+  });
+  return [
+    s('Cooper Mlezcko', now - 1.4 * h, null, { subteam: 'Mechanical' }),
+    s('Asher Mosseri', day(1, 15), 3, { subteam: 'Programming', note: 'Tuned the autonomous path' }),
+    s('Sebastian Tolbert', day(1, 15), 2.5, { subteam: 'Assembly', note: 'Shooter mount' }),
+    s('Jackson Lucks', day(1, 16), 2),
+    s('Cooper Mlezcko', day(2, 15), 3.5, { subteam: 'Mechanical', note: 'Drivetrain rebuild' }),
+    s('Sophia Bermudez', day(3, 15), 2, { subteam: 'CAD' }),
+    s('Asher Mosseri', day(8, 15), 4, { subteam: 'Team Management' }),
+    s('Michael Meidan', day(8, 15), 3, { subteam: 'CAD', autoEnded: true }),
+  ];
+}
+function demoPlans() {
+  const iso = (n) => {
+    const d = new Date(Date.now() + n * 86400000);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
+  return [
+    { id: uid(), date: iso(1), start: '15:30', end: '18:00', title: 'Build session', subteam: '', people: { 'Cooper Mlezcko': 'in', 'Sebastian Tolbert': 'in' } },
+    { id: uid(), date: iso(3), start: '15:30', end: '17:30', title: 'Driver practice', subteam: 'Programming', people: { 'Jackson Lucks': 'out' } },
+  ];
 }
 
 // Demo uploads: version id -> object URL (not saved across reloads).
@@ -811,6 +854,48 @@ export const demoStore = {
   },
   async deleteSticker(s) {
     state.stickers = (state.stickers || []).filter((x) => x.id !== s.id);
+    commit();
+  },
+
+  subscribeShifts(cb) {
+    return listen(() => cb([...(state.shifts || [])]));
+  },
+  async startShifts(people, start, extra, actor) {
+    const add = people.map((person) => ({ id: uid(), person, start, end: null, note: '', subteam: '', taskIds: [], ...extra, createdBy: actor.name }));
+    state.shifts = [...(state.shifts || []), ...add];
+    commit();
+  },
+  async updateShift(id, patch, actor) {
+    state.shifts = (state.shifts || []).map((s) => (s.id === id ? { ...s, ...patch, updatedBy: actor.name } : s));
+    commit();
+  },
+  async deleteShift(id) {
+    state.shifts = (state.shifts || []).filter((s) => s.id !== id);
+    commit();
+  },
+  subscribeShiftPlans(cb) {
+    return listen(() => cb([...(state.shiftPlans || [])]));
+  },
+  async addShiftPlans(plans, actor) {
+    state.shiftPlans = [...(state.shiftPlans || []), ...plans.map((p) => ({ id: uid(), ...p, people: {}, createdBy: actor.name }))];
+    commit();
+  },
+  async updateShiftPlan(id, patch) {
+    state.shiftPlans = (state.shiftPlans || []).map((p) => (p.id === id ? { ...p, ...patch } : p));
+    commit();
+  },
+  async rsvpShiftPlan(id, name, answer) {
+    state.shiftPlans = (state.shiftPlans || []).map((p) => {
+      if (p.id !== id) return p;
+      const people = { ...p.people };
+      if (answer) people[name] = answer;
+      else delete people[name];
+      return { ...p, people };
+    });
+    commit();
+  },
+  async deleteShiftPlans(ids) {
+    state.shiftPlans = (state.shiftPlans || []).filter((p) => !ids.includes(p.id));
     commit();
   },
 
