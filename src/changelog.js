@@ -4,6 +4,16 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '2.13',
+    date: '2026-10-21',
+    title: 'Reading clears notifications',
+    items: [
+      'Opening a channel or DM marks its notifications as read in the 🔔 and removes them from your iPad’s notification list.',
+      'Same for tasks: opening a task clears the notifications about it.',
+      'Looking at the board clears the “due tomorrow” reminder.',
+    ],
+  },
+  {
     version: '2.12',
     date: '2026-10-21',
     title: 'Chat opens where you left off',

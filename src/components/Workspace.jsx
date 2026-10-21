@@ -715,6 +715,33 @@ export default function Workspace({ store, actor, rename, renames }) {
 
   const openTask = tasks?.find((t) => t.id === openId) || null;
 
+  // Seeing something clears its notifications: in the bell, and on the phone
+  // (the notification-center entries this app showed).
+  const [pageVisible, setPageVisible] = useState(document.visibilityState === 'visible');
+  useEffect(() => {
+    const onVis = () => setPageVisible(document.visibilityState === 'visible');
+    document.addEventListener('visibilitychange', onVis);
+    return () => document.removeEventListener('visibilitychange', onVis);
+  }, []);
+  const seenTarget = useMemo(() => {
+    if (!pageVisible) return [];
+    const out = [];
+    if (openId) out.push(`task:${openId}`);
+    if (view === 'chat' && currentConv) out.push(`chat:${currentConv.key}`);
+    if (view === 'board') out.push('view:board');
+    return out;
+  }, [pageVisible, openId, view, currentConv]);
+  useEffect(() => {
+    if (!seenTarget.length) return;
+    const ids = inbox.filter((n) => !n.read && seenTarget.includes(n.open)).map((n) => n.id);
+    if (ids.length) store.markInboxRead(actor.name, ids).catch((e) => console.warn('inbox read', e));
+    navigator.serviceWorker
+      ?.getRegistration?.()
+      .then((reg) => reg?.getNotifications?.())
+      .then((list) => list?.forEach((n) => seenTarget.includes(n.data?.open) && n.close()))
+      .catch(() => {});
+  }, [seenTarget, inbox, store, actor.name]);
+
   // Where a notification points: 'task:<id>', 'chat:<channel>', or 'view:<tab>'.
   const liveTasks = useRef(tasks);
   liveTasks.current = tasks;
