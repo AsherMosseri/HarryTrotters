@@ -80,8 +80,23 @@ export default function Composer({
     const el = box.current;
     if (!el) return;
     el.style.height = 'auto';
-    el.style.height = Math.min(el.scrollHeight, 200) + 'px';
+    // Empty: one line. Safari counts a wrapped placeholder in scrollHeight.
+    el.style.height = text ? Math.min(el.scrollHeight, 200) + 'px' : '';
   }, [text]);
+  // The phone ＋ menu closes when you tap anywhere else or press Escape.
+  const moreMenu = useRef(null);
+  const moreBtn = useRef(null);
+  useEffect(() => {
+    if (panel !== 'more') return;
+    const away = (e) => !moreMenu.current?.contains(e.target) && !moreBtn.current?.contains(e.target) && setPanel(null);
+    const esc = (e) => e.key === 'Escape' && setPanel(null);
+    document.addEventListener('pointerdown', away);
+    document.addEventListener('keydown', esc);
+    return () => {
+      document.removeEventListener('pointerdown', away);
+      document.removeEventListener('keydown', esc);
+    };
+  }, [panel]);
 
   const subteamMembers = (s) => roster.filter((n) => people?.infoOf(n)?.subteams?.includes(s));
 
@@ -363,11 +378,17 @@ export default function Composer({
         {!editing && (
           <>
             {/* Phones: one ＋ button with a menu; wider screens show the buttons. */}
-            <button className="icon-btn show-phone" onClick={() => setPanel(panel === 'more' ? null : 'more')} aria-label="Add" title="Add">
+            <button
+              ref={moreBtn}
+              className="icon-btn show-phone"
+              onClick={() => setPanel(panel === 'more' ? null : 'more')}
+              aria-label="Add"
+              title="Add"
+            >
               ＋
             </button>
             {panel === 'more' && (
-              <div className="composer-more">
+              <div className="composer-more" ref={moreMenu}>
                 <button onClick={() => (setPanel(null), fileInput.current?.click())}>📷 Photo</button>
                 <button onClick={() => setPanel('gif')}>🎞 GIF</button>
                 <button onClick={() => setPanel('poll')}>📊 Poll</button>

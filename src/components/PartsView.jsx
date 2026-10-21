@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { SUBTEAMS } from '../config.js';
 import { PART_STATUSES } from '../data/diff.js';
-import { relTime } from '../util.js';
+import { relTime, useEscape } from '../util.js';
 import { CloseIcon, PlusIcon } from './common.jsx';
 
 const VENDORS = ['goBILDA', 'REV Robotics', 'AndyMark', 'ServoCity', 'McMaster-Carr', 'Amazon', 'Home Depot'];
@@ -27,6 +27,7 @@ export function PartStatusSelect({ value, onChange }) {
 }
 
 function PartDialog({ part, tasks, onClose, onSave, onDelete }) {
+  useEscape(onClose);
   const [form, setForm] = useState({
     name: part.name || '',
     vendor: part.vendor || '',

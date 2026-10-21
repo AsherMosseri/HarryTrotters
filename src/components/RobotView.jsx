@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { RobotScene } from '../robot/scene.js';
 import { loadModel, diffModels } from '../robot/model.js';
-import { relTime } from '../util.js';
+import { relTime, useEscape } from '../util.js';
 import { CloseIcon, PlusIcon, StatusDot } from './common.jsx';
 
 // Models are kept per version so switching back is instant. A model object can
@@ -44,6 +44,7 @@ function UploadDialog({ onClose, onUpload }) {
   const [name, setName] = useState('');
   const [notes, setNotes] = useState('');
   const [progress, setProgress] = useState(null);
+  useEscape(onClose, progress === null);
 
   const pick = async (f) => {
     setFile(f);
@@ -150,6 +151,7 @@ function UploadDialog({ onClose, onUpload }) {
 }
 
 function PinDialog({ draft, partName, tasks, parts, onClose, onSave }) {
+  useEscape(onClose);
   const [text, setText] = useState('');
   const [taskId, setTaskId] = useState('');
   const [partId, setPartId] = useState('');

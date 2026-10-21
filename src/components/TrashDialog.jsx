@@ -1,7 +1,8 @@
-import { relTime } from '../util.js';
+import { relTime, useEscape } from '../util.js';
 import { CloseIcon, StatusDot } from './common.jsx';
 
 export default function TrashDialog({ trash, days, isManager, api, onClose }) {
+  useEscape(onClose);
   const daysLeft = (t) => Math.max(0, Math.ceil(days - (Date.now() - t.deletedAt) / 86400000));
   return (
     <div className="panel-backdrop center" onClick={onClose}>

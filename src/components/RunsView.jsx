@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { shortDate, todayISO } from '../milestones.js';
 import { Avatar, CloseIcon, PlusIcon } from './common.jsx';
+import { useEscape } from '../util.js';
 
 const PERIODS = [
   { key: 'auto', label: 'Auto' },
@@ -147,6 +148,7 @@ function ScoreChart({ runs }) {
 }
 
 function RunDialog({ run, roster, onClose, onSave, onDelete }) {
+  useEscape(onClose);
   const isNew = !run.id;
   const [form, setForm] = useState({
     date: run.date || todayISO(),

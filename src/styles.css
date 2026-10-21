@@ -285,7 +285,7 @@ a { color: var(--accent); }
 .col-title { width: 38%; min-width: 260px; }
 .title-cell { display: flex; align-items: center; gap: 8px; }
 .draft {
-  flex: 1; min-width: 0; border: 0; background: transparent; padding: 6px 8px; margin: -6px -8px;
+  flex: 1; min-width: 0; text-overflow: ellipsis; border: 0; background: transparent; padding: 6px 8px; margin: -6px -8px;
   border-radius: 8px; font-weight: 600;
 }
 .draft:hover { background: var(--surface-2); }
@@ -880,6 +880,7 @@ div.org-member { cursor: default; }
   flex: 1; resize: none; min-height: 40px; max-height: 160px; padding: 9px 12px; border-radius: 10px;
   border: 1px solid var(--border); background: var(--surface-2); font-size: 16px; line-height: 1.35;
 }
+.composer-row textarea::placeholder { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .suggest {
   position: absolute; left: 10px; right: 10px; bottom: 100%; margin: 0 0 4px; padding: 4px; list-style: none; z-index: 6;
   background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow-lg);
@@ -1311,6 +1312,7 @@ h3.md-h { font-size: 16.5px; }
   .tl-scroll { --label: 150px; }
   .tl-label .ms-state { display: none; }
   .org-branches { grid-template-columns: 1fr 1fr; padding-top: 0; }
+  .org-branches .org-member b { white-space: normal; overflow-wrap: anywhere; }
   .org-branches::before, .org-branches > .org-box::before { display: none; }
   .org-staff-line { width: 14px; }
   .org-staff-row + .org-stem { display: none; }
@@ -1594,7 +1596,7 @@ h3.md-h { font-size: 16.5px; }
 .dialog.shift-dialog .fields { margin-bottom: 4px; }
 @media (max-width: 760px) {
   .shift-grid { grid-template-columns: 1fr; }
-  .shift-board li { grid-template-columns: 22px 24px minmax(70px, 110px) minmax(0, 1fr) 50px; }
+  .shift-board li { grid-template-columns: 22px 24px minmax(0, 1fr) 56px 50px; }
   .shift-pop { position: fixed; left: 8px; right: 8px; top: 58px; width: auto; }
 }
 
@@ -1804,13 +1806,15 @@ h3.md-h { font-size: 16.5px; }
   .whats-new-version { max-height: none; overflow: visible; }
   /* Parts: cards instead of a wide table. */
   .parts-grid thead { display: none; }
-  .parts-grid, .parts-grid tbody { display: block; width: 100%; }
+  .parts-grid, .parts-grid tbody { display: block; width: 100%; min-width: 0; }
   .parts-grid tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; padding: 12px 14px; border-bottom: 1px solid var(--border); }
   .parts-grid td { display: block; padding: 0; border: 0; }
   .parts-grid td:nth-child(2) { grid-column: 2; grid-row: 1; align-self: start; }
   .parts-grid td:nth-child(3), .parts-grid td:nth-child(4), .parts-grid td:nth-child(5) { grid-column: 1 / -1; font-size: 14px; }
   .parts-grid td:nth-child(4)::before { content: 'Qty '; color: var(--muted); }
-  .parts-grid td:nth-child(5) { text-align: left; }
+  .parts-grid td:nth-child(4), .parts-grid td:nth-child(5) { text-align: left; }
+  /* No vendor or task: hide the "—" instead of showing an empty row. */
+  .parts-grid td:nth-child(3):has(> .muted:only-child), .parts-grid td:nth-child(6):has(> .muted:only-child) { display: none; }
   .parts-grid td:nth-child(6) { grid-column: 1 / -1; }
   .parts-grid td:nth-child(7) { display: none; }
 }
@@ -1821,9 +1825,11 @@ h3.md-h { font-size: 16.5px; }
 }
 /* Phones: toasts sit above the bottom tab bar. */
 .app:has(.bottom-nav) .toast { bottom: calc(84px + env(safe-area-inset-bottom)); }
+/* …and above the message box on screens with chat. */
+.app:has(.bottom-nav):has(.composer) .toast { bottom: calc(150px + env(safe-area-inset-bottom)); }
 /* Phones: chat's search, pins, and members panels stop above the tab bar. */
 .app:has(.bottom-nav) .chat-side { bottom: calc(76px + env(safe-area-inset-bottom)); }
-@media (max-width: 760px) {
+@media (max-width: 1000px) {
   /* Shifts schedule: the buttons get their own line so the title isn't squeezed. */
   .shift-plans li .grow { flex: 1 1 calc(100% - 110px); min-width: 0; }
   .plan-actions { flex: 1 1 100%; justify-content: flex-end; }
@@ -1839,4 +1845,8 @@ h3.md-h { font-size: 16.5px; }
   /* The profile card is a card that fits its content, in the middle of the screen. */
   .panel-backdrop.center:has(> .dialog.profile-card) { align-items: center; padding: 16px; }
   .panel-backdrop.center > .dialog.profile-card { width: min(400px, 100%); height: auto; max-height: 100%; border-radius: 16px; padding-bottom: 0; }
+}
+@media (max-width: 760px) {
+  /* With a pop-up open (it covers the tab bar), messages sit at the very bottom edge. */
+  .app:has(.bottom-nav):has(.panel-backdrop) .toast { bottom: max(12px, env(safe-area-inset-bottom)); }
 }

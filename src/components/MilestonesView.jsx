@@ -12,6 +12,7 @@ import {
   todayISO,
 } from '../milestones.js';
 import { Avatar, AvatarStack, CloseIcon, DraftInput, PlusIcon, StatusDot } from './common.jsx';
+import { useEscape } from '../util.js';
 
 const colorOf = (subteam) => SUBTEAM_COLORS[subteam] || 'var(--accent)';
 
@@ -132,6 +133,7 @@ function Timeline({ items, competitionDate, onOpen }) {
 }
 
 export function MilestoneDialog({ roster, onClose, onCreate }) {
+  useEscape(onClose);
   const today = todayISO();
   const [form, setForm] = useState({ title: '', subteam: '', owners: [], start: today, end: addDays(today, 6), notes: '' });
   const set = (patch) => setForm((f) => ({ ...f, ...patch }));
@@ -204,6 +206,7 @@ export function MilestoneDialog({ roster, onClose, onCreate }) {
 }
 
 function MilestonePanel({ item, roster, api, isManager, onClose, onOpenTask, onAddTask }) {
+  useEscape(onClose);
   const { m, progress, state } = item;
   const set = (patch) => api.updateMilestone(m, patch);
   const statusRank = Object.fromEntries(STATUSES.map((s, i) => [s.id, i]));

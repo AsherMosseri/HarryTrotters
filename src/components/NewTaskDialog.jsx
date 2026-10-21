@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { STATUSES, SUBTEAMS, PRIORITIES } from '../config.js';
 import { Avatar, CloseIcon } from './common.jsx';
+import { useEscape } from '../util.js';
 
 export default function NewTaskDialog({ initial, roster, milestones = [], me, onClose, onCreate }) {
+  useEscape(onClose);
   const [form, setForm] = useState({
     title: initial.title || '',
     status: initial.status || 'todo',

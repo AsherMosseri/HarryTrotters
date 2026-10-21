@@ -4,6 +4,19 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '2.35',
+    date: '2026-10-21',
+    title: 'More phone polish',
+    items: [
+      'The chat box stays one line when it’s empty (it was growing to two lines on iPhone), and long channel names in it end with “…”.',
+      'The chat ＋ menu closes when you tap anywhere else.',
+      'Parts cards show the status and quantity again, and skip empty vendor or task lines.',
+      'Long task titles in Table end with “…”; Team and the hours list show full names.',
+      'Messages at the bottom no longer cover the chat box or a pop-up’s buttons.',
+      'Every pop-up closes with Escape on a keyboard, and Shift schedule rows fit on an iPad held upright.',
+    ],
+  },
+  {
     version: '2.34',
     date: '2026-10-21',
     title: 'Pop-ups fit phones',

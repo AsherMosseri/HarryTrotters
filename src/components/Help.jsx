@@ -3,6 +3,7 @@ import { REQUESTS_TO, TEAM_NAME } from '../config.js';
 import { CHANGELOG, VERSION } from '../changelog.js';
 import { CloseIcon } from './common.jsx';
 import { checkForUpdate } from './UpdateGate.jsx';
+import { useEscape } from '../util.js';
 
 const QUICK_TIPS = [
   ['+', 'Add a task', 'Tap + New task, or the + at the top of a column. Give it an owner and a due date.'],
@@ -170,6 +171,7 @@ function Rules() {
 
 // Shown once per device after joining.
 export function WelcomeCard({ name, showRobot, pushStatus, onEnablePush, onClose }) {
+  useEscape(onClose);
   const [busy, setBusy] = useState(false);
   return (
     <div className="panel-backdrop center" onClick={onClose}>

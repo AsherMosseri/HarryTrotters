@@ -15,6 +15,7 @@ import { PlusIcon } from './common.jsx';
 import { personId } from '../data/diff.js';
 import { todayISO } from '../milestones.js';
 import { Avatar, CloseIcon } from './common.jsx';
+import { useEscape } from '../util.js';
 
 // Team Management sits under the team name with the subteams below it;
 // Secretary is a support role that hangs off to the side of Team Management.
@@ -34,6 +35,7 @@ function SubteamPill({ name }) {
 // Managers' names are tied to their manager codes in the security rules, so
 // they can't be renamed here.
 function PersonDialog({ person, taken, onClose, onSave, onRemove }) {
+  useEscape(onClose);
   const [name, setName] = useState(person.name || '');
   const canRename = !person.isNew && !isManagerName(person.name);
   const nameChanged = person.isNew || name.trim() !== person.name;

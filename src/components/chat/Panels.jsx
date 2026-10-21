@@ -4,6 +4,7 @@ import { activeStatus } from '../../people.js';
 import { Avatar, CloseIcon, DisplayName, usePeople } from '../common.jsx';
 import { renderRich } from './format.jsx';
 import { timeOf } from './Message.jsx';
+import { useEscape } from '../../util.js';
 
 const dateOf = (ms) => new Date(ms).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 
@@ -207,6 +208,7 @@ export const slugChannel = (name) =>
 
 // Team management: add or edit a channel.
 export function ChannelDialog({ channel, channels, onSave, onDelete, onMove, onClose }) {
+  useEscape(onClose);
   const [name, setName] = useState(channel?.name || '');
   const [topic, setTopic] = useState(channel?.topic || '');
   const [subteam, setSubteam] = useState(channel?.subteam || '');
@@ -301,6 +303,7 @@ export function ChannelDialog({ channel, channels, onSave, onDelete, onMove, onC
 
 // Start a DM with one person, or a group DM.
 export function NewDmDialog({ roster, actor, onStart, onClose }) {
+  useEscape(onClose);
   const [picked, setPicked] = useState([]);
   const [name, setName] = useState('');
   const others = roster.filter((n) => n !== actor.name);

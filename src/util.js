@@ -109,6 +109,16 @@ export async function preparePhoto(file) {
 }
 
 // True while a media query matches (e.g. phone width), updating live.
+// Close a pop-up with the Escape key (when `on`).
+export function useEscape(onClose, on = true) {
+  useEffect(() => {
+    if (!on) return;
+    const key = (e) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', key);
+    return () => window.removeEventListener('keydown', key);
+  }, [onClose, on]);
+}
+
 export function useMedia(query) {
   const [on, setOn] = useState(() => typeof matchMedia === 'function' && matchMedia(query).matches);
   useEffect(() => {
