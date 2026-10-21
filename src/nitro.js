@@ -74,7 +74,25 @@ export const PALETTES = [
   { id: 'chroma', label: 'Chroma', colors: ['#f43f5e', '#22d3ee'] },
 ];
 
-// Inline style for a display name: chosen font, one color, or a two-color gradient.
+// Gradient color stops for 2–3 colors. Each color holds for part of its
+// stretch before blending (sharp: 0 blends the whole way, 1 is hard bands),
+// so gradients look crisp instead of smeared.
+export const DEFAULT_SHARP = 0.35;
+export function gradientStops(colors, sharp = DEFAULT_SHARP) {
+  const cs = colors.filter(Boolean).slice(0, 3);
+  if (cs.length < 2) return `${cs[0] || 'transparent'}, ${cs[0] || 'transparent'}`;
+  const seg = 100 / cs.length;
+  const hold = seg * sharp;
+  return cs
+    .map((c, i) => {
+      const from = i === 0 ? 0 : (i + 0.5) * seg - hold / 2;
+      const to = i === cs.length - 1 ? 100 : (i + 0.5) * seg + hold / 2;
+      return `${c} ${from.toFixed(1)}% ${to.toFixed(1)}%`;
+    })
+    .join(', ');
+}
+
+// Inline style for a display name: chosen font, one color, or a 2–3 color gradient.
 export function nameStyle(profile, fallbackColor) {
   const s = profile?.nameStyle || {};
   const style = {};
@@ -82,7 +100,7 @@ export function nameStyle(profile, fallbackColor) {
   if (font) style.fontFamily = font;
   const colors = (s.colors || []).filter(Boolean);
   if (colors.length >= 2) {
-    style.backgroundImage = `linear-gradient(90deg, ${colors[0]}, ${colors[1]})`;
+    style.backgroundImage = `linear-gradient(90deg, ${gradientStops(colors)})`;
     style.WebkitBackgroundClip = 'text';
     style.backgroundClip = 'text';
     style.color = 'transparent';

@@ -2,7 +2,9 @@
 // (pictures, about me, Nitro-style looks, status).
 import { useEffect, useRef, useState } from 'react';
 import { SUBTEAM_COLORS, gradeLabel } from '../config.js';
-import { DECORATIONS, EFFECTS, MOTIONS, NAME_FONTS, SWATCHES, effectById, nameStyle } from '../nitro.js';
+import { DECORATIONS, EFFECTS, MOTIONS, NAME_FONTS, SWATCHES, effectById, gradientStops, nameStyle } from '../nitro.js';
+import { DEFAULT_BORDER, borderProps } from '../borders.js';
+import BorderEditor from './BorderEditor.jsx';
 import { EmojiPicker, GifPicker } from './chat/Pickers.jsx';
 import { activeStatus } from '../people.js';
 import { Avatar, CloseIcon, usePeople } from './common.jsx';
@@ -178,7 +180,9 @@ function CardBody({ name, look, actor, tasks, children }) {
   return (
     <div
       className={`profile-body${themed ? ' themed' : ''}`}
-      style={themed ? { '--pa': profile.theme.a, '--pb': profile.theme.b } : undefined}
+      style={
+        themed ? { '--pgrad': `linear-gradient(180deg, ${gradientStops([profile.theme.a, profile.theme.m, profile.theme.b])})` } : undefined
+      }
     >
       <ProfileEffect id={profile.effect} custom={profile.effectCustom} />
       <div
@@ -251,10 +255,18 @@ function CardBody({ name, look, actor, tasks, children }) {
 
 export function ProfileCard({ name, actor, tasks, onClose, onMessage, onEdit }) {
   useEscape(onClose);
+  const people = usePeople();
   const me = name === actor.name;
+  const border = borderProps(people?.profileOf(name)?.cardBorder);
   return (
     <div className="panel-backdrop center" onClick={onClose}>
-      <div className="dialog profile-card" onClick={(e) => e.stopPropagation()} role="dialog" aria-label={name}>
+      <div
+        className={`dialog profile-card ${border.className}`}
+        style={border.style}
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-label={name}
+      >
         <button className="icon-btn profile-close" onClick={onClose} aria-label="Close">
           <CloseIcon />
         </button>
@@ -413,11 +425,14 @@ export function ProfileEditor({ name, actor, api, tasks = [], onClose }) {
   const me = name === actor.name;
   const current = activeStatus(profile);
   const [tab, setTab] = useState('profile');
+  const [borderFor, setBorderFor] = useState('card');
   const [look, setLook] = useState({
     about: profile.about || '',
     pronouns: profile.pronouns || '',
     decoration: profile.decoration || '',
     decorationCustom: profile.decorationCustom || null,
+    cardBorder: profile.cardBorder || null,
+    msgBorder: profile.msgBorder || null,
     effect: profile.effect || '',
     effectCustom: profile.effectCustom || null,
     nameStyle: profile.nameStyle || { font: '', colors: [] },
@@ -590,7 +605,18 @@ export function ProfileEditor({ name, actor, api, tasks = [], onClose }) {
                       <p className="muted tiny">Second color for a gradient (optional):</p>
                       <ColorRow
                         value={colors[1] || ''}
-                        onChange={(c) => set({ nameStyle: { ...look.nameStyle, colors: [colors[0], c] } })}
+                        onChange={(c) =>
+                          set({ nameStyle: { ...look.nameStyle, colors: c ? [colors[0], c, colors[2] || ''] : [colors[0]] } })
+                        }
+                      />
+                    </>
+                  )}
+                  {colors[0] && colors[1] && (
+                    <>
+                      <p className="muted tiny">Third color (optional):</p>
+                      <ColorRow
+                        value={colors[2] || ''}
+                        onChange={(c) => set({ nameStyle: { ...look.nameStyle, colors: [colors[0], colors[1], c] } })}
                       />
                     </>
                   )}
@@ -649,15 +675,35 @@ export function ProfileEditor({ name, actor, api, tasks = [], onClose }) {
                       <input
                         type="color"
                         value={look.theme?.a || '#6366f1'}
-                        onChange={(e) => set({ theme: { a: e.target.value, b: look.theme?.b || '#ec4899' } })}
+                        onChange={(e) => set({ theme: { ...look.theme, a: e.target.value, b: look.theme?.b || '#ec4899' } })}
                       />
                     </label>
+                    {look.theme?.m ? (
+                      <label className="row gap-sm small">
+                        Middle{' '}
+                        <input type="color" value={look.theme.m} onChange={(e) => set({ theme: { ...look.theme, m: e.target.value } })} />
+                        <button
+                          className="icon-btn small"
+                          aria-label="Remove middle color"
+                          onClick={() => set({ theme: { a: look.theme.a, b: look.theme.b } })}
+                        >
+                          <CloseIcon />
+                        </button>
+                      </label>
+                    ) : (
+                      <button
+                        className="link-btn small"
+                        onClick={() => set({ theme: { a: look.theme?.a || '#6366f1', b: look.theme?.b || '#ec4899', m: '#f59e0b' } })}
+                      >
+                        ＋ Middle color
+                      </button>
+                    )}
                     <label className="row gap-sm small">
                       Bottom{' '}
                       <input
                         type="color"
                         value={look.theme?.b || '#ec4899'}
-                        onChange={(e) => set({ theme: { a: look.theme?.a || '#6366f1', b: e.target.value } })}
+                        onChange={(e) => set({ theme: { ...look.theme, a: look.theme?.a || '#6366f1', b: e.target.value } })}
                       />
                     </label>
                     {look.theme && (
@@ -666,6 +712,57 @@ export function ProfileEditor({ name, actor, api, tasks = [], onClose }) {
                       </button>
                     )}
                   </div>
+                  <h3 className="field-label">Borders</h3>
+                  <div className="segmented">
+                    {[
+                      ['card', 'Profile card'],
+                      ['msg', 'My messages'],
+                      ['avatar', 'Avatar'],
+                    ].map(([id, label]) => (
+                      <button key={id} className={`plain-seg${borderFor === id ? ' on' : ''}`} onClick={() => setBorderFor(id)}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  {borderFor === 'card' && (
+                    <BorderEditor
+                      value={look.cardBorder || { ...DEFAULT_BORDER, style: 'none' }}
+                      onChange={(cardBorder) => set({ cardBorder })}
+                    />
+                  )}
+                  {borderFor === 'msg' && (
+                    <BorderEditor
+                      value={look.msgBorder || { ...DEFAULT_BORDER, style: 'none', radius: 12 }}
+                      maxRadius={24}
+                      onChange={(msgBorder) => set({ msgBorder })}
+                      sample={
+                        <div className="border-sample">
+                          <span className={`msg-text ${borderProps(look.msgBorder).className}`} style={borderProps(look.msgBorder).style}>
+                            This is how your messages look.
+                          </span>
+                        </div>
+                      }
+                    />
+                  )}
+                  {borderFor === 'avatar' && (
+                    <div className="border-editor">
+                      <p className="muted small">
+                        Your avatar’s border is its decoration ring: any style, up to 3 colors, thickness, and spin.
+                      </p>
+                      <button
+                        className="btn"
+                        onClick={() => {
+                          set(look.decorationCustom ? { decoration: 'custom' } : { decoration: 'custom', decorationCustom: DEFAULT_DECO });
+                          setTimeout(
+                            () => document.querySelector('.deco-editor')?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
+                            50,
+                          );
+                        }}
+                      >
+                        Edit my avatar border
+                      </button>
+                    </div>
+                  )}
                 </>
               )}
               {tab === 'status' && me && (
@@ -737,7 +834,10 @@ export function ProfileEditor({ name, actor, api, tasks = [], onClose }) {
             </div>
             <div className="editor-preview">
               <h3 className="field-label">Preview</h3>
-              <div className="profile-card preview-card">
+              <div
+                className={`profile-card preview-card ${borderProps(look.cardBorder).className}`}
+                style={borderProps(look.cardBorder).style}
+              >
                 <CardBody
                   name={name}
                   actor={actor}

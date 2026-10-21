@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { personId } from '../../data/diff.js';
-import { Avatar, DisplayName, StatusDot } from '../common.jsx';
+import { Avatar, DisplayName, StatusDot, usePeople } from '../common.jsx';
+import { borderProps } from '../../borders.js';
 import { isJumbo, renderRich } from './format.jsx';
 import { EmojiPicker } from './Pickers.jsx';
 import { CUSTOM_RE } from './emoji.js';
@@ -225,6 +226,8 @@ export default function Message({
   const [picker, setPicker] = useState(false);
   const [removing, setRemoving] = useState(false);
   const mine = m.byUid === actor.uid;
+  // The author's message border (Edit profile → Style → Borders).
+  const frame = borderProps(usePeople()?.profileOf(m.by)?.msgBorder);
   const reactions = Object.entries(m.reactions || {}).filter(([, who]) => who && Object.keys(who).length);
   const myRoles = ctx.myRoles || [];
   // Highlight messages that ping me (not my own).
@@ -292,7 +295,7 @@ export default function Message({
         ) : (
           <>
             {m.text && !m.poll && (
-              <div className={`msg-text${jumbo ? ' jumbo' : ''}`}>
+              <div className={`msg-text${jumbo ? ' jumbo' : ''} ${frame.className}`} style={frame.style}>
                 {renderRich(m.text, ctx)}
                 {m.editedAt && <span className="muted tiny edited"> (edited)</span>}
               </div>

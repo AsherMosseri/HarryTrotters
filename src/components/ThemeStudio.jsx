@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { SWATCHES } from '../nitro.js';
+import { SWATCHES, gradientStops } from '../nitro.js';
+import GradientColors from './GradientColors.jsx';
 import { preparePhoto } from '../util.js';
 import { EmojiPicker, GifPicker } from './chat/Pickers.jsx';
 import { CloseIcon } from './common.jsx';
@@ -26,6 +27,7 @@ const FX_PRESETS = [
 export function themeFromProfile(profile = {}, fallback = '') {
   const a = profile.theme?.a || profile.bannerColor || fallback || CUSTOM_DEFAULT.colors[0];
   const b = profile.theme?.b || a;
+  const m = profile.theme?.m;
   const fx =
     profile.effect === 'custom' && profile.effectCustom?.value
       ? profile.effectCustom
@@ -35,7 +37,7 @@ export function themeFromProfile(profile = {}, fallback = '') {
   return {
     ...CUSTOM_DEFAULT,
     accent: a,
-    colors: [a, b],
+    colors: m ? [a, m, b] : [a, b],
     tint: 24,
     bg: profile.banner?.url ? { kind: 'image', value: profile.banner.url } : null,
     show: 35,
@@ -52,13 +54,17 @@ const emojiTile = (emoji) =>
 export function applyThemeVars(t) {
   const root = document.documentElement.style;
   if (!t) {
-    for (const k of ['--accent', '--p1', '--p2', '--tint']) root.removeProperty(k);
+    for (const k of ['--accent', '--p1', '--p2', '--tint', '--theme-grad', '--theme-grad-shift']) root.removeProperty(k);
     return;
   }
   root.setProperty('--accent', t.accent);
   root.setProperty('--p1', t.colors[0]);
   root.setProperty('--p2', t.colors[1]);
   root.setProperty('--tint', `${t.tint}%`);
+  // Up to three colors, each mixed into the page color.
+  const mixed = t.colors.filter(Boolean).map((c) => `color-mix(in srgb, ${c} ${t.tint}%, var(--bg))`);
+  root.setProperty('--theme-grad', `linear-gradient(160deg, ${gradientStops(mixed, 0.2)})`);
+  root.setProperty('--theme-grad-shift', `linear-gradient(120deg, ${[...mixed, mixed[0]].join(', ')})`);
 }
 
 // Behind the whole app: moving colors, a picture/GIF or emoji pattern, and
@@ -179,8 +185,7 @@ export default function ThemeStudio({ value, onChange, profile, profileColor, up
 
         <h3 className="studio-h">Background colors</h3>
         <div className="studio-two">
-          <ColorPick label="First color" value={t.colors[0]} onChange={(c) => set({ colors: [c, t.colors[1]] })} />
-          <ColorPick label="Second color" value={t.colors[1]} onChange={(c) => set({ colors: [t.colors[0], c] })} />
+          <GradientColors label="Background color" colors={t.colors} onChange={(colors) => set({ colors })} />
         </div>
         <label className="studio-range">
           <span>Strength</span>

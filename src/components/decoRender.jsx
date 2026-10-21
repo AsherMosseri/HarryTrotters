@@ -1,9 +1,11 @@
+import { gradientStops } from '../nitro.js';
+
 // Draws a custom avatar decoration: a ring (style, colors, thickness, spin)
 // and up to three stickers (emoji, GIF, or picture) placed anywhere on or
 // around the avatar, each sized, rotated, and animated.
 //
 // custom = {
-//   ring: { style, colors: [a, b], width (% of avatar), spin: '' | 'cw' | 'ccw', speed (s) },
+//   ring: { style, colors: [a, b, c?], width (% of avatar), spin: '' | 'cw' | 'ccw', speed (s) },
 //   badges: [{ kind: 'emoji' | 'image', value, path?, angle (°, 0 = top), dist (0 center … 0.75 outside),
 //              size (× avatar), rotate (°), anim, dir: 'cw' | 'ccw', speed (s) }],
 // }
@@ -33,19 +35,22 @@ export const DEFAULT_DECO = {
 };
 
 function ringBackground({ style, colors = [] }) {
-  const [a = '#8b5cf6', b = '#06b6d4'] = colors;
+  const cs = colors.filter(Boolean);
+  const [a = '#8b5cf6', b = '#06b6d4', c] = cs;
   switch (style) {
     case 'solid':
     case 'glow':
       return a;
     case 'gradient':
-      return `linear-gradient(135deg, ${a}, ${b})`;
+      return `linear-gradient(135deg, ${gradientStops([a, b, c])})`;
     case 'duo':
-      return `conic-gradient(${a} 0 50%, ${b} 50% 100%)`;
+      return c ? `conic-gradient(${a} 0 33.3%, ${b} 33.3% 66.6%, ${c} 66.6% 100%)` : `conic-gradient(${a} 0 50%, ${b} 50% 100%)`;
     case 'rainbow':
       return 'conic-gradient(#ef4444, #f97316, #eab308, #22c55e, #06b6d4, #6366f1, #d946ef, #ef4444)';
     case 'dashed':
-      return `repeating-conic-gradient(${a} 0 14deg, transparent 14deg 22deg, ${b} 22deg 36deg, transparent 36deg 44deg)`;
+      return c
+        ? `repeating-conic-gradient(${a} 0 12deg, transparent 12deg 20deg, ${b} 20deg 32deg, transparent 32deg 40deg, ${c} 40deg 52deg, transparent 52deg 60deg)`
+        : `repeating-conic-gradient(${a} 0 14deg, transparent 14deg 22deg, ${b} 22deg 36deg, transparent 36deg 44deg)`;
     case 'dots':
       return `repeating-conic-gradient(${a} 0 8deg, transparent 8deg 30deg)`;
     default:

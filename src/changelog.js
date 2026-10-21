@@ -4,6 +4,17 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '2.30',
+    date: '2026-10-21',
+    title: 'Three-color gradients and custom borders',
+    items: [
+      'Gradients can have an optional third color: your name, your profile colors (add a middle color), your avatar ring, and custom app themes.',
+      'Gradients look crisper: each color holds a bit before blending.',
+      'Custom borders (Edit profile → Style → Borders): around your profile card and around your chat messages. Solid, gradient (up to 3 colors), rainbow, dashed, dotted, double, or glow, with any thickness and roundness, and spin, shimmer, or pulse.',
+      'The Avatar border option jumps to your custom avatar ring.',
+    ],
+  },
+  {
     version: '2.29',
     date: '2026-10-21',
     title: 'Custom avatar decorations',

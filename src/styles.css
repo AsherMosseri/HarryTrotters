@@ -1340,7 +1340,7 @@ h3.md-h { font-size: 16.5px; }
 
 /* profile card */
 .profile-body { position: relative; display: flex; flex-direction: column; padding: 0 20px 18px; }
-.profile-body.themed { background: linear-gradient(180deg, var(--pa), var(--pb)); }
+.profile-body.themed { background: var(--pgrad); }
 .profile-inner { position: relative; z-index: 2; display: flex; flex-direction: column; }
 .profile-body.themed .profile-inner { margin: 6px -8px 0; padding: 10px; border-radius: 12px; background: color-mix(in srgb, var(--surface) 88%, transparent); }
 .profile-inner > h2 { margin: 4px 0 0; font-size: 21px; line-height: 1.25; }
@@ -1435,7 +1435,7 @@ h3.md-h { font-size: 16.5px; }
 
 /* app color themes */
 :root[data-palette] { --accent-soft: color-mix(in srgb, var(--accent) 16%, var(--surface)); }
-:root[data-palette] body { background: linear-gradient(160deg, color-mix(in srgb, var(--p1) var(--tint, 16%), var(--bg)), color-mix(in srgb, var(--p2) var(--tint, 16%), var(--bg))) fixed; }
+:root[data-palette] body { background: var(--theme-grad, linear-gradient(160deg, color-mix(in srgb, var(--p1) var(--tint, 16%), var(--bg)), color-mix(in srgb, var(--p2) var(--tint, 16%), var(--bg)))) fixed; }
 :root[data-palette='midnight'] { --accent: #6366f1; --p1: #6366f1; --p2: #0ea5e9; }
 :root[data-palette='sunset'] { --accent: #f97316; --p1: #f97316; --p2: #db2777; }
 :root[data-palette='ocean'] { --accent: #0891b2; --p1: #0891b2; --p2: #2563eb; }
@@ -1642,9 +1642,9 @@ h3.md-h { font-size: 16.5px; }
 #root { position: relative; isolation: isolate; }
 .app-backdrop { position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; }
 .app-backdrop.shift {
-  background: linear-gradient(120deg,
+  background: var(--theme-grad-shift, linear-gradient(120deg,
     color-mix(in srgb, var(--p1) var(--tint, 16%), var(--bg)), color-mix(in srgb, var(--p2) var(--tint, 16%), var(--bg)),
-    color-mix(in srgb, var(--p1) var(--tint, 16%), var(--bg)));
+    color-mix(in srgb, var(--p1) var(--tint, 16%), var(--bg))));
   background-size: 300% 300%; animation: bg-shift 16s ease-in-out infinite;
 }
 @keyframes bg-shift { 50% { background-position: 100% 50%; } }
@@ -1701,3 +1701,17 @@ h3.md-h { font-size: 16.5px; }
 .deco-sticker-tab.on { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
 .deco-sticker-tab img { width: 30px; height: 30px; object-fit: contain; }
 .deco-sticker { display: flex; flex-direction: column; gap: 8px; }
+
+/* ---------- custom borders (src/borders.js) ---------- */
+@property --cb-angle { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+.custom-border.cb-spin { animation: cb-spin 4s linear infinite; }
+@keyframes cb-spin { to { --cb-angle: 360deg; } }
+.custom-border.cb-shimmer { animation: cb-shimmer 5s ease-in-out infinite; }
+@keyframes cb-shimmer { 0%, 100% { background-position: 0 0, 0% 50%; } 50% { background-position: 0 0, 100% 50%; } }
+.custom-border.cb-pulse { animation: cb-pulse 1.8s ease-in-out infinite; }
+@keyframes cb-pulse { 50% { box-shadow: 0 0 18px 2px var(--cb-glow); } }
+@media (prefers-reduced-motion: reduce) { .custom-border { animation: none !important; } }
+.msg-text.custom-border { display: inline-block; max-width: 100%; padding: 4px 10px; margin: 2px 0; }
+.gradient-colors { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+.border-editor { display: flex; flex-direction: column; gap: 10px; padding: 12px; border: 1px dashed var(--border); border-radius: 12px; }
+.border-sample { align-self: stretch; padding: 8px 12px; }

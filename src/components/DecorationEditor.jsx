@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { SWATCHES } from '../nitro.js';
 import { EmojiPicker, GifPicker } from './chat/Pickers.jsx';
 import { Avatar } from './common.jsx';
+import GradientColors from './GradientColors.jsx';
 import { BADGE_ANIMS, DEFAULT_DECO, RING_STYLES } from './decoRender.jsx';
 import { shrinkParticle } from './People.jsx';
 
@@ -180,11 +181,12 @@ export default function DecorationEditor({ name, value, onChange, upload }) {
       <Chips label="Ring style" options={RING_STYLES} value={d.ring.style} onChange={(style) => setRing({ style })} />
       {d.ring.style !== 'none' && (
         <>
-          {d.ring.style !== 'rainbow' && (
-            <Colors label="Ring color" value={d.ring.colors[0]} onChange={(c) => setRing({ colors: [c, d.ring.colors[1]] })} />
-          )}
-          {['gradient', 'duo', 'dashed'].includes(d.ring.style) && (
-            <Colors label="Second ring color" value={d.ring.colors[1]} onChange={(c) => setRing({ colors: [d.ring.colors[0], c] })} />
+          {['gradient', 'duo', 'dashed'].includes(d.ring.style) ? (
+            <GradientColors label="Ring color" colors={d.ring.colors} onChange={(colors) => setRing({ colors })} />
+          ) : (
+            d.ring.style !== 'rainbow' && (
+              <Colors label="Ring color" value={d.ring.colors[0]} onChange={(c) => setRing({ colors: [c, ...d.ring.colors.slice(1)] })} />
+            )
           )}
           <Slider label="Thickness" min={3} max={22} value={d.ring.width} onChange={(width) => setRing({ width })} />
           <Chips
