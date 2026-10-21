@@ -1425,3 +1425,25 @@ h3.md-h { font-size: 16.5px; }
   .editor-grid { grid-template-columns: minmax(0, 1fr); }
   .editor-preview { position: static; }
 }
+
+/* ---------- version log ---------- */
+.version-chip { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; text-align: left; border: 1px solid var(--border); background: var(--surface-2); border-radius: 10px; padding: 8px 12px; font-size: 14px; color: var(--text); }
+.version-chip:hover { border-color: var(--accent); }
+.dialog.version-log { width: min(680px, calc(100vw - 32px)); gap: 8px; }
+.version-backdrop { z-index: 210; }
+.version { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.version.open { border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); }
+.version-head { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; border: 0; background: transparent; padding: 10px 12px; color: var(--text); }
+.version-head:hover { background: var(--surface-2); }
+.version-num { flex: none; min-width: 52px; text-align: center; font-weight: 800; font-size: 13px; padding: 4px 8px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); }
+.version-current { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; color: var(--st-done); }
+.version-chevron { color: var(--muted); }
+.version-items { margin: 0; padding: 0 14px 12px 34px; display: flex; flex-direction: column; gap: 5px; font-size: 14px; line-height: 1.45; }
+.dialog.whats-new { width: min(520px, calc(100vw - 32px)); padding-top: 20px; }
+.dialog.whats-new h2 { margin: 0; font-size: 21px; }
+.dialog.whats-new h3 { margin: 4px 0; font-size: 15px; }
+.dialog.whats-new .version-items { padding: 0 0 0 20px; }
+.whats-new-badge { align-self: flex-start; font-weight: 800; padding: 4px 12px; border-radius: 999px; color: #fff; background: linear-gradient(90deg, var(--accent), #ec4899); }
+.whats-new-version { max-height: 50vh; overflow-y: auto; }
+.update-whats-new { text-align: left; width: 100%; background: var(--surface-2); border-radius: 10px; padding: 10px 12px; font-size: 14px; }
+.update-whats-new .version-items { padding: 6px 0 0 18px; }

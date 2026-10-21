@@ -33,6 +33,8 @@ Each build publishes `version.json`; open pages check it every minute and block 
 
 Pushing to `main` deploys to GitHub Pages via `.github/workflows/deploy.yml`.
 
+**Version log:** every user-visible change gets an entry at the top of `src/changelog.js` (version number, date, title, and a line per feature or fix). The build publishes it in `version.json`, so open pages show "Version X is ready" with its highlights, devices see a "What's new" card once after updating, and the full log is in Help (?).
+
 ### Rules and notifications deploy
 
 `.github/workflows/firebase.yml` publishes `firestore.rules`, `storage.rules`, and the

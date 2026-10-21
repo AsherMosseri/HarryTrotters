@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { TEAM_NAME } from '../config.js';
+import { CHANGELOG, VERSION } from '../changelog.js';
 import { CloseIcon } from './common.jsx';
 
 const QUICK_TIPS = [
@@ -187,7 +188,7 @@ export function WelcomeCard({ name, showRobot, pushStatus, onEnablePush, onClose
   );
 }
 
-export function HelpDialog({ isManager, showRobot, onClose }) {
+export function HelpDialog({ isManager, showRobot, onClose, onVersionLog }) {
   return (
     <div className="panel-backdrop center" onClick={onClose}>
       <div className="dialog help" onClick={(e) => e.stopPropagation()} role="dialog" aria-labelledby="help-title">
@@ -198,6 +199,12 @@ export function HelpDialog({ isManager, showRobot, onClose }) {
             <CloseIcon />
           </button>
         </div>
+        <button className="version-chip" onClick={onVersionLog}>
+          <span>
+            Version <b>{VERSION}</b> · {CHANGELOG[0].title}
+          </span>
+          <span className="link-btn">Version log →</span>
+        </button>
         <TipList showRobot={showRobot} />
         <Rules />
         <div className="help-sections">

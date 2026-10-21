@@ -22,6 +22,8 @@ import ChatView from './ChatView.jsx';
 // The 3D viewer pulls in three.js, so it loads only when the Robot tab opens.
 const RobotView = lazy(() => import('./RobotView.jsx'));
 import { HelpDialog, WelcomeCard } from './Help.jsx';
+import { VersionLogDialog, WhatsNew } from './VersionLog.jsx';
+import { VERSION, versionsSince } from '../changelog.js';
 import Inbox from './Inbox.jsx';
 
 // Light / dark / automatic, plus the app color themes.
@@ -158,6 +160,14 @@ export default function Workspace({ store, actor, rename, renames }) {
   const [settings, setSettings] = useState({});
   const [cat, setCat] = useState(false);
   const [welcomed, setWelcomed] = useLocalStorage('welcome-seen-v1', false);
+  // "What's new" shows once per device after an update (not on a brand-new device).
+  const [seenVersion, setSeenVersion] = useLocalStorage('seen-version', null);
+  const [showLog, setShowLog] = useState(false);
+  useEffect(() => {
+    if (!welcomed && seenVersion !== VERSION) setSeenVersion(VERSION);
+  }, [welcomed, seenVersion, setSeenVersion]);
+  const whatsNew =
+    welcomed && seenVersion && seenVersion !== VERSION ? versionsSince(seenVersion) : welcomed && !seenVersion ? versionsSince(null) : null;
   const [showHelp, setShowHelp] = useState(false);
   const [savedView, setView] = useLocalStorage('view', 'board');
   const showRobot = ROBOT_TAB_PEOPLE.includes(actor.name);
@@ -1049,7 +1059,28 @@ export default function Workspace({ store, actor, rename, renames }) {
             onClose={() => setWelcomed(true)}
           />
         )}
-        {showHelp && <HelpDialog isManager={actor.admin} showRobot={showRobot} onClose={() => setShowHelp(false)} />}
+        {showHelp && (
+          <HelpDialog
+            isManager={actor.admin}
+            showRobot={showRobot}
+            onClose={() => setShowHelp(false)}
+            onVersionLog={() => {
+              setShowHelp(false);
+              setShowLog(true);
+            }}
+          />
+        )}
+        {whatsNew?.length > 0 && !showLog && (
+          <WhatsNew
+            versions={whatsNew}
+            onClose={() => setSeenVersion(VERSION)}
+            onFullLog={() => {
+              setSeenVersion(VERSION);
+              setShowLog(true);
+            }}
+          />
+        )}
+        {showLog && <VersionLogDialog current={VERSION} onClose={() => setShowLog(false)} />}
         {cat && <CatParty onClose={() => setCat(false)} />}
         {toast && (
           <div className="toast" role="alert" onClick={() => setToast(null)}>
