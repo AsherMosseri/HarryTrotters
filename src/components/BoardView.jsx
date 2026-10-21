@@ -13,6 +13,7 @@ import {
 } from '@dnd-kit/core';
 import { STATUSES, priorityById } from '../config.js';
 import { AvatarStack, DueChip, PriorityBadge, CommentIcon, PlusIcon } from './common.jsx';
+import { useLocalStorage } from '../util.js';
 
 // Drop into whichever column is under the finger/cursor; fall back to overlap.
 const collision = (args) => {
@@ -97,7 +98,45 @@ function Column({ status, tasks, onOpen, onAdd }) {
   );
 }
 
-export default function BoardView({ tasks, milestones = [], api, onOpen, onAdd }) {
+// Phones: one status at a time (chips with counts), full-width cards, no dragging.
+function PhoneBoard({ columns, onOpen, onAdd }) {
+  const [status, setStatus] = useLocalStorage('phone-status', 'todo');
+  const current = STATUSES.find((s) => s.id === status) || STATUSES[1];
+  const list = columns[current.id] || [];
+  return (
+    <div className="phone-board">
+      <div className="phone-status-chips" role="tablist">
+        {STATUSES.map((s) => (
+          <button
+            key={s.id}
+            role="tab"
+            aria-selected={s.id === current.id}
+            className={`phone-status${s.id === current.id ? ' on' : ''}`}
+            style={{ '--c': s.color }}
+            onClick={() => setStatus(s.id)}
+          >
+            <span className="dot" />
+            {s.short || s.label}
+            <strong>{columns[s.id].length}</strong>
+          </button>
+        ))}
+      </div>
+      <div className="phone-cards">
+        {list.map((t) => (
+          <button key={t.id} className={`card phone-card${t.status === 'done' ? ' is-done' : ''}`} onClick={() => onOpen(t.id)}>
+            <CardBody task={t} />
+          </button>
+        ))}
+        {!list.length && <p className="column-empty">Nothing in {current.short || current.label}.</p>}
+        <button className="btn ghost phone-add" onClick={() => onAdd(current.id)}>
+          <PlusIcon /> Add to {current.short || current.label}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export default function BoardView({ tasks, milestones = [], api, onOpen, onAdd, phone = false }) {
   const [activeId, setActiveId] = useState(null);
   // Mouse drags right away; touch needs a short press so the board still scrolls.
   const sensors = useSensors(
@@ -114,6 +153,7 @@ export default function BoardView({ tasks, milestones = [], api, onOpen, onAdd }
   }, [tasks, milestones]);
 
   const active = tasks.find((t) => t.id === activeId);
+  if (phone) return <PhoneBoard columns={columns} onOpen={onOpen} onAdd={onAdd} />;
 
   return (
     <DndContext

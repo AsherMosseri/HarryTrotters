@@ -107,3 +107,17 @@ export async function preparePhoto(file) {
   else URL.revokeObjectURL(img.src);
   return { full, thumb, width, height };
 }
+
+// True while a media query matches (e.g. phone width), updating live.
+export function useMedia(query) {
+  const [on, setOn] = useState(() => typeof matchMedia === 'function' && matchMedia(query).matches);
+  useEffect(() => {
+    if (typeof matchMedia !== 'function') return;
+    const m = matchMedia(query);
+    const update = () => setOn(m.matches);
+    update();
+    m.addEventListener('change', update);
+    return () => m.removeEventListener('change', update);
+  }, [query]);
+  return on;
+}

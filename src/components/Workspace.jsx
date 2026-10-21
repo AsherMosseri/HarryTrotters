@@ -1,10 +1,21 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { CHANNELS, COMPETITION, RENAMED, ROBOT_TAB_PEOPLE, ROSTER, STATUSES, SUBTEAMS, PRIORITIES, TEAM_NAME } from '../config.js';
+import {
+  CHANNELS,
+  COMPETITION,
+  RENAMED,
+  ROBOT_TAB_PEOPLE,
+  ROSTER,
+  STATUSES,
+  SUBTEAMS,
+  PRIORITIES,
+  REQUESTS_TO,
+  TEAM_NAME,
+} from '../config.js';
 import { ONLINE_MS, TYPING_MS, buildPeopleInfo, buildProfiles } from '../people.js';
 import { PALETTES } from '../nitro.js';
 import { daysBetween, todayISO } from '../milestones.js';
 import { newTaskDefaults, personId } from '../data/diff.js';
-import { preparePhoto, useLocalStorage } from '../util.js';
+import { preparePhoto, useLocalStorage, useMedia } from '../util.js';
 import { Avatar, PeopleContext, PlusIcon } from './common.jsx';
 import { ProfileCard, ProfileEditor } from './People.jsx';
 import TableView from './TableView.jsx';
@@ -21,9 +32,10 @@ import RunsView from './RunsView.jsx';
 import ChatView from './ChatView.jsx';
 // The 3D viewer pulls in three.js, so it loads only when the Robot tab opens.
 const RobotView = lazy(() => import('./RobotView.jsx'));
-import { HelpDialog, WelcomeCard } from './Help.jsx';
+import { HelpDialog, UpdateCheck, WelcomeCard } from './Help.jsx';
 import { VersionLogDialog, WhatsNew } from './VersionLog.jsx';
 import { RequestsDialog } from './Requests.jsx';
+import { BottomNav, MoreSheet, Sheet } from './PhoneChrome.jsx';
 import ShiftsView, { ShiftButton } from './Shifts.jsx';
 import { CheckinGate, answerOf } from './Checkin.jsx';
 import ThemeStudio, { AppBackdrop, CUSTOM_DEFAULT, applyThemeVars, themeFromProfile } from './ThemeStudio.jsx';
@@ -31,7 +43,7 @@ import { VERSION, versionsSince } from '../changelog.js';
 import Inbox from './Inbox.jsx';
 
 // Light / dark / automatic, plus the app color themes.
-function ThemeMenu({ theme, setTheme, palette, setPalette, customColors, profileColors, onCustom, onClose }) {
+function ThemeMenu({ theme, setTheme, palette, setPalette, customColors, profileColors, onCustom, onClose, inline = false }) {
   useEffect(() => {
     const away = (e) => !e.target.closest('.theme-wrap') && onClose();
     const esc = (e) => e.key === 'Escape' && onClose();
@@ -43,7 +55,7 @@ function ThemeMenu({ theme, setTheme, palette, setPalette, customColors, profile
     };
   }, [onClose]);
   return (
-    <div className="theme-menu" role="dialog" aria-label="Theme">
+    <div className={`theme-menu${inline ? ' inline' : ''}`} role="dialog" aria-label="Theme">
       <div className="segmented">
         {[
           ['light', '☀️ Light'],
@@ -187,6 +199,10 @@ export default function Workspace({ store, actor, rename, renames }) {
   const views = showRobot ? VIEWS : VIEWS.filter(([id]) => id !== 'robot');
   const view = views.some(([id]) => id === savedView) ? savedView : 'board';
   const taskView = view === 'board' || view === 'table';
+  // Phones get a slim top bar, a bottom tab bar, and sheets instead of the header's buttons.
+  const phone = useMedia('(max-width: 760px)');
+  const [phoneSheet, setPhoneSheet] = useState(null); // 'me' | 'more' | 'filters'
+  const closeSheet = useCallback(() => setPhoneSheet(null), []);
   const tabsRef = useRef(null);
   // On narrow screens the tab strip scrolls sideways; keep the current tab visible.
   useEffect(() => {
@@ -266,7 +282,7 @@ export default function Workspace({ store, actor, rename, renames }) {
   const [requests, setRequests] = useState([]);
   const [showRequests, setShowRequests] = useState(null);
   useEffect(() => store.subscribeRequests(setRequests, quiet('requests')), [store, quiet]);
-  const newRequests = actor.admin ? requests.filter((r) => r.status === 'new').length : 0;
+  const newRequests = actor.name === REQUESTS_TO ? requests.filter((r) => r.status === 'new').length : 0;
   // Shifts (clock in/out) and the planned schedule.
   const [shifts, setShifts] = useState([]);
   const [shiftPlans, setShiftPlans] = useState([]);
@@ -878,6 +894,95 @@ export default function Workspace({ store, actor, rename, renames }) {
   const setF = (patch) => setFilters({ ...EMPTY_FILTERS, ...filters, ...patch });
   const anyFilter = filters.q || filters.person || filters.subteam || filters.priority || filters.statuses.length || filters.hideDone;
 
+  const shiftButton = (
+    <ShiftButton
+      shift={myShift}
+      open={shiftPanel}
+      setOpen={setShiftPanel}
+      myTasks={myOpenTasks}
+      onStart={startMyShift}
+      onUpdate={(patch) => myShift && api.updateShift(myShift.id, patch)}
+      onCancel={() => {
+        setShiftPanel(false);
+        if (myShift) api.deleteShift(myShift.id);
+      }}
+      onOpenTab={() => {
+        setShiftPanel(false);
+        setView('shifts');
+      }}
+    />
+  );
+  const inboxButton = (
+    <Inbox
+      items={inbox}
+      pushStatus={pushStatus}
+      onEnablePush={enablePush}
+      onDisablePush={disablePush}
+      onOpen={goTo}
+      onMarkRead={(ids) => store.markInboxRead(actor.name, ids).catch(fail)}
+      onClear={(ids) => store.clearInbox(actor.name, ids).catch(fail)}
+    />
+  );
+  const themeMenuProps = {
+    theme,
+    setTheme,
+    palette,
+    setPalette,
+    customColors: customTheme.colors || CUSTOM_DEFAULT.colors,
+    profileColors: profileTheme.colors,
+    onCustom: () => {
+      setPalette('custom');
+      setThemeMenu(false);
+      setPhoneSheet(null);
+      setStudio(true);
+    },
+  };
+  // Person, subteam, priority, Hide done, Clear, and Recently deleted (a sheet on phones).
+  const filterControls = (
+    <>
+      <select className="filter" value={filters.person} onChange={(e) => setF({ person: e.target.value })} aria-label="Person">
+        <option value="">Everyone</option>
+        <option value="__me">Me ({actor.name.split(' ')[0]})</option>
+        <option value="__none">Unassigned</option>
+        {roster.map((n) => (
+          <option key={n} value={n}>
+            {n}
+          </option>
+        ))}
+      </select>
+      <select className="filter" value={filters.subteam} onChange={(e) => setF({ subteam: e.target.value })} aria-label="Subteam">
+        <option value="">All subteams</option>
+        {SUBTEAMS.map((s) => (
+          <option key={s}>{s}</option>
+        ))}
+      </select>
+      <select className="filter" value={filters.priority} onChange={(e) => setF({ priority: e.target.value })} aria-label="Priority">
+        <option value="">Any priority</option>
+        {PRIORITIES.map((p) => (
+          <option key={p.id} value={p.id}>
+            {p.label}
+          </option>
+        ))}
+      </select>
+      <button className={`chip${filters.hideDone ? ' on' : ''}`} onClick={() => setF({ hideDone: !filters.hideDone })}>
+        Hide done
+      </button>
+      {anyFilter ? (
+        <button className="link-btn" onClick={() => setFilters(EMPTY_FILTERS)}>
+          Clear
+        </button>
+      ) : null}
+      {trash.length > 0 && (
+        <button className="chip trash-chip" onClick={() => setShowTrash(true)}>
+          🗑 Recently deleted ({trash.length})
+        </button>
+      )}
+    </>
+  );
+  const filterCount = [filters.person && filters.person !== '__me', filters.subteam, filters.priority, filters.hideDone].filter(
+    Boolean,
+  ).length;
+
   return (
     <PeopleContext.Provider value={peopleCtx}>
       <div className={`app${view === 'chat' || view === 'robot' ? ' chat-mode' : ''}`}>
@@ -887,105 +992,83 @@ export default function Workspace({ store, actor, rename, renames }) {
           </div>
         )}
         <AppBackdrop theme={activeTheme} />
-        <header className="topbar">
-          <button className="brand" onClick={() => setCat(true)}>
-            <span className="logo-mark">✓</span>
-            <span className="brand-text">
-              {TEAM_NAME} <span className="muted">Tasks</span>
-            </span>
-          </button>
-          <nav className="tabs" role="tablist" ref={tabsRef}>
-            {views.map(([id, label]) => (
-              <button key={id} role="tab" aria-selected={view === id} className={view === id ? 'active' : ''} onClick={() => setView(id)}>
-                {label}
-                {id === 'chat' && unreadTotal > 0 && (
-                  <span className={`tab-badge${unreadMentions ? ' mention' : ''}`} aria-label={`${unreadTotal} unread`}>
-                    {unreadTotal > 99 ? '99+' : unreadTotal}
-                  </span>
-                )}
-              </button>
-            ))}
-          </nav>
-          <div className="topbar-right">
-            <Countdown date={competitionDate} />
-            <ShiftButton
-              shift={myShift}
-              open={shiftPanel}
-              setOpen={setShiftPanel}
-              myTasks={myOpenTasks}
-              onStart={startMyShift}
-              onUpdate={(patch) => myShift && api.updateShift(myShift.id, patch)}
-              onCancel={() => {
-                setShiftPanel(false);
-                if (myShift) api.deleteShift(myShift.id);
-              }}
-              onOpenTab={() => {
-                setShiftPanel(false);
-                setView('shifts');
-              }}
-            />
-            <Inbox
-              items={inbox}
-              pushStatus={pushStatus}
-              onEnablePush={enablePush}
-              onDisablePush={disablePush}
-              onOpen={goTo}
-              onMarkRead={(ids) => store.markInboxRead(actor.name, ids).catch(fail)}
-              onClear={(ids) => store.clearInbox(actor.name, ids).catch(fail)}
-            />
-            <button
-              className="icon-btn idea-btn"
-              title="Request a feature"
-              aria-label={newRequests ? `Feature requests, ${newRequests} new` : 'Request a feature'}
-              onClick={() => setShowRequests(true)}
-            >
-              💡
+        {phone ? (
+          <header className="topbar phone-top">
+            <button className="brand" onClick={() => setCat(true)} aria-label="Team logo">
+              <span className="logo-mark">✓</span>
+            </button>
+            <h1 className="phone-title">{views.find(([id]) => id === view)?.[1] || 'Board'}</h1>
+            <span className="spacer" />
+            {shiftButton}
+            {inboxButton}
+            <button className="avatar-btn me-btn" onClick={() => setPhoneSheet('me')} aria-label="You: profile, theme, ideas, help">
+              <Avatar name={actor.name} size={34} />
               {newRequests > 0 && <span className="bell-badge">{newRequests > 9 ? '9+' : newRequests}</span>}
             </button>
-            <button className="icon-btn help-btn" title="Help" aria-label="Help" onClick={() => setShowHelp(true)}>
-              ?
+          </header>
+        ) : (
+          <header className="topbar">
+            <button className="brand" onClick={() => setCat(true)}>
+              <span className="logo-mark">✓</span>
+              <span className="brand-text">
+                {TEAM_NAME} <span className="muted">Tasks</span>
+              </span>
             </button>
-            <span className="theme-wrap">
+            <nav className="tabs" role="tablist" ref={tabsRef}>
+              {views.map(([id, label]) => (
+                <button key={id} role="tab" aria-selected={view === id} className={view === id ? 'active' : ''} onClick={() => setView(id)}>
+                  {label}
+                  {id === 'chat' && unreadTotal > 0 && (
+                    <span className={`tab-badge${unreadMentions ? ' mention' : ''}`} aria-label={`${unreadTotal} unread`}>
+                      {unreadTotal > 99 ? '99+' : unreadTotal}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </nav>
+            <div className="topbar-right">
+              <Countdown date={competitionDate} />
+              {shiftButton}
+              {inboxButton}
               <button
-                className={`icon-btn${themeMenu ? ' on' : ''}`}
-                title="Theme"
-                aria-label="Theme"
-                onClick={() => setThemeMenu(!themeMenu)}
+                className="icon-btn idea-btn"
+                title="Request a feature"
+                aria-label={newRequests ? `Feature requests, ${newRequests} new` : 'Request a feature'}
+                onClick={() => setShowRequests(true)}
               >
-                <ThemeIcon theme={theme} />
+                💡
+                {newRequests > 0 && <span className="bell-badge">{newRequests > 9 ? '9+' : newRequests}</span>}
               </button>
-              {themeMenu && (
-                <ThemeMenu
-                  theme={theme}
-                  setTheme={setTheme}
-                  palette={palette}
-                  setPalette={setPalette}
-                  customColors={customTheme.colors || CUSTOM_DEFAULT.colors}
-                  profileColors={profileTheme.colors}
-                  onCustom={() => {
-                    setPalette('custom');
-                    setThemeMenu(false);
-                    setStudio(true);
-                  }}
-                  onClose={() => setThemeMenu(false)}
-                />
-              )}
-            </span>
-            <div className="user-chip">
-              <button className="avatar-btn" onClick={() => setProfileFor(actor.name)} title="Your profile" aria-label="Your profile">
-                <Avatar name={actor.name} size={30} />
+              <button className="icon-btn help-btn" title="Help" aria-label="Help" onClick={() => setShowHelp(true)}>
+                ?
               </button>
-              <span className="user-name">{actor.name.split(' ')[0]}</span>
-              <button
-                className="link-btn"
-                title="Not you? Switch to a different name (needs the team code again)"
-                onClick={() => confirm('Switch user? You will need the team code again on this device.') && store.leave()}
-              >
-                Switch
-              </button>
+              <span className="theme-wrap">
+                <button
+                  className={`icon-btn${themeMenu ? ' on' : ''}`}
+                  title="Theme"
+                  aria-label="Theme"
+                  onClick={() => setThemeMenu(!themeMenu)}
+                >
+                  <ThemeIcon theme={theme} />
+                </button>
+                {themeMenu && <ThemeMenu {...themeMenuProps} onClose={() => setThemeMenu(false)} />}
+              </span>
+              <div className="user-chip">
+                <button className="avatar-btn" onClick={() => setProfileFor(actor.name)} title="Your profile" aria-label="Your profile">
+                  <Avatar name={actor.name} size={30} />
+                </button>
+                <span className="user-name">{actor.name.split(' ')[0]}</span>
+                <button
+                  className="link-btn"
+                  title="Not you? Switch to a different name (needs the team code again)"
+                  onClick={() => confirm('Switch user? You will need the team code again on this device.') && store.leave()}
+                >
+                  Switch
+                </button>
+              </div>
             </div>
-          </div>
-        </header>
+          </header>
+        )}
         {/* Only this area scrolls; the header stays put above it. */}
         <div className="app-scroll">
           {taskView && announcement && (
@@ -1014,7 +1097,7 @@ export default function Workspace({ store, actor, rename, renames }) {
           )}
 
           {taskView && (
-            <div className="toolbar">
+            <div className={`toolbar${phone ? ' phone' : ''}`}>
               <input
                 className="search"
                 type="search"
@@ -1029,53 +1112,22 @@ export default function Workspace({ store, actor, rename, renames }) {
                 >
                   My tasks
                 </button>
-                <select className="filter" value={filters.person} onChange={(e) => setF({ person: e.target.value })} aria-label="Person">
-                  <option value="">Everyone</option>
-                  <option value="__me">Me ({actor.name.split(' ')[0]})</option>
-                  <option value="__none">Unassigned</option>
-                  {roster.map((n) => (
-                    <option key={n} value={n}>
-                      {n}
-                    </option>
-                  ))}
-                </select>
-                <select className="filter" value={filters.subteam} onChange={(e) => setF({ subteam: e.target.value })} aria-label="Subteam">
-                  <option value="">All subteams</option>
-                  {SUBTEAMS.map((s) => (
-                    <option key={s}>{s}</option>
-                  ))}
-                </select>
-                <select
-                  className="filter"
-                  value={filters.priority}
-                  onChange={(e) => setF({ priority: e.target.value })}
-                  aria-label="Priority"
-                >
-                  <option value="">Any priority</option>
-                  {PRIORITIES.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.label}
-                    </option>
-                  ))}
-                </select>
-                <button className={`chip${filters.hideDone ? ' on' : ''}`} onClick={() => setF({ hideDone: !filters.hideDone })}>
-                  Hide done
-                </button>
-                {anyFilter ? (
-                  <button className="link-btn" onClick={() => setFilters(EMPTY_FILTERS)}>
-                    Clear
+                {phone ? (
+                  <button className={`chip${filterCount ? ' on' : ''}`} onClick={() => setPhoneSheet('filters')}>
+                    Filters{filterCount ? ` · ${filterCount}` : ''}
                   </button>
-                ) : null}
-                {trash.length > 0 && (
-                  <button className="chip trash-chip" onClick={() => setShowTrash(true)}>
-                    🗑 Recently deleted ({trash.length})
-                  </button>
+                ) : (
+                  filterControls
                 )}
               </div>
-              <span className="spacer" />
-              <button className="btn primary" onClick={() => setNewTask({ status: 'todo' })}>
-                <PlusIcon /> New task
-              </button>
+              {!phone && (
+                <>
+                  <span className="spacer" />
+                  <button className="btn primary" onClick={() => setNewTask({ status: 'todo' })}>
+                    <PlusIcon /> New task
+                  </button>
+                </>
+              )}
             </div>
           )}
 
@@ -1243,6 +1295,7 @@ export default function Workspace({ store, actor, rename, renames }) {
                 <TableView tasks={filtered} api={api} onOpen={setOpenId} total={tasks.length} />
               ) : (
                 <BoardView
+                  phone={phone}
                   tasks={filtered}
                   milestones={milestones}
                   api={api}
@@ -1381,6 +1434,64 @@ export default function Workspace({ store, actor, rename, renames }) {
             <ProfileEditor name={editProfileFor} actor={actor} api={api} tasks={tasks || []} onClose={() => setEditProfileFor(null)} />
           )}
         </div>
+        {phone && (
+          <>
+            {taskView && (
+              <button className="fab" onClick={() => setNewTask({ status: 'todo' })} aria-label="New task">
+                ＋
+              </button>
+            )}
+            <BottomNav
+              views={views}
+              view={view}
+              setView={(v) => {
+                setPhoneSheet(null);
+                setView(v);
+              }}
+              badges={{ chat: unreadTotal }}
+              moreOn={phoneSheet === 'more'}
+              onMore={() => setPhoneSheet(phoneSheet === 'more' ? null : 'more')}
+            />
+            {phoneSheet === 'more' && <MoreSheet views={views} view={view} setView={setView} onClose={closeSheet} />}
+            {phoneSheet === 'filters' && (
+              <Sheet title="Filters" onClose={closeSheet}>
+                <div className="sheet-filters">{filterControls}</div>
+                <button className="btn primary big-btn" onClick={closeSheet}>
+                  Show tasks
+                </button>
+              </Sheet>
+            )}
+            {phoneSheet === 'me' && (
+              <Sheet title="You" onClose={closeSheet}>
+                <div className="me-head">
+                  <Avatar name={actor.name} size={48} />
+                  <div className="grow">
+                    <b>{actor.name}</b>
+                    <div>
+                      <Countdown date={competitionDate} />
+                    </div>
+                  </div>
+                </div>
+                <div className="me-list">
+                  <button onClick={() => (closeSheet(), setProfileFor(actor.name))}>👤 My profile</button>
+                  <button onClick={() => (closeSheet(), setEditProfileFor(actor.name))}>✏️ Edit profile</button>
+                  <button onClick={() => (closeSheet(), setShowRequests(true))}>
+                    💡 Request a feature {newRequests > 0 && <span className="me-badge">{newRequests}</span>}
+                  </button>
+                  <button onClick={() => (closeSheet(), setShowHelp(true))}>❓ Help</button>
+                </div>
+                <ThemeMenu {...themeMenuProps} inline onClose={() => {}} />
+                <UpdateCheck />
+                <button
+                  className="btn me-switch"
+                  onClick={() => confirm('Switch user? You will need the team code again on this device.') && store.leave()}
+                >
+                  Switch user
+                </button>
+              </Sheet>
+            )}
+          </>
+        )}
       </div>
     </PeopleContext.Provider>
   );

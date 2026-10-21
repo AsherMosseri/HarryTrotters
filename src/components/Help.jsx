@@ -18,6 +18,7 @@ const QUICK_TIPS = [
     'The bell shows announcements, @mentions, tasks given to you, and what’s due tomorrow. Tap 🔔 → Turn on to get them on this device even when the app is closed.',
   ],
   ['💡', 'Have an idea for the app?', `Tap 💡 at the top, type it, and tap Send idea. It goes straight to ${REQUESTS_TO.split(' ')[0]}.`],
+  ['📱', 'On a phone', 'Use the tabs at the bottom (More has the rest). On the board, pick a status at the top, tap a task to open it, and tap ＋ to add one. Tap your picture for theme, help, and more.'],
   ['🗑', 'Deleted something by mistake?', 'Tap Undo, or find it under Recently deleted in the filter row for 30 days.'],
 ];
 
@@ -206,7 +207,7 @@ export function WelcomeCard({ name, showRobot, pushStatus, onEnablePush, onClose
 }
 
 // Asks the site for the newest version now. A newer one opens the update screen.
-function UpdateCheck() {
+export function UpdateCheck() {
   const [state, setState] = useState(null); // null | 'checking' | result
   const run = async () => {
     setState('checking');

@@ -75,9 +75,11 @@ function RequestItem({ r, actor, api, focused, onMakeTask }) {
   const votes = Object.keys(r.votes || {});
   const mine = votes.includes(actor.name);
   const st = statusOf(r.status);
-  const canDelete = actor.admin || r.by === actor.name;
+  // Only REQUESTS_TO (Asher) sets the status, replies, and turns ideas into tasks.
+  const owner = actor.name === REQUESTS_TO;
+  const canDelete = owner || r.by === actor.name;
   return (
-    <li ref={ref} className={`request${focused ? ' focused' : ''}${r.status === 'new' && actor.admin ? ' unseen' : ''}`}>
+    <li ref={ref} className={`request${focused ? ' focused' : ''}${r.status === 'new' && owner ? ' unseen' : ''}`}>
       <div className="request-head">
         <Avatar name={r.by} size={24} />
         <DisplayName name={r.by} className="request-by" />
@@ -122,7 +124,7 @@ function RequestItem({ r, actor, api, focused, onMakeTask }) {
         >
           👍 {votes.length || ''}
         </button>
-        {actor.admin && (
+        {owner && (
           <>
             <select
               className="request-status-select"

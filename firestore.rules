@@ -183,10 +183,13 @@ service cloud.firestore {
         && request.resource.data.text is string && request.resource.data.text.size() > 0
         && request.resource.data.text.size() <= 2000
         && request.resource.data.status == 'new';
-      allow update: if isManager() || (isMember()
+      allow update: if requestsOwner() || (isMember()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['votes']));
-      allow delete: if isManager() || (isMember() && resource.data.byUid == request.auth.uid);
+      allow delete: if requestsOwner() || (isMember() && resource.data.byUid == request.auth.uid);
     }
+    // Who feature requests go to (REQUESTS_TO in src/config.js): only they set
+    // the status and reply. Joining under this name takes their manager code.
+    function requestsOwner() { return isManager() && isMe('Asher Mosseri'); }
 
     // Shifts (clock in/out). You clock yourself in (now, or up to 12 hours
     // earlier) and out; team management can add, fix, or remove anyone's.

@@ -4,6 +4,18 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '2.31',
+    date: '2026-10-21',
+    title: 'A real phone layout',
+    items: [
+      'On phones: a slim top bar (timer, bell, and your picture) and a tab bar at the bottom: Board, Chat, Shifts, Parts, and More for everything else.',
+      'Tap your picture for your profile, theme, ideas, help, updates, and Switch user.',
+      'Board on phones: pick a status at the top and see its tasks as full-width cards. Tap a task to open it and tap a status to move it. The ＋ button adds a task.',
+      'Filters live in a Filters sheet; Parts shows cards instead of a wide table; the What’s new card no longer cuts off.',
+      'Only Asher can change a feature request’s status or reply to it.',
+    ],
+  },
+  {
     version: '2.30',
     date: '2026-10-21',
     title: 'Three-color gradients and custom borders',
