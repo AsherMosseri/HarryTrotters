@@ -471,7 +471,10 @@ export function ProfileEditor({ name, actor, api, tasks = [], onClose }) {
   const save = () =>
     run('save', async () => {
       const patch = { ...look, about: look.about.trim().slice(0, 190), pronouns: look.pronouns.trim().slice(0, 40) };
-      if (me) patch.status = text.trim() || emoji ? { emoji, text: text.trim().slice(0, 80), until: untilFor(clearAfter) } : null;
+      // Status: yours, or anyone's for team management. Only saved when changed, so its "clear after" time is kept.
+      const statusChanged = emoji !== (current?.emoji || '') || text.trim() !== (current?.text || '') || clearAfter !== 'never';
+      if (statusChanged)
+        patch.status = text.trim() || emoji ? { emoji, text: text.trim().slice(0, 80), until: untilFor(clearAfter) } : null;
       await api.saveProfile(name, patch);
       onClose();
     });
@@ -499,7 +502,11 @@ export function ProfileEditor({ name, actor, api, tasks = [], onClose }) {
           <div className="editor-grid">
             <div className="editor-form">
               <div className="segmented editor-tabs">
-                {[['profile', 'Profile'], ['style', 'Style'], ...(me ? [['status', 'Status']] : [])].map(([id, label]) => (
+                {[
+                  ['profile', 'Profile'],
+                  ['style', 'Style'],
+                  ['status', 'Status'],
+                ].map(([id, label]) => (
                   <button key={id} className={tab === id ? 'active' : ''} onClick={() => setTab(id)}>
                     {label}
                   </button>
@@ -765,7 +772,7 @@ export function ProfileEditor({ name, actor, api, tasks = [], onClose }) {
                   )}
                 </>
               )}
-              {tab === 'status' && me && (
+              {tab === 'status' && (
                 <>
                   <div className="row gap">
                     <input
@@ -780,7 +787,7 @@ export function ProfileEditor({ name, actor, api, tasks = [], onClose }) {
                       value={text}
                       maxLength={80}
                       onChange={(e) => setText(e.target.value)}
-                      placeholder="What are you up to?"
+                      placeholder={me ? 'What are you up to?' : `What's ${name.split(' ')[0]} up to?`}
                       aria-label="Status"
                     />
                   </div>
@@ -838,12 +845,7 @@ export function ProfileEditor({ name, actor, api, tasks = [], onClose }) {
                 className={`profile-card preview-card ${borderProps(look.cardBorder).className}`}
                 style={borderProps(look.cardBorder).style}
               >
-                <CardBody
-                  name={name}
-                  actor={actor}
-                  tasks={tasks}
-                  look={{ ...look, status: me ? (text || emoji ? { emoji, text } : null) : profile.status }}
-                />
+                <CardBody name={name} actor={actor} tasks={tasks} look={{ ...look, status: text || emoji ? { emoji, text } : null }} />
               </div>
             </div>
           </div>

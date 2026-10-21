@@ -115,6 +115,7 @@ function RequestItem({ r, actor, api, focused, onMakeTask }) {
           </div>
         </div>
       )}
+      {votes.length > 0 && <p className="request-voters">👍 Wanted by {votes.map(firstName).join(', ')}</p>}
       <div className="request-actions">
         <button
           className={`vote-btn${mine ? ' on' : ''}`}

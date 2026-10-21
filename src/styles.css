@@ -855,7 +855,7 @@ div.org-member { cursor: default; }
 }
 .msg.selected .msg-actions { display: flex; }
 @media (hover: hover) { .msg:hover .msg-actions { display: flex; } }
-.msg-actions > button { border: 0; background: transparent; border-radius: 7px; min-width: 32px; height: 30px; padding: 0 6px; font-size: 14px; white-space: nowrap; }
+.msg-actions > button { flex: none; border: 0; background: transparent; border-radius: 7px; min-width: 32px; height: 30px; padding: 0 6px; font-size: 14px; white-space: nowrap; }
 .msg-actions > button:hover { background: var(--surface-2); }
 .danger-text { color: var(--danger); }
 .emoji-picker {
@@ -1302,7 +1302,7 @@ h3.md-h { font-size: 16.5px; }
   .emoji-picker.big { width: auto; }
   .notify-menu { position: fixed; left: 12px; right: 12px; top: 120px; width: auto; }
   .msg { padding: 2px 10px; }
-  .msg-actions { right: 6px; max-width: calc(100% - 12px); overflow-x: auto; }
+  .msg-actions { right: 6px; top: auto; bottom: calc(100% - 4px); max-width: calc(100% - 12px); flex-wrap: wrap; justify-content: flex-end; }
   .emoji-picker { position: fixed; left: 12px; right: 12px; top: auto; bottom: 90px; width: auto; }
   .stat-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .points-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -1852,3 +1852,11 @@ h3.md-h { font-size: 16.5px; }
   /* With a pop-up open (it covers the tab bar), messages sit at the very bottom edge. */
   .app:has(.bottom-nav):has(.panel-backdrop) .toast { bottom: max(12px, env(safe-area-inset-bottom)); }
 }
+
+/* Who reacted (shows when you tap a message). */
+.reacted-by { display: flex; flex-direction: column; gap: 3px; margin-top: 6px; padding: 6px 10px; border-radius: 10px; background: var(--surface-2); font-size: 13px; color: var(--muted); width: fit-content; max-width: 100%; }
+.reacted-by > div { display: flex; align-items: baseline; gap: 8px; }
+.reacted-glyph { flex: none; min-width: 22px; font-size: 15px; }
+.reacted-glyph .custom-emoji { width: 18px; height: 18px; vertical-align: -3px; }
+.reacted-super { font-size: 10px; margin-left: 1px; }
+.request-voters { margin: 0; font-size: 12.5px; color: var(--muted); }

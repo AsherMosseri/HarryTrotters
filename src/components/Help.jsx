@@ -87,7 +87,7 @@ const SECTIONS = [
       'Type @ to mention someone, @Programming (or any subteam) to ping that subteam, # to link a task, and : for emoji (like :fire:).',
       'Tap Aa for text styles: bold, italic, bold italic, underline, strikethrough, big/medium/small headings, small gray text, quotes, lists, code, and ||spoilers|| (hidden until tapped). You can also type them: **bold**, *italic*, ***bold italic***, __underline__, ~~strike~~, # Big, ## Medium, ### Small, -# small text, > quote.',
       'Tap 📷 for a photo, GIF for GIFs, 📊 for a poll, 📎 for any file up to 25 MB (videos play right in the chat), 🎫 for team stickers, and 😊 for every emoji (on a phone or iPad these are under ＋). Pasting a picture or file works too. Links show a preview, and YouTube videos play in the chat.',
-      'Tap (or hover over) a message to react (✨ for an animated super reaction), reply, 📌 pin it, edit or delete your own, or turn it into a task with +Task. 📌 at the top shows the channel’s pinned messages; 🔍 searches messages.',
+      'Tap (or hover over) a message to react (✨ for an animated super reaction), reply, 📌 pin it, edit or delete your own, or turn it into a task with +Task. Tapping a message also shows who reacted with what. 📌 at the top shows the channel’s pinned messages; 🔍 searches messages.',
       '🔔 at the top of a channel: All messages, Only @mentions (the default), or Nothing. Announcements and DMs default to All.',
       'Direct messages: tap ＋ next to Direct messages (or Message on someone’s profile) to message one person or a group.',
       'Tap anyone’s name or picture for their profile. Tap your own picture (top right) → Edit profile for a picture (GIFs stay animated), a banner, pronouns, about me, your name’s font and colors, an avatar decoration (or a custom one: any ring, colors, and spin, plus stickers you place, size, rotate, and animate), a profile effect (or a custom one that rains, rises, or floats any emoji, GIF, or picture you pick), profile colors (2 or 3), borders around your profile card and your messages, and a status like “🔧 At the lab”. A green dot means they have the app open; you’ll see when someone is typing.',
@@ -135,7 +135,7 @@ const MANAGER_TIPS = [
   'Team emoji: open 😊 and tap ＋ under Team emoji to add your own (:name:), or remove them. Stickers: open 🎫 and tap ＋.',
   'Shifts tab: 🧪 Lab check-in asks everyone who’s going to the lab (lunch / after school). Lunch is split by middle and high school lunch using each person’s grade, which you set on the Team tab (Edit).',
   'Shifts tab: Clock in… several people at once, End anyone’s shift, Plan a shift (once or weekly), set the season hours goal, add a missed shift, fix or delete any shift, and Export CSV.',
-  'DMs: you can read every DM (under Team DMs) but can’t post in other people’s. You can change anyone’s profile picture from their profile.',
+  'DMs: you can read every DM (under Team DMs) but can’t post in other people’s. You can change anyone’s profile picture and custom status from their profile (Edit profile → Status).',
 ];
 
 function TipList({ showRobot }) {

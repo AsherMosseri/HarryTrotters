@@ -4,6 +4,18 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '2.37',
+    date: '2026-10-21',
+    title: 'Who reacted, and managers can set status',
+    items: [
+      'Tap a message to see who reacted with each emoji (it works on iPads and phones, not just with a mouse).',
+      'Feature requests show who wants each idea under it.',
+      'Team management can change or clear anyone’s custom status: open their profile → Edit profile → Status.',
+      'Editing your profile without touching your status keeps its “clear after” time.',
+      'On phones, a message’s buttons show just above it (no longer covering it) and wrap onto two rows instead of overlapping.',
+    ],
+  },
+  {
     version: '2.36',
     date: '2026-10-21',
     title: 'Version log fix',

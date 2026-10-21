@@ -364,6 +364,20 @@ export default function Message({
             ))}
           </div>
         )}
+        {/* Tap a message to see who reacted with what. */}
+        {selected && !removing && (reactions.length > 0 || supers.length > 0) && (
+          <div className="reacted-by" aria-label="Who reacted">
+            {[...supers.map(([e, who]) => [e, who, true]), ...reactions.map(([e, who]) => [e, who, false])].map(([emoji, who, sup]) => (
+              <div key={`${sup ? 's' : 'r'}-${emoji}`}>
+                <span className="reacted-glyph">
+                  <ReactionGlyph emoji={emoji} teamEmoji={teamEmoji} />
+                  {sup && <span className="reacted-super">✨</span>}
+                </span>
+                <span>{Object.values(who).join(', ')}</span>
+              </div>
+            ))}
+          </div>
+        )}
         {removing && (
           <div className="msg-reactions remove-mode">
             <span className="muted small">Remove a reaction:</span>
