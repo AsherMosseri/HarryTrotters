@@ -4,6 +4,15 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '2.28',
+    date: '2026-10-21',
+    title: 'Chat follows along',
+    items: [
+      'Chat scrolls down when you send a message, even in busy channels and even if you had scrolled up.',
+      'It stays at the bottom when photos, GIFs, videos, and link previews finish loading.',
+    ],
+  },
+  {
     version: '2.27',
     date: '2026-10-21',
     title: 'Custom themes',

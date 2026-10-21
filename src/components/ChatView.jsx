@@ -113,6 +113,7 @@ export default function ChatView({
   const list = useRef(null);
   const atBottom = useRef(true);
   const lastCount = useRef(0);
+  const lastNewest = useRef(null);
   const pendingJump = useRef(null);
 
   const conv = current;
@@ -175,30 +176,54 @@ export default function ChatView({
     setNewBelow(false);
     setNotifyOpen(false);
     lastCount.current = all.length;
+    lastNewest.current = all[all.length - 1]?.id ?? null;
     if (all.length) showStart();
     // Opened from search or a pin in another conversation: go to that message.
     if (pendingJump.current) jumpTo(pendingJump.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conv.key]);
 
-  // Follow new messages if already at the bottom (or if they're mine).
+  // Follow new messages if already at the bottom (or if they're mine). "New"
+  // means a different newest message: the live window is capped at PAGE, so
+  // the count stays the same once a channel is busy.
   useLayoutEffect(() => {
     const el = list.current;
     if (!el) return;
     const newest = all[all.length - 1];
-    const grew = all.length > lastCount.current;
-    const firstLoad = lastCount.current === 0;
+    const firstLoad = lastCount.current === 0 && all.length > 0;
+    const newestChanged = !!newest && newest.id !== lastNewest.current;
     lastCount.current = all.length;
-    if (!grew) return;
+    lastNewest.current = newest?.id ?? null;
     // Messages arriving for a conversation that just opened empty.
     if (firstLoad) showStart();
-    else if (atBottom.current || newest?.byUid === actor.uid) {
+    else if (!newestChanged) {
+      // Same messages, changed (an edit, a reaction, a link preview): stay at the bottom.
+      if (atBottom.current) el.scrollTop = el.scrollHeight;
+    } else if (atBottom.current || newest.byUid === actor.uid) {
       el.scrollTop = el.scrollHeight;
+      atBottom.current = true;
       setNewBelow(false);
     } else setNewBelow(true);
     if (pendingJump.current) jumpTo(pendingJump.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [all, actor.uid]);
+
+  // At the bottom, stay there when things grow later: photos, GIFs, and videos
+  // finishing loading, or the list getting shorter (a reply bar, the keyboard).
+  useEffect(() => {
+    const el = list.current;
+    if (!el) return;
+    const stick = () => atBottom.current && (el.scrollTop = el.scrollHeight);
+    el.addEventListener('load', stick, true);
+    el.addEventListener('loadedmetadata', stick, true);
+    const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(stick) : null;
+    ro?.observe(el);
+    return () => {
+      el.removeEventListener('load', stick, true);
+      el.removeEventListener('loadedmetadata', stick, true);
+      ro?.disconnect();
+    };
+  }, []);
 
   const onScroll = () => {
     const el = list.current;
