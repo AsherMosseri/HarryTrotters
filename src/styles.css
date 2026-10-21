@@ -244,6 +244,10 @@ a { color: var(--accent); }
 }
 .status-select .dot { background: var(--c); }
 .status-select.compact { padding: 3px 10px; font-size: 12.5px; }
+.status-caret { margin-left: -2px; opacity: 0.7; font-size: 12px; }
+.segmented button.status-seg { display: inline-flex; align-items: center; gap: 6px; }
+.segmented button.status-seg::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--c); }
+.segmented button.status-seg.on { background: color-mix(in srgb, var(--c) 16%, var(--surface)); color: var(--text); box-shadow: inset 0 0 0 2px var(--c); }
 
 .tag {
   display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 12px; font-weight: 600;

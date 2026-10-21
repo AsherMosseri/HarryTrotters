@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { SUBTEAMS, PRIORITIES, statusById, priorityById } from '../config.js';
+import { SUBTEAMS, PRIORITIES, STATUSES, statusById, priorityById } from '../config.js';
 import { fullTime, relTime } from '../util.js';
 import { Avatar, CloseIcon, DraftInput, StatusSelect } from './common.jsx';
 import { PartStatusSelect } from './PartsView.jsx';
@@ -321,6 +321,21 @@ export default function TaskPanel({ task, api, roster, milestones = [], parts = 
           )}
 
           <div className="fields">
+            <span className="field-label">Status</span>
+            <div className="segmented status-segs">
+              {STATUSES.map((s) => (
+                <button
+                  key={s.id}
+                  className={`status-seg${task.status === s.id ? ' on' : ''}`}
+                  style={{ '--c': s.color }}
+                  aria-pressed={task.status === s.id}
+                  onClick={() => set({ status: s.id })}
+                >
+                  {s.short || s.label}
+                </button>
+              ))}
+            </div>
+
             <span className="field-label">Who</span>
             <div className="assignee-picker">
               {roster.map((n) => {

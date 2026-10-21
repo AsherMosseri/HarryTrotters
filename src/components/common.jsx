@@ -80,6 +80,11 @@ export function StatusSelect({ value, onChange, compact }) {
     <label className={`status-select${compact ? ' compact' : ''}`} style={{ '--c': s.color }} onClick={(e) => e.stopPropagation()}>
       <StatusDot status={s.id} />
       <span>{compact ? s.short || s.label : s.label}</span>
+      {!compact && (
+        <span className="status-caret" aria-hidden="true">
+          ▾
+        </span>
+      )}
       <select value={s.id} onChange={(e) => onChange(e.target.value)} aria-label="Status">
         {STATUSES.map((o) => (
           <option key={o.id} value={o.id}>

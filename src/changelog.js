@@ -4,6 +4,15 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '2.16',
+    date: '2026-10-21',
+    title: 'Status buttons in tasks',
+    items: [
+      'Open a task and tap a Status button (To Do, In Progress, Blocked, …) to move it, just like Priority.',
+      'The status pill at the top of a task now shows ▾ so you can tell it’s tappable too.',
+    ],
+  },
+  {
     version: '2.15',
     date: '2026-10-21',
     title: 'Feature requests',
