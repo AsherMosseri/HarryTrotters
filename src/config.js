@@ -31,6 +31,15 @@ export function makeRenamer(renames = {}) {
   };
 }
 
+// Grade levels. Team management changes them on the Team tab; anyone not
+// listed here (or saved there) is DEFAULT_GRADE. 8th grade and below eat
+// middle school lunch, which the lab check-in shows separately.
+export const GRADES = [6, 7, 8, 9, 10, 11, 12];
+export const DEFAULT_GRADE = 9;
+export const GRADE_DEFAULTS = { 'Matthew Kuehl': 8, 'Cooper Mlezcko': 8 };
+export const gradeLabel = (g) => `${g}th grade`;
+export const lunchOf = (g) => (g <= 8 ? 'Middle school lunch' : 'High school lunch');
+
 // Feature requests (💡) go to this person's bell and phone. Same as
 // REQUESTS_TO in functions/index.js.
 export const REQUESTS_TO = 'Asher Mosseri';
@@ -85,6 +94,8 @@ export const ORG_GROUPS = [...SUBTEAMS, 'Secretary'];
 export const CHANNELS = [
   { id: 'announcements', subteam: '', announce: true },
   { id: 'general', subteam: '' },
+  // Also shown inside the Parts tab.
+  { id: 'parts', subteam: '' },
   ...SUBTEAMS.map((s) => ({ id: s.toLowerCase().replace(/[^a-z0-9]+/g, '-'), subteam: s })),
 ];
 

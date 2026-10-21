@@ -69,6 +69,7 @@ const stickersCol = collection(db, 'stickers');
 const requestsCol = collection(db, 'requests');
 const shiftsCol = collection(db, 'shifts');
 const shiftPlansCol = collection(db, 'shiftPlans');
+const checkinsCol = collection(db, 'checkins');
 const isDm = (conv) => conv.startsWith('dm:');
 const convCol = (conv) => (isDm(conv) ? collection(dmsCol, conv.slice(3), 'messages') : collection(channelsCol, conv, 'messages'));
 const convFolder = (conv) => `chat/${conv.replace(':', '-')}`;
@@ -759,7 +760,17 @@ export const firebaseStore = {
   startShifts(people, start, extra, actor) {
     const batch = writeBatch(db);
     for (const person of people)
-      batch.set(doc(shiftsCol), { person, start, end: null, note: '', subteam: '', taskIds: [], ...extra, ...actorFields(actor), at: Date.now() });
+      batch.set(doc(shiftsCol), {
+        person,
+        start,
+        end: null,
+        note: '',
+        subteam: '',
+        taskIds: [],
+        ...extra,
+        ...actorFields(actor),
+        at: Date.now(),
+      });
     return batch.commit();
   },
   updateShift(id, patch, actor) {
@@ -767,6 +778,20 @@ export const firebaseStore = {
   },
   deleteShift(id) {
     return deleteDoc(doc(shiftsCol, id));
+  },
+  // Lab check-ins: team management asks who's coming (lunch / after school);
+  // everyone answers for themselves.
+  subscribeCheckins(cb, onError) {
+    return onSnapshot(checkinsCol, (snap) => cb(snap.docs.map(readDoc)), onError);
+  },
+  addCheckin(data, actor) {
+    return setDoc(doc(checkinsCol), { ...data, answers: {}, ...actorFields(actor), at: Date.now() });
+  },
+  answerCheckin(id, name, answer) {
+    return updateDoc(doc(checkinsCol, id), new FieldPath('answers', name), { ...answer, at: Date.now() });
+  },
+  deleteCheckin(id) {
+    return deleteDoc(doc(checkinsCol, id));
   },
   // The schedule: planned shifts people can sign up for.
   subscribeShiftPlans(cb, onError) {

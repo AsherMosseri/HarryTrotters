@@ -25,6 +25,7 @@ import { HelpDialog, WelcomeCard } from './Help.jsx';
 import { VersionLogDialog, WhatsNew } from './VersionLog.jsx';
 import { RequestsDialog } from './Requests.jsx';
 import ShiftsView, { ShiftButton } from './Shifts.jsx';
+import { CheckinGate, answerOf } from './Checkin.jsx';
 import { VERSION, versionsSince } from '../changelog.js';
 import Inbox from './Inbox.jsx';
 
@@ -263,6 +264,9 @@ export default function Workspace({ store, actor, rename, renames }) {
   const [shiftPanel, setShiftPanel] = useState(false);
   useEffect(() => store.subscribeShifts(setShifts, quiet('shifts')), [store, quiet]);
   useEffect(() => store.subscribeShiftPlans(setShiftPlans, quiet('shift schedule')), [store, quiet]);
+  // Lab check-ins: today's unanswered one blocks the app until it's answered.
+  const [checkins, setCheckins] = useState([]);
+  useEffect(() => store.subscribeCheckins(setCheckins, quiet('lab check-ins')), [store, quiet]);
   const competitionDate = settings.competitionDate || COMPETITION.date;
 
   // Notifications: the bell's list, and phone notifications on this device.
@@ -392,6 +396,9 @@ export default function Workspace({ store, actor, rename, renames }) {
   }, [channelDocs, dmDocs, rename, actor.name]);
   const allConvs = useMemo(() => [...convs.channels, ...convs.dms, ...convs.teamDms], [convs]);
   const currentConv = allConvs.find((c) => c.key === chatChannel) || convs.channels.find((c) => c.id === 'general') || convs.channels[0];
+  // #parts also shows inside the Parts tab; the conversation on screen is that or the Chat tab's.
+  const partsConv = convs.channels.find((c) => c.id === 'parts');
+  const shownConv = view === 'chat' ? currentConv : view === 'parts' ? partsConv : null;
 
   // Live chat for every channel and my DMs (for unread counts), plus a team DM
   // being viewed.
@@ -427,7 +434,7 @@ export default function Workspace({ store, actor, rename, renames }) {
   const peopleInfo = useMemo(() => buildPeopleInfo(roster, roles, rename), [roster, roles, rename]);
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), view === 'chat' ? 2000 : 30000);
+    const t = setInterval(() => setNow(Date.now()), view === 'chat' || view === 'parts' ? 2000 : 30000);
     return () => clearInterval(t);
   }, [view]);
   const online = useMemo(() => {
@@ -458,6 +465,12 @@ export default function Workspace({ store, actor, rename, renames }) {
     [profiles, online, peopleInfo],
   );
   const openPerson = useCallback((name) => setProfileFor(name), []);
+  const gradeOf = useCallback((name) => peopleInfo.get(name)?.grade || 9, [peopleInfo]);
+  const today = todayISO();
+  const pendingCheckin = checkins.find((c) => c.date === today && (c.slots || []).length && !answerOf(c, actor.name, rename));
+  const upcomingCheckins = checkins
+    .filter((c) => c.date >= today)
+    .sort((a, b) => a.date.localeCompare(b.date) || (a.at || 0) - (b.at || 0));
 
   // Heartbeat: this device is online while the app is open and visible.
   useEffect(() => {
@@ -532,10 +545,10 @@ export default function Workspace({ store, actor, rename, renames }) {
 
   // Mark the open channel read while it's on screen.
   useEffect(() => {
-    if (view !== 'chat' || !chatRead) return;
+    if (!shownConv || !chatRead) return;
     const markRead = () => {
       if (document.visibilityState !== 'visible') return;
-      const key = currentConv?.key;
+      const key = shownConv.key;
       const msgs = chat[key] || [];
       const newest = msgs.length ? msgs[msgs.length - 1].at : 0;
       if (key && newest > (chatRead[key] || 0)) setChatRead({ ...chatRead, [key]: newest });
@@ -543,7 +556,7 @@ export default function Workspace({ store, actor, rename, renames }) {
     markRead();
     document.addEventListener('visibilitychange', markRead);
     return () => document.removeEventListener('visibilitychange', markRead);
-  }, [view, chat, currentConv, chatRead, setChatRead]);
+  }, [chat, shownConv, chatRead, setChatRead]);
 
   // Lets api.create see the current filters without rebuilding api on every change.
   const filterState = useRef();
@@ -705,6 +718,9 @@ export default function Workspace({ store, actor, rename, renames }) {
       updateShift: (id, patch) => store.updateShift(id, patch, actor).catch(fail),
       deleteShift: (id) => store.deleteShift(id).catch(fail),
       addShiftPlans: (list) => store.addShiftPlans(list, actor).catch(fail),
+      addCheckin: (data) => store.addCheckin(data, actor).catch(fail),
+      answerCheckin: (id, answer) => store.answerCheckin(id, actor.name, answer).catch(fail),
+      deleteCheckin: (id) => store.deleteCheckin(id).catch(fail),
       rsvpShiftPlan: (id, answer) => store.rsvpShiftPlan(id, actor.name, answer).catch(fail),
       deleteShiftPlans: (ids) => store.deleteShiftPlans(ids).catch(fail),
       addRequest: (text) =>
@@ -759,13 +775,13 @@ export default function Workspace({ store, actor, rename, renames }) {
     if (!pageVisible) return [];
     const out = [];
     if (openId) out.push(`task:${openId}`);
-    if (view === 'chat' && currentConv) out.push(`chat:${currentConv.key}`);
+    if (shownConv) out.push(`chat:${shownConv.key}`);
     if (view === 'board') out.push('view:board');
     if (showRequests) out.push(...requests.map((r) => `requests:${r.id}`));
     if (view === 'shifts') out.push('view:shifts');
     if (shiftPanel) out.push('shift:end');
     return out;
-  }, [pageVisible, openId, view, currentConv, showRequests, requests, shiftPanel]);
+  }, [pageVisible, openId, view, shownConv, showRequests, requests, shiftPanel]);
   useEffect(() => {
     if (!seenTarget.length) return;
     const ids = inbox.filter((n) => !n.read && seenTarget.includes(n.open)).map((n) => n.id);
@@ -1081,7 +1097,47 @@ export default function Workspace({ store, actor, rename, renames }) {
               onAddTask={(m) => setNewTask({ status: 'todo', milestoneId: m.id, subteam: m.subteam || '' })}
             />
           ) : view === 'parts' ? (
-            <PartsView parts={parts} tasks={tasks} api={api} onOpenTask={setOpenId} />
+            <div className="parts-layout">
+              <PartsView parts={parts} tasks={tasks} api={api} onOpenTask={setOpenId} />
+              {partsConv && (
+                <ChatView
+                  embedded
+                  convs={convs}
+                  current={partsConv}
+                  setCurrent={(key) => {
+                    setChatChannel(key);
+                    setView('chat');
+                  }}
+                  onOpenFull={() => {
+                    setChatChannel(partsConv.key);
+                    setView('chat');
+                  }}
+                  messages={chat}
+                  unread={unread}
+                  readAt={chatRead || {}}
+                  actor={actor}
+                  isManager={actor.admin}
+                  roster={roster}
+                  tasks={tasks}
+                  api={api}
+                  teamEmoji={teamEmoji}
+                  stickers={stickers}
+                  typing={typingIn(partsConv.key)}
+                  levelOf={levelOf}
+                  setLevel={(c, v) => api.saveProfile(actor.name, { notify: { [c.key]: v } })}
+                  onPerson={openPerson}
+                  onOpenTask={setOpenId}
+                  onMakeTask={(m, c) =>
+                    setNewTask({
+                      status: 'todo',
+                      subteam: c.subteam || '',
+                      title: (m.text || m.poll?.question || 'Follow up on chat photo').replace(/\s+/g, ' ').slice(0, 90),
+                      description: `From ${c.label}, ${m.by}: ${m.text || m.poll?.question || '(photo)'}`,
+                    })
+                  }
+                />
+              )}
+            </div>
           ) : view === 'checklists' ? (
             <ChecklistsView checklists={checklists} api={api} isManager={actor.admin} />
           ) : view === 'chat' ? (
@@ -1146,6 +1202,8 @@ export default function Workspace({ store, actor, rename, renames }) {
               onStartMine={startMyShift}
               onOpenMine={() => setShiftPanel(true)}
               onOpenTask={setOpenId}
+              checkins={upcomingCheckins}
+              gradeOf={gradeOf}
             />
           ) : view === 'runs' ? (
             <RunsView runs={runs} roster={roster} api={api} />
@@ -1241,6 +1299,9 @@ export default function Workspace({ store, actor, rename, renames }) {
           )}
           {showLog && <VersionLogDialog current={VERSION} onClose={() => setShowLog(false)} />}
           {cat && <CatParty onClose={() => setCat(false)} />}
+          {pendingCheckin && (
+            <CheckinGate checkin={pendingCheckin} rename={rename} onAnswer={(a) => api.answerCheckin(pendingCheckin.id, a)} />
+          )}
           {toast && (
             <div className="toast" role="alert" onClick={() => setToast(null)}>
               <span>{toast.text}</span>

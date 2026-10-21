@@ -13,6 +13,8 @@ A live, shared task board for the team — replaces the old Google Sheet task lo
 - **Nitro-style extras**: animated GIF profile pictures, banners, pronouns, about me, display-name fonts and gradient colors, avatar decorations, profile effects (including custom ones made from any emoji, GIPHY GIF, or picture), profile theme colors, super reactions, team stickers, any file up to 25 MB in chat (videos and audio play inline), and per-device app color themes. Options live in `src/nitro.js`.
 - **Notifications**: the 🔔 lists announcements, @mentions, tasks someone gave you, and a 7:30 AM (New York time) due-tomorrow reminder. Each device can turn on phone notifications (on iPhone/iPad, from the Home Screen app only). Sent by the Cloud Functions in `functions/`.
 - **Shifts** tab: ⏱ in the top bar starts a shift in one tap and shows a running timer (tap it to add notes/subteam/tasks, move the start earlier, or end it). The tab shows who's at the lab, the planned schedule (team management plans shifts, once or weekly; people answer I'm in / Can't), season and weekly hours with a goal (`settings/team.shiftGoal`), the log, and CSV export. The `shiftChecks` Cloud Function runs every 15 minutes: a 4-hour "Still at the lab?" reminder, a reminder an hour before planned shifts, and ending shifts left running past midnight (New York time) at the person's last activity.
+- **Lab check-in** (Shifts tab): team management asks who's going to the lab (lunch and/or after school) for a day. Everyone is notified (`onCheckin` Cloud Function), and on that day the app shows the question when it opens until it's answered. Lunch answers are split into middle school and high school lunch by grade (`grade` on the Team tab; defaults in `GRADE_DEFAULTS` in `src/config.js`).
+- **Parts chat**: the Parts tab shows the #parts channel beside the list.
 - **Feature requests**: 💡 at the top (and the idea box on the “What’s new” card after each update) sends an idea to `REQUESTS_TO` in `src/config.js` (Asher) as a notification. Everyone can see ideas and 👍 them; team management sets the status (New, Planned, In progress, Added, Not now), replies, or turns one into a task, and the person who asked is notified.
 - **Robot** tab: 3D viewer for Onshape GLTF exports (three.js, loaded only on this tab) with a parts tree, hide/show/isolate, exploded view, pinned notes linked to tasks and parts, a sandbox to move/rotate parts and save layouts, and side-by-side version compare (added/removed/moved). Model files need CORS enabled on the Storage bucket to download (see the in-app message).
 - **Team** tab: organization chart by subteam plus each person's role and responsibilities (editable on the site; starting values in `ORG_DEFAULTS` in `src/config.js`).
@@ -69,7 +71,7 @@ Test locally with the emulators: `npx firebase-tools emulators:start --only fire
 ## Data model (Firestore)
 
 - `milestones/{id}` — `{ title, subteam, owners[], start, end, notes, done }`; tasks link via `milestoneId`.
-- `roles/{personId}` — `{ name, title, subteams[], responsibilities[], removed }` — org chart edits and people the manager added or removed.
+- `roles/{personId}` — `{ name, title, grade, subteams[], responsibilities[], removed }` — org chart edits and people the manager added or removed.
 - `settings/team` — `{ competitionDate }`.
 - `parts/{id}` — `{ name, vendor, partNumber, qty, unitCost, url, status, subteam, taskId, notes }`.
 - Task photos live in Cloud Storage at `tasks/{taskId}/{photoId}.jpg` (+ `-thumb.jpg`); the task's `photos` array holds their URLs.
@@ -88,9 +90,10 @@ Test locally with the emulators: `npx firebase-tools emulators:start --only fire
 - `stickers/{id}` — `{ name, url, path }`, team stickers; files in Storage under `stickers/`.
 - `emoji/{name}` — `{ name, url, path }`, team emoji; files in Storage under `emoji/`.
 - `shifts/{id}` — `{ person, start, end (null while running), note, subteam, taskIds[], by, byUid, autoEnded?, reminded?, planId? }` (ms times). You create your own (start up to 12 h back) and end it; managers change anything.
+- `checkins/{id}` — `{ date, question, slots: ['lunch' | 'after'], answers: { [name]: { lunch?, after?, at } }, by, byUid, at }`. Managers create/delete; people answer only for themselves.
 - `shiftPlans/{id}` — `{ date: 'YYYY-MM-DD', start: 'HH:MM', end: 'HH:MM', title, subteam, people: { [name]: 'in' | 'out' }, repeatId?, reminded? }`. Managers create/delete; people answer only for themselves.
 - `requests/{id}` — `{ text, by, byUid, at, status: new | planned | working | done | declined, votes: { [name]: true }, reply?, updatedBy?, updatedAt? }`. Anyone creates (as themselves, status new) and 👍s; managers change the rest.
-- `inbox/{personId}/items/{id}` — `{ type: announcement | mention | assigned | due | request | shift, title, body, open, by, at, read }`, written only by the Cloud Functions; `open` is `task:<id>`, `chat:<channel>`, `view:<tab>`, `requests:<id>`, or `shift:end`.
+- `inbox/{personId}/items/{id}` — `{ type: announcement | mention | assigned | due | request | shift | checkin, title, body, open, by, at, read }`, written only by the Cloud Functions; `open` is `task:<id>`, `chat:<channel>`, `view:<tab>`, `requests:<id>`, or `shift:end`.
 - `pushTokens/{token}` — `{ uid, person, ua, at }`, one per device with phone notifications on; only the functions read them.
 - `members/{uid}` — `{ name, code, joinedAt }` — one per device that entered the right code; only readable by that device.
 - `people/{uid}` — `{ name, joinedAt }` — names for the assignee picker, readable by the team.

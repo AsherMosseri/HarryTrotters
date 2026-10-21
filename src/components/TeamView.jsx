@@ -1,5 +1,16 @@
 import { useMemo, useState } from 'react';
-import { isManagerName, ORG_DEFAULTS, ORG_GROUPS, SUBTEAM_COLORS, TEAM_NAME, TEAM_NICKNAME } from '../config.js';
+import {
+  DEFAULT_GRADE,
+  GRADE_DEFAULTS,
+  GRADES,
+  gradeLabel,
+  isManagerName,
+  ORG_DEFAULTS,
+  ORG_GROUPS,
+  SUBTEAM_COLORS,
+  TEAM_NAME,
+  TEAM_NICKNAME,
+} from '../config.js';
 import { PlusIcon } from './common.jsx';
 import { personId } from '../data/diff.js';
 import { todayISO } from '../milestones.js';
@@ -32,6 +43,7 @@ function PersonDialog({ person, taken, onClose, onSave, onRemove }) {
   const [title, setTitle] = useState(person.title || '');
   const [subteams, setSubteams] = useState(person.subteams || []);
   const [resp, setResp] = useState((person.responsibilities || []).join('\n'));
+  const [grade, setGrade] = useState(person.grade || DEFAULT_GRADE);
   const toggle = (s) => setSubteams(subteams.includes(s) ? subteams.filter((x) => x !== s) : [...subteams, s]);
 
   return (
@@ -46,6 +58,7 @@ function PersonDialog({ person, taken, onClose, onSave, onRemove }) {
             name: person.isNew || canRename ? name.trim() : person.name,
             removed: false,
             title: title.trim(),
+            grade,
             subteams: ORG_GROUPS.filter((s) => subteams.includes(s)),
             responsibilities: resp
               .split('\n')
@@ -95,6 +108,16 @@ function PersonDialog({ person, taken, onClose, onSave, onRemove }) {
             onChange={(e) => setTitle(e.target.value)}
             placeholder="e.g. Captain, CAD Lead, Secretary"
           />
+          <label className="field-label" htmlFor="p-grade">
+            Grade
+          </label>
+          <select id="p-grade" className="input" value={grade} onChange={(e) => setGrade(Number(e.target.value))}>
+            {GRADES.map((g) => (
+              <option key={g} value={g}>
+                {gradeLabel(g)}
+              </option>
+            ))}
+          </select>
           <span className="field-label">Subteams</span>
           <div className="assignee-picker">
             {ORG_GROUPS.map((s) => (
@@ -166,6 +189,7 @@ export default function TeamView({ roster, roles, tasks, api, isManager, rename 
 
   // Starting roles, keyed by each person's current name.
   const defaults = useMemo(() => Object.fromEntries(Object.entries(ORG_DEFAULTS).map(([k, v]) => [rename(k), v])), [rename]);
+  const grades = useMemo(() => Object.fromEntries(Object.entries(GRADE_DEFAULTS).map(([k, v]) => [rename(k), v])), [rename]);
 
   const people = useMemo(() => {
     const saved = Object.fromEntries(roles.map((r) => [r.id, r]));
@@ -175,13 +199,14 @@ export default function TeamView({ roster, roles, tasks, api, isManager, rename 
       return {
         name,
         title: role.title || '',
+        grade: role.grade || grades[name] || DEFAULT_GRADE,
         subteams: role.subteams || [],
         responsibilities: role.responsibilities || [],
         open: mine.length,
         overdue: mine.filter((t) => t.dueDate && t.dueDate < today).length,
       };
     });
-  }, [roster, roles, tasks, today, defaults]);
+  }, [roster, roles, tasks, today, defaults, grades]);
 
   const inTeam = (s) => people.filter((p) => p.subteams.includes(s));
   const onEdit = isManager ? setEditing : null;
@@ -262,7 +287,9 @@ export default function TeamView({ roster, roles, tasks, api, isManager, rename 
               <Avatar name={p.name} size={40} />
               <div className="grow">
                 <h3>{p.name}</h3>
-                <div className="muted small">{p.title || 'Team member'}</div>
+                <div className="muted small">
+                  {p.title || 'Team member'} · {gradeLabel(p.grade)}
+                </div>
               </div>
               {isManager && (
                 <button className="link-btn" onClick={() => setEditing(p)}>
@@ -312,6 +339,7 @@ export default function TeamView({ roster, roles, tasks, api, isManager, rename 
                   await api.saveRole({
                     name: p.name,
                     title: p.title,
+                    grade: p.grade,
                     subteams: p.subteams,
                     responsibilities: p.responsibilities,
                     removed: true,

@@ -90,6 +90,10 @@ export default function ChatView({
   onPerson,
   onOpenTask,
   onMakeTask,
+  // Shown inside another tab (Parts): one conversation, no channel list or
+  // side panels, and a button to open it in the Chat tab.
+  embedded = false,
+  onOpenFull,
 }) {
   const people = usePeople();
   const [selected, setSelected] = useState(null);
@@ -100,7 +104,7 @@ export default function ChatView({
   const [viewing, setViewing] = useState(null);
   const [newBelow, setNewBelow] = useState(false);
   const [side, setSide] = useState(() =>
-    typeof matchMedia === 'function' && matchMedia('(min-width: 1200px)').matches ? 'members' : null,
+    !embedded && typeof matchMedia === 'function' && matchMedia('(min-width: 1200px)').matches ? 'members' : null,
   );
   const [dialog, setDialog] = useState(null); // { type: 'channel', channel? } | { type: 'dm' } | { type: 'emoji' }
   const [notifyOpen, setNotifyOpen] = useState(false);
@@ -308,42 +312,44 @@ export default function ChatView({
   );
 
   return (
-    <main className={`content chat${side ? ' with-side' : ''}`}>
-      <aside className="channel-list">{sideList}</aside>
-      <div className="chat-mobile-bar">
-        <select className="input channel-select" value={conv.key} onChange={(e) => setCurrent(e.target.value)} aria-label="Channel or DM">
-          <optgroup label="Channels">
-            {convs.channels.map((c) => (
-              <option key={c.key} value={c.key}>
-                #{c.name}
-                {unread[c.key]?.count && !unread[c.key].muted ? ` (${unread[c.key].count})` : ''}
-              </option>
-            ))}
-          </optgroup>
-          {convs.dms.length > 0 && (
-            <optgroup label="Direct messages">
-              {convs.dms.map((c) => (
+    <main className={`content chat${side ? ' with-side' : ''}${embedded ? ' embedded' : ''}`}>
+      {!embedded && <aside className="channel-list">{sideList}</aside>}
+      {!embedded && (
+        <div className="chat-mobile-bar">
+          <select className="input channel-select" value={conv.key} onChange={(e) => setCurrent(e.target.value)} aria-label="Channel or DM">
+            <optgroup label="Channels">
+              {convs.channels.map((c) => (
                 <option key={c.key} value={c.key}>
-                  {c.short}
-                  {unread[c.key]?.count ? ` (${unread[c.key].count})` : ''}
+                  #{c.name}
+                  {unread[c.key]?.count && !unread[c.key].muted ? ` (${unread[c.key].count})` : ''}
                 </option>
               ))}
             </optgroup>
-          )}
-          {isManager && convs.teamDms.length > 0 && (
-            <optgroup label="Team DMs (view only)">
-              {convs.teamDms.map((c) => (
-                <option key={c.key} value={c.key}>
-                  {c.short}
-                </option>
-              ))}
-            </optgroup>
-          )}
-        </select>
-        <button className="btn" onClick={() => setDialog({ type: 'dm' })} aria-label="New direct message">
-          ✉️ New
-        </button>
-      </div>
+            {convs.dms.length > 0 && (
+              <optgroup label="Direct messages">
+                {convs.dms.map((c) => (
+                  <option key={c.key} value={c.key}>
+                    {c.short}
+                    {unread[c.key]?.count ? ` (${unread[c.key].count})` : ''}
+                  </option>
+                ))}
+              </optgroup>
+            )}
+            {isManager && convs.teamDms.length > 0 && (
+              <optgroup label="Team DMs (view only)">
+                {convs.teamDms.map((c) => (
+                  <option key={c.key} value={c.key}>
+                    {c.short}
+                  </option>
+                ))}
+              </optgroup>
+            )}
+          </select>
+          <button className="btn" onClick={() => setDialog({ type: 'dm' })} aria-label="New direct message">
+            ✉️ New
+          </button>
+        </div>
+      )}
 
       <section className="chat-main">
         <header className="chat-head">
@@ -373,22 +379,31 @@ export default function ChatView({
             </span>
           </div>
           <div className="chat-tools">
-            <button
-              className={`icon-btn${side === 'search' ? ' on' : ''}`}
-              onClick={() => setSide(side === 'search' ? null : 'search')}
-              title="Search"
-              aria-label="Search messages"
-            >
-              🔍
-            </button>
-            <button
-              className={`icon-btn${side === 'pins' ? ' on' : ''}`}
-              onClick={() => setSide(side === 'pins' ? null : 'pins')}
-              title="Pinned messages"
-              aria-label="Pinned messages"
-            >
-              📌
-            </button>
+            {embedded && (
+              <button className="btn small-btn" onClick={onOpenFull} title="Search, pins, and members are in the Chat tab">
+                Open in Chat ↗
+              </button>
+            )}
+            {!embedded && (
+              <>
+                <button
+                  className={`icon-btn${side === 'search' ? ' on' : ''}`}
+                  onClick={() => setSide(side === 'search' ? null : 'search')}
+                  title="Search"
+                  aria-label="Search messages"
+                >
+                  🔍
+                </button>
+                <button
+                  className={`icon-btn${side === 'pins' ? ' on' : ''}`}
+                  onClick={() => setSide(side === 'pins' ? null : 'pins')}
+                  title="Pinned messages"
+                  aria-label="Pinned messages"
+                >
+                  📌
+                </button>
+              </>
+            )}
             {(conv.kind !== 'dm' || conv.mine) && (
               <span className="notify-wrap">
                 <button
@@ -413,14 +428,16 @@ export default function ChatView({
                 )}
               </span>
             )}
-            <button
-              className={`icon-btn${side === 'members' ? ' on' : ''}`}
-              onClick={() => setSide(side === 'members' ? null : 'members')}
-              title="Members"
-              aria-label="Members"
-            >
-              👥
-            </button>
+            {!embedded && (
+              <button
+                className={`icon-btn${side === 'members' ? ' on' : ''}`}
+                onClick={() => setSide(side === 'members' ? null : 'members')}
+                title="Members"
+                aria-label="Members"
+              >
+                👥
+              </button>
+            )}
           </div>
         </header>
         <div className="msg-list" ref={list} onScroll={onScroll}>

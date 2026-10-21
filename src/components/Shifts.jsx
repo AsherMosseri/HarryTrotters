@@ -3,6 +3,7 @@ import { SUBTEAMS } from '../config.js';
 import { addDays, mondayOf, parseDay, toISO, todayISO } from '../milestones.js';
 import { firstName } from '../util.js';
 import { Avatar, AvatarStack, CloseIcon, PlusIcon } from './common.jsx';
+import { CheckinCard, CheckinDialog } from './Checkin.jsx';
 
 const MIN = 60000;
 const HOUR = 60 * MIN;
@@ -260,7 +261,13 @@ function PlanDialog({ onDone, onClose }) {
         <label className="field-label" htmlFor="sp-title">
           What
         </label>
-        <input id="sp-title" className="input" value={p.title} placeholder="e.g. Build session" onChange={(e) => set({ title: e.target.value })} />
+        <input
+          id="sp-title"
+          className="input"
+          value={p.title}
+          placeholder="e.g. Build session"
+          onChange={(e) => set({ title: e.target.value })}
+        />
         <label className="field-label" htmlFor="sp-date">
           Date
         </label>
@@ -423,7 +430,10 @@ function downloadCsv(rows, tasksById) {
       ((s.end - s.start) / HOUR).toFixed(2),
       s.subteam,
       s.note,
-      (s.taskIds || []).map((id) => tasksById.get(id)?.title || '').filter(Boolean).join('; '),
+      (s.taskIds || [])
+        .map((id) => tasksById.get(id)?.title || '')
+        .filter(Boolean)
+        .join('; '),
       s.autoEnded ? 'yes' : '',
     ]);
   }
@@ -450,11 +460,25 @@ function inPeriod(s, period) {
   return s.start >= from && s.start < to;
 }
 
-export default function ShiftsView({ shifts, plans, actor, roster, tasks, goal, api, rename, onStartMine, onOpenMine, onOpenTask }) {
+export default function ShiftsView({
+  shifts,
+  plans,
+  actor,
+  roster,
+  tasks,
+  goal,
+  api,
+  rename,
+  onStartMine,
+  onOpenMine,
+  onOpenTask,
+  checkins = [],
+  gradeOf,
+}) {
   const now = useNow(30000);
   const isManager = actor.admin;
   const me = actor.name;
-  const [dialog, setDialog] = useState(null); // 'clockin' | 'plan' | { shift }
+  const [dialog, setDialog] = useState(null); // 'clockin' | 'plan' | 'checkin' | { shift }
   const [hoursPeriod, setHoursPeriod] = useState('all');
   const [period, setPeriod] = useState('week');
   const [who, setWho] = useState('');
@@ -468,14 +492,13 @@ export default function ShiftsView({ shifts, plans, actor, roster, tasks, goal, 
   const mine = running.find((s) => s.person === me);
   const tasksById = useMemo(() => new Map((tasks || []).map((t) => [t.id, t])), [tasks]);
 
-  const upcoming = plans
-    .filter((p) => planMs(p.date, p.end) > now)
-    .sort((a, b) => planMs(a.date, a.start) - planMs(b.date, b.start));
+  const upcoming = plans.filter((p) => planMs(p.date, p.end) > now).sort((a, b) => planMs(a.date, a.start) - planMs(b.date, b.start));
   const shownPlans = more ? upcoming : upcoming.slice(0, 6);
 
   const totals = useMemo(() => {
     const m = new Map();
-    for (const s of all) if (inPeriod(s, hoursPeriod === 'all' ? 'all' : 'week')) m.set(s.person, (m.get(s.person) || 0) + lengthOf(s, now));
+    for (const s of all)
+      if (inPeriod(s, hoursPeriod === 'all' ? 'all' : 'week')) m.set(s.person, (m.get(s.person) || 0) + lengthOf(s, now));
     if (!m.has(me)) m.set(me, 0);
     return [...m].sort((a, b) => b[1] - a[1]);
   }, [all, hoursPeriod, now, me]);
@@ -506,6 +529,11 @@ export default function ShiftsView({ shifts, plans, actor, roster, tasks, goal, 
           <p className="muted">Who’s at the lab, who’s coming, and everyone’s hours.</p>
         </div>
         <span className="spacer" />
+        {isManager && (
+          <button className="btn" onClick={() => setDialog('checkin')}>
+            🧪 Lab check-in
+          </button>
+        )}
         {mine ? (
           <button className="btn primary" onClick={onOpenMine}>
             ⏱ End my shift
@@ -516,6 +544,20 @@ export default function ShiftsView({ shifts, plans, actor, roster, tasks, goal, 
           </button>
         )}
       </div>
+
+      {checkins.map((c) => (
+        <CheckinCard
+          key={c.id}
+          checkin={c}
+          roster={roster}
+          gradeOf={gradeOf}
+          me={me}
+          isManager={isManager}
+          rename={rename}
+          onAnswer={(a) => api.answerCheckin(c.id, a)}
+          onDelete={() => api.deleteCheckin(c.id)}
+        />
+      ))}
 
       <div className="stat-tiles">
         <div className="stat">
@@ -698,14 +740,24 @@ export default function ShiftsView({ shifts, plans, actor, roster, tasks, goal, 
                 className="input"
                 defaultValue={goal || ''}
                 placeholder="—"
-                onBlur={(e) => Number(e.target.value) !== (Number(goal) || 0) && api.saveSettings({ shiftGoal: Number(e.target.value) || 0 })}
+                onBlur={(e) =>
+                  Number(e.target.value) !== (Number(goal) || 0) && api.saveSettings({ shiftGoal: Number(e.target.value) || 0 })
+                }
               />
               h
             </label>
           ) : (
             goal > 0 && <span className="muted small">Season goal: {goal} h</span>
           )}
-          <button className="btn small-btn" onClick={() => downloadCsv([...all].sort((a, b) => a.start - b.start), tasksById)}>
+          <button
+            className="btn small-btn"
+            onClick={() =>
+              downloadCsv(
+                [...all].sort((a, b) => a.start - b.start),
+                tasksById,
+              )
+            }
+          >
             ⬇ Export CSV
           </button>
         </div>
@@ -814,6 +866,15 @@ export default function ShiftsView({ shifts, plans, actor, roster, tasks, goal, 
           onClose={() => setDialog(null)}
           onDone={async (people) => {
             await api.startShifts(people, Date.now());
+            setDialog(null);
+          }}
+        />
+      )}
+      {dialog === 'checkin' && (
+        <CheckinDialog
+          onClose={() => setDialog(null)}
+          onDone={async (data) => {
+            await api.addCheckin(data);
             setDialog(null);
           }}
         />

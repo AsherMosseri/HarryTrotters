@@ -1,11 +1,12 @@
 // Each person's org-chart info (title, subteams, responsibilities): what team
 // management saved on the Team tab, else the defaults in config.js.
-import { ORG_DEFAULTS, SUBTEAM_COLORS } from './config.js';
+import { DEFAULT_GRADE, GRADE_DEFAULTS, ORG_DEFAULTS, SUBTEAM_COLORS } from './config.js';
 import { personId } from './data/diff.js';
 
 export function buildPeopleInfo(roster, roles, rename) {
   const saved = Object.fromEntries(roles.map((r) => [r.id, r]));
   const defaults = Object.fromEntries(Object.entries(ORG_DEFAULTS).map(([k, v]) => [rename(k), v]));
+  const grades = Object.fromEntries(Object.entries(GRADE_DEFAULTS).map(([k, v]) => [rename(k), v]));
   const out = new Map();
   for (const name of roster) {
     const role = saved[personId(name)] || defaults[name] || {};
@@ -14,6 +15,7 @@ export function buildPeopleInfo(roster, roles, rename) {
       title: role.title || '',
       subteams,
       responsibilities: role.responsibilities || [],
+      grade: role.grade || grades[name] || DEFAULT_GRADE,
       // Name color in chat, like a Discord role color: their first subteam.
       color: SUBTEAM_COLORS[subteams[0]] || '',
     });

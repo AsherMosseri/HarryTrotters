@@ -51,6 +51,7 @@ const SECTIONS = [
     [
       'Track each part as Needed → Ordered → Arrived, with vendor, quantity, and cost.',
       'Link a part to the task waiting on it. The top shows what’s been spent.',
+      'The #parts chat sits next to the list, for talking about orders. Open in Chat ↗ has search and pins.',
     ],
   ],
   [
@@ -65,6 +66,7 @@ const SECTIONS = [
       'Shifts tab: who’s at the lab now, the schedule (tap I’m in or Can’t), everyone’s hours, and the log of past shifts.',
       'You get a reminder after 4 hours on shift and an hour before a shift you said you’d come to. A shift left running past midnight ends at the last time you used the app (marked auto-ended).',
       'Edit your own past shifts’ notes, subteam, and tasks. Team management fixes times.',
+      'Lab check-in: when team management asks who’s going to the lab, the app asks you when you open it. Answer Yes or No for lunch and after school; change it later in the Shifts tab.',
     ],
   ],
   [
@@ -128,6 +130,7 @@ const MANAGER_TIPS = [
   'Chat: post in #announcements (everyone gets a notification), use @everyone, delete any message, and remove reactions (🚫☺ on a message).',
   'Channels: ＋ next to Channels adds one; ⚙ on a channel renames it, sets its topic and subteam color, moves it up or down, or deletes it.',
   'Team emoji: open 😊 and tap ＋ under Team emoji to add your own (:name:), or remove them. Stickers: open 🎫 and tap ＋.',
+  'Shifts tab: 🧪 Lab check-in asks everyone who’s going to the lab (lunch / after school). Lunch is split by middle and high school lunch using each person’s grade, which you set on the Team tab (Edit).',
   'Shifts tab: Clock in… several people at once, End anyone’s shift, Plan a shift (once or weekly), set the season hours goal, add a missed shift, fix or delete any shift, and Export CSV.',
   'DMs: you can read every DM (under Team DMs) but can’t post in other people’s. You can change anyone’s profile picture from their profile.',
 ];

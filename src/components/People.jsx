@@ -1,7 +1,7 @@
 // Profile card (tap someone's name or picture) and the profile editor
 // (pictures, about me, Nitro-style looks, status).
 import { useEffect, useRef, useState } from 'react';
-import { SUBTEAM_COLORS } from '../config.js';
+import { SUBTEAM_COLORS, gradeLabel } from '../config.js';
 import { DECORATIONS, EFFECTS, MOTIONS, NAME_FONTS, SWATCHES, effectById, nameStyle } from '../nitro.js';
 import { EmojiPicker, GifPicker } from './chat/Pickers.jsx';
 import { activeStatus } from '../people.js';
@@ -212,7 +212,9 @@ function CardBody({ name, look, actor, tasks, children }) {
             <p className="about-text">{profile.about}</p>
           </div>
         )}
-        {info.title && <p className="profile-title">{info.title}</p>}
+        {(info.title || info.grade) && (
+          <p className="profile-title">{[info.title, info.grade && gradeLabel(info.grade)].filter(Boolean).join(' · ')}</p>
+        )}
         {info.subteams?.length > 0 && (
           <div className="profile-pills">
             {info.subteams.map((s) => (

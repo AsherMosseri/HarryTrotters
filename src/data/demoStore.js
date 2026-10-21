@@ -349,8 +349,24 @@ function demoPlans() {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   };
   return [
-    { id: uid(), date: iso(1), start: '15:30', end: '18:00', title: 'Build session', subteam: '', people: { 'Cooper Mlezcko': 'in', 'Sebastian Tolbert': 'in' } },
-    { id: uid(), date: iso(3), start: '15:30', end: '17:30', title: 'Driver practice', subteam: 'Programming', people: { 'Jackson Lucks': 'out' } },
+    {
+      id: uid(),
+      date: iso(1),
+      start: '15:30',
+      end: '18:00',
+      title: 'Build session',
+      subteam: '',
+      people: { 'Cooper Mlezcko': 'in', 'Sebastian Tolbert': 'in' },
+    },
+    {
+      id: uid(),
+      date: iso(3),
+      start: '15:30',
+      end: '17:30',
+      title: 'Driver practice',
+      subteam: 'Programming',
+      people: { 'Jackson Lucks': 'out' },
+    },
   ];
 }
 
@@ -861,7 +877,17 @@ export const demoStore = {
     return listen(() => cb([...(state.shifts || [])]));
   },
   async startShifts(people, start, extra, actor) {
-    const add = people.map((person) => ({ id: uid(), person, start, end: null, note: '', subteam: '', taskIds: [], ...extra, createdBy: actor.name }));
+    const add = people.map((person) => ({
+      id: uid(),
+      person,
+      start,
+      end: null,
+      note: '',
+      subteam: '',
+      taskIds: [],
+      ...extra,
+      createdBy: actor.name,
+    }));
     state.shifts = [...(state.shifts || []), ...add];
     commit();
   },
@@ -871,6 +897,23 @@ export const demoStore = {
   },
   async deleteShift(id) {
     state.shifts = (state.shifts || []).filter((s) => s.id !== id);
+    commit();
+  },
+  subscribeCheckins(cb) {
+    return listen(() => cb([...(state.checkins || [])]));
+  },
+  async addCheckin(data, actor) {
+    state.checkins = [...(state.checkins || []), { id: uid(), ...data, answers: {}, by: actor.name, at: Date.now() }];
+    commit();
+  },
+  async answerCheckin(id, name, answer) {
+    state.checkins = (state.checkins || []).map((c) =>
+      c.id === id ? { ...c, answers: { ...c.answers, [name]: { ...answer, at: Date.now() } } } : c,
+    );
+    commit();
+  },
+  async deleteCheckin(id) {
+    state.checkins = (state.checkins || []).filter((c) => c.id !== id);
     commit();
   },
   subscribeShiftPlans(cb) {
@@ -908,13 +951,23 @@ export const demoStore = {
     // What the Cloud Function does: let REQUESTS_TO know (not about their own).
     if (actor.name !== REQUESTS_TO)
       state.inbox = [
-        { id: uid(), type: 'request', title: `${actor.name.split(' ')[0]} requested a feature`, body: text, open: `requests:${r.id}`, at: r.at, read: false },
+        {
+          id: uid(),
+          type: 'request',
+          title: `${actor.name.split(' ')[0]} requested a feature`,
+          body: text,
+          open: `requests:${r.id}`,
+          at: r.at,
+          read: false,
+        },
         ...(state.inbox || []),
       ];
     commit();
   },
   async updateRequest(id, patch, actor) {
-    state.requests = (state.requests || []).map((r) => (r.id === id ? { ...r, ...patch, updatedBy: actor.name, updatedAt: Date.now() } : r));
+    state.requests = (state.requests || []).map((r) =>
+      r.id === id ? { ...r, ...patch, updatedBy: actor.name, updatedAt: Date.now() } : r,
+    );
     commit();
   },
   async voteRequest(id, name, on) {

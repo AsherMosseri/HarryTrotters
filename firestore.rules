@@ -219,6 +219,15 @@ service cloud.firestore {
         && request.resource.data.people.diff(resource.data.people).affectedKeys().hasOnly([myName(), renamedMe()]));
     }
 
+    // Lab check-ins: team management asks; everyone answers only for themselves.
+    match /checkins/{id} {
+      allow read: if isMember();
+      allow create, delete: if isManager();
+      allow update: if isManager() || (isMember()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['answers'])
+        && request.resource.data.answers.diff(resource.data.answers).affectedKeys().hasOnly([myName(), renamedMe()]));
+    }
+
     // Practice and match log: anyone on the team.
     match /runs/{id} {
       allow read, write: if isMember();

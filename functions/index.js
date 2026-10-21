@@ -281,6 +281,28 @@ export const onTaskAssigned = onDocumentWritten('tasks/{taskId}', async (event) 
   );
 });
 
+// A new lab check-in: everyone gets a notification to answer it (the app
+// also asks when it opens).
+export const onCheckin = onDocumentCreated('checkins/{id}', async (event) => {
+  const c = event.data?.data();
+  if (!c) return;
+  const rename = await renamer();
+  const by = rename(c.by || '');
+  const people = new Set((await db.collection('people').get()).docs.map((p) => rename(p.get('name') || '')));
+  await notify(
+    [...people]
+      .filter((to) => to && to !== by)
+      .map((to) => ({
+        to,
+        type: 'checkin',
+        title: `Lab check-in from ${first(by)}`,
+        body: c.question || 'Are you going to the lab today?',
+        open: 'view:shifts',
+        by,
+      })),
+  );
+});
+
 // Shifts, every 15 minutes:
 // - clocked in 4+ hours: "Still at the lab?" (once per shift)
 // - still running from before today (New York time): ended at the person's
@@ -358,7 +380,10 @@ export const shiftChecks = onSchedule({ schedule: 'every 15 minutes', timeZone: 
     }
   }
 
-  const plans = await db.collection('shiftPlans').where('date', 'in', [today, localDate(1)]).get();
+  const plans = await db
+    .collection('shiftPlans')
+    .where('date', 'in', [today, localDate(1)])
+    .get();
   for (const p of plans.docs) {
     const plan = p.data();
     if (plan.reminded || !plan.start) continue;

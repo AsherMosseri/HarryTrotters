@@ -182,13 +182,19 @@ export function RequestsDialog({ requests, actor, api, focusId, onMakeTask, onCl
           </button>
         </div>
         <p className="muted small">
-          What should the app do next? Ideas go to {firstName(REQUESTS_TO)}, and you’ll get a notification when yours is planned or
-          added. Tap 👍 on ideas you want too.
+          What should the app do next? Ideas go to {firstName(REQUESTS_TO)}, and you’ll get a notification when yours is planned or added.
+          Tap 👍 on ideas you want too.
         </p>
         <RequestBox onSend={api.addRequest} autoFocus={!focused} />
         <div className="segmented request-tabs" role="tablist">
           {TABS.map(([id, label, has]) => (
-            <button key={id} role="tab" aria-selected={tab === id} className={`plain-seg${tab === id ? ' on' : ''}`} onClick={() => setTab(id)}>
+            <button
+              key={id}
+              role="tab"
+              aria-selected={tab === id}
+              className={`plain-seg${tab === id ? ' on' : ''}`}
+              onClick={() => setTab(id)}
+            >
               {label} <span className="muted">{requests.filter(has).length}</span>
             </button>
           ))}

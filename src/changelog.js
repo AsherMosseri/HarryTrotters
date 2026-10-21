@@ -4,6 +4,17 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '2.26',
+    date: '2026-10-21',
+    title: 'Lab check-in, grades, and parts chat',
+    items: [
+      'Lab check-in: team management asks “Who’s going to the lab today?” (lunch and/or after school) from the Shifts tab. Everyone gets a notification, and the app asks you when you open it until you answer.',
+      'Results in the Shifts tab: lunch is split into middle school lunch and high school lunch by grade, plus after school, not going, and who hasn’t answered. Change your answer anytime.',
+      'Grade level on profiles and the Team tab. Only team management can change it.',
+      'Parts tab: a #parts chat right next to the parts list (also in the Chat tab).',
+    ],
+  },
+  {
     version: '2.25',
     date: '2026-10-21',
     title: 'Status bar color',
