@@ -5,8 +5,14 @@
 // Hubs have fixed ports like the real REV hubs. Devices (motors, servos,
 // sensors...) have one or two ports on the side you pick (`side`).
 
-export const HUB_W = 340;
-export const HUB_H = 250;
+import controlHubPhoto from './assets/diagram/control-hub.webp';
+import expansionHubPhoto from './assets/diagram/expansion-hub.webp';
+import motorPhoto from './assets/diagram/motor.webp';
+import servoPhoto from './assets/diagram/servo.webp';
+import batteryPhoto from './assets/diagram/battery.webp';
+
+// Hubs are drawn as their photos, this wide on the canvas.
+export const HUB_W = 460;
 
 // Port kinds: what plugs in where, and how a wire of that kind looks
 // (an outer and inner color, like a two-conductor cable).
@@ -22,43 +28,70 @@ export const KINDS = {
   usb: { label: 'USB', outer: '#334155', inner: '#94a3b8' },
 };
 
-function hubPorts(usb) {
-  const ports = [];
-  // Two XT30 power ports on top (battery in, and on to the next hub).
-  ports.push({ id: 'pwr0', kind: 'power', label: 'XT30', x: 36, y: 0, side: 'top' });
-  ports.push({ id: 'pwr1', kind: 'power', label: 'XT30', x: 78, y: 0, side: 'top' });
-  if (usb) ports.push({ id: 'usb', kind: 'usb', label: 'USB', x: HUB_W - 60, y: 0, side: 'top' });
-  // Motors 0-3, each with its encoder port just below, on the left.
-  for (let i = 0; i < 4; i++) {
-    ports.push({ id: `m${i}`, kind: 'motor', label: `M${i}`, x: 0, y: 46 + i * 48, side: 'left' });
-    ports.push({ id: `e${i}`, kind: 'encoder', label: `E${i}`, x: 0, y: 64 + i * 48, side: 'left' });
-  }
-  // Servos 0-5 along the bottom.
-  for (let i = 0; i < 6; i++) ports.push({ id: `s${i}`, kind: 'servo', label: `S${i}`, x: 50 + i * 48, y: HUB_H, side: 'bottom' });
-  // Right side: RS485, I²C 0-3, digital pairs, analog pairs.
-  const right = [
-    ['rs485', 'rs485', 'RS485'],
-    ['i2c0', 'i2c', 'I²C 0'],
-    ['i2c1', 'i2c', 'I²C 1'],
-    ['i2c2', 'i2c', 'I²C 2'],
-    ['i2c3', 'i2c', 'I²C 3'],
-    ['d01', 'digital', 'D 0-1'],
-    ['d23', 'digital', 'D 2-3'],
-    ['d45', 'digital', 'D 4-5'],
-    ['d67', 'digital', 'D 6-7'],
-    ['a01', 'analog', 'A 0-1'],
-    ['a23', 'analog', 'A 2-3'],
-  ];
-  right.forEach(([id, kind, label], i) => ports.push({ id, kind, label, x: HUB_W, y: 24 + i * 20, side: 'right' }));
-  return ports;
+// A hub from its photo: where each connector is in the photo (in the
+// photo's own pixels), scaled to the canvas.
+function hubFromPhoto(photo, iw, ih, spots) {
+  const h = Math.round((HUB_W * ih) / iw);
+  const ports = spots.map(([id, kind, label, x, y, side]) => ({ id, kind, label, x: (x * HUB_W) / iw, y: (y * h) / ih, side }));
+  return { photo, w: HUB_W, h, ports };
 }
+// Shared layout: XT30 power on top, motors (and their encoders) down the
+// left, servos along the bottom, RS485 / I²C / digital / analog on the right.
+function spots({ pwrY, motorY, encY, servoX, servoY, rs485, i2c, digital, analog, usb }) {
+  const out = [
+    ['pwr0', 'power', 'XT30', 22, pwrY, 'top'],
+    ['pwr1', 'power', 'XT30', 40, pwrY, 'top'],
+  ];
+  if (usb) out.push(['usb', 'usb', 'USB', usb, 2, 'top']);
+  motorY.forEach((y, i) => out.push([`m${i}`, 'motor', `M${i}`, 8, y, 'left']));
+  encY.forEach((y, i) => out.push([`e${i}`, 'encoder', `E${i}`, 25, y, 'left']));
+  servoX.forEach((x, i) => out.push([`s${i}`, 'servo', `S${i}`, x, servoY, 'bottom']));
+  out.push(['rs485', 'rs485', 'RS485', 362, rs485, 'right']);
+  i2c.forEach((y, i) => out.push([`i2c${i}`, 'i2c', `I²C ${i}`, 362, y, 'right']));
+  ['d01', 'd23', 'd45', 'd67'].forEach((id, i) => out.push([id, 'digital', `D ${id[1]}-${id[2]}`, 362, digital[i], 'right']));
+  ['a01', 'a23'].forEach((id, i) => out.push([id, 'analog', `A ${id[1]}-${id[2]}`, 362, analog[i], 'right']));
+  return out;
+}
+const CONTROL_HUB = hubFromPhoto(
+  controlHubPhoto,
+  395,
+  284,
+  spots({
+    pwrY: 48,
+    usb: 300,
+    motorY: [97, 137, 175, 212],
+    encY: [115, 154, 192, 229],
+    servoX: [90, 117, 145, 173, 200, 228],
+    servoY: 258,
+    rs485: 87,
+    i2c: [146, 133, 118, 105],
+    digital: [206, 193, 178, 163],
+    analog: [236, 223],
+  }),
+);
+const EXPANSION_HUB = hubFromPhoto(
+  expansionHubPhoto,
+  392,
+  294,
+  spots({
+    pwrY: 50,
+    motorY: [98, 137, 180, 217],
+    encY: [119, 158, 199, 237],
+    servoX: [89, 117, 144, 172, 199, 227],
+    servoY: 268,
+    rs485: 89,
+    i2c: [152, 137, 123, 107],
+    digital: [213, 199, 185, 170],
+    analog: [246, 230],
+  }),
+);
 
 // type → how it looks and its ports. Device ports have no x/y: they sit on
 // the device's chosen side (see portPos).
 export const PART_TYPES = {
-  controlHub: { name: 'Control Hub', hub: true, stripe: '#f97316', ports: hubPorts(true) },
-  expansionHub: { name: 'Expansion Hub', hub: true, stripe: '#94a3b8', ports: hubPorts(false) },
-  battery: { name: 'Battery', icon: '🔋', ports: [{ id: 'out', kind: 'power', label: '' }] },
+  controlHub: { name: 'Control Hub', hub: true, ...CONTROL_HUB },
+  expansionHub: { name: 'Expansion Hub', hub: true, ...EXPANSION_HUB },
+  battery: { name: 'Battery', icon: '🔋', photo: batteryPhoto, ports: [{ id: 'out', kind: 'power', label: '' }] },
   switch: {
     name: 'Power switch',
     icon: '🔘',
@@ -70,12 +103,13 @@ export const PART_TYPES = {
   motor: {
     name: 'Motor',
     icon: '⚙️',
+    photo: motorPhoto,
     ports: [
       { id: 'pwr', kind: 'motor', label: '' },
       { id: 'enc', kind: 'encoder', label: 'enc' },
     ],
   },
-  servo: { name: 'Servo', icon: '🦾', ports: [{ id: 'sig', kind: 'servo', label: '' }] },
+  servo: { name: 'Servo', icon: '🦾', photo: servoPhoto, ports: [{ id: 'sig', kind: 'servo', label: '' }] },
   i2cSensor: { name: 'I²C sensor', icon: '📡', hint: 'Distance, color, IMU', ports: [{ id: 'i2c', kind: 'i2c', label: '' }] },
   digitalSensor: { name: 'Digital sensor', icon: '👆', hint: 'Touch, limit switch', ports: [{ id: 'dig', kind: 'digital', label: '' }] },
   analogSensor: { name: 'Analog sensor', icon: '🎚️', hint: 'Potentiometer', ports: [{ id: 'ana', kind: 'analog', label: '' }] },
@@ -105,7 +139,7 @@ export const DEV_H = 48;
 
 export function partSize(p) {
   const t = PART_TYPES[p.type];
-  if (t?.hub) return { w: HUB_W, h: HUB_H };
+  if (t?.hub) return { w: t.w, h: t.h };
   if (p.type === 'text') {
     const size = p.size || 18;
     const lines = String(p.text || 'Text').split('\n');
@@ -258,17 +292,17 @@ export function defaultDiagram() {
   const parts = [
     { id: 'bat', type: 'battery', x: 40, y: 30, label: 'Battery', side: 'right' },
     { id: 'sw', type: 'switch', x: 230, y: 30, label: 'Power switch' },
-    { id: 'ch', type: 'controlHub', x: 460, y: 110, label: 'Control Hub' },
-    { id: 'eh', type: 'expansionHub', x: 460, y: 560, label: 'Expansion Hub' },
-    { id: 'fl', type: 'motor', x: 150, y: 130, label: 'Front Left Wheel' },
-    { id: 'fr', type: 'motor', x: 150, y: 190, label: 'Front Right Wheel' },
-    { id: 'bl', type: 'motor', x: 150, y: 250, label: 'Back Left Wheel' },
-    { id: 'br', type: 'motor', x: 150, y: 310, label: 'Back Right Wheel' },
-    { id: 'wm', type: 'servo', x: 380, y: 430, label: 'Windmill', side: 'top' },
-    { id: 'li', type: 'servo', x: 540, y: 430, label: 'Left intake', side: 'top' },
-    { id: 'mi', type: 'motor', x: 150, y: 580, label: 'Main Intake' },
-    { id: 'fw', type: 'motor', x: 150, y: 640, label: 'Flywheel' },
-    { id: 'ri', type: 'servo', x: 420, y: 880, label: 'Right intake', side: 'top' },
+    { id: 'ch', type: 'controlHub', x: 440, y: 110, label: 'Control Hub' },
+    { id: 'eh', type: 'expansionHub', x: 440, y: 680, label: 'Expansion Hub' },
+    { id: 'fl', type: 'motor', x: 160, y: 150, label: 'Front Left Wheel' },
+    { id: 'fr', type: 'motor', x: 160, y: 210, label: 'Front Right Wheel' },
+    { id: 'bl', type: 'motor', x: 160, y: 270, label: 'Back Left Wheel' },
+    { id: 'br', type: 'motor', x: 160, y: 330, label: 'Back Right Wheel' },
+    { id: 'wm', type: 'servo', x: 420, y: 520, label: 'Windmill', side: 'top' },
+    { id: 'li', type: 'servo', x: 590, y: 520, label: 'Left intake', side: 'top' },
+    { id: 'mi', type: 'motor', x: 160, y: 765, label: 'Main Intake' },
+    { id: 'fw', type: 'motor', x: 160, y: 830, label: 'Flywheel' },
+    { id: 'ri', type: 'servo', x: 480, y: 1090, label: 'Right intake', side: 'top' },
   ];
   const wires = [
     ['bat', 'out', 'sw', 'in'],

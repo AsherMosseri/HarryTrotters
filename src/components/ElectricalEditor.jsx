@@ -3,8 +3,6 @@ import {
   ADDABLE,
   DEV_H,
   DEV_W,
-  HUB_H,
-  HUB_W,
   KINDS,
   PART_TYPES,
   bounds,
@@ -35,57 +33,33 @@ function labelLines(text, max = 11) {
   return [a, b.length > max + 2 ? `${b.slice(0, max)}…` : b];
 }
 
+// A hub is its photo; each port is a small colored dot on the real connector.
 function Hub({ part, selected, dim }) {
   const t = PART_TYPES[part.type];
-  const [first, second] = t.name.toUpperCase().split(' ');
   return (
     <g data-part={part.id} transform={`translate(${part.x},${part.y})`} opacity={dim ? 0.45 : 1} className="dg-part">
-      <rect width={HUB_W} height={HUB_H} rx="14" fill="#1f2230" stroke={selected ? '#6366f1' : '#0b0d14'} strokeWidth={selected ? 4 : 2} />
-      <path
-        d={`M${HUB_W * 0.46},0 L${HUB_W * 0.64},0 L${HUB_W * 0.42},${HUB_H} L${HUB_W * 0.24},${HUB_H} Z`}
-        fill={t.stripe}
-        opacity="0.85"
-      />
-      <text x={HUB_W / 2} y={HUB_H / 2 - 4} textAnchor="middle" fill="#fff" fontSize="26" fontWeight="900" fontStyle="italic">
-        {first}
-      </text>
-      <text x={HUB_W / 2} y={HUB_H / 2 + 24} textAnchor="middle" fill="#fff" fontSize="26" fontWeight="900" fontStyle="italic">
-        {second}
-      </text>
+      <image href={t.photo} width={t.w} height={t.h} preserveAspectRatio="none" />
+      {selected && <rect x="-4" y="-4" width={t.w + 8} height={t.h + 8} rx="18" fill="none" stroke="#6366f1" strokeWidth="4" />}
       {part.label && part.label !== t.name && (
-        <text x={HUB_W / 2} y={HUB_H / 2 + 48} textAnchor="middle" fill="#cbd5e1" fontSize="13" fontWeight="600">
-          {part.label}
-        </text>
+        <g pointerEvents="none">
+          <rect x={t.w / 2 - 80} y="8" width="160" height="22" rx="11" fill="#111827" opacity="0.85" />
+          <text x={t.w / 2} y="23.5" textAnchor="middle" fill="#fff" fontSize="12.5" fontWeight="700">
+            {part.label}
+          </text>
+        </g>
       )}
       {t.ports.map((p) => {
         const k = KINDS[p.kind];
-        const horiz = p.side === 'left' || p.side === 'right';
-        const lx = p.side === 'left' ? p.x + 14 : p.side === 'right' ? p.x - 14 : p.x;
-        const ly = p.side === 'top' ? p.y + 20 : p.side === 'bottom' ? p.y - 12 : p.y + 3.5;
         return (
           <g key={p.id} data-port={`${part.id}:${p.id}`} className="dg-port">
-            <rect
-              x={p.x - (horiz ? 7 : 8)}
-              y={p.y - (horiz ? 5 : 6)}
-              width={horiz ? 14 : 16}
-              height={horiz ? 10 : 12}
-              rx="2"
-              fill={k.inner}
-              stroke={k.outer}
-              strokeWidth="2"
-            />
-            <circle cx={p.x} cy={p.y} r="12" fill="transparent" />
-            <text
-              x={lx}
-              y={ly}
-              textAnchor={p.side === 'left' ? 'start' : p.side === 'right' ? 'end' : 'middle'}
-              fill="#cbd5e1"
-              fontSize="10"
-              fontWeight="700"
-              pointerEvents="none"
-            >
-              {p.label}
-            </text>
+            {p.kind === 'usb' && (
+              <text x={p.x} y={p.y + 16} textAnchor="middle" fill="#cbd5e1" fontSize="10" fontWeight="700" pointerEvents="none">
+                USB
+              </text>
+            )}
+            <circle cx={p.x} cy={p.y} r="4.2" fill={k.inner} stroke={k.outer} strokeWidth="1.8" />
+            <circle cx={p.x} cy={p.y} r="7.5" fill="transparent" />
+            <title>{`${t.name} · ${portName(part, p)}`}</title>
           </g>
         );
       })}
@@ -106,9 +80,13 @@ function Device({ part, selected, dim }) {
         stroke={selected ? '#6366f1' : '#94a3b8'}
         strokeWidth={selected ? 3 : 1.5}
       />
-      <text x="10" y={DEV_H / 2 + 8} fontSize="22">
-        {t.icon}
-      </text>
+      {t.photo ? (
+        <image href={t.photo} x="5" y="4" width="34" height={DEV_H - 8} preserveAspectRatio="xMidYMid meet" />
+      ) : (
+        <text x="10" y={DEV_H / 2 + 8} fontSize="22">
+          {t.icon}
+        </text>
+      )}
       {lines.map((l, i) => (
         <text key={i} x="40" y={DEV_H / 2 + 5 + (i - (lines.length - 1) / 2) * 15} fontSize="12.5" fontWeight="650" fill="#111827">
           {l}
@@ -198,23 +176,25 @@ function DiagramSvg({ diagram, view, sel, pending, ptr, focusPart, svgRef, handl
       </defs>
       <rect data-bg="1" x={view.x - view.w} y={view.y - view.h} width={view.w * 3} height={view.h * 3} fill="#fbfbfd" />
       <rect data-bg="1" x={view.x - view.w} y={view.y - view.h} width={view.w * 3} height={view.h * 3} fill={`url(#${dots})`} />
-      {wires.map((w) => (
-        <Wire
-          key={w.id}
-          parts={parts}
-          wire={w}
-          selected={sel?.kind === 'wire' && sel.id === w.id}
-          dim={focusWires && !focusWires.has(w.id)}
-        />
-      ))}
-      {parts.map((p) => {
-        const selected = sel?.kind === 'part' && sel.id === p.id;
-        const dim = focusParts && !focusParts.has(p.id);
-        if (PART_TYPES[p.type]?.hub) return <Hub key={p.id} part={p} selected={selected} dim={dim} />;
-        if (p.type === 'text') return <TextPart key={p.id} part={p} selected={selected} />;
-        if (!PART_TYPES[p.type]) return null;
-        return <Device key={p.id} part={p} selected={selected} dim={dim} />;
-      })}
+      <g data-content="1">
+        {wires.map((w) => (
+          <Wire
+            key={w.id}
+            parts={parts}
+            wire={w}
+            selected={sel?.kind === 'wire' && sel.id === w.id}
+            dim={focusWires && !focusWires.has(w.id)}
+          />
+        ))}
+        {parts.map((p) => {
+          const selected = sel?.kind === 'part' && sel.id === p.id;
+          const dim = focusParts && !focusParts.has(p.id);
+          if (PART_TYPES[p.type]?.hub) return <Hub key={p.id} part={p} selected={selected} dim={dim} />;
+          if (p.type === 'text') return <TextPart key={p.id} part={p} selected={selected} />;
+          if (!PART_TYPES[p.type]) return null;
+          return <Device key={p.id} part={p} selected={selected} dim={dim} />;
+        })}
+      </g>
       {pendFrom && ptr && (
         <path
           d={`M${pendFrom.x},${pendFrom.y} L${ptr.x},${ptr.y}`}
@@ -239,8 +219,20 @@ export function DiagramPreview({ diagram }) {
   return <DiagramSvg diagram={d} view={b} className="dg-preview" />;
 }
 
+// Everything drawn (parts and the cables between them, which can curve
+// outside the parts), from the live drawing when there is one.
+function drawnBounds(el, parts, pad) {
+  try {
+    const g = el?.querySelector('[data-content]')?.getBBox();
+    if (g && g.width && g.height) return { x: g.x - pad, y: g.y - pad, w: g.width + pad * 2, h: g.height + pad * 2 };
+  } catch {
+    /* not rendered yet */
+  }
+  return bounds(parts, pad);
+}
+
 function fitView(parts, el) {
-  const b = bounds(parts, 50);
+  const b = drawnBounds(el, parts, 40);
   const r = el?.getBoundingClientRect();
   const aspect = r && r.height ? r.width / r.height : 1.4;
   // Grow one side so the whole diagram fits the box's shape.
@@ -562,11 +554,29 @@ export default function ElectricalEditor({ remote, canEdit, actor, onSave, onClo
   );
 
   const exportPng = async () => {
-    const b = bounds(parts, 30);
+    const b = drawnBounds(svgRef.current, parts, 30);
     const svg = svgRef.current.cloneNode(true);
     svg.setAttribute('viewBox', `${b.x} ${b.y} ${b.w} ${b.h}`);
     svg.setAttribute('width', String(b.w * 2));
     svg.setAttribute('height', String(b.h * 2));
+    // A drawing saved as a picture can't load other files: put the photos inside it.
+    const inline = new Map();
+    for (const el of svg.querySelectorAll('image')) {
+      const href = el.getAttribute('href');
+      if (!href || href.startsWith('data:')) continue;
+      if (!inline.has(href)) {
+        const blob = await (await fetch(href)).blob();
+        inline.set(
+          href,
+          await new Promise((res) => {
+            const r = new FileReader();
+            r.onload = () => res(r.result);
+            r.readAsDataURL(blob);
+          }),
+        );
+      }
+      el.setAttribute('href', inline.get(href));
+    }
     const img = new Image();
     img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(new XMLSerializer().serializeToString(svg))}`;
     await img.decode();
@@ -719,6 +729,11 @@ export default function ElectricalEditor({ remote, canEdit, actor, onSave, onClo
                 </ul>
               ) : (
                 <p className="muted small">No earlier versions yet.</p>
+              )}
+              {canEdit && (
+                <button className="btn" onClick={() => change(defaultDiagram())}>
+                  ↺ Start over from our drawing
+                </button>
               )}
             </>
           ) : selPart ? (

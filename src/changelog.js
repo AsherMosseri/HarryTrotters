@@ -4,6 +4,16 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '2.40',
+    date: '2026-10-26',
+    title: 'Real parts in the electrical diagram',
+    items: [
+      'The Control Hub and Expansion Hub are their real pictures now, and you wire straight to the real connectors (the colored dots): battery, motors and encoders, servos, RS485, I²C, digital, and analog.',
+      'Motors, servos, and batteries show the goBILDA parts we use.',
+      'Saving the diagram as a PNG includes the pictures.',
+    ],
+  },
+  {
     version: '2.39',
     date: '2026-10-26',
     title: 'Resources and the electrical diagram',
