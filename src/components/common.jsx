@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { STATUSES, PRIORITIES, statusById, priorityById } from '../config.js';
 import { colorFor, initials, dueInfo } from '../util.js';
 import { decorationById, nameProps } from '../nitro.js';
-import { AnimatedDecoration, CustomDecoration } from './decoRender.jsx';
+import { AnimatedDecoration, CustomDecoration, DecorationBehind } from './decoRender.jsx';
 import { createPortal } from 'react-dom';
 
 // Profiles, who's online, and each person's subteams, for any component that
@@ -13,12 +13,44 @@ export const usePeople = () => useContext(PeopleContext);
 // A profile picture (GIFs stay animated), or colored initials, with the
 // person's avatar decoration. showOnline adds a green dot when the person has
 // the app open.
+// An animated (GIF) picture with a still first frame underneath. With Calm
+// chat on, chat rows show the still frame until you hover or tap them.
+function GifAvatar({ src, name, size }) {
+  const still = useRef(null);
+  return (
+    <span className="avatar gif-av" title={name} style={{ width: size, height: size }}>
+      <canvas ref={still} className="gif-still" width={size * 2} height={size * 2} aria-hidden="true" />
+      <img
+        className="gif-live"
+        src={src}
+        alt={name}
+        referrerPolicy="no-referrer"
+        onLoad={(e) => {
+          const c = still.current;
+          if (!c) return;
+          const g = c.getContext('2d');
+          const img = e.currentTarget;
+          // Cover-crop the first frame into the circle.
+          const k = Math.max(c.width / img.naturalWidth, c.height / img.naturalHeight);
+          const w = img.naturalWidth * k;
+          const h = img.naturalHeight * k;
+          g.drawImage(img, (c.width - w) / 2, (c.height - h) / 2, w, h);
+        }}
+      />
+    </span>
+  );
+}
+
 export function Avatar({ name, size = 26, photo, showOnline = false, decoration, decorationCustom }) {
   const people = usePeople();
   const src = photo || people?.photoOf(name);
   const deco = decoration ?? people?.profileOf(name)?.decoration ?? '';
   let pic = src ? (
-    <img className="avatar" src={src} alt={name} title={name} style={{ width: size, height: size }} referrerPolicy="no-referrer" />
+    /\.gif(\?|$)|giphy\.com/i.test(src) ? (
+      <GifAvatar src={src} name={name} size={size} />
+    ) : (
+      <img className="avatar" src={src} alt={name} title={name} style={{ width: size, height: size }} referrerPolicy="no-referrer" />
+    )
   ) : (
     <span className="avatar" title={name} style={{ width: size, height: size, background: colorFor(name), fontSize: size * 0.4 }}>
       {initials(name)}
@@ -35,6 +67,7 @@ export function Avatar({ name, size = 26, photo, showOnline = false, decoration,
     // Animated decorations; tiny avatars get just a matching ring.
     pic = (
       <span className={`deco deco-anim deco-${deco}`} style={{ width: size, height: size, '--s': `${size}px` }}>
+        {size >= 28 && <DecorationBehind id={deco} />}
         {pic}
         {size >= 28 && <AnimatedDecoration id={deco} />}
       </span>

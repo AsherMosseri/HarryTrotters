@@ -90,6 +90,7 @@ function RequestItem({ r, actor, api, focused, onMakeTask }) {
           {st.icon} {st.label}
         </span>
       </div>
+      {r.kind && <span className="request-kind">🎨 Profile style</span>}
       <p className="request-text">{r.text}</p>
       {r.reply && !replying && (
         <p className="request-reply">

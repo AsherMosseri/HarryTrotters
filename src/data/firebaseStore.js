@@ -61,6 +61,7 @@ const partsCol = collection(db, 'parts');
 const checklistsCol = collection(db, 'checklists');
 const resourcesCol = collection(db, 'resources');
 const diagramsCol = collection(db, 'diagrams');
+const notesCol = collection(db, 'notes');
 const runsCol = collection(db, 'runs');
 const channelsCol = collection(db, 'channels');
 const dmsCol = collection(db, 'dms');
@@ -467,6 +468,13 @@ export const firebaseStore = {
   deleteResource(id) {
     return deleteDoc(doc(resourcesCol, id));
   },
+  // Private notes you keep about teammates: notes/{your id} = { owner, notes: { [name]: text } }.
+  subscribeNotes(owner, cb, onError) {
+    return onSnapshot(doc(notesCol, personId(owner)), (snap) => cb(snap.exists() ? snap.data().notes || {} : {}), onError);
+  },
+  saveNote(owner, about, text) {
+    return setDoc(doc(notesCol, personId(owner)), { owner, notes: { [about]: text ? text.slice(0, 500) : deleteField() } }, { merge: true });
+  },
   subscribeDiagram(id, cb, onError) {
     return onSnapshot(doc(diagramsCol, id), (snap) => cb(snap.exists() ? { id, ...snap.data() } : null), onError);
   },
@@ -762,8 +770,8 @@ export const firebaseStore = {
   subscribeRequests(cb, onError) {
     return onSnapshot(requestsCol, (snap) => cb(snap.docs.map(readDoc).sort((a, b) => b.at - a.at)), onError);
   },
-  addRequest(text, actor) {
-    return setDoc(doc(requestsCol), { text, ...actorFields(actor), at: Date.now(), status: 'new', votes: {} });
+  addRequest(text, actor, kind = '') {
+    return setDoc(doc(requestsCol), { text, ...actorFields(actor), at: Date.now(), status: 'new', votes: {}, ...(kind ? { kind } : {}) });
   },
   updateRequest(id, patch, actor) {
     return updateDoc(doc(requestsCol, id), { ...patch, updatedBy: actor.name, updatedAt: Date.now() });

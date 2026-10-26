@@ -188,7 +188,7 @@ export async function shrinkParticle(file) {
 
 // Little badges in the card's corner, like Discord's: team management and
 // each subteam.
-const BADGE_ICONS = {
+export const BADGE_ICONS = {
   'Team Management': '🛡️',
   CAD: '📐',
   Mechanical: '🔧',
@@ -316,7 +316,7 @@ function CardBody({ name, look, actor, tasks, children, replayKey }) {
   );
 }
 
-export function ProfileCard({ name, actor, tasks, onClose, onMessage, onEdit }) {
+export function ProfileCard({ name, actor, tasks, onClose, onMessage, onEdit, onFull }) {
   useEscape(onClose);
   const people = usePeople();
   const me = name === actor.name;
@@ -335,6 +335,11 @@ export function ProfileCard({ name, actor, tasks, onClose, onMessage, onEdit }) 
             <CloseIcon />
           </button>
           <CardBody name={name} actor={actor} tasks={tasks}>
+            {onFull && (
+              <button className="link-btn small pc-full" onClick={onFull}>
+                View full profile →
+              </button>
+            )}
             <div className="row gap profile-actions">
               {me ? (
                 <button className="btn primary grow" onClick={onEdit}>
@@ -483,6 +488,56 @@ function ColorRow({ value, onChange, allowNone = true }) {
 
 // Your profile (or, for team management, anyone's): pictures, about me,
 // pronouns, name style, decoration, effect, profile colors, and status.
+// Ask for a new font, effect, decoration, etc. Goes to the 💡 feature requests.
+export const STYLE_KINDS = [
+  ['font', 'Font'],
+  ['name-effect', 'Name effect'],
+  ['nameplate', 'Nameplate'],
+  ['decoration', 'Avatar decoration'],
+  ['effect', 'Profile effect'],
+  ['border', 'Border'],
+  ['style', 'Something else'],
+];
+function StyleRequest({ kind, setKind, onSend }) {
+  const [text, setText] = useState('');
+  const [sent, setSent] = useState(false);
+  const send = async () => {
+    const label = STYLE_KINDS.find(([k]) => k === kind)?.[1] || 'Style';
+    if (await onSend(`${label}: ${text.trim()}`, kind)) {
+      setText('');
+      setSent(true);
+    }
+  };
+  return (
+    <div className="style-request" id="style-request">
+      <h3 className="field-label">💡 Want something new?</h3>
+      <p className="muted tiny">Ask for a font, effect, decoration, or anything else. It goes straight to Asher.</p>
+      <div className="row gap wrap">
+        <select className="input" value={kind} onChange={(e) => setKind(e.target.value)} aria-label="What kind">
+          {STYLE_KINDS.map(([k, l]) => (
+            <option key={k} value={k}>
+              {l}
+            </option>
+          ))}
+        </select>
+        <input
+          className="input grow"
+          value={text}
+          maxLength={300}
+          onChange={(e) => (setText(e.target.value), setSent(false))}
+          placeholder="Describe it, like “a lightning name effect”"
+          aria-label="Your idea"
+          onKeyDown={(e) => e.key === 'Enter' && text.trim() && send()}
+        />
+        <button className="btn primary" disabled={!text.trim()} onClick={send}>
+          Send
+        </button>
+      </div>
+      {sent && <p className="request-sent">Sent! You’ll get a notification when it’s added.</p>}
+    </div>
+  );
+}
+
 export function ProfileEditor({ name, actor, api, tasks = [], onClose }) {
   const people = usePeople();
   useEscape(onClose);
@@ -491,6 +546,19 @@ export function ProfileEditor({ name, actor, api, tasks = [], onClose }) {
   const current = activeStatus(profile);
   const [tab, setTab] = useState('profile');
   const [borderFor, setBorderFor] = useState('card');
+  const [reqKind, setReqKind] = useState('font');
+  const askFor = (k) => {
+    setReqKind(k);
+    setTimeout(() => {
+      document.getElementById('style-request')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      document.querySelector('#style-request input')?.focus({ preventScroll: true });
+    }, 30);
+  };
+  const More = ({ k }) => (
+    <button className="link-btn small ask-more" onClick={() => askFor(k)}>
+      Want another? Request one
+    </button>
+  );
   const [look, setLook] = useState({
     about: profile.about || '',
     pronouns: profile.pronouns || '',
@@ -669,6 +737,7 @@ export function ProfileEditor({ name, actor, api, tasks = [], onClose }) {
                         </button>
                       ))}
                     </div>
+                    <More k="font" />
                     <h3 className="field-label">Name color</h3>
                     <ColorRow
                       value={colors[0] || ''}
@@ -717,6 +786,7 @@ export function ProfileEditor({ name, actor, api, tasks = [], onClose }) {
                         </button>
                       ))}
                     </div>
+                    <More k="name-effect" />
                     <h3 className="field-label">Nameplate</h3>
                     <p className="muted tiny">Shows behind your name in the members list and in DMs.</p>
                     <div className="np-grid">
@@ -754,6 +824,7 @@ export function ProfileEditor({ name, actor, api, tasks = [], onClose }) {
                         ))}
                       </div>
                     )}
+                    <More k="nameplate" />
                     <h3 className="field-label">Avatar decoration</h3>
                     <div className="choice-grid deco-grid">
                       {DECORATIONS.map((d) => (
@@ -787,6 +858,7 @@ export function ProfileEditor({ name, actor, api, tasks = [], onClose }) {
                         upload={(file, oldPath) => api.uploadEffectImage(name, file, oldPath)}
                       />
                     )}
+                    <More k="decoration" />
                     <h3 className="field-label">Profile effect</h3>
                     <div className="fx-tiles">
                       {EFFECTS.map((f) => (
@@ -814,6 +886,7 @@ export function ProfileEditor({ name, actor, api, tasks = [], onClose }) {
                         upload={(file, oldPath) => api.uploadEffectImage(name, file, oldPath)}
                       />
                     )}
+                    <More k="effect" />
                     <h3 className="field-label">Profile colors</h3>
                     <div className="row gap">
                       <label className="row gap-sm small">
@@ -911,6 +984,8 @@ export function ProfileEditor({ name, actor, api, tasks = [], onClose }) {
                         </button>
                       </div>
                     )}
+                    <More k="border" />
+                    <StyleRequest kind={reqKind} setKind={setReqKind} onSend={api.addRequest} />
                   </>
                 )}
                 {tab === 'status' && (

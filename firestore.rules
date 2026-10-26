@@ -84,6 +84,15 @@ service cloud.firestore {
         && request.resource.data.url is string && request.resource.data.url.matches('https?://.+');
       allow delete: if isManager() || (isMember() && resource.data.byUid == request.auth.uid);
     }
+    // Private notes about teammates: only the person who wrote them can read
+    // or change them (notes/{their id}).
+    function myId() { return myName().lower().replace('[^a-z0-9]+', '-').replace('^-|-$', ''); }
+    match /notes/{id} {
+      allow read: if isMember() && id == myId();
+      allow create, update: if isMember() && id == myId() && request.resource.data.owner == myName()
+        && request.resource.data.notes is map;
+      allow delete: if isMember() && id == myId();
+    }
     // Diagrams (diagrams/electrical). The app lets Electrical and team
     // management edit; earlier versions are kept in the doc's history.
     match /diagrams/{id} {

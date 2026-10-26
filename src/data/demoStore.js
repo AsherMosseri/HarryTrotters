@@ -10,7 +10,7 @@ import {
   personId,
 } from './diff.js';
 import { STARTER_CHECKLISTS, starterItems } from '../checklists.js';
-import { REQUESTS_TO } from '../config.js';
+import { REQUESTS_TO, ROSTER } from '../config.js';
 
 const KEY = 'ftc32313-demo-v13';
 const listeners = new Set();
@@ -450,7 +450,9 @@ export const demoStore = {
   async refreshPush() {},
 
   subscribePeople(cb) {
-    return listen(() => cb([...(state.people || [])]));
+    // Sample join dates (the real app records them when each person joins).
+    const sample = ROSTER.map((name, i) => ({ id: `demo-${i}`, name, joinedAt: Date.UTC(2026, 8, 3 + i * 4) }));
+    return listen(() => cb([...sample, ...(state.people || [])]));
   },
 
   subscribeTasks(cb) {
@@ -623,6 +625,16 @@ export const demoStore = {
   },
   async deleteResource(id) {
     state.resources = (state.resources || []).filter((r) => r.id !== id);
+    commit();
+  },
+  subscribeNotes(owner, cb) {
+    return listen(() => cb({ ...(state.notes || {}) }));
+  },
+  async saveNote(owner, about, text) {
+    const notes = { ...(state.notes || {}) };
+    if (text) notes[about] = text.slice(0, 500);
+    else delete notes[about];
+    state.notes = notes;
     commit();
   },
   subscribeDiagram(id, cb) {
@@ -969,8 +981,8 @@ export const demoStore = {
   subscribeRequests(cb) {
     return listen(() => cb([...(state.requests || [])].sort((a, b) => b.at - a.at)));
   },
-  async addRequest(text, actor) {
-    const r = { id: uid(), text, by: actor.name, at: Date.now(), status: 'new', votes: {} };
+  async addRequest(text, actor, kind = '') {
+    const r = { id: uid(), text, by: actor.name, at: Date.now(), status: 'new', votes: {}, ...(kind ? { kind } : {}) };
     state.requests = [r, ...(state.requests || [])];
     // What the Cloud Function does: let REQUESTS_TO know (not about their own).
     if (actor.name !== REQUESTS_TO)

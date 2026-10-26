@@ -20,6 +20,13 @@ export const DECORATIONS = [
   { id: 'ripple', label: 'Ripple', anim: true },
   { id: 'petals', label: 'Petals', anim: true },
   { id: 'circuit', label: 'Circuit', anim: true },
+  { id: 'catears', label: 'Cat ears', anim: true },
+  { id: 'bunny', label: 'Bunny ears', anim: true },
+  { id: 'wizard', label: 'Wizard hat', anim: true },
+  { id: 'horns', label: 'Horns', anim: true },
+  { id: 'headphones', label: 'Headphones', anim: true },
+  { id: 'antenna', label: 'Antenna', anim: true },
+  { id: 'wings', label: 'Wings', anim: true },
   { id: 'custom', label: 'Custom…' },
 ];
 export const decorationById = Object.fromEntries(DECORATIONS.map((d) => [d.id, d]));
@@ -46,6 +53,19 @@ export const NAME_FONTS = [
   { id: 'mono', label: 'Mono', css: 'ui-monospace, SFMono-Regular, Menlo, monospace' },
   { id: 'script', label: 'Script', css: '"Snell Roundhand", "Segoe Script", "Brush Script MT", cursive' },
   { id: 'chunky', label: 'Chunky', css: '"Arial Black", "Helvetica Neue", Impact, sans-serif' },
+  { id: 'pixel', label: 'Pixel', css: '"Press Start 2P", monospace', small: true },
+  { id: 'arcade', label: 'Arcade', css: '"Silkscreen", monospace' },
+  { id: 'comic', label: 'Comic', css: '"Bangers", cursive' },
+  { id: 'marker', label: 'Marker', css: '"Permanent Marker", cursive' },
+  { id: 'hand', label: 'Handwritten', css: '"Caveat", cursive' },
+  { id: 'retro', label: 'Retro script', css: '"Pacifico", cursive' },
+  { id: 'scifi', label: 'Sci-fi', css: '"Orbitron", sans-serif' },
+  { id: 'bubble', label: 'Bubbly', css: '"Fredoka", sans-serif' },
+  { id: 'poster', label: 'Poster', css: '"Bebas Neue", sans-serif' },
+  { id: 'fancy', label: 'Fancy', css: '"Playfair Display", serif', italic: true },
+  { id: 'typewriter', label: 'Typewriter', css: '"Special Elite", monospace' },
+  { id: 'neonsign', label: 'Neon sign', css: '"Monoton", cursive' },
+  { id: 'gothic', label: 'Gothic', css: '"UnifrakturMaguntia", serif' },
 ];
 export const fontById = Object.fromEntries(NAME_FONTS.map((f) => [f.id, f]));
 
@@ -117,6 +137,12 @@ export const NAME_EFFECTS = [
   { id: 'pop', label: '🧱 3D pop' },
   { id: 'glitch', label: '📺 Glitch' },
   { id: 'rainbow', label: '🌈 Rainbow' },
+  { id: 'fire', label: '🔥 Fire' },
+  { id: 'ice', label: '🧊 Ice' },
+  { id: 'gold', label: '🏆 Gold' },
+  { id: 'toon', label: '💥 Toon' },
+  { id: 'sparkle', label: '✨ Glitter' },
+  { id: 'pulse', label: '💓 Pulse' },
 ];
 const RAINBOW = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#06b6d4', '#6366f1', '#d946ef', '#ef4444'];
 
@@ -127,6 +153,8 @@ export function nameStyle(profile, fallbackColor) {
   const style = {};
   const font = fontById[s.font]?.css;
   if (font) style.fontFamily = font;
+  if (fontById[s.font]?.small) style.fontSize = '0.72em';
+  if (fontById[s.font]?.italic) style.fontStyle = 'italic';
   const colors = (s.colors || []).filter(Boolean);
   const main = colors[0] || fallbackColor;
   if (main) style['--nglow'] = main;
@@ -136,7 +164,25 @@ export function nameStyle(profile, fallbackColor) {
     style.backgroundClip = 'text';
     style.color = 'transparent';
   };
-  if (s.effect === 'rainbow') {
+  if (s.effect === 'fire') {
+    clip('linear-gradient(0deg, #dc2626, #f97316 40%, #facc15 70%, #fef9c3)');
+    style.backgroundSize = '100% 200%';
+  } else if (s.effect === 'ice') {
+    clip('linear-gradient(100deg, #0ea5e9, #bae6fd 40%, #ffffff 50%, #bae6fd 60%, #0ea5e9)');
+    style.backgroundSize = '200% auto';
+  } else if (s.effect === 'gold') {
+    clip('linear-gradient(100deg, #92400e, #f59e0b 30%, #fef3c7 48%, #f59e0b 66%, #92400e)');
+    style.backgroundSize = '220% auto';
+  } else if (s.effect === 'sparkle') {
+    const base =
+      colors.length >= 2
+        ? `linear-gradient(90deg, ${gradientStops(colors)})`
+        : `linear-gradient(${main || '#a855f7'}, ${main || '#a855f7'})`;
+    clip(
+      `radial-gradient(circle at 20% 30%, #fff 0 1.2px, transparent 1.6px), radial-gradient(circle at 70% 60%, #fff 0 1px, transparent 1.4px), radial-gradient(circle at 45% 80%, #fff 0 1.3px, transparent 1.7px), ${base}`,
+    );
+    style.backgroundSize = '14px 14px, 18px 18px, 22px 22px, 100% 100%';
+  } else if (s.effect === 'rainbow') {
     clip(`linear-gradient(90deg, ${RAINBOW.join(', ')})`);
     style.backgroundSize = '200% auto';
   } else if (s.effect === 'shimmer' && (colors.length || fallbackColor)) {

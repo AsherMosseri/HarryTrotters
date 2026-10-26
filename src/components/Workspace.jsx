@@ -18,6 +18,7 @@ import { newTaskDefaults, personId } from '../data/diff.js';
 import { preparePhoto, useLocalStorage, useMedia } from '../util.js';
 import { Avatar, Overlay, PeopleContext, PlusIcon } from './common.jsx';
 import { ProfileCard, ProfileEditor } from './People.jsx';
+import ProfilePage from './ProfilePage.jsx';
 import TableView from './TableView.jsx';
 import BoardView from './BoardView.jsx';
 import TaskPanel from './TaskPanel.jsx';
@@ -44,7 +45,19 @@ import { VERSION, versionsSince } from '../changelog.js';
 import Inbox from './Inbox.jsx';
 
 // Light / dark / automatic, plus the app color themes.
-function ThemeMenu({ theme, setTheme, palette, setPalette, customColors, profileColors, onCustom, onClose, inline = false }) {
+function ThemeMenu({
+  theme,
+  setTheme,
+  palette,
+  setPalette,
+  customColors,
+  profileColors,
+  onCustom,
+  onClose,
+  calm,
+  setCalm,
+  inline = false,
+}) {
   useEffect(() => {
     const away = (e) => !e.target.closest('.theme-wrap') && onClose();
     const esc = (e) => e.key === 'Escape' && onClose();
@@ -85,6 +98,13 @@ function ThemeMenu({ theme, setTheme, palette, setPalette, customColors, profile
           🎨 Custom…
         </button>
       </div>
+      <label className="calm-toggle">
+        <input type="checkbox" checked={calm} onChange={(e) => setCalm(e.target.checked)} />
+        <span>
+          <b>Calm chat</b>
+          <span className="muted tiny">Animated pictures, names, and decorations in chat play when you hover or tap.</span>
+        </span>
+      </label>
     </div>
   );
 }
@@ -183,6 +203,11 @@ export default function Workspace({ store, actor, rename, renames }) {
   const [robot, setRobot] = useState({ versions: [], pins: [], layouts: [] });
   const [chat, setChat] = useState({}); // { [channelId]: newest messages }
   const [chatChannel, setChatChannel] = useLocalStorage('chat-channel', 'general');
+  // Calm chat (on by default, per device): animations in chat wait for hover or tap.
+  const [calm, setCalm] = useLocalStorage('calm-chat', true);
+  useEffect(() => {
+    document.documentElement.classList.toggle('calm-chat', calm !== false);
+  }, [calm]);
   const [chatRead, setChatRead] = useLocalStorage('chat-read', null); // { [channelId]: ms read up to }
   const [settings, setSettings] = useState({});
   const [cat, setCat] = useState(false);
@@ -513,10 +538,23 @@ export default function Workspace({ store, actor, rename, renames }) {
       profileOf: (name) => profiles.get(name),
       isOnline: (name) => online.has(name),
       infoOf: (name) => peopleInfo.get(name) || { subteams: [], responsibilities: [], title: '', color: '' },
+      roster,
     }),
-    [profiles, online, peopleInfo],
+    [profiles, online, peopleInfo, roster],
   );
   const openPerson = useCallback((name) => setProfileFor(name), []);
+  const [fullProfileFor, setFullProfileFor] = useState(null);
+  // Private notes about teammates (only you see yours).
+  const [notes, setNotes] = useState({});
+  useEffect(() => store.subscribeNotes(actor.name, setNotes, (e) => console.warn('notes', e)), [store, actor.name]);
+  const joinedOf = useCallback(
+    (name) => Math.min(...people.filter((p) => rename(p.name || '') === name && p.joinedAt).map((p) => p.joinedAt), Infinity),
+    [people, rename],
+  );
+  const lastSeenOf = useCallback(
+    (name) => Math.max(0, ...presence.filter((p) => rename(p.name || '') === name).map((p) => p.at || 0)),
+    [presence, rename],
+  );
   const myProfile = profiles.get(actor.name);
   const myColor = peopleInfo.get(actor.name)?.color;
   const profileTheme = useMemo(() => themeFromProfile(myProfile, myColor), [myProfile, myColor]);
@@ -787,8 +825,8 @@ export default function Workspace({ store, actor, rename, renames }) {
       deleteCheckin: (id) => store.deleteCheckin(id).catch(fail),
       rsvpShiftPlan: (id, answer) => store.rsvpShiftPlan(id, actor.name, answer).catch(fail),
       deleteShiftPlans: (ids) => store.deleteShiftPlans(ids).catch(fail),
-      addRequest: (text) =>
-        store.addRequest(text, actor).then(
+      addRequest: (text, kind) =>
+        store.addRequest(text, actor, kind).then(
           () => true,
           (e) => {
             fail(e);
@@ -796,6 +834,7 @@ export default function Workspace({ store, actor, rename, renames }) {
           },
         ),
       updateRequest: (id, patch) => store.updateRequest(id, patch, actor).catch(fail),
+      saveNote: (about, text) => store.saveNote(actor.name, about, text).catch(fail),
       voteRequest: (id, vote) => store.voteRequest(id, actor.name, vote).catch(fail),
       deleteRequest: (id) => store.deleteRequest(id).catch(fail),
       editMessage: (channel, id, patch) => store.editMessage(channel, id, patch).catch(fail),
@@ -952,6 +991,8 @@ export default function Workspace({ store, actor, rename, renames }) {
     />
   );
   const themeMenuProps = {
+    calm,
+    setCalm,
     theme,
     setTheme,
     palette,
@@ -1459,6 +1500,10 @@ export default function Workspace({ store, actor, rename, renames }) {
                 setEditProfileFor(profileFor);
                 setProfileFor(null);
               }}
+              onFull={() => {
+                setFullProfileFor(profileFor);
+                setProfileFor(null);
+              }}
               onMessage={async () => {
                 const key = await api.openDm([actor.name, profileFor]);
                 setProfileFor(null);
@@ -1467,6 +1512,36 @@ export default function Workspace({ store, actor, rename, renames }) {
                   setView('chat');
                 }
               }}
+            />
+          )}
+          {fullProfileFor && (
+            <ProfilePage
+              name={fullProfileFor}
+              actor={actor}
+              tasks={tasks || []}
+              shifts={shifts}
+              joinedAt={Number.isFinite(joinedOf(fullProfileFor)) ? joinedOf(fullProfileFor) : 0}
+              lastSeen={lastSeenOf(fullProfileFor)}
+              notes={notes}
+              api={api}
+              onPerson={(n) => setFullProfileFor(n)}
+              onOpenTask={(id) => {
+                setFullProfileFor(null);
+                setOpenId(id);
+              }}
+              onEdit={() => {
+                setEditProfileFor(fullProfileFor);
+                setFullProfileFor(null);
+              }}
+              onMessage={async () => {
+                const key = await api.openDm([actor.name, fullProfileFor]);
+                setFullProfileFor(null);
+                if (key) {
+                  setChatChannel(key);
+                  setView('chat');
+                }
+              }}
+              onClose={() => setFullProfileFor(null)}
             />
           )}
           {editProfileFor && (

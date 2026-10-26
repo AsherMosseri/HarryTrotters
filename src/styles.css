@@ -2031,9 +2031,9 @@ body:has(.bottom-nav):has(.composer) .toast { bottom: calc(150px + env(safe-area
   93% { clip-path: inset(70% 0 2% 0); transform: translate(2px, 0); }
 }
 /* In chat, names animate when you hover or tap the message (like Discord). */
-.msg .ne, .msg .ne::before, .msg .ne::after { animation-play-state: paused; }
-.msg:hover .ne, .msg:hover .ne::before, .msg:hover .ne::after,
-.msg.selected .ne, .msg.selected .ne::before, .msg.selected .ne::after { animation-play-state: running; }
+.calm-chat :is(.msg, .member-row, .conv-row):not(:hover):not(.selected) .ne,
+.calm-chat :is(.msg, .member-row, .conv-row):not(:hover):not(.selected) .ne::before,
+.calm-chat :is(.msg, .member-row, .conv-row):not(:hover):not(.selected) .ne::after { animation-play-state: paused; }
 @media (prefers-reduced-motion: reduce) { .ne, .ne::before, .ne::after { animation: none !important; } }
 .ne-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; }
 .ne-choice { border: 2px solid var(--border); background: var(--surface); border-radius: 12px; padding: 8px 6px 6px; display: flex; flex-direction: column; align-items: center; gap: 2px; color: var(--text); }
@@ -2067,8 +2067,7 @@ body:has(.bottom-nav):has(.composer) .toast { bottom: calc(150px + env(safe-area
 .adeco .ad-pulse { animation: ad-pulse 2.2s linear infinite; }
 @keyframes ad-pulse { to { stroke-dashoffset: -346; } }
 /* In chat, decorations animate when you hover or tap the message. */
-.msg .adeco, .msg .adeco * { animation-play-state: paused; }
-.msg:hover .adeco, .msg:hover .adeco *, .msg.selected .adeco, .msg.selected .adeco * { animation-play-state: running; }
+.calm-chat :is(.msg, .member-row, .conv-row):not(:hover):not(.selected) :is(.adeco, .adeco *) { animation-play-state: paused; }
 @media (prefers-reduced-motion: reduce) { .adeco, .adeco * { animation: none !important; } }
 /* Small avatars: a ring in the decoration's colors instead. */
 .deco-anim::before { inset: calc(var(--s) * -0.08); }
@@ -2125,3 +2124,95 @@ body:has(.bottom-nav):has(.composer) .toast { bottom: calc(150px + env(safe-area
 .np-choice { position: relative; overflow: hidden; isolation: isolate; border: 2px solid var(--border); background: var(--surface); border-radius: 10px; padding: 9px 10px; text-align: left; font-weight: 700; color: var(--text); }
 .np-choice > span:not(.nameplate) { position: relative; z-index: 1; }
 .np-choice.on { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+
+/* ---------- full profile (ProfilePage.jsx) ---------- */
+.dialog.profile-page { position: relative; width: min(640px, calc(100vw - 32px)); padding: 0; overflow: hidden auto; gap: 0; animation: pc-pop 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.15); }
+.panel-backdrop.center > .dialog.profile-page > * { flex-shrink: 0; }
+.pp { position: relative; display: flex; flex-direction: column; background: var(--surface); min-height: 100%; }
+.pp.themed { background: var(--pc-grad); }
+.pp-banner { height: 170px; background-size: cover; background-position: center; }
+.pp-head { position: relative; height: 72px; display: flex; align-items: center; justify-content: flex-end; padding: 0 16px; gap: 8px; }
+.pp-avatar { top: -78px; left: 20px; }
+.pp-bubble { left: 160px; top: -34px; max-width: calc(100% - 330px); }
+.pp-actions { display: flex; gap: 8px; position: relative; z-index: 2; }
+.pp-panel { position: relative; margin: 0 14px 14px; padding: 14px 16px 16px; border-radius: 14px; background: var(--surface-2); display: flex; flex-direction: column; }
+.pp.themed .pp-panel { background: color-mix(in srgb, var(--surface) 84%, transparent); }
+.pp-title { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.pp-name { margin: 0; font-size: 26px; font-weight: 800; line-height: 1.2; overflow-wrap: anywhere; }
+.pp-badges { position: static; box-shadow: none; }
+.pp-onshift { color: var(--st-done); font-weight: 600; }
+.pp-status-inline { display: none; margin-top: 8px !important; }
+.pp-tabs { margin: 14px 0 4px; }
+.pp-body { display: flex; flex-direction: column; }
+.pp-body .profile-section { margin-top: 14px; }
+.pp-body .profile-section p { margin: 0; }
+.pp-note { width: 100%; resize: vertical; font-size: 14px; background: color-mix(in srgb, var(--surface) 70%, transparent); }
+.pp-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 14px; }
+.pp-stats > div { background: var(--surface); border-radius: 10px; padding: 8px 10px; display: flex; flex-direction: column; }
+.pp-stats b { font-size: 22px; line-height: 1.1; }
+.pp-stats span { font-size: 11.5px; color: var(--muted); }
+.pp-tasks { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.pp-tasks .link-btn { text-align: left; color: var(--text); font-weight: 500; display: inline-flex; align-items: center; gap: 6px; }
+.pp-mates { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.pp-mate { display: inline-flex; align-items: center; gap: 7px; border: 0; background: var(--surface); border-radius: 999px; padding: 3px 10px 3px 3px; font-size: 14px; }
+.pp-foot { margin: 14px 0 0; }
+.pp > .profile-effect { z-index: 3; }
+.pc-full { align-self: flex-start; margin-top: 12px; }
+@media (max-width: 760px) {
+  .pp-banner { height: 130px; }
+  .pp-head { height: 64px; padding: 0 12px; }
+  .pp-avatar { top: -50px; left: 14px; }
+  .pp-actions .btn { padding: 6px 10px; font-size: 14px; }
+  .pp-bubble { display: none; }
+  .pp-status-inline { display: block !important; }
+  .pp-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pp-name { font-size: 22px; }
+}
+/* Decorations that break out of the circle (ears, hats, wings...). */
+.adeco.adeco-behind { z-index: 0; }
+.adeco .ad-twitch { animation: ad-twitch 4s ease-in-out infinite; }
+.adeco .ad-twitch.late { animation-delay: -1.3s; }
+@keyframes ad-twitch { 0%, 86%, 100% { transform: rotate(0); } 90% { transform: rotate(-12deg); } 94% { transform: rotate(6deg); } }
+.adeco .ad-flop { animation: ad-flop 3s ease-in-out infinite; }
+.adeco .ad-flop.late { animation-delay: -1.5s; }
+@keyframes ad-flop { 50% { transform: rotate(var(--r, 8deg)); } }
+.adeco .ad-sway { animation: ad-sway 3.4s ease-in-out infinite; }
+@keyframes ad-sway { 0%, 100% { transform: rotate(-3deg); } 50% { transform: rotate(4deg); } }
+.adeco .ad-bop { animation: ad-bop 0.9s ease-in-out infinite; }
+@keyframes ad-bop { 50% { transform: translateY(-2px) rotate(-2deg); } }
+.adeco .ad-note { animation: ad-note 1.8s ease-out infinite; animation-delay: var(--d, 0s); }
+@keyframes ad-note { from { transform: translate(0, 10px); opacity: 0; } 30% { opacity: 1; } to { transform: translate(8px, -14px); opacity: 0; } }
+.adeco .ad-blink { animation: ad-blink 1.4s steps(1) infinite; }
+@keyframes ad-blink { 50% { fill: #7f1d1d; filter: none; } }
+.adeco .ad-flap { animation: ad-flap 1.6s ease-in-out infinite; }
+@keyframes ad-flap { 50% { transform: rotate(-14deg); } }
+.deco-catears::before, .deco-bunny::before, .deco-wizard::before, .deco-horns::before, .deco-headphones::before, .deco-antenna::before, .deco-wings::before { display: none; }
+
+/* GIF avatars: still frame + live GIF. Calm chat shows the still one in chat rows until hover or tap. */
+.gif-av { position: relative; overflow: hidden; display: inline-block; flex: none; border-radius: 50%; }
+.gif-av > canvas, .gif-av > img { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 50%; object-fit: cover; display: block; }
+.gif-av > canvas { visibility: hidden; }
+.calm-chat :is(.msg, .member-row, .conv-row):not(:hover):not(.selected) .gif-av > img { visibility: hidden; }
+.calm-chat :is(.msg, .member-row, .conv-row):not(:hover):not(.selected) .gif-av > canvas { visibility: visible; }
+@media (prefers-reduced-motion: reduce) { .gif-av > img { visibility: hidden; } .gif-av > canvas { visibility: visible; } }
+.calm-toggle { display: flex; gap: 10px; align-items: flex-start; margin-top: 4px; padding: 8px 10px; border-radius: 10px; background: var(--surface-2); cursor: pointer; }
+.calm-toggle input { margin-top: 3px; accent-color: var(--accent); }
+.calm-toggle > span { display: flex; flex-direction: column; font-size: 14px; }
+
+/* More name effects */
+.ne-fire { animation: ne-fire 1.6s ease-in-out infinite; filter: drop-shadow(0 0 4px rgba(249, 115, 22, 0.6)); }
+@keyframes ne-fire { 0%, 100% { background-position: 0 0; } 50% { background-position: 0 100%; } }
+.ne-ice { animation: ne-slide 4s linear infinite; filter: drop-shadow(0 0 3px rgba(125, 211, 252, 0.8)); }
+.ne-gold { animation: ne-slide 3s linear infinite; filter: drop-shadow(0 1px 0 #78350f); }
+.ne-toon { -webkit-text-stroke: 1.6px #111827; paint-order: stroke fill; filter: drop-shadow(2px 2px 0 var(--nglow, #6366f1)); letter-spacing: 0.02em; }
+.ne-sparkle { animation: ne-glitter 1.6s linear infinite; }
+@keyframes ne-glitter { to { background-position: 14px -14px, -18px 18px, 22px 22px, 0 0; } }
+.ne-pulse { animation: ne-pulse 1.4s ease-in-out infinite; }
+@keyframes ne-pulse { 50% { filter: drop-shadow(0 0 6px var(--nglow, currentColor)); transform: scale(1.04); } }
+.calm-chat :is(.msg, .member-row, .conv-row):not(:hover):not(.selected) .ne { animation-play-state: paused; }
+
+.ask-more { align-self: flex-start; margin-top: -2px; }
+.style-request { margin-top: 18px; padding: 12px; border-radius: 12px; background: var(--surface-2); display: flex; flex-direction: column; gap: 6px; }
+.style-request .field-label { margin: 0; }
+.style-request select { width: auto; }
+.request-kind { align-self: flex-start; font-size: 11.5px; font-weight: 700; color: var(--accent); background: var(--accent-soft); border-radius: 999px; padding: 1px 8px; }

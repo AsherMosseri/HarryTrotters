@@ -4,6 +4,19 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '2.43',
+    date: '2026-10-26',
+    title: 'Full profiles, and lots more style',
+    items: [
+      'Full profiles: tap “View full profile” on anyone’s card for a big profile with About, Activity (hours, what they’re working on, what they finished), and Team (their subteammates).',
+      'Profiles show when someone joined, when they were last on, and if they’re at the lab right now. You can keep a private note on anyone’s profile that only you can see.',
+      'Decorations that break out of the circle: Cat ears, Bunny ears, Wizard hat, Horns, Headphones, Antenna, and Wings.',
+      '13 new name fonts (Pixel, Arcade, Comic, Marker, Handwritten, Retro script, Sci-fi, Bubbly, Poster, Fancy, Typewriter, Neon sign, Gothic) and 6 new name effects (Fire, Ice, Gold, Toon, Glitter, Pulse).',
+      'Calm chat (theme menu, on by default): animated pictures, names, and decorations in chat play when you hover or tap. Turn it off to have them play all the time.',
+      'Want a font, effect, or decoration we don’t have? Edit profile → Style → “Want something new?” (or “Want another?” under any section).',
+    ],
+  },
+  {
     version: '2.42',
     date: '2026-10-26',
     title: 'Pop-ups fixed for good on iPhone and iPad',

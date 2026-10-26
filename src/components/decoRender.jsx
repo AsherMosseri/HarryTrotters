@@ -299,11 +299,133 @@ export function AnimatedDecoration({ id }) {
         />
       </>
     );
+  } else if (id === 'catears') {
+    body = (
+      <>
+        {[
+          ['M10,24 L4,-14 L40,6 Z', 'M14,18 L11,-4 L32,8 Z', ' ad-twitch'],
+          ['M90,24 L96,-14 L60,6 Z', 'M86,18 L89,-4 L68,8 Z', ' ad-twitch late'],
+        ].map(([outer, inner, cls], i) => (
+          <g key={i} className={`ad-ear${cls}`} style={{ transformOrigin: i ? '78px 16px' : '22px 16px' }}>
+            <path d={outer} fill="#334155" stroke="#0f172a" strokeWidth="2.5" strokeLinejoin="round" />
+            <path d={inner} fill="#f9a8d4" />
+          </g>
+        ))}
+      </>
+    );
+  } else if (id === 'bunny') {
+    body = (
+      <>
+        {[
+          [30, -12, -12],
+          [70, -12, 12],
+        ].map(([x, y, r], i) => (
+          <g
+            key={i}
+            className={`ad-ear ad-flop${i ? ' late' : ''}`}
+            style={{ transformOrigin: `${x}px 14px` }}
+            transform={`rotate(${r} ${x} 14)`}
+          >
+            <ellipse cx={x} cy={y} rx="11" ry="27" fill="#f8fafc" stroke="#94a3b8" strokeWidth="2" />
+            <ellipse cx={x} cy={y + 2} rx="5.5" ry="19" fill="#fbcfe8" />
+          </g>
+        ))}
+      </>
+    );
+  } else if (id === 'wizard') {
+    body = (
+      <g className="ad-sway" style={{ transformOrigin: '50px 16px' }}>
+        <path d="M12,20 C30,12 70,12 88,20 C70,30 30,30 12,20 Z" fill="#3b0764" stroke="#1e1b4b" strokeWidth="2" />
+        <path d="M26,20 C36,-8 52,-30 78,-26 C64,-16 66,0 74,20 Z" fill="#6d28d9" stroke="#1e1b4b" strokeWidth="2" strokeLinejoin="round" />
+        <path d="M30,15 C46,12 60,12 72,16 L73,20 C58,16 44,16 29,19 Z" fill="#facc15" />
+        {[
+          [48, 0],
+          [60, -12],
+          [42, -8],
+        ].map(([x, y], i) => (
+          <g key={i} transform={`translate(${x} ${y}) scale(0.6)`}>
+            <path className="ad-twinkle" d={SPARK} fill="#fde68a" style={{ '--d': `${-i * 0.5}s` }} />
+          </g>
+        ))}
+      </g>
+    );
+  } else if (id === 'horns') {
+    body = (
+      <>
+        {['M22,16 C10,6 6,-8 12,-20 C16,-6 26,2 36,6 Z', 'M78,16 C90,6 94,-8 88,-20 C84,-6 74,2 64,6 Z'].map((d, i) => (
+          <path
+            key={i}
+            className="ad-glow"
+            d={d}
+            fill="#dc2626"
+            stroke="#7f1d1d"
+            strokeWidth="2"
+            strokeLinejoin="round"
+            style={{ '--c': '#ef4444' }}
+          />
+        ))}
+      </>
+    );
+  } else if (id === 'headphones') {
+    body = (
+      <g className="ad-bop" style={{ transformOrigin: '50px 50px' }}>
+        <path d="M2,52 C2,0 98,0 98,52" fill="none" stroke="#1f2937" strokeWidth="7" strokeLinecap="round" />
+        <path d="M2,52 C2,0 98,0 98,52" fill="none" stroke="#6366f1" strokeWidth="2.5" strokeLinecap="round" />
+        {[-6, 92].map((x, i) => (
+          <g key={i}>
+            <rect x={x} y="40" width="14" height="30" rx="7" fill="#111827" />
+            <rect x={x + 3} y="45" width="8" height="20" rx="4" fill="#6366f1" />
+          </g>
+        ))}
+        {[0, 1, 2].map((i) => (
+          <text key={i} className="ad-note" x={104 + i * 6} y={34 - i * 10} fontSize="13" fill="#a5b4fc" style={{ '--d': `${-i * 0.6}s` }}>
+            ♪
+          </text>
+        ))}
+      </g>
+    );
+  } else if (id === 'antenna') {
+    body = (
+      <>
+        <line x1="50" y1="2" x2="50" y2="-20" stroke="#64748b" strokeWidth="3.5" strokeLinecap="round" />
+        <circle className="ad-blink ad-glow" cx="50" cy="-24" r="6" fill="#ef4444" style={{ '--c': '#ef4444' }} />
+        {[
+          [1, 50],
+          [99, 50],
+        ].map(([x, y], i) => (
+          <g key={i}>
+            <rect x={x - 6} y={y - 9} width="12" height="18" rx="3" fill="#94a3b8" stroke="#475569" strokeWidth="2" />
+            <circle cx={x} cy={y} r="2.5" fill="#475569" />
+          </g>
+        ))}
+      </>
+    );
   }
   if (!body) return null;
   return (
     <svg className={`adeco adeco-${id}`} viewBox="-30 -30 160 160" aria-hidden="true">
       {body}
+    </svg>
+  );
+}
+
+// Wings sit behind the avatar.
+export function DecorationBehind({ id }) {
+  if (id !== 'wings') return null;
+  const wing = 'M0,0 C-26,-20 -44,-8 -48,10 C-38,8 -34,14 -40,24 C-28,20 -24,28 -28,36 C-16,30 -6,24 0,14 Z';
+  return (
+    <svg className="adeco adeco-behind" viewBox="-30 -30 160 160" aria-hidden="true">
+      {[
+        [8, 46, 1],
+        [92, 46, -1],
+      ].map(([x, y, sx], i) => (
+        <g key={i} transform={`translate(${x} ${y}) scale(${sx} 1)`}>
+          <g className="ad-flap" style={{ transformOrigin: '0 0' }}>
+            <path d={wing} fill="#f8fafc" stroke="#cbd5e1" strokeWidth="1.5" />
+            <path d="M-8,4 C-20,-4 -30,0 -34,8" fill="none" stroke="#e2e8f0" strokeWidth="1.5" />
+          </g>
+        </g>
+      ))}
     </svg>
   );
 }
