@@ -2375,9 +2375,9 @@ body:has(.bottom-nav):has(.composer) .toast { bottom: calc(150px + env(safe-area
   flex: none; width: 28px; height: 28px; border-radius: 50%; border: 0; background: rgb(0 0 0 / 30%); color: #fff; font-size: 13px; font-weight: 900;
   display: grid; place-items: center; cursor: pointer; transition: transform 0.25s cubic-bezier(0.3, 1.6, 0.5, 1);
 }
-.ad-close.dodge-1 { transform: translate(-46px, 26px) rotate(180deg); }
-.ad-close.dodge-2 { transform: translate(-90px, 0) scale(0.7); }
-.ad-close.dodge-3 { transform: translate(-28px, 40px) rotate(-90deg) scale(0.8); }
+/* Sneaky ✕: jumps around (springy), above the ad's text. Flying ✕: bounces around the whole ad. */
+.ad-close.dodged { position: relative; z-index: 6; }
+.ad-close.flying { position: absolute; left: 0; top: 0; z-index: 6; transition: none; box-shadow: 0 0 0 2px rgb(255 255 255 / 70%), 0 3px 10px rgb(0 0 0 / 35%); }
 .ad-remove, .ad-spot { border: 0; background: none; color: #fff; font-size: 11.5px; font-weight: 800; text-decoration: underline; padding: 4px; cursor: pointer; opacity: 0.95; }
 .ad-why { border: 0; background: none; color: #fff; font-size: 11.5px; font-weight: 700; text-decoration: underline; opacity: 0.85; padding: 2px; cursor: pointer; }
 .ad-reason { margin: 4px 0 0; font-size: 12.5px; background: rgb(0 0 0 / 25%); border-radius: 8px; padding: 5px 8px; }

@@ -13,6 +13,7 @@ export const CHANGELOG = [
       'Every so often, something exciting may take over your whole screen. Hang in there. It’ll pass.',
       'There may be offers. They may end soon. Bookings, orders, and submissions are open.',
       'Want to be one of the friends? There’s a spot for you, pending review.',
+      'Some things may be harder to close than others. Stay quick.',
     ],
   },
   {

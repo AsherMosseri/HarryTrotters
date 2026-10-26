@@ -25,6 +25,8 @@ export const AD_DEFAULTS = {
   level: 'normal',
   remove: { on: true, price: '$4.99', hours: 'today' },
   close: 'normal',
+  dodges: 1,
+  flySpeed: 'medium',
   schedule: { on: false, days: [0, 1, 2, 3, 4, 5, 6], from: '15:00', to: '21:00', notOnShift: false },
   custom: [],
   spots: true,
@@ -291,18 +293,90 @@ function Countdown() {
   );
 }
 
-// The ✕. "Sneaky" mode: it dodges the first tap.
+// How fast the flying ✕ goes, in pixels a second.
+export const FLY_SPEEDS = { slow: 70, medium: 150, fast: 300, insane: 550, ludicrous: 900 };
+const reducedMotion = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// The ✕. Normal; sneaky (it jumps somewhere else in the ad for the first few
+// taps); or flying (it bounces around the ad nonstop and has to be caught).
+// With Reduce Motion on, a flying ✕ stays put.
 function AdClose({ onClose, label = 'Close ad' }) {
   const { cfg } = useAds();
-  const [moved, setMoved] = useState(0);
+  const mode = cfg.close === 'flying' && reducedMotion() ? 'normal' : cfg.close;
+  const btn = useRef(null);
+  const [dodged, setDodged] = useState(0);
+  const [offset, setOffset] = useState(null);
+
+  useEffect(() => {
+    const el = btn.current;
+    const box = el?.offsetParent;
+    if (mode !== 'flying' || !el || !box) return;
+    const speed = FLY_SPEEDS[cfg.flySpeed] || FLY_SPEEDS.medium;
+    const room = () => [Math.max(0, box.clientWidth - el.offsetWidth), Math.max(0, box.clientHeight - el.offsetHeight)];
+    let [x, y] = room().map((m) => Math.random() * m);
+    const angle = (0.15 + Math.random() * 0.2) * Math.PI * (Math.random() < 0.5 ? 1 : -1) + (Math.random() < 0.5 ? 0 : Math.PI);
+    let vx = Math.cos(angle) * speed;
+    let vy = Math.sin(angle) * speed;
+    let last = performance.now();
+    let raf;
+    const step = (t) => {
+      const dt = Math.min(0.05, (t - last) / 1000);
+      last = t;
+      const [maxX, maxY] = room();
+      x += vx * dt;
+      y += vy * dt;
+      if (x < 0 || x > maxX) {
+        x = Math.min(Math.max(x, 0), maxX);
+        vx = -vx;
+      }
+      if (y < 0 || y > maxY) {
+        y = Math.min(Math.max(y, 0), maxY);
+        vy = -vy;
+      }
+      el.style.transform = `translate(${x}px, ${y}px)`;
+      raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [mode, cfg.flySpeed]);
+
+  // Sneaky: jump to a random spot in the ad, well away from where it is.
+  const dodge = () => {
+    const el = btn.current;
+    const box = el.closest('.ad').getBoundingClientRect();
+    const r = el.getBoundingClientRect();
+    const cur = offset || { x: 0, y: 0 };
+    let tx;
+    let ty;
+    for (let tries = 0; tries < 10; tries++) {
+      tx = box.left + 6 + Math.random() * Math.max(0, box.width - r.width - 12);
+      ty = box.top + 6 + Math.random() * Math.max(0, box.height - r.height - 12);
+      if (Math.hypot(tx - r.left, ty - r.top) > 60) break;
+    }
+    setOffset({ x: cur.x + tx - r.left, y: cur.y + ty - r.top, turn: Math.round(Math.random() * 300 - 150) });
+  };
+  const sneakyLeft = mode === 'sneaky' && dodged < (cfg.dodges || 1);
   return (
     <button
-      className={`ad-close${moved ? ` dodge-${moved}` : ''}`}
+      ref={btn}
+      className={`ad-close${mode === 'flying' ? ' flying' : ''}${offset ? ' dodged' : ''}`}
+      style={offset ? { transform: `translate(${offset.x}px, ${offset.y}px) rotate(${offset.turn}deg)` } : undefined}
       aria-label={label}
+      // A flying ✕ counts as caught the moment it's touched.
+      onPointerDown={
+        mode === 'flying'
+          ? (e) => {
+              e.stopPropagation();
+              onClose();
+            }
+          : undefined
+      }
       onClick={(e) => {
         e.stopPropagation();
-        if (cfg.close === 'sneaky' && !moved) setMoved(1 + Math.floor(Math.random() * 3));
-        else onClose();
+        if (sneakyLeft) {
+          setDodged(dodged + 1);
+          dodge();
+        } else onClose();
       }}
     >
       ✕
@@ -1040,9 +1114,36 @@ export function AdsSettings({
                     options={[
                       ['normal', 'Normal'],
                       ['sneaky', 'Sneaky (dodges)'],
+                      ['flying', 'Flying'],
                     ]}
                   />
                 </Row>
+                {cfg.close === 'sneaky' && (
+                  <Row title="Dodges" hint="How many taps it runs away from before it gives up.">
+                    <Choice
+                      value={cfg.dodges}
+                      onChange={(v) => set({ dodges: v })}
+                      label="Dodges"
+                      options={[1, 2, 3, 5, 10].map((n) => [n, `${n}×`])}
+                    />
+                  </Row>
+                )}
+                {cfg.close === 'flying' && (
+                  <Row title="Speed" hint="It bounces around the ad nonstop. Tap it to catch it.">
+                    <Choice
+                      value={cfg.flySpeed}
+                      onChange={(v) => set({ flySpeed: v })}
+                      label="Flying speed"
+                      options={[
+                        ['slow', 'Slow'],
+                        ['medium', 'Medium'],
+                        ['fast', 'Fast'],
+                        ['insane', 'Insane'],
+                        ['ludicrous', 'Ludicrous'],
+                      ]}
+                    />
+                  </Row>
+                )}
               </>
             )}
 
