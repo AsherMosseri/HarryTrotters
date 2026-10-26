@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { CloseIcon } from './common.jsx';
+import { CloseIcon, Overlay } from './common.jsx';
 
 // Phone layout pieces: the bottom tab bar, and sheets that slide up from the bottom.
 export const PHONE_MAIN = ['board', 'chat', 'shifts', 'parts'];
@@ -24,19 +24,21 @@ export function Sheet({ title, onClose, children, className = '' }) {
     return () => window.removeEventListener('keydown', esc);
   }, [onClose]);
   return (
-    <div className="panel-backdrop sheet-backdrop" onClick={onClose}>
-      <div className={`sheet ${className}`} onClick={(e) => e.stopPropagation()} role="dialog" aria-label={title}>
-        <div className="sheet-grip" aria-hidden="true" />
-        <div className="sheet-head">
-          <h2>{title}</h2>
-          <span className="spacer" />
-          <button className="icon-btn" onClick={onClose} aria-label="Close">
-            <CloseIcon />
-          </button>
+    <Overlay>
+      <div className="panel-backdrop sheet-backdrop" onClick={onClose}>
+        <div className={`sheet ${className}`} onClick={(e) => e.stopPropagation()} role="dialog" aria-label={title}>
+          <div className="sheet-grip" aria-hidden="true" />
+          <div className="sheet-head">
+            <h2>{title}</h2>
+            <span className="spacer" />
+            <button className="icon-btn" onClick={onClose} aria-label="Close">
+              <CloseIcon />
+            </button>
+          </div>
+          <div className="sheet-body">{children}</div>
         </div>
-        <div className="sheet-body">{children}</div>
       </div>
-    </div>
+    </Overlay>
   );
 }
 

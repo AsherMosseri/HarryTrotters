@@ -4,6 +4,14 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '2.42',
+    date: '2026-10-26',
+    title: 'Pop-ups fixed for good on iPhone and iPad',
+    items: [
+      'Every pop-up (What’s new, Edit profile, Help, ideas, task details, and the rest) now opens over the whole screen instead of inside the scrolling page, so it no longer ends up under the top bar, cut off, or bouncing back when you scroll.',
+    ],
+  },
+  {
     version: '2.41',
     date: '2026-10-26',
     title: 'Profiles, Nitro-style',

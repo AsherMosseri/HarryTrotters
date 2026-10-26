@@ -16,7 +16,7 @@ import { PALETTES } from '../nitro.js';
 import { daysBetween, todayISO } from '../milestones.js';
 import { newTaskDefaults, personId } from '../data/diff.js';
 import { preparePhoto, useLocalStorage, useMedia } from '../util.js';
-import { Avatar, PeopleContext, PlusIcon } from './common.jsx';
+import { Avatar, Overlay, PeopleContext, PlusIcon } from './common.jsx';
 import { ProfileCard, ProfileEditor } from './People.jsx';
 import TableView from './TableView.jsx';
 import BoardView from './BoardView.jsx';
@@ -1431,21 +1431,23 @@ export default function Workspace({ store, actor, rename, renames }) {
             <CheckinGate checkin={pendingCheckin} rename={rename} onAnswer={(a) => api.answerCheckin(pendingCheckin.id, a)} />
           )}
           {toast && (
-            <div className="toast" role="alert" onClick={() => setToast(null)}>
-              <span>{toast.text}</span>
-              {toast.action && (
-                <button
-                  className="toast-action"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toast.action.run();
-                    setToast(null);
-                  }}
-                >
-                  {toast.action.label}
-                </button>
-              )}
-            </div>
+            <Overlay>
+              <div className="toast" role="alert" onClick={() => setToast(null)}>
+                <span>{toast.text}</span>
+                {toast.action && (
+                  <button
+                    className="toast-action"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toast.action.run();
+                      setToast(null);
+                    }}
+                  >
+                    {toast.action.label}
+                  </button>
+                )}
+              </div>
+            </Overlay>
           )}
           {profileFor && (
             <ProfileCard

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { GIPHY_API_KEY } from '../../config.js';
-import { CloseIcon } from '../common.jsx';
+import { CloseIcon, Overlay } from '../common.jsx';
 import { GROUPS, GROUP_ICONS, emojiList, firstEmoji, loadEmoji, recentEmoji, searchEmoji, rememberEmoji } from './emoji.js';
 import { isTouch } from '../../util.js';
 
@@ -148,50 +148,52 @@ export function EmojiManager({ teamEmoji, api, onClose }) {
   };
 
   return (
-    <div className="panel-backdrop center" onClick={onClose}>
-      <div className="dialog" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Team emoji">
-        <div className="panel-head">
-          <h2>Team emoji</h2>
-          <span className="spacer" />
-          <button className="icon-btn" onClick={onClose} aria-label="Close">
-            <CloseIcon />
-          </button>
-        </div>
-        <p className="muted small">
-          Everyone can use these in messages and reactions as :name:. Square pictures work best; GIFs stay animated.
-        </p>
-        <div className="row gap">
-          <input className="input grow" value={name} onChange={(e) => setName(e.target.value)} placeholder="Name, like robot or harry" />
-          <label className="btn">
-            {file ? '✓ Picture' : 'Picture…'}
-            <input
-              type="file"
-              accept="image/png,image/gif,image/jpeg,image/webp"
-              hidden
-              onChange={(e) => setFile(e.target.files[0] || null)}
-            />
-          </label>
-          <button className="btn primary" onClick={add} disabled={busy || !file || !clean}>
-            {busy ? 'Adding…' : 'Add'}
-          </button>
-        </div>
-        {clean && <p className="muted small">Type it as :{clean}:</p>}
-        {err && <p className="form-error">{err}</p>}
-        <div className="emoji-admin-list">
-          {teamEmoji.map((e) => (
-            <div key={e.id} className="row gap">
-              <img className="custom-emoji big" src={e.url} alt="" />
-              <span className="grow">:{e.name}:</span>
-              <span className="muted small">{e.by?.split(' ')[0]}</span>
-              <button className="link-btn danger-text" onClick={() => confirm(`Delete :${e.name}:?`) && api.deleteEmoji(e)}>
-                Delete
-              </button>
-            </div>
-          ))}
-          {!teamEmoji.length && <p className="muted small">No team emoji yet.</p>}
+    <Overlay>
+      <div className="panel-backdrop center" onClick={onClose}>
+        <div className="dialog" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Team emoji">
+          <div className="panel-head">
+            <h2>Team emoji</h2>
+            <span className="spacer" />
+            <button className="icon-btn" onClick={onClose} aria-label="Close">
+              <CloseIcon />
+            </button>
+          </div>
+          <p className="muted small">
+            Everyone can use these in messages and reactions as :name:. Square pictures work best; GIFs stay animated.
+          </p>
+          <div className="row gap">
+            <input className="input grow" value={name} onChange={(e) => setName(e.target.value)} placeholder="Name, like robot or harry" />
+            <label className="btn">
+              {file ? '✓ Picture' : 'Picture…'}
+              <input
+                type="file"
+                accept="image/png,image/gif,image/jpeg,image/webp"
+                hidden
+                onChange={(e) => setFile(e.target.files[0] || null)}
+              />
+            </label>
+            <button className="btn primary" onClick={add} disabled={busy || !file || !clean}>
+              {busy ? 'Adding…' : 'Add'}
+            </button>
+          </div>
+          {clean && <p className="muted small">Type it as :{clean}:</p>}
+          {err && <p className="form-error">{err}</p>}
+          <div className="emoji-admin-list">
+            {teamEmoji.map((e) => (
+              <div key={e.id} className="row gap">
+                <img className="custom-emoji big" src={e.url} alt="" />
+                <span className="grow">:{e.name}:</span>
+                <span className="muted small">{e.by?.split(' ')[0]}</span>
+                <button className="link-btn danger-text" onClick={() => confirm(`Delete :${e.name}:?`) && api.deleteEmoji(e)}>
+                  Delete
+                </button>
+              </div>
+            ))}
+            {!teamEmoji.length && <p className="muted small">No team emoji yet.</p>}
+          </div>
         </div>
       </div>
-    </div>
+    </Overlay>
   );
 }
 
@@ -308,67 +310,69 @@ export function PollDialog({ onCreate, onClose }) {
   const filled = options.map((o) => o.trim()).filter(Boolean);
   const ok = question.trim() && filled.length >= 2;
   return (
-    <div className="panel-backdrop center" onClick={onClose}>
-      <form
-        className="dialog poll-dialog"
-        onClick={(e) => e.stopPropagation()}
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (!ok) return;
-          onCreate({
-            question: question.trim().slice(0, 200),
-            multi,
-            options: filled.slice(0, 10).map((text, i) => ({ id: String.fromCharCode(97 + i), text: text.slice(0, 80) })),
-          });
-        }}
-      >
-        <div className="panel-head">
-          <h2>📊 New poll</h2>
-          <span className="spacer" />
-          <button type="button" className="icon-btn" onClick={onClose} aria-label="Close">
-            <CloseIcon />
-          </button>
-        </div>
-        <input
-          className="input big"
-          autoFocus={!isTouch}
-          value={question}
-          onChange={(e) => setQuestion(e.target.value)}
-          placeholder="Ask a question"
-        />
-        {options.map((o, i) => (
-          <div key={i} className="row gap">
-            <input
-              className="input grow"
-              value={o}
-              onChange={(e) => setOptions(options.map((x, j) => (j === i ? e.target.value : x)))}
-              placeholder={`Option ${i + 1}`}
-            />
-            {options.length > 2 && (
-              <button
-                type="button"
-                className="icon-btn small"
-                onClick={() => setOptions(options.filter((_, j) => j !== i))}
-                aria-label="Remove option"
-              >
-                <CloseIcon />
-              </button>
-            )}
+    <Overlay>
+      <div className="panel-backdrop center" onClick={onClose}>
+        <form
+          className="dialog poll-dialog"
+          onClick={(e) => e.stopPropagation()}
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!ok) return;
+            onCreate({
+              question: question.trim().slice(0, 200),
+              multi,
+              options: filled.slice(0, 10).map((text, i) => ({ id: String.fromCharCode(97 + i), text: text.slice(0, 80) })),
+            });
+          }}
+        >
+          <div className="panel-head">
+            <h2>📊 New poll</h2>
+            <span className="spacer" />
+            <button type="button" className="icon-btn" onClick={onClose} aria-label="Close">
+              <CloseIcon />
+            </button>
           </div>
-        ))}
-        {options.length < 10 && (
-          <button type="button" className="link-btn" onClick={() => setOptions([...options, ''])}>
-            ＋ Add option
+          <input
+            className="input big"
+            autoFocus={!isTouch}
+            value={question}
+            onChange={(e) => setQuestion(e.target.value)}
+            placeholder="Ask a question"
+          />
+          {options.map((o, i) => (
+            <div key={i} className="row gap">
+              <input
+                className="input grow"
+                value={o}
+                onChange={(e) => setOptions(options.map((x, j) => (j === i ? e.target.value : x)))}
+                placeholder={`Option ${i + 1}`}
+              />
+              {options.length > 2 && (
+                <button
+                  type="button"
+                  className="icon-btn small"
+                  onClick={() => setOptions(options.filter((_, j) => j !== i))}
+                  aria-label="Remove option"
+                >
+                  <CloseIcon />
+                </button>
+              )}
+            </div>
+          ))}
+          {options.length < 10 && (
+            <button type="button" className="link-btn" onClick={() => setOptions([...options, ''])}>
+              ＋ Add option
+            </button>
+          )}
+          <label className="row gap small">
+            <input type="checkbox" checked={multi} onChange={(e) => setMulti(e.target.checked)} /> Allow picking more than one
+          </label>
+          <button className="btn primary big-btn" disabled={!ok}>
+            Post poll
           </button>
-        )}
-        <label className="row gap small">
-          <input type="checkbox" checked={multi} onChange={(e) => setMulti(e.target.checked)} /> Allow picking more than one
-        </label>
-        <button className="btn primary big-btn" disabled={!ok}>
-          Post poll
-        </button>
-      </form>
-    </div>
+        </form>
+      </div>
+    </Overlay>
   );
 }
 
@@ -442,47 +446,51 @@ export function StickerManager({ stickers, api, onClose }) {
     }
   };
   return (
-    <div className="panel-backdrop center" onClick={onClose}>
-      <div className="dialog" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Team stickers">
-        <div className="panel-head">
-          <h2>Team stickers</h2>
-          <span className="spacer" />
-          <button className="icon-btn" onClick={onClose} aria-label="Close">
-            <CloseIcon />
-          </button>
-        </div>
-        <p className="muted small">Stickers are sent as a big picture. PNGs with a see-through background look best; GIFs stay animated.</p>
-        <div className="row gap">
-          <input className="input grow" value={name} onChange={(e) => setName(e.target.value)} placeholder="Name, like robot dance" />
-          <label className="btn">
-            {file ? '✓ Picture' : 'Picture…'}
-            <input
-              type="file"
-              accept="image/png,image/gif,image/jpeg,image/webp"
-              hidden
-              onChange={(e) => setFile(e.target.files[0] || null)}
-            />
-          </label>
-          <button className="btn primary" onClick={add} disabled={busy || !file}>
-            {busy ? 'Adding…' : 'Add'}
-          </button>
-        </div>
-        {err && <p className="form-error">{err}</p>}
-        <div className="sticker-grid admin">
-          {stickers.map((s) => (
-            <div key={s.id} className="sticker-admin">
-              <img src={s.url} alt={s.name} />
-              <span className="tiny">{s.name}</span>
-              <button
-                className="link-btn danger-text tiny"
-                onClick={() => confirm(`Delete the "${s.name}" sticker?`) && api.deleteSticker(s)}
-              >
-                Delete
-              </button>
-            </div>
-          ))}
+    <Overlay>
+      <div className="panel-backdrop center" onClick={onClose}>
+        <div className="dialog" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Team stickers">
+          <div className="panel-head">
+            <h2>Team stickers</h2>
+            <span className="spacer" />
+            <button className="icon-btn" onClick={onClose} aria-label="Close">
+              <CloseIcon />
+            </button>
+          </div>
+          <p className="muted small">
+            Stickers are sent as a big picture. PNGs with a see-through background look best; GIFs stay animated.
+          </p>
+          <div className="row gap">
+            <input className="input grow" value={name} onChange={(e) => setName(e.target.value)} placeholder="Name, like robot dance" />
+            <label className="btn">
+              {file ? '✓ Picture' : 'Picture…'}
+              <input
+                type="file"
+                accept="image/png,image/gif,image/jpeg,image/webp"
+                hidden
+                onChange={(e) => setFile(e.target.files[0] || null)}
+              />
+            </label>
+            <button className="btn primary" onClick={add} disabled={busy || !file}>
+              {busy ? 'Adding…' : 'Add'}
+            </button>
+          </div>
+          {err && <p className="form-error">{err}</p>}
+          <div className="sticker-grid admin">
+            {stickers.map((s) => (
+              <div key={s.id} className="sticker-admin">
+                <img src={s.url} alt={s.name} />
+                <span className="tiny">{s.name}</span>
+                <button
+                  className="link-btn danger-text tiny"
+                  onClick={() => confirm(`Delete the "${s.name}" sticker?`) && api.deleteSticker(s)}
+                >
+                  Delete
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
-    </div>
+    </Overlay>
   );
 }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { CHANGELOG } from '../changelog.js';
-import { CloseIcon } from './common.jsx';
+import { CloseIcon, Overlay } from './common.jsx';
 import { RequestBox } from './Requests.jsx';
 
 const fmtDate = (iso) => new Date(`${iso}T12:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
@@ -45,33 +45,35 @@ export function VersionLogDialog({ log = CHANGELOG, current, currentLabel = 'Cur
   const toggle = (ver) => setOpen((s) => (s.has(ver) ? new Set([...s].filter((x) => x !== ver)) : new Set([...s, ver])));
   const all = open.size === log.length;
   return (
-    <div className="panel-backdrop center version-backdrop" onClick={onClose}>
-      <div className="dialog version-log" onClick={(e) => e.stopPropagation()} role="dialog" aria-labelledby="vlog-title">
-        <div className="panel-head">
-          <h2 id="vlog-title">Version log</h2>
-          <span className="spacer" />
-          <button className="link-btn small" onClick={() => setOpen(new Set(all ? [] : log.map((v) => v.version)))}>
-            {all ? 'Collapse all' : 'Expand all'}
-          </button>
-          <button className="icon-btn" onClick={onClose} aria-label="Close">
-            <CloseIcon />
-          </button>
+    <Overlay>
+      <div className="panel-backdrop center version-backdrop" onClick={onClose}>
+        <div className="dialog version-log" onClick={(e) => e.stopPropagation()} role="dialog" aria-labelledby="vlog-title">
+          <div className="panel-head">
+            <h2 id="vlog-title">Version log</h2>
+            <span className="spacer" />
+            <button className="link-btn small" onClick={() => setOpen(new Set(all ? [] : log.map((v) => v.version)))}>
+              {all ? 'Collapse all' : 'Expand all'}
+            </button>
+            <button className="icon-btn" onClick={onClose} aria-label="Close">
+              <CloseIcon />
+            </button>
+          </div>
+          <p className="muted small">
+            {log.length} versions, {log.reduce((n, v) => n + v.items.length, 0)} changes since the first board.
+          </p>
+          {log.map((v) => (
+            <VersionBlock
+              key={v.version}
+              v={v}
+              open={open.has(v.version)}
+              onToggle={() => toggle(v.version)}
+              current={v.version === current}
+              currentLabel={currentLabel}
+            />
+          ))}
         </div>
-        <p className="muted small">
-          {log.length} versions, {log.reduce((n, v) => n + v.items.length, 0)} changes since the first board.
-        </p>
-        {log.map((v) => (
-          <VersionBlock
-            key={v.version}
-            v={v}
-            open={open.has(v.version)}
-            onToggle={() => toggle(v.version)}
-            current={v.version === current}
-            currentLabel={currentLabel}
-          />
-        ))}
       </div>
-    </div>
+    </Overlay>
   );
 }
 
@@ -80,41 +82,43 @@ export function WhatsNew({ versions, onClose, onFullLog, onRequest }) {
   useEscape(onClose);
   const latest = versions[0];
   return (
-    <div className="panel-backdrop center" onClick={onClose}>
-      <div className="dialog whats-new" onClick={(e) => e.stopPropagation()} role="dialog" aria-labelledby="new-title">
-        <div className="whats-new-badge">v{latest.version}</div>
-        <h2 id="new-title">What’s new in version {latest.version}</h2>
-        {versions.map((v) => (
-          <div key={v.version} className="whats-new-version">
-            {versions.length > 1 && (
-              <h3>
-                v{v.version} · {v.title}
-              </h3>
-            )}
-            {versions.length === 1 && <p className="muted">{v.title}</p>}
-            <ul className="version-items">
-              {v.items.map((it) => (
-                <li key={it}>{it}</li>
-              ))}
-            </ul>
+    <Overlay>
+      <div className="panel-backdrop center" onClick={onClose}>
+        <div className="dialog whats-new" onClick={(e) => e.stopPropagation()} role="dialog" aria-labelledby="new-title">
+          <div className="whats-new-badge">v{latest.version}</div>
+          <h2 id="new-title">What’s new in version {latest.version}</h2>
+          {versions.map((v) => (
+            <div key={v.version} className="whats-new-version">
+              {versions.length > 1 && (
+                <h3>
+                  v{v.version} · {v.title}
+                </h3>
+              )}
+              {versions.length === 1 && <p className="muted">{v.title}</p>}
+              <ul className="version-items">
+                {v.items.map((it) => (
+                  <li key={it}>{it}</li>
+                ))}
+              </ul>
+            </div>
+          ))}
+          {onRequest && (
+            <div className="whats-new-idea">
+              <h3>💡 What should we add next?</h3>
+              <RequestBox onSend={onRequest} />
+            </div>
+          )}
+          <div className="row gap">
+            <button className="btn" onClick={onFullLog}>
+              Full version log
+            </button>
+            <span className="spacer" />
+            <button className="btn primary" onClick={onClose} autoFocus>
+              Got it
+            </button>
           </div>
-        ))}
-        {onRequest && (
-          <div className="whats-new-idea">
-            <h3>💡 What should we add next?</h3>
-            <RequestBox onSend={onRequest} />
-          </div>
-        )}
-        <div className="row gap">
-          <button className="btn" onClick={onFullLog}>
-            Full version log
-          </button>
-          <span className="spacer" />
-          <button className="btn primary" onClick={onClose} autoFocus>
-            Got it
-          </button>
         </div>
       </div>
-    </div>
+    </Overlay>
   );
 }

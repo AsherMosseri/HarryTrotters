@@ -3,7 +3,7 @@ import { SWATCHES, gradientStops } from '../nitro.js';
 import GradientColors from './GradientColors.jsx';
 import { preparePhoto } from '../util.js';
 import { EmojiPicker, GifPicker } from './chat/Pickers.jsx';
-import { CloseIcon } from './common.jsx';
+import { CloseIcon, Overlay } from './common.jsx';
 import { CustomEffect, ProfileEffect } from './People.jsx';
 import { FX } from '../fx/effects.js';
 
@@ -156,139 +156,141 @@ export default function ThemeStudio({ value, onChange, profile, profileColor, up
   };
 
   return (
-    <div className="panel-backdrop center studio-backdrop" onClick={onClose}>
-      <div className="dialog theme-studio" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Custom theme">
-        <div className="panel-head">
-          <h2>🎨 Custom theme</h2>
-          <span className="spacer" />
-          <button className="icon-btn" onClick={onClose} aria-label="Close">
-            <CloseIcon />
-          </button>
-        </div>
-        <p className="muted small">Changes show in the app as you make them. Only on this device.</p>
-        <div className="row gap wrap">
-          <button className="btn" onClick={() => onChange(themeFromProfile(profile, profileColor))}>
-            🪞 Start from my profile
-          </button>
-          <button className="btn" onClick={surprise}>
-            🎲 Surprise me
-          </button>
-          <button className="link-btn small" onClick={() => onChange(CUSTOM_DEFAULT)}>
-            Reset
-          </button>
-        </div>
+    <Overlay>
+      <div className="panel-backdrop center studio-backdrop" onClick={onClose}>
+        <div className="dialog theme-studio" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Custom theme">
+          <div className="panel-head">
+            <h2>🎨 Custom theme</h2>
+            <span className="spacer" />
+            <button className="icon-btn" onClick={onClose} aria-label="Close">
+              <CloseIcon />
+            </button>
+          </div>
+          <p className="muted small">Changes show in the app as you make them. Only on this device.</p>
+          <div className="row gap wrap">
+            <button className="btn" onClick={() => onChange(themeFromProfile(profile, profileColor))}>
+              🪞 Start from my profile
+            </button>
+            <button className="btn" onClick={surprise}>
+              🎲 Surprise me
+            </button>
+            <button className="link-btn small" onClick={() => onChange(CUSTOM_DEFAULT)}>
+              Reset
+            </button>
+          </div>
 
-        <h3 className="studio-h">Accent</h3>
-        <p className="muted tiny">Buttons, links, and the selected tab.</p>
-        <ColorPick label="Accent" value={t.accent} onChange={(accent) => set({ accent })} />
+          <h3 className="studio-h">Accent</h3>
+          <p className="muted tiny">Buttons, links, and the selected tab.</p>
+          <ColorPick label="Accent" value={t.accent} onChange={(accent) => set({ accent })} />
 
-        <h3 className="studio-h">Background colors</h3>
-        <div className="studio-two">
-          <GradientColors label="Background color" colors={t.colors} onChange={(colors) => set({ colors })} />
-        </div>
-        <label className="studio-range">
-          <span>Strength</span>
-          <input type="range" min="0" max="70" value={t.tint} onChange={(e) => set({ tint: Number(e.target.value) })} />
-          <b>{t.tint}%</b>
-        </label>
-        <label className="studio-check">
-          <input type="checkbox" checked={t.motion === 'shift'} onChange={(e) => set({ motion: e.target.checked ? 'shift' : '' })} /> 🌊
-          Make the colors move
-        </label>
+          <h3 className="studio-h">Background colors</h3>
+          <div className="studio-two">
+            <GradientColors label="Background color" colors={t.colors} onChange={(colors) => set({ colors })} />
+          </div>
+          <label className="studio-range">
+            <span>Strength</span>
+            <input type="range" min="0" max="70" value={t.tint} onChange={(e) => set({ tint: Number(e.target.value) })} />
+            <b>{t.tint}%</b>
+          </label>
+          <label className="studio-check">
+            <input type="checkbox" checked={t.motion === 'shift'} onChange={(e) => set({ motion: e.target.checked ? 'shift' : '' })} /> 🌊
+            Make the colors move
+          </label>
 
-        <h3 className="studio-h">Background picture</h3>
-        <div className="row gap wrap">
-          <button className={`btn${!t.bg ? ' on-btn' : ''}`} onClick={() => set({ bg: null })}>
-            None
-          </button>
-          <button className="btn" onClick={() => file.current?.click()} disabled={busy}>
-            {busy ? 'Uploading…' : '🖼 Picture'}
-          </button>
-          <button className="btn" onClick={() => setPanel(panel === 'gif' ? null : 'gif')}>
-            GIF
-          </button>
-          <button className="btn" onClick={() => setPanel(panel === 'emoji' ? null : 'emoji')}>
-            😊 Emoji pattern
-          </button>
-          {t.bg?.value && (
-            <span className="studio-bg-now" title="Current background">
-              {t.bg.kind === 'image' ? <img src={t.bg.value} alt="" /> : t.bg.value}
-            </span>
-          )}
-          <input
-            ref={file}
-            type="file"
-            accept="image/*"
-            hidden
-            onChange={(e) => (e.target.files[0] && pickPicture(e.target.files[0]), (e.target.value = ''))}
-          />
-        </div>
-        {panel === 'emoji' && (
-          <EmojiPicker
-            className="effect-picker"
-            onPick={(em) => {
-              set({ bg: { kind: 'emoji', value: em } });
-              setPanel(null);
-            }}
-            onClose={() => setPanel(null)}
-          />
-        )}
-        {panel === 'gif' && (
-          <div className="effect-gif">
-            <GifPicker
-              onPick={(gif) => {
-                set({ bg: { kind: 'image', value: gif.url } });
+          <h3 className="studio-h">Background picture</h3>
+          <div className="row gap wrap">
+            <button className={`btn${!t.bg ? ' on-btn' : ''}`} onClick={() => set({ bg: null })}>
+              None
+            </button>
+            <button className="btn" onClick={() => file.current?.click()} disabled={busy}>
+              {busy ? 'Uploading…' : '🖼 Picture'}
+            </button>
+            <button className="btn" onClick={() => setPanel(panel === 'gif' ? null : 'gif')}>
+              GIF
+            </button>
+            <button className="btn" onClick={() => setPanel(panel === 'emoji' ? null : 'emoji')}>
+              😊 Emoji pattern
+            </button>
+            {t.bg?.value && (
+              <span className="studio-bg-now" title="Current background">
+                {t.bg.kind === 'image' ? <img src={t.bg.value} alt="" /> : t.bg.value}
+              </span>
+            )}
+            <input
+              ref={file}
+              type="file"
+              accept="image/*"
+              hidden
+              onChange={(e) => (e.target.files[0] && pickPicture(e.target.files[0]), (e.target.value = ''))}
+            />
+          </div>
+          {panel === 'emoji' && (
+            <EmojiPicker
+              className="effect-picker"
+              onPick={(em) => {
+                set({ bg: { kind: 'emoji', value: em } });
                 setPanel(null);
-              }}
-              onUpload={(f) => {
-                setPanel(null);
-                pickPicture(f);
               }}
               onClose={() => setPanel(null)}
             />
-          </div>
-        )}
-        {t.bg?.value && (
-          <label className="studio-range">
-            <span>Show through</span>
-            <input type="range" min="5" max="80" value={t.show} onChange={(e) => set({ show: Number(e.target.value) })} />
-            <b>{t.show}%</b>
-          </label>
-        )}
-        {err && <p className="form-error">{err}</p>}
+          )}
+          {panel === 'gif' && (
+            <div className="effect-gif">
+              <GifPicker
+                onPick={(gif) => {
+                  set({ bg: { kind: 'image', value: gif.url } });
+                  setPanel(null);
+                }}
+                onUpload={(f) => {
+                  setPanel(null);
+                  pickPicture(f);
+                }}
+                onClose={() => setPanel(null)}
+              />
+            </div>
+          )}
+          {t.bg?.value && (
+            <label className="studio-range">
+              <span>Show through</span>
+              <input type="range" min="5" max="80" value={t.show} onChange={(e) => set({ show: Number(e.target.value) })} />
+              <b>{t.show}%</b>
+            </label>
+          )}
+          {err && <p className="form-error">{err}</p>}
 
-        <h3 className="studio-h">Floating</h3>
-        <div className="row gap wrap">
-          <button className={`btn${!t.fx ? ' on-btn' : ''}`} onClick={() => set({ fx: null })}>
-            None
-          </button>
-          {FX_PRESETS.map(([id, icon, label]) => (
-            <button
-              key={id}
-              className={`btn${t.fx?.preset === id ? ' on-btn' : ''}`}
-              onClick={() => set({ fx: { preset: id } })}
-              aria-label={label}
-              title={label}
-            >
-              {icon}
+          <h3 className="studio-h">Floating</h3>
+          <div className="row gap wrap">
+            <button className={`btn${!t.fx ? ' on-btn' : ''}`} onClick={() => set({ fx: null })}>
+              None
             </button>
-          ))}
-          <button
-            className={`btn${t.fx && !t.fx.preset ? ' on-btn' : ''}`}
-            onClick={() => set({ fx: t.fx && !t.fx.preset ? t.fx : { kind: 'emoji', value: '🤖', motion: 'fall' } })}
-          >
-            Anything…
-          </button>
-        </div>
-        {t.fx && !t.fx.preset && <CustomEffect value={t.fx} onChange={(fx) => set({ fx })} upload={upload} />}
+            {FX_PRESETS.map(([id, icon, label]) => (
+              <button
+                key={id}
+                className={`btn${t.fx?.preset === id ? ' on-btn' : ''}`}
+                onClick={() => set({ fx: { preset: id } })}
+                aria-label={label}
+                title={label}
+              >
+                {icon}
+              </button>
+            ))}
+            <button
+              className={`btn${t.fx && !t.fx.preset ? ' on-btn' : ''}`}
+              onClick={() => set({ fx: t.fx && !t.fx.preset ? t.fx : { kind: 'emoji', value: '🤖', motion: 'fall' } })}
+            >
+              Anything…
+            </button>
+          </div>
+          {t.fx && !t.fx.preset && <CustomEffect value={t.fx} onChange={(fx) => set({ fx })} upload={upload} />}
 
-        <div className="row gap">
-          <span className="spacer" />
-          <button className="btn primary" onClick={onClose}>
-            Done
-          </button>
+          <div className="row gap">
+            <span className="spacer" />
+            <button className="btn primary" onClick={onClose}>
+              Done
+            </button>
+          </div>
         </div>
       </div>
-    </div>
+    </Overlay>
   );
 }

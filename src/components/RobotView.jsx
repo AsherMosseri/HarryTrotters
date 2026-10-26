@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { RobotScene } from '../robot/scene.js';
 import { loadModel, diffModels } from '../robot/model.js';
 import { relTime, useEscape } from '../util.js';
-import { CloseIcon, PlusIcon, StatusDot } from './common.jsx';
+import { CloseIcon, Overlay, PlusIcon, StatusDot } from './common.jsx';
 
 // Models are kept per version so switching back is instant. A model object can
 // only be shown in one viewport at a time, so compare loads its own copy.
@@ -60,93 +60,97 @@ function UploadDialog({ onClose, onUpload }) {
   const heavy = file && check && !check.error && (file.size > 40e6 || check.triangles > 1.5e6);
 
   return (
-    <div className="panel-backdrop center" onClick={() => progress === null && onClose()}>
-      <form
-        className="dialog"
-        onClick={(e) => e.stopPropagation()}
-        onSubmit={async (e) => {
-          e.preventDefault();
-          if (!file || !check || check.error || !name.trim()) return;
-          setProgress(0);
-          const ok = await onUpload(
-            file,
-            { name: name.trim(), notes: notes.trim(), triangles: check.triangles, parts: check.parts },
-            setProgress,
-          );
-          if (ok === false) setProgress(null);
-          else onClose();
-        }}
-      >
-        <div className="panel-head">
-          <h2>Upload a robot version</h2>
-          <span className="spacer" />
-          <button type="button" className="icon-btn" onClick={onClose} aria-label="Close" disabled={progress !== null}>
-            <CloseIcon />
-          </button>
-        </div>
-        <ol className="muted small upload-steps">
-          <li>In Onshape, open the robot assembly.</li>
-          <li>Right-click the assembly's tab at the bottom → Export.</li>
-          <li>Format: GLTF. Detail: Coarse or Medium.</li>
-          <li>Choose the downloaded file below.</li>
-        </ol>
-        <input
-          type="file"
-          accept=".glb,.gltf,model/gltf-binary,model/gltf+json"
-          onChange={(e) => e.target.files[0] && pick(e.target.files[0])}
-        />
-        {file && !check && <p className="muted small">Checking the file…</p>}
-        {check?.error && (
-          <p className="form-error">
-            This file couldn't be opened as a 3D model. Export the assembly from Onshape as GLTF (a single .glb or .gltf file) and try
-            again.
-          </p>
-        )}
-        {check && !check.error && (
-          <p className="muted small">
-            ✓ {check.parts} parts · {Math.round(check.triangles / 1000)}k triangles · {fmtSize(file.size)}
-          </p>
-        )}
-        {heavy && (
-          <p className="warn-note">This model is heavy and may be slow on iPads. If it is, export again from Onshape with Coarse detail.</p>
-        )}
-        <div className="fields">
-          <label className="field-label" htmlFor="rv-name">
-            Name
-          </label>
-          <input
-            id="rv-name"
-            className="input"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. v2 – revised intake"
-          />
-          <label className="field-label" htmlFor="rv-notes">
-            Notes
-          </label>
-          <input
-            id="rv-notes"
-            className="input"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="What changed? (optional)"
-          />
-        </div>
-        {progress !== null && (
-          <div className="ms-progress-bar" style={{ '--c': 'var(--accent)' }}>
-            <span style={{ width: `${Math.round(progress * 100)}%` }} />
+    <Overlay>
+      <div className="panel-backdrop center" onClick={() => progress === null && onClose()}>
+        <form
+          className="dialog"
+          onClick={(e) => e.stopPropagation()}
+          onSubmit={async (e) => {
+            e.preventDefault();
+            if (!file || !check || check.error || !name.trim()) return;
+            setProgress(0);
+            const ok = await onUpload(
+              file,
+              { name: name.trim(), notes: notes.trim(), triangles: check.triangles, parts: check.parts },
+              setProgress,
+            );
+            if (ok === false) setProgress(null);
+            else onClose();
+          }}
+        >
+          <div className="panel-head">
+            <h2>Upload a robot version</h2>
+            <span className="spacer" />
+            <button type="button" className="icon-btn" onClick={onClose} aria-label="Close" disabled={progress !== null}>
+              <CloseIcon />
+            </button>
           </div>
-        )}
-        <div className="row gap end">
-          <button type="button" className="btn ghost" onClick={onClose} disabled={progress !== null}>
-            Cancel
-          </button>
-          <button className="btn primary" disabled={!file || !check || check.error || !name.trim() || progress !== null}>
-            {progress !== null ? `Uploading ${Math.round(progress * 100)}%` : 'Upload'}
-          </button>
-        </div>
-      </form>
-    </div>
+          <ol className="muted small upload-steps">
+            <li>In Onshape, open the robot assembly.</li>
+            <li>Right-click the assembly's tab at the bottom → Export.</li>
+            <li>Format: GLTF. Detail: Coarse or Medium.</li>
+            <li>Choose the downloaded file below.</li>
+          </ol>
+          <input
+            type="file"
+            accept=".glb,.gltf,model/gltf-binary,model/gltf+json"
+            onChange={(e) => e.target.files[0] && pick(e.target.files[0])}
+          />
+          {file && !check && <p className="muted small">Checking the file…</p>}
+          {check?.error && (
+            <p className="form-error">
+              This file couldn't be opened as a 3D model. Export the assembly from Onshape as GLTF (a single .glb or .gltf file) and try
+              again.
+            </p>
+          )}
+          {check && !check.error && (
+            <p className="muted small">
+              ✓ {check.parts} parts · {Math.round(check.triangles / 1000)}k triangles · {fmtSize(file.size)}
+            </p>
+          )}
+          {heavy && (
+            <p className="warn-note">
+              This model is heavy and may be slow on iPads. If it is, export again from Onshape with Coarse detail.
+            </p>
+          )}
+          <div className="fields">
+            <label className="field-label" htmlFor="rv-name">
+              Name
+            </label>
+            <input
+              id="rv-name"
+              className="input"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. v2 – revised intake"
+            />
+            <label className="field-label" htmlFor="rv-notes">
+              Notes
+            </label>
+            <input
+              id="rv-notes"
+              className="input"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="What changed? (optional)"
+            />
+          </div>
+          {progress !== null && (
+            <div className="ms-progress-bar" style={{ '--c': 'var(--accent)' }}>
+              <span style={{ width: `${Math.round(progress * 100)}%` }} />
+            </div>
+          )}
+          <div className="row gap end">
+            <button type="button" className="btn ghost" onClick={onClose} disabled={progress !== null}>
+              Cancel
+            </button>
+            <button className="btn primary" disabled={!file || !check || check.error || !name.trim() || progress !== null}>
+              {progress !== null ? `Uploading ${Math.round(progress * 100)}%` : 'Upload'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </Overlay>
   );
 }
 
@@ -156,64 +160,66 @@ function PinDialog({ draft, partName, tasks, parts, onClose, onSave }) {
   const [taskId, setTaskId] = useState('');
   const [partId, setPartId] = useState('');
   return (
-    <div className="panel-backdrop center" onClick={onClose}>
-      <form
-        className="dialog"
-        onClick={(e) => e.stopPropagation()}
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (text.trim()) onSave({ ...draft, text: text.trim(), taskId, partId });
-        }}
-      >
-        <div className="panel-head">
-          <h2>📍 Pin on {partName}</h2>
-          <span className="spacer" />
-          <button type="button" className="icon-btn" onClick={onClose} aria-label="Close">
-            <CloseIcon />
-          </button>
-        </div>
-        <textarea
-          className="input description"
-          rows={3}
-          autoFocus
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          placeholder="What's the note? e.g. this bracket cracked, check clearance here…"
-        />
-        <div className="fields">
-          <label className="field-label" htmlFor="pin-task">
-            Task
-          </label>
-          <select id="pin-task" className="input" value={taskId} onChange={(e) => setTaskId(e.target.value)}>
-            <option value="">None</option>
-            {tasks.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.title}
-              </option>
-            ))}
-          </select>
-          <label className="field-label" htmlFor="pin-part">
-            Part
-          </label>
-          <select id="pin-part" className="input" value={partId} onChange={(e) => setPartId(e.target.value)}>
-            <option value="">None</option>
-            {parts.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="row gap end">
-          <button type="button" className="btn ghost" onClick={onClose}>
-            Cancel
-          </button>
-          <button className="btn primary" disabled={!text.trim()}>
-            Add pin
-          </button>
-        </div>
-      </form>
-    </div>
+    <Overlay>
+      <div className="panel-backdrop center" onClick={onClose}>
+        <form
+          className="dialog"
+          onClick={(e) => e.stopPropagation()}
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (text.trim()) onSave({ ...draft, text: text.trim(), taskId, partId });
+          }}
+        >
+          <div className="panel-head">
+            <h2>📍 Pin on {partName}</h2>
+            <span className="spacer" />
+            <button type="button" className="icon-btn" onClick={onClose} aria-label="Close">
+              <CloseIcon />
+            </button>
+          </div>
+          <textarea
+            className="input description"
+            rows={3}
+            autoFocus
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="What's the note? e.g. this bracket cracked, check clearance here…"
+          />
+          <div className="fields">
+            <label className="field-label" htmlFor="pin-task">
+              Task
+            </label>
+            <select id="pin-task" className="input" value={taskId} onChange={(e) => setTaskId(e.target.value)}>
+              <option value="">None</option>
+              {tasks.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.title}
+                </option>
+              ))}
+            </select>
+            <label className="field-label" htmlFor="pin-part">
+              Part
+            </label>
+            <select id="pin-part" className="input" value={partId} onChange={(e) => setPartId(e.target.value)}>
+              <option value="">None</option>
+              {parts.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="row gap end">
+            <button type="button" className="btn ghost" onClick={onClose}>
+              Cancel
+            </button>
+            <button className="btn primary" disabled={!text.trim()}>
+              Add pin
+            </button>
+          </div>
+        </form>
+      </div>
+    </Overlay>
   );
 }
 

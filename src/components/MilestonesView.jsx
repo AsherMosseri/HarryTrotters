@@ -11,7 +11,7 @@ import {
   shortDate,
   todayISO,
 } from '../milestones.js';
-import { Avatar, AvatarStack, CloseIcon, DraftInput, PlusIcon, StatusDot } from './common.jsx';
+import { Avatar, AvatarStack, CloseIcon, DraftInput, Overlay, PlusIcon, StatusDot } from './common.jsx';
 import { useEscape } from '../util.js';
 
 const colorOf = (subteam) => SUBTEAM_COLORS[subteam] || 'var(--accent)';
@@ -140,68 +140,77 @@ export function MilestoneDialog({ roster, onClose, onCreate }) {
   const badDates = form.end < form.start;
 
   return (
-    <div className="panel-backdrop center" onClick={onClose}>
-      <form
-        className="dialog"
-        onClick={(e) => e.stopPropagation()}
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (form.title.trim() && !badDates) onCreate({ ...form, title: form.title.trim() });
-        }}
-      >
-        <div className="panel-head">
-          <h2>New milestone</h2>
-          <span className="spacer" />
-          <button type="button" className="icon-btn" onClick={onClose} aria-label="Close">
-            <CloseIcon />
-          </button>
-        </div>
-        <input
-          className="input big"
-          autoFocus
-          value={form.title}
-          onChange={(e) => set({ title: e.target.value })}
-          placeholder="e.g. CAD the new intake"
-        />
-        <div className="fields">
-          <label className="field-label" htmlFor="m-sub">
-            Subteam
-          </label>
-          <select id="m-sub" className="input" value={form.subteam} onChange={(e) => set({ subteam: e.target.value })}>
-            <option value="">Whole team</option>
-            {SUBTEAMS.map((s) => (
-              <option key={s}>{s}</option>
-            ))}
-          </select>
-          <span className="field-label">Owners</span>
-          <OwnerPicker roster={roster} value={form.owners} onChange={(owners) => set({ owners })} />
-          <label className="field-label" htmlFor="m-start">
-            Starts
-          </label>
-          <input id="m-start" className="input" type="date" value={form.start} onChange={(e) => set({ start: e.target.value })} required />
-          <label className="field-label" htmlFor="m-end">
-            Ends
-          </label>
-          <input id="m-end" className="input" type="date" value={form.end} onChange={(e) => set({ end: e.target.value })} required />
-        </div>
-        {badDates && <p className="form-error">The end date is before the start date.</p>}
-        <textarea
-          className="input description"
-          rows={3}
-          value={form.notes}
-          onChange={(e) => set({ notes: e.target.value })}
-          placeholder="Notes (optional)"
-        />
-        <div className="row gap end">
-          <button type="button" className="btn ghost" onClick={onClose}>
-            Cancel
-          </button>
-          <button className="btn primary" disabled={!form.title.trim() || badDates}>
-            Create milestone
-          </button>
-        </div>
-      </form>
-    </div>
+    <Overlay>
+      <div className="panel-backdrop center" onClick={onClose}>
+        <form
+          className="dialog"
+          onClick={(e) => e.stopPropagation()}
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (form.title.trim() && !badDates) onCreate({ ...form, title: form.title.trim() });
+          }}
+        >
+          <div className="panel-head">
+            <h2>New milestone</h2>
+            <span className="spacer" />
+            <button type="button" className="icon-btn" onClick={onClose} aria-label="Close">
+              <CloseIcon />
+            </button>
+          </div>
+          <input
+            className="input big"
+            autoFocus
+            value={form.title}
+            onChange={(e) => set({ title: e.target.value })}
+            placeholder="e.g. CAD the new intake"
+          />
+          <div className="fields">
+            <label className="field-label" htmlFor="m-sub">
+              Subteam
+            </label>
+            <select id="m-sub" className="input" value={form.subteam} onChange={(e) => set({ subteam: e.target.value })}>
+              <option value="">Whole team</option>
+              {SUBTEAMS.map((s) => (
+                <option key={s}>{s}</option>
+              ))}
+            </select>
+            <span className="field-label">Owners</span>
+            <OwnerPicker roster={roster} value={form.owners} onChange={(owners) => set({ owners })} />
+            <label className="field-label" htmlFor="m-start">
+              Starts
+            </label>
+            <input
+              id="m-start"
+              className="input"
+              type="date"
+              value={form.start}
+              onChange={(e) => set({ start: e.target.value })}
+              required
+            />
+            <label className="field-label" htmlFor="m-end">
+              Ends
+            </label>
+            <input id="m-end" className="input" type="date" value={form.end} onChange={(e) => set({ end: e.target.value })} required />
+          </div>
+          {badDates && <p className="form-error">The end date is before the start date.</p>}
+          <textarea
+            className="input description"
+            rows={3}
+            value={form.notes}
+            onChange={(e) => set({ notes: e.target.value })}
+            placeholder="Notes (optional)"
+          />
+          <div className="row gap end">
+            <button type="button" className="btn ghost" onClick={onClose}>
+              Cancel
+            </button>
+            <button className="btn primary" disabled={!form.title.trim() || badDates}>
+              Create milestone
+            </button>
+          </div>
+        </form>
+      </div>
+    </Overlay>
   );
 }
 
@@ -213,125 +222,127 @@ function MilestonePanel({ item, roster, api, isManager, onClose, onOpenTask, onA
   const tasks = [...progress.tasks].sort((a, b) => statusRank[a.status] - statusRank[b.status]);
 
   return (
-    <div className="panel-backdrop" onClick={onClose}>
-      <aside className="panel" onClick={(e) => e.stopPropagation()} aria-label="Milestone details">
-        <div className="panel-head">
-          <StatePill state={state} />
-          <span className="spacer" />
-          {isManager && (
-            <button
-              className="link-btn danger"
-              onClick={() => {
-                if (confirm(`Delete milestone “${m.title}”? Its tasks stay on the board, just unlinked.`)) {
-                  api.deleteMilestone(m, progress.tasks);
-                  onClose();
+    <Overlay>
+      <div className="panel-backdrop" onClick={onClose}>
+        <aside className="panel" onClick={(e) => e.stopPropagation()} aria-label="Milestone details">
+          <div className="panel-head">
+            <StatePill state={state} />
+            <span className="spacer" />
+            {isManager && (
+              <button
+                className="link-btn danger"
+                onClick={() => {
+                  if (confirm(`Delete milestone “${m.title}”? Its tasks stay on the board, just unlinked.`)) {
+                    api.deleteMilestone(m, progress.tasks);
+                    onClose();
+                  }
+                }}
+              >
+                Delete
+              </button>
+            )}
+            <button className="icon-btn" onClick={onClose} aria-label="Close">
+              <CloseIcon />
+            </button>
+          </div>
+          <div className="panel-scroll">
+            <DraftInput
+              multiline
+              className="panel-title"
+              value={m.title}
+              placeholder="Milestone title"
+              onSave={(title) => title.trim() && set({ title: title.trim() })}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  e.currentTarget.blur();
                 }
               }}
-            >
-              Delete
-            </button>
-          )}
-          <button className="icon-btn" onClick={onClose} aria-label="Close">
-            <CloseIcon />
-          </button>
-        </div>
-        <div className="panel-scroll">
-          <DraftInput
-            multiline
-            className="panel-title"
-            value={m.title}
-            placeholder="Milestone title"
-            onSave={(title) => title.trim() && set({ title: title.trim() })}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                e.currentTarget.blur();
-              }
-            }}
-          />
+            />
 
-          <div className="ms-progress">
-            <div className="ms-progress-bar" style={{ '--c': colorOf(m.subteam) }}>
-              <span style={{ width: `${progress.pct * 100}%` }} />
+            <div className="ms-progress">
+              <div className="ms-progress-bar" style={{ '--c': colorOf(m.subteam) }}>
+                <span style={{ width: `${progress.pct * 100}%` }} />
+              </div>
+              <span className="small muted">
+                {progress.total ? `${progress.done} of ${progress.total} tasks done` : 'No tasks linked yet'}
+              </span>
             </div>
-            <span className="small muted">
-              {progress.total ? `${progress.done} of ${progress.total} tasks done` : 'No tasks linked yet'}
-            </span>
-          </div>
 
-          <label className="done-toggle">
-            <input type="checkbox" checked={!!m.done} onChange={(e) => set({ done: e.target.checked })} />
-            Milestone is complete
-          </label>
-
-          <div className="fields">
-            <label className="field-label" htmlFor="mp-sub">
-              Subteam
+            <label className="done-toggle">
+              <input type="checkbox" checked={!!m.done} onChange={(e) => set({ done: e.target.checked })} />
+              Milestone is complete
             </label>
-            <select id="mp-sub" className="input" value={m.subteam || ''} onChange={(e) => set({ subteam: e.target.value })}>
-              <option value="">Whole team</option>
-              {SUBTEAMS.map((s) => (
-                <option key={s}>{s}</option>
+
+            <div className="fields">
+              <label className="field-label" htmlFor="mp-sub">
+                Subteam
+              </label>
+              <select id="mp-sub" className="input" value={m.subteam || ''} onChange={(e) => set({ subteam: e.target.value })}>
+                <option value="">Whole team</option>
+                {SUBTEAMS.map((s) => (
+                  <option key={s}>{s}</option>
+                ))}
+              </select>
+              <span className="field-label">Owners</span>
+              <OwnerPicker roster={roster} value={m.owners || []} onChange={(owners) => set({ owners })} />
+              <label className="field-label" htmlFor="mp-start">
+                Starts
+              </label>
+              <input
+                id="mp-start"
+                className="input"
+                type="date"
+                value={m.start || ''}
+                onChange={(e) =>
+                  e.target.value && set({ start: e.target.value, ...(m.end && m.end < e.target.value ? { end: e.target.value } : {}) })
+                }
+              />
+              <label className="field-label" htmlFor="mp-end">
+                Ends
+              </label>
+              <input
+                id="mp-end"
+                className="input"
+                type="date"
+                value={m.end || ''}
+                min={m.start}
+                onChange={(e) => e.target.value && set({ end: e.target.value })}
+              />
+            </div>
+
+            <label className="field-label">Notes</label>
+            <DraftInput
+              multiline
+              className="input description"
+              value={m.notes}
+              placeholder="Goals, parts list, risks…"
+              onSave={(notes) => set({ notes })}
+            />
+
+            <div className="row">
+              <h3 className="section-title grow">Tasks</h3>
+              <button className="btn" onClick={onAddTask}>
+                <PlusIcon /> Add task
+              </button>
+            </div>
+            <ul className="ms-tasks">
+              {tasks.map((t) => (
+                <li key={t.id}>
+                  <button onClick={() => onOpenTask(t.id)} className={t.status === 'done' ? 'is-done' : ''}>
+                    <StatusDot status={t.status} />
+                    <span className="grow">{t.title || 'Untitled'}</span>
+                    <AvatarStack names={t.assignees} size={20} />
+                  </button>
+                </li>
               ))}
-            </select>
-            <span className="field-label">Owners</span>
-            <OwnerPicker roster={roster} value={m.owners || []} onChange={(owners) => set({ owners })} />
-            <label className="field-label" htmlFor="mp-start">
-              Starts
-            </label>
-            <input
-              id="mp-start"
-              className="input"
-              type="date"
-              value={m.start || ''}
-              onChange={(e) =>
-                e.target.value && set({ start: e.target.value, ...(m.end && m.end < e.target.value ? { end: e.target.value } : {}) })
-              }
-            />
-            <label className="field-label" htmlFor="mp-end">
-              Ends
-            </label>
-            <input
-              id="mp-end"
-              className="input"
-              type="date"
-              value={m.end || ''}
-              min={m.start}
-              onChange={(e) => e.target.value && set({ end: e.target.value })}
-            />
+              {!tasks.length && <li className="muted small">Add tasks here, or pick this milestone in any task's details.</li>}
+            </ul>
+            <p className="meta muted tiny">Last updated by {m.updatedBy || m.createdBy || '?'}</p>
           </div>
-
-          <label className="field-label">Notes</label>
-          <DraftInput
-            multiline
-            className="input description"
-            value={m.notes}
-            placeholder="Goals, parts list, risks…"
-            onSave={(notes) => set({ notes })}
-          />
-
-          <div className="row">
-            <h3 className="section-title grow">Tasks</h3>
-            <button className="btn" onClick={onAddTask}>
-              <PlusIcon /> Add task
-            </button>
-          </div>
-          <ul className="ms-tasks">
-            {tasks.map((t) => (
-              <li key={t.id}>
-                <button onClick={() => onOpenTask(t.id)} className={t.status === 'done' ? 'is-done' : ''}>
-                  <StatusDot status={t.status} />
-                  <span className="grow">{t.title || 'Untitled'}</span>
-                  <AvatarStack names={t.assignees} size={20} />
-                </button>
-              </li>
-            ))}
-            {!tasks.length && <li className="muted small">Add tasks here, or pick this milestone in any task's details.</li>}
-          </ul>
-          <p className="meta muted tiny">Last updated by {m.updatedBy || m.createdBy || '?'}</p>
-        </div>
-      </aside>
-    </div>
+        </aside>
+      </div>
+    </Overlay>
   );
 }
 

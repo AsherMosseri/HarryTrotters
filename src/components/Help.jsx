@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { REQUESTS_TO, TEAM_NAME } from '../config.js';
 import { CHANGELOG, VERSION } from '../changelog.js';
-import { CloseIcon } from './common.jsx';
+import { CloseIcon, Overlay } from './common.jsx';
 import { checkForUpdate } from './UpdateGate.jsx';
 import { useEscape } from '../util.js';
 
@@ -19,7 +19,11 @@ const QUICK_TIPS = [
     'The bell shows announcements, @mentions, tasks given to you, and what’s due tomorrow. Tap 🔔 → Turn on to get them on this device even when the app is closed.',
   ],
   ['💡', 'Have an idea for the app?', `Tap 💡 at the top, type it, and tap Send idea. It goes straight to ${REQUESTS_TO.split(' ')[0]}.`],
-  ['📱', 'On a phone', 'Use the tabs at the bottom (More has the rest). On the board, pick a status at the top, tap a task to open it, and tap ＋ to add one. Tap your picture for theme, help, and more.'],
+  [
+    '📱',
+    'On a phone',
+    'Use the tabs at the bottom (More has the rest). On the board, pick a status at the top, tap a task to open it, and tap ＋ to add one. Tap your picture for theme, help, and more.',
+  ],
   ['🗑', 'Deleted something by mistake?', 'Tap Undo, or find it under Recently deleted in the filter row for 30 days.'],
 ];
 
@@ -175,37 +179,39 @@ export function WelcomeCard({ name, showRobot, pushStatus, onEnablePush, onClose
   useEscape(onClose);
   const [busy, setBusy] = useState(false);
   return (
-    <div className="panel-backdrop center" onClick={onClose}>
-      <div className="dialog welcome" onClick={(e) => e.stopPropagation()} role="dialog" aria-labelledby="welcome-title">
-        <h2 id="welcome-title">Welcome, {name.split(' ')[0]}! 👋</h2>
-        <p className="muted">Here’s how the {TEAM_NAME} task board works.</p>
-        <TipList showRobot={showRobot} />
-        <Rules />
-        <p className="muted small">You can see these tips again anytime with the ? button at the top.</p>
-        {pushStatus === 'off' ? (
-          <>
-            <button
-              className="btn primary big-btn"
-              disabled={busy}
-              onClick={async () => {
-                setBusy(true);
-                await onEnablePush();
-                onClose();
-              }}
-            >
-              {busy ? 'Turning on…' : '🔔 Turn on notifications'}
+    <Overlay>
+      <div className="panel-backdrop center" onClick={onClose}>
+        <div className="dialog welcome" onClick={(e) => e.stopPropagation()} role="dialog" aria-labelledby="welcome-title">
+          <h2 id="welcome-title">Welcome, {name.split(' ')[0]}! 👋</h2>
+          <p className="muted">Here’s how the {TEAM_NAME} task board works.</p>
+          <TipList showRobot={showRobot} />
+          <Rules />
+          <p className="muted small">You can see these tips again anytime with the ? button at the top.</p>
+          {pushStatus === 'off' ? (
+            <>
+              <button
+                className="btn primary big-btn"
+                disabled={busy}
+                onClick={async () => {
+                  setBusy(true);
+                  await onEnablePush();
+                  onClose();
+                }}
+              >
+                {busy ? 'Turning on…' : '🔔 Turn on notifications'}
+              </button>
+              <button className="link-btn" onClick={onClose}>
+                Not now
+              </button>
+            </>
+          ) : (
+            <button className="btn primary big-btn" onClick={onClose} autoFocus>
+              Got it
             </button>
-            <button className="link-btn" onClick={onClose}>
-              Not now
-            </button>
-          </>
-        ) : (
-          <button className="btn primary big-btn" onClick={onClose} autoFocus>
-            Got it
-          </button>
-        )}
+          )}
+        </div>
       </div>
-    </div>
+    </Overlay>
   );
 }
 
@@ -237,53 +243,55 @@ export function HelpDialog({ isManager, showRobot, onClose, onVersionLog, onRequ
     return () => window.removeEventListener('keydown', esc);
   }, [onClose]);
   return (
-    <div className="panel-backdrop center" onClick={onClose}>
-      <div className="dialog help" onClick={(e) => e.stopPropagation()} role="dialog" aria-labelledby="help-title">
-        <div className="panel-head">
-          <h2 id="help-title">Help</h2>
-          <span className="spacer" />
-          <button className="icon-btn" onClick={onClose} aria-label="Close">
-            <CloseIcon />
+    <Overlay>
+      <div className="panel-backdrop center" onClick={onClose}>
+        <div className="dialog help" onClick={(e) => e.stopPropagation()} role="dialog" aria-labelledby="help-title">
+          <div className="panel-head">
+            <h2 id="help-title">Help</h2>
+            <span className="spacer" />
+            <button className="icon-btn" onClick={onClose} aria-label="Close">
+              <CloseIcon />
+            </button>
+          </div>
+          <button className="version-chip" onClick={onVersionLog}>
+            <span>
+              Version <b>{VERSION}</b> · {CHANGELOG[0].title}
+            </span>
+            <span className="link-btn">Version log →</span>
           </button>
-        </div>
-        <button className="version-chip" onClick={onVersionLog}>
-          <span>
-            Version <b>{VERSION}</b> · {CHANGELOG[0].title}
-          </span>
-          <span className="link-btn">Version log →</span>
-        </button>
-        <UpdateCheck />
-        <button className="version-chip idea-chip" onClick={onRequests}>
-          <span>
-            💡 <b>Request a feature</b> · ideas go straight to {REQUESTS_TO.split(' ')[0]}
-          </span>
-          <span className="link-btn">Send →</span>
-        </button>
-        <TipList showRobot={showRobot} />
-        <Rules />
-        <div className="help-sections">
-          {SECTIONS.filter(([title]) => showRobot || title !== 'Robot (3D)').map(([title, items]) => (
-            <details key={title}>
-              <summary>{title}</summary>
-              <ul>
-                {items.map((t) => (
-                  <li key={t}>{t}</li>
-                ))}
-              </ul>
-            </details>
-          ))}
-          {isManager && (
-            <details open>
-              <summary>Team management only</summary>
-              <ul>
-                {MANAGER_TIPS.map((t) => (
-                  <li key={t}>{t}</li>
-                ))}
-              </ul>
-            </details>
-          )}
+          <UpdateCheck />
+          <button className="version-chip idea-chip" onClick={onRequests}>
+            <span>
+              💡 <b>Request a feature</b> · ideas go straight to {REQUESTS_TO.split(' ')[0]}
+            </span>
+            <span className="link-btn">Send →</span>
+          </button>
+          <TipList showRobot={showRobot} />
+          <Rules />
+          <div className="help-sections">
+            {SECTIONS.filter(([title]) => showRobot || title !== 'Robot (3D)').map(([title, items]) => (
+              <details key={title}>
+                <summary>{title}</summary>
+                <ul>
+                  {items.map((t) => (
+                    <li key={t}>{t}</li>
+                  ))}
+                </ul>
+              </details>
+            ))}
+            {isManager && (
+              <details open>
+                <summary>Team management only</summary>
+                <ul>
+                  {MANAGER_TIPS.map((t) => (
+                    <li key={t}>{t}</li>
+                  ))}
+                </ul>
+              </details>
+            )}
+          </div>
         </div>
       </div>
-    </div>
+    </Overlay>
   );
 }

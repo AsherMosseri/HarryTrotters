@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { SUBTEAMS, SUBTEAM_COLORS } from '../../config.js';
 import { activeStatus } from '../../people.js';
-import { Avatar, CloseIcon, DisplayName, Nameplate, usePeople } from '../common.jsx';
+import { Avatar, CloseIcon, DisplayName, Nameplate, Overlay, usePeople } from '../common.jsx';
 import { renderRich } from './format.jsx';
 import { timeOf } from './Message.jsx';
 import { useEscape } from '../../util.js';
@@ -217,88 +217,90 @@ export function ChannelDialog({ channel, channels, onSave, onDelete, onMove, onC
   const taken = channels.some((c) => c.name === slug && c.id !== channel?.id);
   const fixed = channel && ['announcements', 'general'].includes(channel.id);
   return (
-    <div className="panel-backdrop center" onClick={onClose}>
-      <form
-        className="dialog"
-        onClick={(e) => e.stopPropagation()}
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (slug && !taken) onSave({ name: slug, topic: topic.trim().slice(0, 120), subteam });
-        }}
-      >
-        <div className="panel-head">
-          <h2>{channel ? `#${channel.name} settings` : 'New channel'}</h2>
-          <span className="spacer" />
-          <button type="button" className="icon-btn" onClick={onClose} aria-label="Close">
-            <CloseIcon />
-          </button>
-        </div>
-        <label className="field-label" htmlFor="ch-name">
-          Name
-        </label>
-        <input
-          id="ch-name"
-          className="input"
-          autoFocus
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="like build-log or outreach"
-        />
-        {slug && <p className="muted small">Shows as #{slug}</p>}
-        {taken && <p className="form-error">There's already a #{slug}.</p>}
-        <label className="field-label" htmlFor="ch-topic">
-          Topic (optional)
-        </label>
-        <input
-          id="ch-topic"
-          className="input"
-          value={topic}
-          onChange={(e) => setTopic(e.target.value)}
-          placeholder="What this channel is for"
-        />
-        {!channel?.announce && (
-          <>
-            <label className="field-label" htmlFor="ch-sub">
-              Subteam (sets its color)
-            </label>
-            <select id="ch-sub" className="input" value={subteam} onChange={(e) => setSubteam(e.target.value)}>
-              <option value="">None (whole team)</option>
-              {SUBTEAMS.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-          </>
-        )}
-        {channel && (
-          <div className="row gap">
-            <span className="small">Position</span>
-            <button type="button" className="btn" onClick={() => onMove(-1)}>
-              ↑ Up
-            </button>
-            <button type="button" className="btn" onClick={() => onMove(1)}>
-              ↓ Down
+    <Overlay>
+      <div className="panel-backdrop center" onClick={onClose}>
+        <form
+          className="dialog"
+          onClick={(e) => e.stopPropagation()}
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (slug && !taken) onSave({ name: slug, topic: topic.trim().slice(0, 120), subteam });
+          }}
+        >
+          <div className="panel-head">
+            <h2>{channel ? `#${channel.name} settings` : 'New channel'}</h2>
+            <span className="spacer" />
+            <button type="button" className="icon-btn" onClick={onClose} aria-label="Close">
+              <CloseIcon />
             </button>
           </div>
-        )}
-        <div className="row gap">
-          {channel && !fixed && (
-            <button
-              type="button"
-              className="btn danger"
-              onClick={() => confirm(`Delete #${channel.name}? Its messages will be hidden.`) && onDelete()}
-            >
-              Delete channel
-            </button>
+          <label className="field-label" htmlFor="ch-name">
+            Name
+          </label>
+          <input
+            id="ch-name"
+            className="input"
+            autoFocus
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="like build-log or outreach"
+          />
+          {slug && <p className="muted small">Shows as #{slug}</p>}
+          {taken && <p className="form-error">There's already a #{slug}.</p>}
+          <label className="field-label" htmlFor="ch-topic">
+            Topic (optional)
+          </label>
+          <input
+            id="ch-topic"
+            className="input"
+            value={topic}
+            onChange={(e) => setTopic(e.target.value)}
+            placeholder="What this channel is for"
+          />
+          {!channel?.announce && (
+            <>
+              <label className="field-label" htmlFor="ch-sub">
+                Subteam (sets its color)
+              </label>
+              <select id="ch-sub" className="input" value={subteam} onChange={(e) => setSubteam(e.target.value)}>
+                <option value="">None (whole team)</option>
+                {SUBTEAMS.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </>
           )}
-          <span className="spacer" />
-          <button className="btn primary" disabled={!slug || taken}>
-            {channel ? 'Save' : 'Create channel'}
-          </button>
-        </div>
-      </form>
-    </div>
+          {channel && (
+            <div className="row gap">
+              <span className="small">Position</span>
+              <button type="button" className="btn" onClick={() => onMove(-1)}>
+                ↑ Up
+              </button>
+              <button type="button" className="btn" onClick={() => onMove(1)}>
+                ↓ Down
+              </button>
+            </div>
+          )}
+          <div className="row gap">
+            {channel && !fixed && (
+              <button
+                type="button"
+                className="btn danger"
+                onClick={() => confirm(`Delete #${channel.name}? Its messages will be hidden.`) && onDelete()}
+              >
+                Delete channel
+              </button>
+            )}
+            <span className="spacer" />
+            <button className="btn primary" disabled={!slug || taken}>
+              {channel ? 'Save' : 'Create channel'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </Overlay>
   );
 }
 
@@ -310,36 +312,38 @@ export function NewDmDialog({ roster, actor, onStart, onClose }) {
   const others = roster.filter((n) => n !== actor.name);
   const toggle = (n) => setPicked(picked.includes(n) ? picked.filter((x) => x !== n) : [...picked, n]);
   return (
-    <div className="panel-backdrop center" onClick={onClose}>
-      <div className="dialog" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="New message">
-        <div className="panel-head">
-          <h2>New message</h2>
-          <span className="spacer" />
-          <button className="icon-btn" onClick={onClose} aria-label="Close">
-            <CloseIcon />
+    <Overlay>
+      <div className="panel-backdrop center" onClick={onClose}>
+        <div className="dialog" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="New message">
+          <div className="panel-head">
+            <h2>New message</h2>
+            <span className="spacer" />
+            <button className="icon-btn" onClick={onClose} aria-label="Close">
+              <CloseIcon />
+            </button>
+          </div>
+          <p className="muted small">Pick one person, or several for a group.</p>
+          <div className="dm-pick">
+            {others.map((n) => (
+              <label key={n} className={`dm-person${picked.includes(n) ? ' on' : ''}`}>
+                <input type="checkbox" checked={picked.includes(n)} onChange={() => toggle(n)} />
+                <Avatar name={n} size={26} showOnline /> {n}
+              </label>
+            ))}
+          </div>
+          {picked.length > 1 && (
+            <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Group name (optional)" />
+          )}
+          <button
+            className="btn primary big-btn"
+            disabled={!picked.length}
+            onClick={() => onStart([actor.name, ...picked], picked.length > 1 ? name.trim() : '')}
+          >
+            {picked.length > 1 ? `Start group (${picked.length + 1} people)` : 'Message'}
           </button>
         </div>
-        <p className="muted small">Pick one person, or several for a group.</p>
-        <div className="dm-pick">
-          {others.map((n) => (
-            <label key={n} className={`dm-person${picked.includes(n) ? ' on' : ''}`}>
-              <input type="checkbox" checked={picked.includes(n)} onChange={() => toggle(n)} />
-              <Avatar name={n} size={26} showOnline /> {n}
-            </label>
-          ))}
-        </div>
-        {picked.length > 1 && (
-          <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Group name (optional)" />
-        )}
-        <button
-          className="btn primary big-btn"
-          disabled={!picked.length}
-          onClick={() => onStart([actor.name, ...picked], picked.length > 1 ? name.trim() : '')}
-        >
-          {picked.length > 1 ? `Start group (${picked.length + 1} people)` : 'Message'}
-        </button>
       </div>
-    </div>
+    </Overlay>
   );
 }
 

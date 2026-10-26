@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { REQUESTS_TO } from '../config.js';
 import { firstName, relTime } from '../util.js';
-import { Avatar, CloseIcon, DisplayName } from './common.jsx';
+import { Avatar, CloseIcon, DisplayName, Overlay } from './common.jsx';
 
 export const REQUEST_STATUSES = [
   { id: 'new', label: 'New', icon: '🆕' },
@@ -191,42 +191,44 @@ export function RequestsDialog({ requests, actor, api, focusId, onMakeTask, onCl
   }, [onClose]);
   const shown = requests.filter(TABS.find(([id]) => id === tab)[2]);
   return (
-    <div className="panel-backdrop center" onClick={onClose}>
-      <div className="dialog requests" onClick={(e) => e.stopPropagation()} role="dialog" aria-labelledby="requests-title">
-        <div className="panel-head">
-          <h2 id="requests-title">💡 Feature requests</h2>
-          <span className="spacer" />
-          <button className="icon-btn" onClick={onClose} aria-label="Close">
-            <CloseIcon />
-          </button>
-        </div>
-        <p className="muted small">
-          What should the app do next? Ideas go to {firstName(REQUESTS_TO)}, and you’ll get a notification when yours is planned or added.
-          Tap 👍 on ideas you want too.
-        </p>
-        <RequestBox onSend={api.addRequest} autoFocus={!focused} />
-        <div className="segmented request-tabs" role="tablist">
-          {TABS.map(([id, label, has]) => (
-            <button
-              key={id}
-              role="tab"
-              aria-selected={tab === id}
-              className={`plain-seg${tab === id ? ' on' : ''}`}
-              onClick={() => setTab(id)}
-            >
-              {label} <span className="muted">{requests.filter(has).length}</span>
+    <Overlay>
+      <div className="panel-backdrop center" onClick={onClose}>
+        <div className="dialog requests" onClick={(e) => e.stopPropagation()} role="dialog" aria-labelledby="requests-title">
+          <div className="panel-head">
+            <h2 id="requests-title">💡 Feature requests</h2>
+            <span className="spacer" />
+            <button className="icon-btn" onClick={onClose} aria-label="Close">
+              <CloseIcon />
             </button>
-          ))}
+          </div>
+          <p className="muted small">
+            What should the app do next? Ideas go to {firstName(REQUESTS_TO)}, and you’ll get a notification when yours is planned or added.
+            Tap 👍 on ideas you want too.
+          </p>
+          <RequestBox onSend={api.addRequest} autoFocus={!focused} />
+          <div className="segmented request-tabs" role="tablist">
+            {TABS.map(([id, label, has]) => (
+              <button
+                key={id}
+                role="tab"
+                aria-selected={tab === id}
+                className={`plain-seg${tab === id ? ' on' : ''}`}
+                onClick={() => setTab(id)}
+              >
+                {label} <span className="muted">{requests.filter(has).length}</span>
+              </button>
+            ))}
+          </div>
+          <ul className="request-list">
+            {shown.map((r) => (
+              <RequestItem key={r.id} r={r} actor={actor} api={api} focused={r.id === focusId} onMakeTask={onMakeTask} />
+            ))}
+            {!shown.length && (
+              <li className="request-empty muted">{tab === 'open' ? 'No open ideas yet. Be the first!' : 'Nothing here yet.'}</li>
+            )}
+          </ul>
         </div>
-        <ul className="request-list">
-          {shown.map((r) => (
-            <RequestItem key={r.id} r={r} actor={actor} api={api} focused={r.id === focusId} onMakeTask={onMakeTask} />
-          ))}
-          {!shown.length && (
-            <li className="request-empty muted">{tab === 'open' ? 'No open ideas yet. Be the first!' : 'Nothing here yet.'}</li>
-          )}
-        </ul>
       </div>
-    </div>
+    </Overlay>
   );
 }

@@ -16,7 +16,7 @@ import {
 } from '../electrical.js';
 import { itemId } from '../data/diff.js';
 import { fullTime } from '../util.js';
-import { CloseIcon } from './common.jsx';
+import { CloseIcon, Overlay } from './common.jsx';
 
 const SNAP = 10;
 const snap = (v) => Math.round(v / SNAP) * SNAP;
@@ -602,305 +602,307 @@ export default function ElectricalEditor({ remote, canEdit, actor, onSave, onClo
   };
 
   return (
-    <div className="dg-screen" role="dialog" aria-label="Electrical diagram">
-      <div className="dg-bar">
-        <h2>⚡ Electrical diagram</h2>
-        {canEdit ? (
-          <div className="dg-tools">
-            <button className="btn primary" onClick={() => setAdding((a) => !a)} aria-expanded={adding}>
-              ＋ Add
-            </button>
-            <button className="btn" onClick={undo} disabled={!past.length} title="Undo (⌘Z)">
-              ↶ Undo
-            </button>
-            <button className="btn" onClick={redo} disabled={!future.length} title="Redo (⇧⌘Z)">
-              ↷ Redo
-            </button>
-            {sel && (
-              <button className="btn danger-btn" onClick={removeSelected}>
-                🗑 Delete
+    <Overlay>
+      <div className="dg-screen" role="dialog" aria-label="Electrical diagram">
+        <div className="dg-bar">
+          <h2>⚡ Electrical diagram</h2>
+          {canEdit ? (
+            <div className="dg-tools">
+              <button className="btn primary" onClick={() => setAdding((a) => !a)} aria-expanded={adding}>
+                ＋ Add
               </button>
-            )}
-            <button
-              className={`btn${panel === 'history' ? ' on-btn' : ''}`}
-              onClick={() => setPanel(panel === 'history' ? null : 'history')}
-            >
-              🕘 Versions
-            </button>
+              <button className="btn" onClick={undo} disabled={!past.length} title="Undo (⌘Z)">
+                ↶ Undo
+              </button>
+              <button className="btn" onClick={redo} disabled={!future.length} title="Redo (⇧⌘Z)">
+                ↷ Redo
+              </button>
+              {sel && (
+                <button className="btn danger-btn" onClick={removeSelected}>
+                  🗑 Delete
+                </button>
+              )}
+              <button
+                className={`btn${panel === 'history' ? ' on-btn' : ''}`}
+                onClick={() => setPanel(panel === 'history' ? null : 'history')}
+              >
+                🕘 Versions
+              </button>
+            </div>
+          ) : (
+            <span className="muted small">View only · Electrical and team management can edit</span>
+          )}
+          <span className="spacer" />
+          <span className="muted small dg-saving">{saving}</span>
+          <button className={`btn${panel === 'ports' ? ' on-btn' : ''}`} onClick={() => setPanel(panel === 'ports' ? null : 'ports')}>
+            🔌 Port list
+          </button>
+          <button className="btn" onClick={exportPng}>
+            ⬇ PNG
+          </button>
+          <button className="icon-btn" onClick={onClose} aria-label="Close">
+            <CloseIcon />
+          </button>
+        </div>
+        {adding && (
+          <div className="dg-add">
+            {ADDABLE.map((type) => (
+              <button key={type} className="dg-add-btn" onClick={() => add(type)} title={PART_TYPES[type].hint || ''}>
+                <span aria-hidden="true">{PART_TYPES[type].icon || (PART_TYPES[type].hub ? '🟧' : '🅣')}</span>
+                {PART_TYPES[type].name}
+              </button>
+            ))}
           </div>
-        ) : (
-          <span className="muted small">View only · Electrical and team management can edit</span>
         )}
-        <span className="spacer" />
-        <span className="muted small dg-saving">{saving}</span>
-        <button className={`btn${panel === 'ports' ? ' on-btn' : ''}`} onClick={() => setPanel(panel === 'ports' ? null : 'ports')}>
-          🔌 Port list
-        </button>
-        <button className="btn" onClick={exportPng}>
-          ⬇ PNG
-        </button>
-        <button className="icon-btn" onClick={onClose} aria-label="Close">
-          <CloseIcon />
-        </button>
-      </div>
-      {adding && (
-        <div className="dg-add">
-          {ADDABLE.map((type) => (
-            <button key={type} className="dg-add-btn" onClick={() => add(type)} title={PART_TYPES[type].hint || ''}>
-              <span aria-hidden="true">{PART_TYPES[type].icon || (PART_TYPES[type].hub ? '🟧' : '🅣')}</span>
-              {PART_TYPES[type].name}
-            </button>
-          ))}
-        </div>
-      )}
-      <div className="dg-body">
-        <div className="dg-canvas">
-          <DiagramSvg
-            diagram={diagram}
-            view={view}
-            sel={sel}
-            pending={pending}
-            ptr={ptr}
-            focusPart={selPart && !PART_TYPES[selPart.type]?.hub && selPart.type !== 'text' ? selPart.id : null}
-            svgRef={svgRef}
-            handlers={{ onPointerDown, onPointerMove, onPointerUp, onPointerCancel: onPointerUp }}
-          />
-          <div className="dg-zoom">
-            <button className="icon-btn" onClick={() => zoomAt(0.8, view.x + view.w / 2, view.y + view.h / 2)} aria-label="Zoom in">
-              ＋
-            </button>
-            <button className="icon-btn" onClick={() => zoomAt(1.25, view.x + view.w / 2, view.y + view.h / 2)} aria-label="Zoom out">
-              −
-            </button>
-            <button className="icon-btn" onClick={() => setView(fitView(parts, svgRef.current))} aria-label="Fit" title="Fit">
-              ⤢
-            </button>
+        <div className="dg-body">
+          <div className="dg-canvas">
+            <DiagramSvg
+              diagram={diagram}
+              view={view}
+              sel={sel}
+              pending={pending}
+              ptr={ptr}
+              focusPart={selPart && !PART_TYPES[selPart.type]?.hub && selPart.type !== 'text' ? selPart.id : null}
+              svgRef={svgRef}
+              handlers={{ onPointerDown, onPointerMove, onPointerUp, onPointerCancel: onPointerUp }}
+            />
+            <div className="dg-zoom">
+              <button className="icon-btn" onClick={() => zoomAt(0.8, view.x + view.w / 2, view.y + view.h / 2)} aria-label="Zoom in">
+                ＋
+              </button>
+              <button className="icon-btn" onClick={() => zoomAt(1.25, view.x + view.w / 2, view.y + view.h / 2)} aria-label="Zoom out">
+                −
+              </button>
+              <button className="icon-btn" onClick={() => setView(fitView(parts, svgRef.current))} aria-label="Fit" title="Fit">
+                ⤢
+              </button>
+            </div>
+            {pending && <div className="dg-hint">Now tap the port to plug it into · Esc to cancel</div>}
           </div>
-          {pending && <div className="dg-hint">Now tap the port to plug it into · Esc to cancel</div>}
-        </div>
-        <aside className="dg-side">
-          {panel === 'ports' ? (
-            <>
-              <h3>Port list</h3>
-              <p className="muted small">What’s plugged in where. Handy for setting up the robot configuration.</p>
-              {portList.map(({ hub, rows }) => (
-                <div key={hub.id} className="dg-portlist">
-                  <h4>{hub.label || PART_TYPES[hub.type].name}</h4>
-                  {rows.length ? (
-                    <table>
-                      <tbody>
-                        {rows.map((r, i) => (
-                          <tr key={i}>
-                            <td>
-                              <span className="dg-swatch" style={{ background: KINDS[r.kind].inner, borderColor: KINDS[r.kind].outer }} />
-                              {r.port}
-                            </td>
-                            <td>{r.to}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  ) : (
-                    <p className="muted small">Nothing plugged in.</p>
-                  )}
-                </div>
-              ))}
-            </>
-          ) : panel === 'history' ? (
-            <>
-              <h3>Versions</h3>
-              <p className="muted small">The diagram before each editing session. Restoring is undoable.</p>
-              {(base.current?.history || []).length ? (
-                <ul className="dg-history">
-                  {base.current.history.map((h, i) => (
-                    <li key={i}>
-                      <span>
-                        {h.by || 'Someone'} · {h.at ? fullTime(h.at) : 'earlier'}
-                        <br />
-                        <span className="muted small">
-                          {h.parts.length} parts, {h.wires.length} wires
+          <aside className="dg-side">
+            {panel === 'ports' ? (
+              <>
+                <h3>Port list</h3>
+                <p className="muted small">What’s plugged in where. Handy for setting up the robot configuration.</p>
+                {portList.map(({ hub, rows }) => (
+                  <div key={hub.id} className="dg-portlist">
+                    <h4>{hub.label || PART_TYPES[hub.type].name}</h4>
+                    {rows.length ? (
+                      <table>
+                        <tbody>
+                          {rows.map((r, i) => (
+                            <tr key={i}>
+                              <td>
+                                <span className="dg-swatch" style={{ background: KINDS[r.kind].inner, borderColor: KINDS[r.kind].outer }} />
+                                {r.port}
+                              </td>
+                              <td>{r.to}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    ) : (
+                      <p className="muted small">Nothing plugged in.</p>
+                    )}
+                  </div>
+                ))}
+              </>
+            ) : panel === 'history' ? (
+              <>
+                <h3>Versions</h3>
+                <p className="muted small">The diagram before each editing session. Restoring is undoable.</p>
+                {(base.current?.history || []).length ? (
+                  <ul className="dg-history">
+                    {base.current.history.map((h, i) => (
+                      <li key={i}>
+                        <span>
+                          {h.by || 'Someone'} · {h.at ? fullTime(h.at) : 'earlier'}
+                          <br />
+                          <span className="muted small">
+                            {h.parts.length} parts, {h.wires.length} wires
+                          </span>
                         </span>
-                      </span>
-                      <button className="btn" onClick={() => change({ parts: h.parts, wires: h.wires })}>
-                        Restore
+                        <button className="btn" onClick={() => change({ parts: h.parts, wires: h.wires })}>
+                          Restore
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="muted small">No earlier versions yet.</p>
+                )}
+                {canEdit && (
+                  <button className="btn" onClick={() => change(defaultDiagram())}>
+                    ↺ Start over from our drawing
+                  </button>
+                )}
+              </>
+            ) : selPart ? (
+              <>
+                <h3>{PART_TYPES[selPart.type]?.name}</h3>
+                {canEdit && selPart.type === 'text' ? (
+                  <>
+                    <textarea
+                      className="input"
+                      rows={3}
+                      value={selPart.text || ''}
+                      onChange={(e) => patchPart(selPart.id, { text: e.target.value }, `text-${selPart.id}`)}
+                      aria-label="Text"
+                    />
+                    <label className="studio-range">
+                      <span>Size</span>
+                      <input
+                        type="range"
+                        min="10"
+                        max="48"
+                        value={selPart.size || 18}
+                        onChange={(e) => patchPart(selPart.id, { size: Number(e.target.value) }, `size-${selPart.id}`)}
+                      />
+                    </label>
+                    <div className="row gap wrap">
+                      {['#b91c1c', '#111827', '#1d4ed8', '#15803d', '#7c3aed'].map((c) => (
+                        <button
+                          key={c}
+                          className={`swatch${(selPart.color || '#b91c1c') === c ? ' on' : ''}`}
+                          style={{ background: c }}
+                          aria-label={c}
+                          onClick={() => patchPart(selPart.id, { color: c })}
+                        />
+                      ))}
+                    </div>
+                  </>
+                ) : canEdit ? (
+                  <input
+                    className="input"
+                    value={selPart.label || ''}
+                    maxLength={40}
+                    onChange={(e) => patchPart(selPart.id, { label: e.target.value }, `label-${selPart.id}`)}
+                    placeholder="Name"
+                    aria-label="Name"
+                  />
+                ) : (
+                  <p className="dg-name">{selPart.label || selPart.text}</p>
+                )}
+                {canEdit && !PART_TYPES[selPart.type]?.hub && !['text', 'switch'].includes(selPart.type) && (
+                  <div className="dg-field">
+                    <span className="field-label">Wires come out of</span>
+                    <div className="segmented">
+                      {['left', 'right', 'top', 'bottom'].map((s) => (
+                        <button
+                          key={s}
+                          className={`plain-seg${(selPart.side || 'right') === s ? ' on' : ''}`}
+                          onClick={() => patchPart(selPart.id, { side: s })}
+                        >
+                          {s[0].toUpperCase() + s.slice(1)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {selPart.type !== 'text' && (
+                  <div className="dg-field">
+                    <span className="field-label">Plugged into</span>
+                    {conns.length ? (
+                      <ul className="dg-conns">
+                        {conns.map((c) => (
+                          <li key={c.wire}>
+                            <button className="link-btn" onClick={() => setSel({ kind: 'wire', id: c.wire })}>
+                              {c.text}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="muted small">{canEdit ? 'Nothing yet. Tap one of its ports, then a port on a hub.' : 'Nothing.'}</p>
+                    )}
+                  </div>
+                )}
+                {canEdit && (
+                  <div className="row gap">
+                    <button className="btn" onClick={duplicate}>
+                      ⧉ Duplicate
+                    </button>
+                    <button className="btn danger-btn" onClick={removeSelected}>
+                      🗑 Delete
+                    </button>
+                  </div>
+                )}
+              </>
+            ) : selWire ? (
+              <>
+                <h3>Wire</h3>
+                <p className="small">
+                  {endText(selWire.from)}
+                  <br />↔ {endText(selWire.to)}
+                </p>
+                <p className="muted small">{KINDS[wireInfo.kind]?.label}</p>
+                {wireInfo.mismatch && <p className="form-error">⚠ The two ends are different kinds of ports. Check this one.</p>}
+                {canEdit && (
+                  <>
+                    <span className="field-label">Color</span>
+                    <div className="row gap wrap">
+                      <button
+                        className={`btn${!selWire.color ? ' on-btn' : ''}`}
+                        onClick={() => change({ ...diagram, wires: wires.map((w) => (w.id === selWire.id ? { ...w, color: null } : w)) })}
+                      >
+                        Auto
                       </button>
+                      {WIRE_COLORS.map((c) => (
+                        <button
+                          key={c}
+                          className={`swatch${selWire.color === c ? ' on' : ''}`}
+                          style={{ background: c }}
+                          aria-label={c}
+                          onClick={() => change({ ...diagram, wires: wires.map((w) => (w.id === selWire.id ? { ...w, color: c } : w)) })}
+                        />
+                      ))}
+                    </div>
+                    <button className="btn danger-btn" onClick={removeSelected}>
+                      🗑 Unplug
+                    </button>
+                  </>
+                )}
+              </>
+            ) : (
+              <>
+                <h3>{canEdit ? 'How to edit' : 'How to read it'}</h3>
+                <ul className="dg-tips small">
+                  {canEdit ? (
+                    <>
+                      <li>＋ Add puts a part in the middle. Drag parts to move them.</li>
+                      <li>To wire: tap a port, then the port to plug it into (or drag from one to the other).</li>
+                      <li>Tap a part to rename it or pick which side its wires come out of.</li>
+                      <li>Drag the background to move around; pinch or scroll to zoom.</li>
+                      <li>Changes save on their own. 🕘 Versions brings back older ones.</li>
+                    </>
+                  ) : (
+                    <>
+                      <li>Tap a part to see what it’s plugged into.</li>
+                      <li>🔌 Port list shows every port in one table.</li>
+                      <li>Drag to move around; pinch or scroll to zoom.</li>
+                    </>
+                  )}
+                </ul>
+                <h4 className="field-label">Wire colors</h4>
+                <ul className="dg-legend small">
+                  {Object.entries(KINDS).map(([k, v]) => (
+                    <li key={k}>
+                      <span className="dg-swatch" style={{ background: v.inner, borderColor: v.outer }} />
+                      {v.label}
                     </li>
                   ))}
                 </ul>
-              ) : (
-                <p className="muted small">No earlier versions yet.</p>
-              )}
-              {canEdit && (
-                <button className="btn" onClick={() => change(defaultDiagram())}>
-                  ↺ Start over from our drawing
-                </button>
-              )}
-            </>
-          ) : selPart ? (
-            <>
-              <h3>{PART_TYPES[selPart.type]?.name}</h3>
-              {canEdit && selPart.type === 'text' ? (
-                <>
-                  <textarea
-                    className="input"
-                    rows={3}
-                    value={selPart.text || ''}
-                    onChange={(e) => patchPart(selPart.id, { text: e.target.value }, `text-${selPart.id}`)}
-                    aria-label="Text"
-                  />
-                  <label className="studio-range">
-                    <span>Size</span>
-                    <input
-                      type="range"
-                      min="10"
-                      max="48"
-                      value={selPart.size || 18}
-                      onChange={(e) => patchPart(selPart.id, { size: Number(e.target.value) }, `size-${selPart.id}`)}
-                    />
-                  </label>
-                  <div className="row gap wrap">
-                    {['#b91c1c', '#111827', '#1d4ed8', '#15803d', '#7c3aed'].map((c) => (
-                      <button
-                        key={c}
-                        className={`swatch${(selPart.color || '#b91c1c') === c ? ' on' : ''}`}
-                        style={{ background: c }}
-                        aria-label={c}
-                        onClick={() => patchPart(selPart.id, { color: c })}
-                      />
-                    ))}
-                  </div>
-                </>
-              ) : canEdit ? (
-                <input
-                  className="input"
-                  value={selPart.label || ''}
-                  maxLength={40}
-                  onChange={(e) => patchPart(selPart.id, { label: e.target.value }, `label-${selPart.id}`)}
-                  placeholder="Name"
-                  aria-label="Name"
-                />
-              ) : (
-                <p className="dg-name">{selPart.label || selPart.text}</p>
-              )}
-              {canEdit && !PART_TYPES[selPart.type]?.hub && !['text', 'switch'].includes(selPart.type) && (
-                <div className="dg-field">
-                  <span className="field-label">Wires come out of</span>
-                  <div className="segmented">
-                    {['left', 'right', 'top', 'bottom'].map((s) => (
-                      <button
-                        key={s}
-                        className={`plain-seg${(selPart.side || 'right') === s ? ' on' : ''}`}
-                        onClick={() => patchPart(selPart.id, { side: s })}
-                      >
-                        {s[0].toUpperCase() + s.slice(1)}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {selPart.type !== 'text' && (
-                <div className="dg-field">
-                  <span className="field-label">Plugged into</span>
-                  {conns.length ? (
-                    <ul className="dg-conns">
-                      {conns.map((c) => (
-                        <li key={c.wire}>
-                          <button className="link-btn" onClick={() => setSel({ kind: 'wire', id: c.wire })}>
-                            {c.text}
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="muted small">{canEdit ? 'Nothing yet. Tap one of its ports, then a port on a hub.' : 'Nothing.'}</p>
-                  )}
-                </div>
-              )}
-              {canEdit && (
-                <div className="row gap">
-                  <button className="btn" onClick={duplicate}>
-                    ⧉ Duplicate
-                  </button>
-                  <button className="btn danger-btn" onClick={removeSelected}>
-                    🗑 Delete
-                  </button>
-                </div>
-              )}
-            </>
-          ) : selWire ? (
-            <>
-              <h3>Wire</h3>
-              <p className="small">
-                {endText(selWire.from)}
-                <br />↔ {endText(selWire.to)}
-              </p>
-              <p className="muted small">{KINDS[wireInfo.kind]?.label}</p>
-              {wireInfo.mismatch && <p className="form-error">⚠ The two ends are different kinds of ports. Check this one.</p>}
-              {canEdit && (
-                <>
-                  <span className="field-label">Color</span>
-                  <div className="row gap wrap">
-                    <button
-                      className={`btn${!selWire.color ? ' on-btn' : ''}`}
-                      onClick={() => change({ ...diagram, wires: wires.map((w) => (w.id === selWire.id ? { ...w, color: null } : w)) })}
-                    >
-                      Auto
-                    </button>
-                    {WIRE_COLORS.map((c) => (
-                      <button
-                        key={c}
-                        className={`swatch${selWire.color === c ? ' on' : ''}`}
-                        style={{ background: c }}
-                        aria-label={c}
-                        onClick={() => change({ ...diagram, wires: wires.map((w) => (w.id === selWire.id ? { ...w, color: c } : w)) })}
-                      />
-                    ))}
-                  </div>
-                  <button className="btn danger-btn" onClick={removeSelected}>
-                    🗑 Unplug
-                  </button>
-                </>
-              )}
-            </>
-          ) : (
-            <>
-              <h3>{canEdit ? 'How to edit' : 'How to read it'}</h3>
-              <ul className="dg-tips small">
-                {canEdit ? (
-                  <>
-                    <li>＋ Add puts a part in the middle. Drag parts to move them.</li>
-                    <li>To wire: tap a port, then the port to plug it into (or drag from one to the other).</li>
-                    <li>Tap a part to rename it or pick which side its wires come out of.</li>
-                    <li>Drag the background to move around; pinch or scroll to zoom.</li>
-                    <li>Changes save on their own. 🕘 Versions brings back older ones.</li>
-                  </>
-                ) : (
-                  <>
-                    <li>Tap a part to see what it’s plugged into.</li>
-                    <li>🔌 Port list shows every port in one table.</li>
-                    <li>Drag to move around; pinch or scroll to zoom.</li>
-                  </>
+                {remote?.updatedBy && (
+                  <p className="muted tiny">
+                    Last changed by {remote.updatedBy}
+                    {remote.updatedAt ? ` · ${fullTime(remote.updatedAt)}` : ''}
+                  </p>
                 )}
-              </ul>
-              <h4 className="field-label">Wire colors</h4>
-              <ul className="dg-legend small">
-                {Object.entries(KINDS).map(([k, v]) => (
-                  <li key={k}>
-                    <span className="dg-swatch" style={{ background: v.inner, borderColor: v.outer }} />
-                    {v.label}
-                  </li>
-                ))}
-              </ul>
-              {remote?.updatedBy && (
-                <p className="muted tiny">
-                  Last changed by {remote.updatedBy}
-                  {remote.updatedAt ? ` · ${fullTime(remote.updatedAt)}` : ''}
-                </p>
-              )}
-            </>
-          )}
-        </aside>
+              </>
+            )}
+          </aside>
+        </div>
       </div>
-    </div>
+    </Overlay>
   );
 }

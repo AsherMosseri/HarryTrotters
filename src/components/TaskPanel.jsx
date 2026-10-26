@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { SUBTEAMS, PRIORITIES, STATUSES, statusById, priorityById } from '../config.js';
 import { fullTime, relTime } from '../util.js';
-import { Avatar, CloseIcon, DraftInput, StatusSelect } from './common.jsx';
+import { Avatar, CloseIcon, DraftInput, Overlay, StatusSelect } from './common.jsx';
 import { PartStatusSelect } from './PartsView.jsx';
 import PhotoViewer from './PhotoViewer.jsx';
 import { itemId } from '../data/diff.js';
@@ -274,211 +274,221 @@ export default function TaskPanel({ task, api, roster, milestones = [], parts = 
   };
 
   return (
-    <div className="panel-backdrop" onClick={onClose}>
-      <aside className="panel" onClick={(e) => e.stopPropagation()} aria-label="Task details">
-        <div className="panel-head">
-          <StatusSelect value={task.status} onChange={(status) => set({ status })} />
-          <span className="spacer" />
-          <button
-            className="link-btn danger"
-            onClick={() => {
-              // Goes to Recently deleted, with an Undo button, so no confirm needed.
-              api.remove(task);
-              onClose();
-            }}
-          >
-            Delete
-          </button>
-          <button className="icon-btn" onClick={onClose} aria-label="Close">
-            <CloseIcon />
-          </button>
-        </div>
-
-        <div className="panel-scroll">
-          <DraftInput
-            multiline
-            className="panel-title"
-            value={task.title}
-            placeholder="Task title"
-            onSave={(title) => title.trim() && set({ title: title.trim() })}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                e.currentTarget.blur();
-              }
-            }}
-          />
-
-          {task.status === 'blocked' && (
-            <div className="blocked-box">
-              <label className="field-label">What's it blocked on?</label>
-              <DraftInput
-                value={task.blockedReason}
-                placeholder="e.g. Waiting on servo shipment"
-                onSave={(blockedReason) => set({ blockedReason })}
-              />
-            </div>
-          )}
-
-          <div className="fields">
-            <span className="field-label">Status</span>
-            <div className="segmented status-segs">
-              {STATUSES.map((s) => (
-                <button
-                  key={s.id}
-                  className={`status-seg${task.status === s.id ? ' on' : ''}`}
-                  style={{ '--c': s.color }}
-                  aria-pressed={task.status === s.id}
-                  onClick={() => set({ status: s.id })}
-                >
-                  {s.short || s.label}
-                </button>
-              ))}
-            </div>
-
-            <span className="field-label">Who</span>
-            <div className="assignee-picker">
-              {roster.map((n) => {
-                const on = (task.assignees || []).includes(n);
-                return (
-                  <button key={n} className={`person${on ? ' on' : ''}`} onClick={() => toggleAssignee(n)}>
-                    <Avatar name={n} size={20} /> {n.split(' ')[0]}
-                  </button>
-                );
-              })}
-            </div>
-
-            <span className="field-label">Priority</span>
-            <div className="segmented">
-              {PRIORITIES.map((p) => (
-                <button key={p.id} className={`prio-${p.id}${task.priority === p.id ? ' on' : ''}`} onClick={() => set({ priority: p.id })}>
-                  {p.label}
-                </button>
-              ))}
-            </div>
-
-            <label className="field-label" htmlFor="f-subteam">
-              Subteam
-            </label>
-            <select id="f-subteam" className="input" value={task.subteam || ''} onChange={(e) => set({ subteam: e.target.value })}>
-              <option value="">None</option>
-              {SUBTEAMS.map((s) => (
-                <option key={s}>{s}</option>
-              ))}
-            </select>
-
-            <label className="field-label" htmlFor="f-due">
-              Due
-            </label>
-            <div className="row gap">
-              <input
-                id="f-due"
-                className="input"
-                type="date"
-                value={task.dueDate || ''}
-                onChange={(e) => set({ dueDate: e.target.value })}
-              />
-              {task.dueDate && (
-                <button className="link-btn" onClick={() => set({ dueDate: '' })}>
-                  Clear
-                </button>
-              )}
-            </div>
-
-            <label className="field-label" htmlFor="f-ms">
-              Milestone
-            </label>
-            <select id="f-ms" className="input" value={task.milestoneId || ''} onChange={(e) => set({ milestoneId: e.target.value })}>
-              <option value="">None</option>
-              {milestones.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.title}
-                </option>
-              ))}
-            </select>
+    <Overlay>
+      <div className="panel-backdrop" onClick={onClose}>
+        <aside className="panel" onClick={(e) => e.stopPropagation()} aria-label="Task details">
+          <div className="panel-head">
+            <StatusSelect value={task.status} onChange={(status) => set({ status })} />
+            <span className="spacer" />
+            <button
+              className="link-btn danger"
+              onClick={() => {
+                // Goes to Recently deleted, with an Undo button, so no confirm needed.
+                api.remove(task);
+                onClose();
+              }}
+            >
+              Delete
+            </button>
+            <button className="icon-btn" onClick={onClose} aria-label="Close">
+              <CloseIcon />
+            </button>
           </div>
 
-          <label className="field-label">Description</label>
-          <DraftInput
-            multiline
-            className="input description"
-            value={task.description}
-            placeholder="Details, steps, measurements… (saves when you tap away)"
-            onSave={(description) => set({ description })}
-          />
-
-          <TaskChecklist items={task.checklist || []} onChange={(checklist) => set({ checklist })} />
-
-          <TaskPhotos task={task} api={api} />
-
-          {myParts.length > 0 && (
-            <>
-              <label className="field-label">Parts for this task</label>
-              <ul className="task-parts">
-                {myParts.map((p) => (
-                  <li key={p.id}>
-                    <span className="grow">
-                      {p.name}
-                      {p.qty > 1 ? ` × ${p.qty}` : ''}
-                      {p.vendor && <span className="muted small"> · {p.vendor}</span>}
-                    </span>
-                    <PartStatusSelect value={p.status} onChange={(status) => api.updatePart(p, { status })} />
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
-
-          <label className="field-label">Links</label>
-          <ul className="links">
-            {(task.links || []).map((url, i) => (
-              <li key={url + i}>
-                <a href={url} target="_blank" rel="noreferrer">
-                  🔗 {hostOf(url)}
-                </a>
-                <button className="link-btn" onClick={() => set({ links: task.links.filter((_, j) => j !== i) })} aria-label="Remove link">
-                  ✕
-                </button>
-              </li>
-            ))}
-          </ul>
-          <form className="row gap" onSubmit={addLink}>
-            <input
-              className="input"
-              value={link}
-              onChange={(e) => setLink(e.target.value)}
-              placeholder="Paste a CAD, GitHub, or photo link"
+          <div className="panel-scroll">
+            <DraftInput
+              multiline
+              className="panel-title"
+              value={task.title}
+              placeholder="Task title"
+              onSave={(title) => title.trim() && set({ title: title.trim() })}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  e.currentTarget.blur();
+                }
+              }}
             />
-            <button className="btn" disabled={!link.trim()}>
-              Add
+
+            {task.status === 'blocked' && (
+              <div className="blocked-box">
+                <label className="field-label">What's it blocked on?</label>
+                <DraftInput
+                  value={task.blockedReason}
+                  placeholder="e.g. Waiting on servo shipment"
+                  onSave={(blockedReason) => set({ blockedReason })}
+                />
+              </div>
+            )}
+
+            <div className="fields">
+              <span className="field-label">Status</span>
+              <div className="segmented status-segs">
+                {STATUSES.map((s) => (
+                  <button
+                    key={s.id}
+                    className={`status-seg${task.status === s.id ? ' on' : ''}`}
+                    style={{ '--c': s.color }}
+                    aria-pressed={task.status === s.id}
+                    onClick={() => set({ status: s.id })}
+                  >
+                    {s.short || s.label}
+                  </button>
+                ))}
+              </div>
+
+              <span className="field-label">Who</span>
+              <div className="assignee-picker">
+                {roster.map((n) => {
+                  const on = (task.assignees || []).includes(n);
+                  return (
+                    <button key={n} className={`person${on ? ' on' : ''}`} onClick={() => toggleAssignee(n)}>
+                      <Avatar name={n} size={20} /> {n.split(' ')[0]}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <span className="field-label">Priority</span>
+              <div className="segmented">
+                {PRIORITIES.map((p) => (
+                  <button
+                    key={p.id}
+                    className={`prio-${p.id}${task.priority === p.id ? ' on' : ''}`}
+                    onClick={() => set({ priority: p.id })}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+
+              <label className="field-label" htmlFor="f-subteam">
+                Subteam
+              </label>
+              <select id="f-subteam" className="input" value={task.subteam || ''} onChange={(e) => set({ subteam: e.target.value })}>
+                <option value="">None</option>
+                {SUBTEAMS.map((s) => (
+                  <option key={s}>{s}</option>
+                ))}
+              </select>
+
+              <label className="field-label" htmlFor="f-due">
+                Due
+              </label>
+              <div className="row gap">
+                <input
+                  id="f-due"
+                  className="input"
+                  type="date"
+                  value={task.dueDate || ''}
+                  onChange={(e) => set({ dueDate: e.target.value })}
+                />
+                {task.dueDate && (
+                  <button className="link-btn" onClick={() => set({ dueDate: '' })}>
+                    Clear
+                  </button>
+                )}
+              </div>
+
+              <label className="field-label" htmlFor="f-ms">
+                Milestone
+              </label>
+              <select id="f-ms" className="input" value={task.milestoneId || ''} onChange={(e) => set({ milestoneId: e.target.value })}>
+                <option value="">None</option>
+                {milestones.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.title}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <label className="field-label">Description</label>
+            <DraftInput
+              multiline
+              className="input description"
+              value={task.description}
+              placeholder="Details, steps, measurements… (saves when you tap away)"
+              onSave={(description) => set({ description })}
+            />
+
+            <TaskChecklist items={task.checklist || []} onChange={(checklist) => set({ checklist })} />
+
+            <TaskPhotos task={task} api={api} />
+
+            {myParts.length > 0 && (
+              <>
+                <label className="field-label">Parts for this task</label>
+                <ul className="task-parts">
+                  {myParts.map((p) => (
+                    <li key={p.id}>
+                      <span className="grow">
+                        {p.name}
+                        {p.qty > 1 ? ` × ${p.qty}` : ''}
+                        {p.vendor && <span className="muted small"> · {p.vendor}</span>}
+                      </span>
+                      <PartStatusSelect value={p.status} onChange={(status) => api.updatePart(p, { status })} />
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+
+            <label className="field-label">Links</label>
+            <ul className="links">
+              {(task.links || []).map((url, i) => (
+                <li key={url + i}>
+                  <a href={url} target="_blank" rel="noreferrer">
+                    🔗 {hostOf(url)}
+                  </a>
+                  <button
+                    className="link-btn"
+                    onClick={() => set({ links: task.links.filter((_, j) => j !== i) })}
+                    aria-label="Remove link"
+                  >
+                    ✕
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <form className="row gap" onSubmit={addLink}>
+              <input
+                className="input"
+                value={link}
+                onChange={(e) => setLink(e.target.value)}
+                placeholder="Paste a CAD, GitHub, or photo link"
+              />
+              <button className="btn" disabled={!link.trim()}>
+                Add
+              </button>
+            </form>
+
+            <p className="meta muted tiny">
+              Created by {task.createdBy || '?'} · {fullTime(task.createdAt)}
+              {task.completedAt ? ` · Completed ${fullTime(task.completedAt)}` : ''}
+            </p>
+
+            <h3 className="section-title">Activity</h3>
+            <Activity items={activity} milestoneName={milestoneName} />
+            <div ref={feedEnd} />
+          </div>
+
+          <form className="comment-box" onSubmit={sendComment}>
+            <textarea
+              rows={1}
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) sendComment(e);
+              }}
+              placeholder="Write a comment…"
+            />
+            <button className="btn primary" disabled={!comment.trim()}>
+              Send
             </button>
           </form>
-
-          <p className="meta muted tiny">
-            Created by {task.createdBy || '?'} · {fullTime(task.createdAt)}
-            {task.completedAt ? ` · Completed ${fullTime(task.completedAt)}` : ''}
-          </p>
-
-          <h3 className="section-title">Activity</h3>
-          <Activity items={activity} milestoneName={milestoneName} />
-          <div ref={feedEnd} />
-        </div>
-
-        <form className="comment-box" onSubmit={sendComment}>
-          <textarea
-            rows={1}
-            value={comment}
-            onChange={(e) => setComment(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) sendComment(e);
-            }}
-            placeholder="Write a comment…"
-          />
-          <button className="btn primary" disabled={!comment.trim()}>
-            Send
-          </button>
-        </form>
-      </aside>
-    </div>
+        </aside>
+      </div>
+    </Overlay>
   );
 }

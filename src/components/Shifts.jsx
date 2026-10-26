@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { SUBTEAMS } from '../config.js';
 import { addDays, mondayOf, parseDay, toISO, todayISO } from '../milestones.js';
 import { firstName } from '../util.js';
-import { Avatar, AvatarStack, CloseIcon, PlusIcon } from './common.jsx';
+import { Avatar, AvatarStack, CloseIcon, Overlay, PlusIcon } from './common.jsx';
 import { CheckinCard, CheckinDialog } from './Checkin.jsx';
 
 const MIN = 60000;
@@ -202,18 +202,20 @@ function Dialog({ title, onClose, children }) {
     return () => window.removeEventListener('keydown', esc);
   }, [onClose]);
   return (
-    <div className="panel-backdrop center" onClick={onClose}>
-      <div className="dialog shift-dialog" onClick={(e) => e.stopPropagation()} role="dialog" aria-label={title}>
-        <div className="panel-head">
-          <h2>{title}</h2>
-          <span className="spacer" />
-          <button className="icon-btn" onClick={onClose} aria-label="Close">
-            <CloseIcon />
-          </button>
+    <Overlay>
+      <div className="panel-backdrop center" onClick={onClose}>
+        <div className="dialog shift-dialog" onClick={(e) => e.stopPropagation()} role="dialog" aria-label={title}>
+          <div className="panel-head">
+            <h2>{title}</h2>
+            <span className="spacer" />
+            <button className="icon-btn" onClick={onClose} aria-label="Close">
+              <CloseIcon />
+            </button>
+          </div>
+          {children}
         </div>
-        {children}
       </div>
-    </div>
+    </Overlay>
   );
 }
 

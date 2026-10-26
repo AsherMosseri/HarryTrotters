@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { SUBTEAMS } from '../config.js';
 import { PART_STATUSES } from '../data/diff.js';
 import { relTime, useEscape } from '../util.js';
-import { CloseIcon, PlusIcon } from './common.jsx';
+import { CloseIcon, Overlay, PlusIcon } from './common.jsx';
 
 const VENDORS = ['goBILDA', 'REV Robotics', 'AndyMark', 'ServoCity', 'McMaster-Carr', 'Amazon', 'Home Depot'];
 const statusById = Object.fromEntries(PART_STATUSES.map((s) => [s.id, s]));
@@ -61,150 +61,152 @@ function PartDialog({ part, tasks, onClose, onSave, onDelete }) {
   };
 
   return (
-    <div className="panel-backdrop center" onClick={onClose}>
-      <form className="dialog" onClick={(e) => e.stopPropagation()} onSubmit={submit}>
-        <div className="panel-head">
-          <h2>{part.id ? 'Edit part' : 'Add a part'}</h2>
-          <span className="spacer" />
-          <button type="button" className="icon-btn" onClick={onClose} aria-label="Close">
-            <CloseIcon />
-          </button>
-        </div>
-        <input
-          className="input big"
-          autoFocus={!part.id}
-          value={form.name}
-          onChange={(e) => set({ name: e.target.value })}
-          placeholder="e.g. 5203 Yellow Jacket motor, 312 RPM"
-        />
-        <div className="fields">
-          <label className="field-label" htmlFor="pt-status">
-            Status
-          </label>
-          <div className="segmented">
-            {PART_STATUSES.map((s) => (
-              <button
-                type="button"
-                key={s.id}
-                id={s.id === 'needed' ? 'pt-status' : undefined}
-                className={`part-seg${form.status === s.id ? ' on' : ''}`}
-                style={{ '--c': s.color }}
-                onClick={() => set({ status: s.id })}
-              >
-                {s.label}
-              </button>
-            ))}
+    <Overlay>
+      <div className="panel-backdrop center" onClick={onClose}>
+        <form className="dialog" onClick={(e) => e.stopPropagation()} onSubmit={submit}>
+          <div className="panel-head">
+            <h2>{part.id ? 'Edit part' : 'Add a part'}</h2>
+            <span className="spacer" />
+            <button type="button" className="icon-btn" onClick={onClose} aria-label="Close">
+              <CloseIcon />
+            </button>
           </div>
-          <label className="field-label" htmlFor="pt-vendor">
-            Vendor
-          </label>
           <input
-            id="pt-vendor"
-            className="input"
-            list="vendors"
-            value={form.vendor}
-            onChange={(e) => set({ vendor: e.target.value })}
-            placeholder="goBILDA"
+            className="input big"
+            autoFocus={!part.id}
+            value={form.name}
+            onChange={(e) => set({ name: e.target.value })}
+            placeholder="e.g. 312 RPM motor"
           />
-          <datalist id="vendors">
-            {VENDORS.map((v) => (
-              <option key={v} value={v} />
-            ))}
-          </datalist>
-          <label className="field-label" htmlFor="pt-num">
-            Part #
-          </label>
-          <input
-            id="pt-num"
-            className="input"
-            value={form.partNumber}
-            onChange={(e) => set({ partNumber: e.target.value })}
-            placeholder="Optional"
-          />
-          <label className="field-label" htmlFor="pt-qty">
-            Qty × cost
-          </label>
-          <div className="row gap">
+          <div className="fields">
+            <label className="field-label" htmlFor="pt-status">
+              Status
+            </label>
+            <div className="segmented">
+              {PART_STATUSES.map((s) => (
+                <button
+                  type="button"
+                  key={s.id}
+                  id={s.id === 'needed' ? 'pt-status' : undefined}
+                  className={`part-seg${form.status === s.id ? ' on' : ''}`}
+                  style={{ '--c': s.color }}
+                  onClick={() => set({ status: s.id })}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+            <label className="field-label" htmlFor="pt-vendor">
+              Vendor
+            </label>
             <input
-              id="pt-qty"
-              className="input qty"
-              type="number"
-              min="0"
-              inputMode="numeric"
-              value={form.qty}
-              onChange={(e) => set({ qty: e.target.value })}
+              id="pt-vendor"
+              className="input"
+              list="vendors"
+              value={form.vendor}
+              onChange={(e) => set({ vendor: e.target.value })}
+              placeholder="goBILDA"
             />
-            <span className="muted">×</span>
-            <span className="money-input">
-              $
+            <datalist id="vendors">
+              {VENDORS.map((v) => (
+                <option key={v} value={v} />
+              ))}
+            </datalist>
+            <label className="field-label" htmlFor="pt-num">
+              Part #
+            </label>
+            <input
+              id="pt-num"
+              className="input"
+              value={form.partNumber}
+              onChange={(e) => set({ partNumber: e.target.value })}
+              placeholder="Optional"
+            />
+            <label className="field-label" htmlFor="pt-qty">
+              Qty × cost
+            </label>
+            <div className="row gap">
               <input
-                className="input"
+                id="pt-qty"
+                className="input qty"
                 type="number"
                 min="0"
-                step="0.01"
-                inputMode="decimal"
-                value={form.unitCost}
-                onChange={(e) => set({ unitCost: e.target.value })}
-                aria-label="Cost each"
+                inputMode="numeric"
+                value={form.qty}
+                onChange={(e) => set({ qty: e.target.value })}
               />
-            </span>
-            <span className="muted small nowrap">= {money((parseInt(form.qty, 10) || 0) * (parseFloat(form.unitCost) || 0))}</span>
+              <span className="muted">×</span>
+              <span className="money-input">
+                $
+                <input
+                  className="input"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  inputMode="decimal"
+                  value={form.unitCost}
+                  onChange={(e) => set({ unitCost: e.target.value })}
+                  aria-label="Cost each"
+                />
+              </span>
+              <span className="muted small nowrap">= {money((parseInt(form.qty, 10) || 0) * (parseFloat(form.unitCost) || 0))}</span>
+            </div>
+            <label className="field-label" htmlFor="pt-url">
+              Link
+            </label>
+            <input
+              id="pt-url"
+              className="input"
+              value={form.url}
+              onChange={(e) => set({ url: e.target.value })}
+              placeholder="Product page"
+              inputMode="url"
+            />
+            <label className="field-label" htmlFor="pt-sub">
+              Subteam
+            </label>
+            <select id="pt-sub" className="input" value={form.subteam} onChange={(e) => set({ subteam: e.target.value })}>
+              <option value="">None</option>
+              {SUBTEAMS.map((s) => (
+                <option key={s}>{s}</option>
+              ))}
+            </select>
+            <label className="field-label" htmlFor="pt-task">
+              For task
+            </label>
+            <select id="pt-task" className="input" value={form.taskId} onChange={(e) => set({ taskId: e.target.value })}>
+              <option value="">None</option>
+              {openTasks.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.title || 'Untitled'}
+                </option>
+              ))}
+            </select>
           </div>
-          <label className="field-label" htmlFor="pt-url">
-            Link
-          </label>
-          <input
-            id="pt-url"
-            className="input"
-            value={form.url}
-            onChange={(e) => set({ url: e.target.value })}
-            placeholder="Product page"
-            inputMode="url"
+          <textarea
+            className="input description"
+            rows={2}
+            value={form.notes}
+            onChange={(e) => set({ notes: e.target.value })}
+            placeholder="Notes (optional)"
           />
-          <label className="field-label" htmlFor="pt-sub">
-            Subteam
-          </label>
-          <select id="pt-sub" className="input" value={form.subteam} onChange={(e) => set({ subteam: e.target.value })}>
-            <option value="">None</option>
-            {SUBTEAMS.map((s) => (
-              <option key={s}>{s}</option>
-            ))}
-          </select>
-          <label className="field-label" htmlFor="pt-task">
-            For task
-          </label>
-          <select id="pt-task" className="input" value={form.taskId} onChange={(e) => set({ taskId: e.target.value })}>
-            <option value="">None</option>
-            {openTasks.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.title || 'Untitled'}
-              </option>
-            ))}
-          </select>
-        </div>
-        <textarea
-          className="input description"
-          rows={2}
-          value={form.notes}
-          onChange={(e) => set({ notes: e.target.value })}
-          placeholder="Notes (optional)"
-        />
-        <div className="row gap end">
-          {onDelete && (
-            <button type="button" className="link-btn danger" onClick={onDelete}>
-              Delete
+          <div className="row gap end">
+            {onDelete && (
+              <button type="button" className="link-btn danger" onClick={onDelete}>
+                Delete
+              </button>
+            )}
+            <span className="spacer" />
+            <button type="button" className="btn ghost" onClick={onClose}>
+              Cancel
             </button>
-          )}
-          <span className="spacer" />
-          <button type="button" className="btn ghost" onClick={onClose}>
-            Cancel
-          </button>
-          <button className="btn primary" disabled={!form.name.trim()}>
-            {part.id ? 'Save' : 'Add part'}
-          </button>
-        </div>
-      </form>
-    </div>
+            <button className="btn primary" disabled={!form.name.trim()}>
+              {part.id ? 'Save' : 'Add part'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </Overlay>
   );
 }
 

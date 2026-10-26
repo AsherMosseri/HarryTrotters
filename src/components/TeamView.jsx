@@ -11,7 +11,7 @@ import {
   TEAM_NAME,
   TEAM_NICKNAME,
 } from '../config.js';
-import { PlusIcon } from './common.jsx';
+import { Overlay, PlusIcon } from './common.jsx';
 import { personId } from '../data/diff.js';
 import { todayISO } from '../milestones.js';
 import { Avatar, CloseIcon } from './common.jsx';
@@ -49,119 +49,121 @@ function PersonDialog({ person, taken, onClose, onSave, onRemove }) {
   const toggle = (s) => setSubteams(subteams.includes(s) ? subteams.filter((x) => x !== s) : [...subteams, s]);
 
   return (
-    <div className="panel-backdrop center" onClick={onClose}>
-      <form
-        className="dialog"
-        onClick={(e) => e.stopPropagation()}
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (!name.trim() || nameError) return;
-          onSave({
-            name: person.isNew || canRename ? name.trim() : person.name,
-            removed: false,
-            title: title.trim(),
-            grade,
-            subteams: ORG_GROUPS.filter((s) => subteams.includes(s)),
-            responsibilities: resp
-              .split('\n')
-              .map((r) => r.replace(/^[-•*]\s*/, '').trim())
-              .filter(Boolean),
-          });
-        }}
-      >
-        <div className="panel-head">
-          {person.isNew ? <h2>Add a person</h2> : <Avatar name={person.name} size={30} />}
-          {!person.isNew && <h2>{person.name}</h2>}
-          <span className="spacer" />
-          <button type="button" className="icon-btn" onClick={onClose} aria-label="Close">
-            <CloseIcon />
-          </button>
-        </div>
-        {(person.isNew || canRename) && (
-          <>
-            {canRename && (
-              <label className="field-label" htmlFor="p-name">
-                Name
-              </label>
-            )}
-            <input
-              id="p-name"
-              className="input big"
-              autoFocus={person.isNew}
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Full name"
-              maxLength={60}
-            />
-          </>
-        )}
-        {canRename && name.trim() && name.trim() !== person.name && !nameError && (
-          <p className="muted small">Their tasks, milestones, and org chart entry will switch to “{name.trim()}”.</p>
-        )}
-        {nameError && <p className="form-error">{nameError}</p>}
-        <div className="fields">
-          <label className="field-label" htmlFor="p-title">
-            Role
-          </label>
-          <input
-            id="p-title"
-            className="input"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="e.g. Captain, CAD Lead, Secretary"
-          />
-          <label className="field-label" htmlFor="p-grade">
-            Grade
-          </label>
-          <select id="p-grade" className="input" value={grade} onChange={(e) => setGrade(Number(e.target.value))}>
-            {GRADES.map((g) => (
-              <option key={g} value={g}>
-                {gradeLabel(g)}
-              </option>
-            ))}
-          </select>
-          <span className="field-label">Subteams</span>
-          <div className="assignee-picker">
-            {ORG_GROUPS.map((s) => (
-              <button
-                type="button"
-                key={s}
-                className={`person sub-toggle${subteams.includes(s) ? ' on' : ''}`}
-                style={{ '--c': SUBTEAM_COLORS[s] }}
-                onClick={() => toggle(s)}
-              >
-                <span className="dot" /> {s}
-              </button>
-            ))}
-          </div>
-        </div>
-        <label className="field-label" htmlFor="p-resp">
-          Responsibilities — one per line
-        </label>
-        <textarea
-          id="p-resp"
-          className="input description"
-          rows={5}
-          value={resp}
-          onChange={(e) => setResp(e.target.value)}
-          placeholder={'Builds and maintains the intake\nKeeps the parts inventory'}
-        />
-        <div className="row gap end">
-          {onRemove && (
-            <button type="button" className="link-btn danger" onClick={onRemove}>
-              Remove from team
+    <Overlay>
+      <div className="panel-backdrop center" onClick={onClose}>
+        <form
+          className="dialog"
+          onClick={(e) => e.stopPropagation()}
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!name.trim() || nameError) return;
+            onSave({
+              name: person.isNew || canRename ? name.trim() : person.name,
+              removed: false,
+              title: title.trim(),
+              grade,
+              subteams: ORG_GROUPS.filter((s) => subteams.includes(s)),
+              responsibilities: resp
+                .split('\n')
+                .map((r) => r.replace(/^[-•*]\s*/, '').trim())
+                .filter(Boolean),
+            });
+          }}
+        >
+          <div className="panel-head">
+            {person.isNew ? <h2>Add a person</h2> : <Avatar name={person.name} size={30} />}
+            {!person.isNew && <h2>{person.name}</h2>}
+            <span className="spacer" />
+            <button type="button" className="icon-btn" onClick={onClose} aria-label="Close">
+              <CloseIcon />
             </button>
+          </div>
+          {(person.isNew || canRename) && (
+            <>
+              {canRename && (
+                <label className="field-label" htmlFor="p-name">
+                  Name
+                </label>
+              )}
+              <input
+                id="p-name"
+                className="input big"
+                autoFocus={person.isNew}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Full name"
+                maxLength={60}
+              />
+            </>
           )}
-          <span className="spacer" />
-          <button type="button" className="btn ghost" onClick={onClose}>
-            Cancel
-          </button>
-          <button className="btn primary" disabled={!name.trim() || !!nameError}>
-            {person.isNew ? 'Add to team' : 'Save'}
-          </button>
-        </div>
-      </form>
-    </div>
+          {canRename && name.trim() && name.trim() !== person.name && !nameError && (
+            <p className="muted small">Their tasks, milestones, and org chart entry will switch to “{name.trim()}”.</p>
+          )}
+          {nameError && <p className="form-error">{nameError}</p>}
+          <div className="fields">
+            <label className="field-label" htmlFor="p-title">
+              Role
+            </label>
+            <input
+              id="p-title"
+              className="input"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="e.g. Captain, CAD Lead, Secretary"
+            />
+            <label className="field-label" htmlFor="p-grade">
+              Grade
+            </label>
+            <select id="p-grade" className="input" value={grade} onChange={(e) => setGrade(Number(e.target.value))}>
+              {GRADES.map((g) => (
+                <option key={g} value={g}>
+                  {gradeLabel(g)}
+                </option>
+              ))}
+            </select>
+            <span className="field-label">Subteams</span>
+            <div className="assignee-picker">
+              {ORG_GROUPS.map((s) => (
+                <button
+                  type="button"
+                  key={s}
+                  className={`person sub-toggle${subteams.includes(s) ? ' on' : ''}`}
+                  style={{ '--c': SUBTEAM_COLORS[s] }}
+                  onClick={() => toggle(s)}
+                >
+                  <span className="dot" /> {s}
+                </button>
+              ))}
+            </div>
+          </div>
+          <label className="field-label" htmlFor="p-resp">
+            Responsibilities — one per line
+          </label>
+          <textarea
+            id="p-resp"
+            className="input description"
+            rows={5}
+            value={resp}
+            onChange={(e) => setResp(e.target.value)}
+            placeholder={'Builds and maintains the intake\nKeeps the parts inventory'}
+          />
+          <div className="row gap end">
+            {onRemove && (
+              <button type="button" className="link-btn danger" onClick={onRemove}>
+                Remove from team
+              </button>
+            )}
+            <span className="spacer" />
+            <button type="button" className="btn ghost" onClick={onClose}>
+              Cancel
+            </button>
+            <button className="btn primary" disabled={!name.trim() || !!nameError}>
+              {person.isNew ? 'Add to team' : 'Save'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </Overlay>
   );
 }
 

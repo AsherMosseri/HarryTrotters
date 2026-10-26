@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { lunchOf } from '../config.js';
 import { addDays, parseDay, todayISO } from '../milestones.js';
 import { firstName } from '../util.js';
-import { Avatar, CloseIcon } from './common.jsx';
+import { Avatar, CloseIcon, Overlay } from './common.jsx';
 
 export const SLOTS = [
   { id: 'lunch', label: 'Lunch', icon: '🥪' },
@@ -59,25 +59,27 @@ function AnswerForm({ checkin, initial, submitLabel, onDone }) {
 export function CheckinGate({ checkin, rename, onAnswer }) {
   const [busy, setBusy] = useState(false);
   return (
-    <div className="checkin-gate" role="alertdialog" aria-labelledby="checkin-title">
-      <div className="gate-card checkin-card">
-        <div className="logo-mark big">🧪</div>
-        <h1 id="checkin-title">{checkin.question || 'Are you going to the lab today?'}</h1>
-        <p className="muted">
-          Lab check-in from {firstName(rename(checkin.by || ''))} · {dayLabel(checkin.date)}. Answer to keep going.
-        </p>
-        <AnswerForm
-          checkin={checkin}
-          submitLabel={busy ? 'Saving…' : 'Done'}
-          onDone={async (a) => {
-            setBusy(true);
-            await onAnswer(a);
-            setBusy(false);
-          }}
-        />
-        <p className="muted tiny">Plans changed? Change your answer anytime in the Shifts tab.</p>
+    <Overlay>
+      <div className="checkin-gate" role="alertdialog" aria-labelledby="checkin-title">
+        <div className="gate-card checkin-card">
+          <div className="logo-mark big">🧪</div>
+          <h1 id="checkin-title">{checkin.question || 'Are you going to the lab today?'}</h1>
+          <p className="muted">
+            Lab check-in from {firstName(rename(checkin.by || ''))} · {dayLabel(checkin.date)}. Answer to keep going.
+          </p>
+          <AnswerForm
+            checkin={checkin}
+            submitLabel={busy ? 'Saving…' : 'Done'}
+            onDone={async (a) => {
+              setBusy(true);
+              await onAnswer(a);
+              setBusy(false);
+            }}
+          />
+          <p className="muted tiny">Plans changed? Change your answer anytime in the Shifts tab.</p>
+        </div>
       </div>
-    </div>
+    </Overlay>
   );
 }
 
@@ -182,53 +184,55 @@ export function CheckinDialog({ onDone, onClose }) {
   const toggle = (s) =>
     setSlots(slots.includes(s) ? slots.filter((x) => x !== s) : SLOTS.map((x) => x.id).filter((x) => x === s || slots.includes(x)));
   return (
-    <div className="panel-backdrop center" onClick={onClose}>
-      <div className="dialog shift-dialog" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Lab check-in">
-        <div className="panel-head">
-          <h2>🧪 Lab check-in</h2>
-          <span className="spacer" />
-          <button className="icon-btn" onClick={onClose} aria-label="Close">
-            <CloseIcon />
-          </button>
-        </div>
-        <p className="muted small">Everyone gets a notification, and the app asks them when they open it until they answer.</p>
-        <div className="fields">
-          <label className="field-label" htmlFor="ci-q">
-            Question
-          </label>
-          <input id="ci-q" className="input" value={question} maxLength={120} onChange={(e) => setQuestion(e.target.value)} />
-          <label className="field-label" htmlFor="ci-date">
-            Day
-          </label>
-          <input id="ci-date" type="date" className="input" value={date} min={todayISO()} onChange={(e) => setDate(e.target.value)} />
-          <span className="field-label">When</span>
-          <div className="segmented">
-            {SLOTS.map((s) => (
-              <button
-                key={s.id}
-                className={`plain-seg${slots.includes(s.id) ? ' on' : ''}`}
-                aria-pressed={slots.includes(s.id)}
-                onClick={() => toggle(s.id)}
-              >
-                {s.icon} {s.label}
-              </button>
-            ))}
+    <Overlay>
+      <div className="panel-backdrop center" onClick={onClose}>
+        <div className="dialog shift-dialog" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Lab check-in">
+          <div className="panel-head">
+            <h2>🧪 Lab check-in</h2>
+            <span className="spacer" />
+            <button className="icon-btn" onClick={onClose} aria-label="Close">
+              <CloseIcon />
+            </button>
+          </div>
+          <p className="muted small">Everyone gets a notification, and the app asks them when they open it until they answer.</p>
+          <div className="fields">
+            <label className="field-label" htmlFor="ci-q">
+              Question
+            </label>
+            <input id="ci-q" className="input" value={question} maxLength={120} onChange={(e) => setQuestion(e.target.value)} />
+            <label className="field-label" htmlFor="ci-date">
+              Day
+            </label>
+            <input id="ci-date" type="date" className="input" value={date} min={todayISO()} onChange={(e) => setDate(e.target.value)} />
+            <span className="field-label">When</span>
+            <div className="segmented">
+              {SLOTS.map((s) => (
+                <button
+                  key={s.id}
+                  className={`plain-seg${slots.includes(s.id) ? ' on' : ''}`}
+                  aria-pressed={slots.includes(s.id)}
+                  onClick={() => toggle(s.id)}
+                >
+                  {s.icon} {s.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="row gap">
+            <span className="spacer" />
+            <button className="btn" onClick={onClose}>
+              Cancel
+            </button>
+            <button
+              className="btn primary"
+              disabled={!slots.length || !question.trim() || !date}
+              onClick={() => onDone({ date, question: question.trim(), slots })}
+            >
+              Ask everyone
+            </button>
           </div>
         </div>
-        <div className="row gap">
-          <span className="spacer" />
-          <button className="btn" onClick={onClose}>
-            Cancel
-          </button>
-          <button
-            className="btn primary"
-            disabled={!slots.length || !question.trim() || !date}
-            onClick={() => onDone({ date, question: question.trim(), slots })}
-          >
-            Ask everyone
-          </button>
-        </div>
       </div>
-    </div>
+    </Overlay>
   );
 }

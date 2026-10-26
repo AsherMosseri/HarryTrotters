@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { VersionLogDialog } from './VersionLog.jsx';
+import { Overlay } from './common.jsx';
 
 const CHECK_EVERY = 60 * 1000;
 
@@ -73,32 +74,34 @@ export default function UpdateGate({ children }) {
     <>
       {children}
       {newVersion && (
-        <div className="update-gate" role="alertdialog" aria-labelledby="update-title">
-          <div className="gate-card">
-            <div className="logo-mark big">↻</div>
-            <h1 id="update-title">{info?.release ? `Version ${info.release} is ready` : 'New version available'}</h1>
-            {info?.changelog?.[0] && (
-              <div className="update-whats-new">
-                <b>{info.changelog[0].title}</b>
-                <ul className="version-items">
-                  {info.changelog[0].items.slice(0, 4).map((it) => (
-                    <li key={it}>{it}</li>
-                  ))}
-                  {info.changelog[0].items.length > 4 && <li className="muted">and {info.changelog[0].items.length - 4} more…</li>}
-                </ul>
-              </div>
-            )}
-            <p className="muted">Reload to get it. Everything you've saved is kept.</p>
-            <button className="btn primary big-btn" onClick={() => loadNewVersion(newVersion)}>
-              Update now
-            </button>
-            {info?.changelog && (
-              <button className="link-btn" onClick={() => setShowLog(true)}>
-                Full version log
+        <Overlay>
+          <div className="update-gate" role="alertdialog" aria-labelledby="update-title">
+            <div className="gate-card">
+              <div className="logo-mark big">↻</div>
+              <h1 id="update-title">{info?.release ? `Version ${info.release} is ready` : 'New version available'}</h1>
+              {info?.changelog?.[0] && (
+                <div className="update-whats-new">
+                  <b>{info.changelog[0].title}</b>
+                  <ul className="version-items">
+                    {info.changelog[0].items.slice(0, 4).map((it) => (
+                      <li key={it}>{it}</li>
+                    ))}
+                    {info.changelog[0].items.length > 4 && <li className="muted">and {info.changelog[0].items.length - 4} more…</li>}
+                  </ul>
+                </div>
+              )}
+              <p className="muted">Reload to get it. Everything you've saved is kept.</p>
+              <button className="btn primary big-btn" onClick={() => loadNewVersion(newVersion)}>
+                Update now
               </button>
-            )}
+              {info?.changelog && (
+                <button className="link-btn" onClick={() => setShowLog(true)}>
+                  Full version log
+                </button>
+              )}
+            </div>
           </div>
-        </div>
+        </Overlay>
       )}
       {showLog && info?.changelog && (
         <VersionLogDialog log={info.changelog} current={info.release} currentLabel="New" onClose={() => setShowLog(false)} />

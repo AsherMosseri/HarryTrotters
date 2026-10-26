@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { shortDate, todayISO } from '../milestones.js';
-import { Avatar, CloseIcon, PlusIcon } from './common.jsx';
+import { Avatar, CloseIcon, Overlay, PlusIcon } from './common.jsx';
 import { useEscape } from '../util.js';
 
 const PERIODS = [
@@ -187,148 +187,150 @@ function RunDialog({ run, roster, onClose, onSave, onDelete }) {
   };
 
   return (
-    <div className="panel-backdrop center" onClick={onClose}>
-      <form className="dialog" onClick={(e) => e.stopPropagation()} onSubmit={submit}>
-        <div className="panel-head">
-          <h2>{isNew ? 'Log a run' : 'Edit run'}</h2>
-          <span className="spacer" />
-          <button type="button" className="icon-btn" onClick={onClose} aria-label="Close">
-            <CloseIcon />
-          </button>
-        </div>
-        <div className="fields">
-          <span className="field-label">Type</span>
-          <div className="segmented">
-            {[
-              ['practice', 'Practice'],
-              ['match', 'Competition match'],
-            ].map(([id, label]) => (
-              <button type="button" key={id} className={`plain-seg${form.type === id ? ' on' : ''}`} onClick={() => set({ type: id })}>
-                {label}
-              </button>
-            ))}
+    <Overlay>
+      <div className="panel-backdrop center" onClick={onClose}>
+        <form className="dialog" onClick={(e) => e.stopPropagation()} onSubmit={submit}>
+          <div className="panel-head">
+            <h2>{isNew ? 'Log a run' : 'Edit run'}</h2>
+            <span className="spacer" />
+            <button type="button" className="icon-btn" onClick={onClose} aria-label="Close">
+              <CloseIcon />
+            </button>
           </div>
-          <label className="field-label" htmlFor="r-date">
-            Date
-          </label>
-          <input id="r-date" className="input" type="date" value={form.date} onChange={(e) => set({ date: e.target.value })} required />
-          {form.type === 'match' && (
-            <>
-              <label className="field-label" htmlFor="r-match">
-                Match
-              </label>
-              <div className="row gap wrap">
-                <input
-                  id="r-match"
-                  className="input match-no"
-                  value={form.matchNumber}
-                  onChange={(e) => set({ matchNumber: e.target.value })}
-                  placeholder="e.g. Q12"
-                />
-                <div className="segmented">
-                  {Object.entries(RESULTS).map(([id, label]) => (
-                    <button
-                      type="button"
-                      key={id}
-                      className={`plain-seg${form.result === id ? ' on' : ''}`}
-                      onClick={() => set({ result: form.result === id ? '' : id })}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </>
-          )}
-          <span className="field-label">Drivers</span>
-          <div className="assignee-picker">
-            {roster.map((n) => {
-              const on = form.drivers.includes(n);
-              return (
-                <button
-                  type="button"
-                  key={n}
-                  className={`person${on ? ' on' : ''}`}
-                  onClick={() => set({ drivers: on ? form.drivers.filter((x) => x !== n) : [...form.drivers, n] })}
-                >
-                  <Avatar name={n} size={20} /> {n.split(' ')[0]}
+          <div className="fields">
+            <span className="field-label">Type</span>
+            <div className="segmented">
+              {[
+                ['practice', 'Practice'],
+                ['match', 'Competition match'],
+              ].map(([id, label]) => (
+                <button type="button" key={id} className={`plain-seg${form.type === id ? ' on' : ''}`} onClick={() => set({ type: id })}>
+                  {label}
                 </button>
-              );
-            })}
-          </div>
-          <span className="field-label">Points</span>
-          <div className="points-grid">
-            {PERIODS.map((p) => (
-              <label key={p.key}>
-                <span>
-                  <i className={`sw sw-${p.key}`} /> {p.label}
-                </span>
+              ))}
+            </div>
+            <label className="field-label" htmlFor="r-date">
+              Date
+            </label>
+            <input id="r-date" className="input" type="date" value={form.date} onChange={(e) => set({ date: e.target.value })} required />
+            {form.type === 'match' && (
+              <>
+                <label className="field-label" htmlFor="r-match">
+                  Match
+                </label>
+                <div className="row gap wrap">
+                  <input
+                    id="r-match"
+                    className="input match-no"
+                    value={form.matchNumber}
+                    onChange={(e) => set({ matchNumber: e.target.value })}
+                    placeholder="e.g. Q12"
+                  />
+                  <div className="segmented">
+                    {Object.entries(RESULTS).map(([id, label]) => (
+                      <button
+                        type="button"
+                        key={id}
+                        className={`plain-seg${form.result === id ? ' on' : ''}`}
+                        onClick={() => set({ result: form.result === id ? '' : id })}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+            <span className="field-label">Drivers</span>
+            <div className="assignee-picker">
+              {roster.map((n) => {
+                const on = form.drivers.includes(n);
+                return (
+                  <button
+                    type="button"
+                    key={n}
+                    className={`person${on ? ' on' : ''}`}
+                    onClick={() => set({ drivers: on ? form.drivers.filter((x) => x !== n) : [...form.drivers, n] })}
+                  >
+                    <Avatar name={n} size={20} /> {n.split(' ')[0]}
+                  </button>
+                );
+              })}
+            </div>
+            <span className="field-label">Points</span>
+            <div className="points-grid">
+              {PERIODS.map((p) => (
+                <label key={p.key}>
+                  <span>
+                    <i className={`sw sw-${p.key}`} /> {p.label}
+                  </span>
+                  <input
+                    className="input"
+                    type="number"
+                    min="0"
+                    inputMode="numeric"
+                    value={form[p.key]}
+                    onChange={(e) => set({ [p.key]: e.target.value })}
+                    placeholder="0"
+                  />
+                </label>
+              ))}
+              <label>
+                <span>Penalties</span>
                 <input
                   className="input"
                   type="number"
                   min="0"
                   inputMode="numeric"
-                  value={form[p.key]}
-                  onChange={(e) => set({ [p.key]: e.target.value })}
+                  value={form.penalties}
+                  onChange={(e) => set({ penalties: e.target.value })}
                   placeholder="0"
                 />
               </label>
-            ))}
-            <label>
-              <span>Penalties</span>
-              <input
-                className="input"
-                type="number"
-                min="0"
-                inputMode="numeric"
-                value={form.penalties}
-                onChange={(e) => set({ penalties: e.target.value })}
-                placeholder="0"
-              />
-            </label>
-            <div className="points-total">
-              Total <b>{sum}</b>
+              <div className="points-total">
+                Total <b>{sum}</b>
+              </div>
             </div>
           </div>
-        </div>
-        <label className="field-label" htmlFor="r-issues">
-          Anything break or go wrong?
-        </label>
-        <textarea
-          id="r-issues"
-          className="input description"
-          rows={2}
-          value={form.issues}
-          onChange={(e) => set({ issues: e.target.value })}
-          placeholder="e.g. Intake jammed on the second cycle"
-        />
-        {isNew && form.issues.trim() && (
-          <label className="done-toggle small">
-            <input type="checkbox" checked={makeTask} onChange={(e) => setMakeTask(e.target.checked)} />
-            Also add a task to fix it
+          <label className="field-label" htmlFor="r-issues">
+            Anything break or go wrong?
           </label>
-        )}
-        <textarea
-          className="input description"
-          rows={2}
-          value={form.notes}
-          onChange={(e) => set({ notes: e.target.value })}
-          placeholder="Notes: strategy, what worked, cycle times… (optional)"
-        />
-        <div className="row gap end">
-          {onDelete && (
-            <button type="button" className="link-btn danger" onClick={onDelete}>
-              Delete
-            </button>
+          <textarea
+            id="r-issues"
+            className="input description"
+            rows={2}
+            value={form.issues}
+            onChange={(e) => set({ issues: e.target.value })}
+            placeholder="e.g. Intake jammed on the second cycle"
+          />
+          {isNew && form.issues.trim() && (
+            <label className="done-toggle small">
+              <input type="checkbox" checked={makeTask} onChange={(e) => setMakeTask(e.target.checked)} />
+              Also add a task to fix it
+            </label>
           )}
-          <span className="spacer" />
-          <button type="button" className="btn ghost" onClick={onClose}>
-            Cancel
-          </button>
-          <button className="btn primary">{isNew ? 'Save run' : 'Save'}</button>
-        </div>
-      </form>
-    </div>
+          <textarea
+            className="input description"
+            rows={2}
+            value={form.notes}
+            onChange={(e) => set({ notes: e.target.value })}
+            placeholder="Notes: strategy, what worked, cycle times… (optional)"
+          />
+          <div className="row gap end">
+            {onDelete && (
+              <button type="button" className="link-btn danger" onClick={onDelete}>
+                Delete
+              </button>
+            )}
+            <span className="spacer" />
+            <button type="button" className="btn ghost" onClick={onClose}>
+              Cancel
+            </button>
+            <button className="btn primary">{isNew ? 'Save run' : 'Save'}</button>
+          </div>
+        </form>
+      </div>
+    </Overlay>
   );
 }
 

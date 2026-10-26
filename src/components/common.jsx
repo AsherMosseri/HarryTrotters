@@ -3,6 +3,7 @@ import { STATUSES, PRIORITIES, statusById, priorityById } from '../config.js';
 import { colorFor, initials, dueInfo } from '../util.js';
 import { decorationById, nameProps } from '../nitro.js';
 import { AnimatedDecoration, CustomDecoration } from './decoRender.jsx';
+import { createPortal } from 'react-dom';
 
 // Profiles, who's online, and each person's subteams, for any component that
 // shows people (set up in Workspace; empty on the join screen).
@@ -72,6 +73,14 @@ export function Nameplate({ plate }) {
       aria-hidden="true"
     />
   );
+}
+
+// Pop-ups render at the end of <body>, outside the app's scrolling area:
+// Safari on iPhone and iPad clips and misplaces fixed pop-ups that live
+// inside a scrolling element (they ended up under the top bar or between
+// the top bar and the tab bar).
+export function Overlay({ children }) {
+  return typeof document === 'undefined' ? children : createPortal(children, document.body);
 }
 
 export function DisplayName({ name, className = '', as: Tag = 'span', ...rest }) {
