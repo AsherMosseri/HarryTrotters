@@ -14,6 +14,8 @@ export const CHANGELOG = [
       'On phones, five or fewer tabs all fit in the tab bar, with no empty More.',
       'The app opens a little faster: the name fonts load in the background.',
       'The phone Filters sheet’s menus are full width.',
+      'On iPad, chat Search, Pins, and Members open beside the chat instead of covering it, so you can still type and send. In portrait, the channel list steps aside while one is open.',
+      'Bigger checkboxes and 👍/👎 buttons on phones and iPads.',
     ],
   },
   {

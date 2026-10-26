@@ -1108,6 +1108,16 @@ h3.md-h { font-size: 16.5px; }
   .content.chat.with-side { grid-template-columns: 220px minmax(0, 1fr); }
   .chat-side { position: fixed; right: 12px; top: 120px; bottom: 12px; width: min(340px, calc(100vw - 24px)); z-index: 25; box-shadow: var(--shadow-lg); }
 }
+/* iPad: Search, Pins, and Members sit beside the chat instead of covering it
+   (and the Send button). In portrait the channel list steps aside meanwhile. */
+@media (max-width: 1199px) and (min-width: 761px) {
+  .content.chat.with-side:not(.embedded) { grid-template-columns: 200px minmax(0, 1fr) 280px; }
+  .content.chat.with-side:not(.embedded) .chat-side { position: static; width: auto; box-shadow: none; }
+}
+@media (max-width: 999px) and (min-width: 761px) {
+  .content.chat.with-side:not(.embedded) { grid-template-columns: minmax(0, 1fr) 280px; }
+  .content.chat.with-side:not(.embedded) .channel-list { display: none; }
+}
 
 /* ---------- robot (3D) ---------- */
 .content.robot { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 10px; padding-bottom: 10px; }
@@ -2276,3 +2286,9 @@ body:has(.bottom-nav):has(.composer) .toast { bottom: calc(150px + env(safe-area
 .switch input:checked + span { background: var(--accent); }
 .switch input:checked + span::after { transform: translateX(16px); }
 .switch input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* Bigger checkboxes and vote buttons for fingers (phones and iPads). */
+@media (pointer: coarse) {
+  .check-items label { padding: 8px 0; }
+  .check-items input[type='checkbox'], .done-toggle input, .calm-toggle input, .studio-check input { width: 22px; height: 22px; flex: none; }
+  .vote-btn { min-height: 36px; padding: 6px 12px; }
+}
