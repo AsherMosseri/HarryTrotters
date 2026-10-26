@@ -70,6 +70,26 @@ service cloud.firestore {
       allow delete: if isManager();
     }
 
+    // Resources tab. Team links: anyone adds; the person who added one, or
+    // team management, changes or removes it.
+    match /resources/{id} {
+      allow read: if isMember();
+      allow create: if isMember() && request.resource.data.byUid == request.auth.uid
+        && request.resource.data.title is string && request.resource.data.title.size() > 0
+        && request.resource.data.title.size() <= 120
+        && request.resource.data.url is string && request.resource.data.url.matches('https?://.+')
+        && request.resource.data.url.size() <= 2000;
+      allow update: if (isManager() || (isMember() && resource.data.byUid == request.auth.uid))
+        && request.resource.data.byUid == resource.data.byUid
+        && request.resource.data.url is string && request.resource.data.url.matches('https?://.+');
+      allow delete: if isManager() || (isMember() && resource.data.byUid == request.auth.uid);
+    }
+    // Diagrams (diagrams/electrical). The app lets Electrical and team
+    // management edit; earlier versions are kept in the doc's history.
+    match /diagrams/{id} {
+      allow read, write: if isMember();
+    }
+
     // The name this device joined with, and whether a name is that person
     // (also after one rename in settings/names).
     function myName() { return get(memberPath()).data.name; }
@@ -183,13 +203,18 @@ service cloud.firestore {
         && request.resource.data.text is string && request.resource.data.text.size() > 0
         && request.resource.data.text.size() <= 2000
         && request.resource.data.status == 'new';
+      // Everyone else: only their own 👍 / 👎.
       allow update: if requestsOwner() || (isMember()
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['votes']));
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['votes', 'downvotes'])
+        && onlyMyVote('votes') && onlyMyVote('downvotes'));
       allow delete: if requestsOwner() || (isMember() && resource.data.byUid == request.auth.uid);
     }
     // Who feature requests go to (REQUESTS_TO in src/config.js): only they set
     // the status and reply. Joining under this name takes their manager code.
     function requestsOwner() { return isManager() && isMe('Asher Mosseri'); }
+    function onlyMyVote(field) {
+      return request.resource.data.get(field, {}).diff(resource.data.get(field, {})).affectedKeys().hasOnly([myName()]);
+    }
 
     // Shifts (clock in/out). You clock yourself in (now, or up to 12 hours
     // earlier) and out; team management can add, fix, or remove anyone's.

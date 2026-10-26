@@ -26,6 +26,7 @@ import MilestonesView from './MilestonesView.jsx';
 import TeamView from './TeamView.jsx';
 import PartsView from './PartsView.jsx';
 import ChecklistsView from './ChecklistsView.jsx';
+import ResourcesView from './ResourcesView.jsx';
 import CatParty from './CatParty.jsx';
 import TrashDialog from './TrashDialog.jsx';
 import RunsView from './RunsView.jsx';
@@ -148,6 +149,7 @@ const VIEWS = [
   ['checklists', 'Checklists'],
   ['runs', 'Match Log'],
   ['robot', 'Robot'],
+  ['resources', 'Resources'],
   ['team', 'Team'],
 ];
 
@@ -277,6 +279,11 @@ export default function Workspace({ store, actor, rename, renames }) {
   useEffect(() => store.subscribeSettings(setSettings, loadFail('settings')), [store, loadFail]);
   useEffect(() => store.subscribeParts(setParts, loadFail('parts')), [store, loadFail]);
   useEffect(() => store.subscribeChecklists(setChecklists, loadFail('checklists')), [store, loadFail]);
+  // Resources: quiet on failure (works before the new rules are published).
+  const [resources, setResources] = useState([]);
+  const [diagram, setDiagram] = useState(null);
+  useEffect(() => store.subscribeResources(setResources, (e) => console.warn('resources', e)), [store]);
+  useEffect(() => store.subscribeDiagram('electrical', setDiagram, (e) => console.warn('diagram', e)), [store]);
   useEffect(() => store.subscribeRuns(setRuns, loadFail('the match log')), [store, loadFail]);
   useEffect(() => store.subscribeRobot(setRobot, loadFail('the robot')), [store, loadFail]);
   // Chat extras. Quiet on failure: the board works without them (e.g. before
@@ -701,6 +708,10 @@ export default function Workspace({ store, actor, rename, renames }) {
       updatePart: (p, patch) => store.updatePart(p.id, patch, actor).catch(fail),
       deletePart: (p) => store.deletePart(p.id).catch(fail),
       createChecklist: (data) => store.createChecklist(data, actor).catch(fail),
+      addResource: (data) => store.addResource(data, actor).catch(fail),
+      updateResource: (id, patch) => store.updateResource(id, patch, actor).catch(fail),
+      deleteResource: (id) => store.deleteResource(id).catch(fail),
+      saveDiagram: (data) => store.saveDiagram('electrical', data, actor),
       renameChecklist: (list, title) => store.renameChecklist(list.id, title).catch(fail),
       setChecklistItem: (list, item) => store.setChecklistItem(list.id, item).catch(fail),
       toggleChecklistItem: (list, item, done) =>
@@ -785,7 +796,7 @@ export default function Workspace({ store, actor, rename, renames }) {
           },
         ),
       updateRequest: (id, patch) => store.updateRequest(id, patch, actor).catch(fail),
-      voteRequest: (id, on) => store.voteRequest(id, actor.name, on).catch(fail),
+      voteRequest: (id, vote) => store.voteRequest(id, actor.name, vote).catch(fail),
       deleteRequest: (id) => store.deleteRequest(id).catch(fail),
       editMessage: (channel, id, patch) => store.editMessage(channel, id, patch).catch(fail),
       uploadChatGif: (channel, file) => store.uploadChatGif(channel, file).catch((e) => (fail(e), null)),
@@ -1301,6 +1312,15 @@ export default function Workspace({ store, actor, rename, renames }) {
               onOpenTask={setOpenId}
               checkins={upcomingCheckins}
               gradeOf={gradeOf}
+            />
+          ) : view === 'resources' ? (
+            <ResourcesView
+              resources={resources}
+              diagram={diagram}
+              actor={actor}
+              isManager={actor.admin}
+              canEditDiagram={actor.admin || (peopleInfo.get(actor.name)?.subteams || []).includes('Electrical')}
+              api={api}
             />
           ) : view === 'runs' ? (
             <RunsView runs={runs} roster={roster} api={api} />

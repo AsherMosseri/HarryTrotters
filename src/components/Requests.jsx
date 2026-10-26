@@ -73,7 +73,8 @@ function RequestItem({ r, actor, api, focused, onMakeTask }) {
     if (focused) ref.current?.scrollIntoView({ block: 'center' });
   }, [focused]);
   const votes = Object.keys(r.votes || {});
-  const mine = votes.includes(actor.name);
+  const downs = Object.keys(r.downvotes || {});
+  const mine = votes.includes(actor.name) ? 'up' : downs.includes(actor.name) ? 'down' : null;
   const st = statusOf(r.status);
   // Only REQUESTS_TO (Asher) sets the status, replies, and turns ideas into tasks.
   const owner = actor.name === REQUESTS_TO;
@@ -115,15 +116,30 @@ function RequestItem({ r, actor, api, focused, onMakeTask }) {
           </div>
         </div>
       )}
-      {votes.length > 0 && <p className="request-voters">👍 Wanted by {votes.map(firstName).join(', ')}</p>}
+      {(votes.length > 0 || downs.length > 0) && (
+        <p className="request-voters">
+          {votes.length > 0 && <span>👍 Wanted by {votes.map(firstName).join(', ')}</span>}
+          {downs.length > 0 && <span>👎 Not for {downs.map(firstName).join(', ')}</span>}
+        </p>
+      )}
       <div className="request-actions">
         <button
-          className={`vote-btn${mine ? ' on' : ''}`}
-          onClick={() => api.voteRequest(r.id, !mine)}
-          aria-pressed={mine}
-          title={votes.length ? `Wanted by ${votes.map(firstName).join(', ')}` : 'Want this too'}
+          className={`vote-btn${mine === 'up' ? ' on' : ''}`}
+          onClick={() => api.voteRequest(r.id, mine === 'up' ? null : 'up')}
+          aria-pressed={mine === 'up'}
+          aria-label="Want this"
+          title="Want this too"
         >
           👍 {votes.length || ''}
+        </button>
+        <button
+          className={`vote-btn down${mine === 'down' ? ' on' : ''}`}
+          onClick={() => api.voteRequest(r.id, mine === 'down' ? null : 'down')}
+          aria-pressed={mine === 'down'}
+          aria-label="Don't want this"
+          title="Not for me"
+        >
+          👎 {downs.length || ''}
         </button>
         {owner && (
           <>

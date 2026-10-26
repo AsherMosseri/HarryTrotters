@@ -608,6 +608,30 @@ export const demoStore = {
     commit();
   },
 
+  subscribeResources(cb) {
+    return listen(() => cb([...(state.resources || [])]));
+  },
+  async addResource(data, actor) {
+    state.resources = [...(state.resources || []), { id: uid(), ...data, by: actor.name, byUid: actor.uid, at: Date.now() }];
+    commit();
+  },
+  async updateResource(id, patch, actor) {
+    state.resources = (state.resources || []).map((r) =>
+      r.id === id ? { ...r, ...patch, updatedBy: actor.name, updatedAt: Date.now() } : r,
+    );
+    commit();
+  },
+  async deleteResource(id) {
+    state.resources = (state.resources || []).filter((r) => r.id !== id);
+    commit();
+  },
+  subscribeDiagram(id, cb) {
+    return listen(() => cb(state.diagrams?.[id] ? { id, ...state.diagrams[id] } : null));
+  },
+  async saveDiagram(id, data, actor) {
+    state.diagrams = { ...state.diagrams, [id]: { ...data, updatedBy: actor.name, updatedAt: Date.now() } };
+    commit();
+  },
   subscribeChecklists(cb) {
     return listen(() => cb((state.checklists || []).map((c) => ({ ...c, items: { ...c.items } }))));
   },
@@ -970,13 +994,16 @@ export const demoStore = {
     );
     commit();
   },
-  async voteRequest(id, name, on) {
+  async voteRequest(id, name, vote) {
     state.requests = (state.requests || []).map((r) => {
       if (r.id !== id) return r;
       const votes = { ...r.votes };
-      if (on) votes[name] = true;
-      else delete votes[name];
-      return { ...r, votes };
+      const downvotes = { ...r.downvotes };
+      delete votes[name];
+      delete downvotes[name];
+      if (vote === 'up') votes[name] = true;
+      if (vote === 'down') downvotes[name] = true;
+      return { ...r, votes, downvotes };
     });
     commit();
   },

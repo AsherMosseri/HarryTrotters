@@ -172,7 +172,9 @@ a { color: var(--accent); }
 .demo-banner a { color: inherit; font-weight: 700; }
 
 .topbar {
-  position: relative; z-index: 20; flex: none;
+  /* No z-index: pop-ups (inside .app-scroll, below) must always draw over the
+     header. With one, iPad Safari put the header over What's new. */
+  position: relative; flex: none;
   display: flex; align-items: center; gap: 16px;
   padding: 10px 16px; padding-top: max(11px, env(safe-area-inset-top)); /* clear of .status-bar-band */
   /* Solid, not a frosted-glass blur: Safari on iPad renders parts of a
@@ -347,6 +349,11 @@ textarea.draft { resize: none; overflow: hidden; }
   display: flex; justify-content: flex-end; animation: fade 0.15s ease;
 }
 .panel-backdrop.center { justify-content: center; align-items: flex-start; padding: 6vh 16px 16px; overflow-y: auto; }
+/* Tall pop-ups scroll inside themselves (the title stays put) instead of the
+   whole backdrop scrolling, which iPad Safari would bounce back. */
+.panel-backdrop.center > .dialog { max-height: calc(100dvh - 6vh - 16px); overflow-y: auto; overscroll-behavior: contain; }
+.panel-backdrop.center > .dialog > * { flex-shrink: 0; }
+.panel-backdrop.center > .dialog > .panel-head:first-child { position: sticky; top: 0; z-index: 5; background: var(--surface); }
 @keyframes fade { from { opacity: 0; } }
 @keyframes slide { from { transform: translateX(40px); opacity: 0; } }
 .panel {
@@ -1537,6 +1544,7 @@ h3.md-h { font-size: 16.5px; }
 .request-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .vote-btn { border: 1px solid var(--border); background: var(--surface); border-radius: 999px; padding: 3px 10px; font-weight: 700; font-size: 13px; color: var(--text); min-width: 44px; }
 .vote-btn.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.vote-btn.down.on { background: color-mix(in srgb, var(--danger) 12%, var(--surface)); border-color: var(--danger); color: var(--danger); }
 .request-status-select { font: inherit; font-size: 13px; padding: 3px 6px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); }
 .request-empty { text-align: center; padding: 16px; }
 
@@ -1859,11 +1867,89 @@ h3.md-h { font-size: 16.5px; }
 .reacted-glyph { flex: none; min-width: 22px; font-size: 15px; }
 .reacted-glyph .custom-emoji { width: 18px; height: 18px; vertical-align: -3px; }
 .reacted-super { font-size: 10px; margin-left: 1px; }
-.request-voters { margin: 0; font-size: 12.5px; color: var(--muted); }
+.request-voters { margin: 0; font-size: 12.5px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 2px 14px; }
 @media (max-width: 760px) {
   /* Chat pickers (emoji, stickers, GIFs, reactions) open near the top, so the keyboard never hides them. */
   .composer :is(.composer-emoji, .sticker-picker, .gif-picker), .msg-actions .reaction-picker {
     position: fixed; top: calc(env(safe-area-inset-top) + 64px); bottom: auto; left: 8px; right: 8px; width: auto; margin: 0;
     max-height: min(480px, calc(100dvh - env(safe-area-inset-top) - 160px)); overflow-y: auto; overscroll-behavior: contain; z-index: 45;
   }
+}
+
+/* ---------- resources tab ---------- */
+.content.resources { display: flex; flex-direction: column; gap: 16px; }
+.res-diagram { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 16px; align-items: center; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 14px; }
+.res-diagram-pic { border: 1px solid var(--border); border-radius: 10px; padding: 0; overflow: hidden; background: #fbfbfd; cursor: zoom-in; height: 240px; display: block; width: 100%; }
+.res-diagram-side { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.res-diagram-side h2, .res-section h2 { margin: 0; font-size: 17px; }
+.res-diagram-side p { margin: 0; }
+.dg-preview { width: 100%; height: 100%; display: block; pointer-events: none; }
+.res-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; align-items: start; }
+.res-section { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.res-section-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.res-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.res-item { display: flex; align-items: flex-start; gap: 10px; padding: 8px 0; border-top: 1px solid var(--border); }
+.res-item:first-child { border-top: 0; padding-top: 0; }
+.res-icon { font-size: 20px; line-height: 1.2; flex: none; }
+.res-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
+.res-text a { font-weight: 650; text-decoration: none; overflow-wrap: anywhere; }
+.res-text a:hover { text-decoration: underline; }
+.res-actions { display: flex; gap: 10px; flex: none; }
+.res-empty { margin: 0; }
+.res-form { display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: 10px; background: var(--surface-2); }
+.res-kinds button { font-size: 13px; }
+@media (max-width: 760px) {
+  .res-diagram { grid-template-columns: minmax(0, 1fr); }
+  .res-diagram-pic { height: 200px; }
+  .res-grid { grid-template-columns: minmax(0, 1fr); }
+}
+.btn.danger-btn { color: var(--danger); }
+
+/* ---------- electrical diagram editor ---------- */
+.dg-screen {
+  position: fixed; inset: 0; z-index: 46; display: flex; flex-direction: column; background: var(--bg);
+  padding-top: max(0px, env(safe-area-inset-top)); animation: fade 0.15s ease;
+}
+.dg-bar { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--border); background: var(--surface); flex-wrap: wrap; }
+.dg-bar h2 { margin: 0 6px 0 0; font-size: 17px; white-space: nowrap; }
+.dg-tools { display: flex; gap: 6px; flex-wrap: wrap; }
+.dg-saving { white-space: nowrap; }
+.dg-add { display: flex; gap: 6px; padding: 8px 14px; overflow-x: auto; border-bottom: 1px solid var(--border); background: var(--surface-2); scrollbar-width: none; }
+.dg-add-btn { flex: none; display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border); background: var(--surface); border-radius: 999px; padding: 6px 12px; font-weight: 600; font-size: 13.5px; white-space: nowrap; }
+.dg-add-btn:hover { border-color: var(--accent); }
+.dg-body { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 300px; }
+.dg-canvas { position: relative; min-height: 0; min-width: 0; }
+.dg-svg { width: 100%; height: 100%; display: block; touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab; }
+.dg-svg .dg-part { cursor: move; }
+.dg-svg .dg-port { cursor: crosshair; }
+.dg-svg .dg-wire { cursor: pointer; }
+.dg-zoom { position: absolute; right: 12px; bottom: 12px; display: flex; flex-direction: column; gap: 4px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 3px; box-shadow: var(--shadow); }
+.dg-hint { position: absolute; left: 50%; top: 12px; transform: translateX(-50%); background: #1f2230; color: #fff; padding: 7px 14px; border-radius: 999px; font-size: 13px; font-weight: 600; pointer-events: none; white-space: nowrap; }
+.dg-side { border-left: 1px solid var(--border); background: var(--surface); padding: 14px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+.dg-side h3 { margin: 0; font-size: 16px; }
+.dg-side h4 { margin: 4px 0 0; }
+.dg-side p { margin: 0; }
+.dg-field { display: flex; flex-direction: column; gap: 6px; }
+.dg-name { font-weight: 650; }
+.dg-conns, .dg-tips, .dg-legend, .dg-history { margin: 0; padding: 0 0 0 18px; display: flex; flex-direction: column; gap: 5px; }
+.dg-legend, .dg-history { list-style: none; padding: 0; }
+.dg-legend li { display: flex; align-items: center; gap: 8px; }
+.dg-swatch { display: inline-block; width: 18px; height: 8px; border-radius: 3px; border: 2px solid; vertical-align: middle; margin-right: 6px; flex: none; }
+.dg-legend .dg-swatch { margin: 0; }
+.dg-history li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 0; border-top: 1px solid var(--border); font-size: 14px; }
+.dg-portlist h4 { font-size: 14px; }
+.dg-portlist table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.dg-portlist td { padding: 4px 0; border-top: 1px solid var(--border); vertical-align: top; }
+.dg-portlist td:first-child { white-space: nowrap; color: var(--muted); padding-right: 10px; }
+@media (max-width: 760px) {
+  .dg-body { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; }
+  .dg-side { border-left: 0; border-top: 1px solid var(--border); max-height: 38dvh; padding-bottom: max(14px, env(safe-area-inset-bottom)); }
+  /* One row that scrolls sideways; the ✕ stays put on the right. */
+  .dg-bar { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding: 8px 10px; gap: 6px; }
+  .dg-bar::-webkit-scrollbar { display: none; }
+  .dg-bar > *, .dg-tools > * { flex: none; }
+  .dg-bar h2, .dg-bar .spacer { display: none; }
+  .dg-tools { flex-wrap: nowrap; }
+  .dg-bar > .icon-btn:last-child { position: sticky; right: -10px; background: var(--surface); box-shadow: -8px 0 8px var(--surface); }
+  .dg-hint { white-space: normal; text-align: center; width: max-content; max-width: calc(100% - 24px); }
 }

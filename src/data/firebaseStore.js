@@ -59,6 +59,8 @@ const settingsDoc = doc(db, 'settings', 'team');
 const namesDoc = doc(db, 'settings', 'names');
 const partsCol = collection(db, 'parts');
 const checklistsCol = collection(db, 'checklists');
+const resourcesCol = collection(db, 'resources');
+const diagramsCol = collection(db, 'diagrams');
 const runsCol = collection(db, 'runs');
 const channelsCol = collection(db, 'channels');
 const dmsCol = collection(db, 'dms');
@@ -452,6 +454,26 @@ export const firebaseStore = {
 
   // Checklist items live in an `items` map keyed by item id, so two people
   // ticking different boxes at once don't overwrite each other.
+  // Resources tab: the team's links, and diagrams (diagrams/electrical).
+  subscribeResources(cb, onError) {
+    return onSnapshot(resourcesCol, (snap) => cb(snap.docs.map(readDoc)), onError);
+  },
+  addResource(data, actor) {
+    return setDoc(doc(resourcesCol), { ...data, ...actorFields(actor), at: Date.now() });
+  },
+  updateResource(id, patch, actor) {
+    return updateDoc(doc(resourcesCol, id), { ...patch, updatedBy: actor.name, updatedAt: Date.now() });
+  },
+  deleteResource(id) {
+    return deleteDoc(doc(resourcesCol, id));
+  },
+  subscribeDiagram(id, cb, onError) {
+    return onSnapshot(doc(diagramsCol, id), (snap) => cb(snap.exists() ? { id, ...snap.data() } : null), onError);
+  },
+  saveDiagram(id, data, actor) {
+    return setDoc(doc(diagramsCol, id), { ...data, updatedBy: actor.name, updatedAt: Date.now() });
+  },
+
   subscribeChecklists(cb, onError) {
     return onSnapshot(checklistsCol, (snap) => cb(snap.docs.map(readDoc)), onError);
   },
@@ -746,8 +768,15 @@ export const firebaseStore = {
   updateRequest(id, patch, actor) {
     return updateDoc(doc(requestsCol, id), { ...patch, updatedBy: actor.name, updatedAt: Date.now() });
   },
-  voteRequest(id, name, on) {
-    return updateDoc(doc(requestsCol, id), new FieldPath('votes', name), on ? true : deleteField());
+  // vote: 'up' (👍), 'down' (👎), or null (neither). One at a time.
+  voteRequest(id, name, vote) {
+    return updateDoc(
+      doc(requestsCol, id),
+      new FieldPath('votes', name),
+      vote === 'up' ? true : deleteField(),
+      new FieldPath('downvotes', name),
+      vote === 'down' ? true : deleteField(),
+    );
   },
   deleteRequest(id) {
     return deleteDoc(doc(requestsCol, id));

@@ -13,6 +13,7 @@ const ICONS = {
   checklists: '✅',
   runs: '🏎',
   robot: '🤖',
+  resources: '📚',
   team: '👥',
 };
 

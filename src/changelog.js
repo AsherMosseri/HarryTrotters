@@ -4,6 +4,18 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '2.39',
+    date: '2026-10-26',
+    title: 'Resources and the electrical diagram',
+    items: [
+      'New Resources tab: the team’s own links (CAD, code, docs; only the team can see them) and good FTC links for BIOBUZZ, programming, electrical, building, and scouting.',
+      'Electrical diagram: every motor, servo, and sensor and the hub port it plugs into. Electrical and team management can edit it: add parts, drag them around, rename them, and wire ports by tapping one and then the other. Changes save on their own, with undo and earlier versions.',
+      'The diagram’s 🔌 Port list shows what’s plugged in where (handy for the robot configuration), and ⬇ PNG saves a picture.',
+      'Feature requests have 👎 too, and show who voted each way.',
+      'On iPad, pop-ups like What’s new show above the top bar and scroll inside themselves, so you can always get back to the top.',
+    ],
+  },
+  {
     version: '2.38',
     date: '2026-10-21',
     title: 'Chat pickers on phones',
