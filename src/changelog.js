@@ -6,11 +6,12 @@ export const CHANGELOG = [
   {
     version: '2.48',
     date: '2026-10-26',
-    title: 'Pretend ads',
+    title: 'Some new friends',
     items: [
-      'See what the app would look like with ads: 20 made-up ones (Torque Juice, Zip Ties Monthly, Sleep™…) with banners, Sponsored cards, ads in chat, and the occasional full-screen ad. They’re fake: no real brands, nothing tracked, nothing sold.',
-      'Ads only show when Asher turns them on, for everyone or for picked people. Tap Remove ads to get rid of them for a while (it’s free, really).',
-      'Asher’s 📺 Ads page controls everything: how many per page, how often full-screen ads pop up, the skip timer, which ads run, a schedule, animation from Calm to CHAOS, your own ads, and very real fake earnings.',
+      'A few new friends of the team may stop by from time to time. They’re very excited to meet you.',
+      'Things around the app might get a little more colorful, a little more sparkly, and a little more enthusiastic than usual.',
+      'Every so often, something exciting may take over your whole screen. Hang in there. It’ll pass.',
+      'There may be offers. They may end soon. They may not be real.',
     ],
   },
   {
