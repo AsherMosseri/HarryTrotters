@@ -44,7 +44,8 @@ export function Sheet({ title, onClose, children, className = '' }) {
 
 export function BottomNav({ views, view, setView, badges = {}, onMore, moreOn }) {
   // Your first four tabs (Edit tabs sets the order); the rest are under More.
-  const main = views.slice(0, PHONE_MAIN_COUNT);
+  // Five or fewer all fit, so there's no More then.
+  const main = views.length <= PHONE_MAIN_COUNT + 1 ? views : views.slice(0, PHONE_MAIN_COUNT);
   const inMore = !main.some(([id]) => id === view);
   return (
     <nav className="bottom-nav" aria-label="Tabs">
@@ -57,12 +58,14 @@ export function BottomNav({ views, view, setView, badges = {}, onMore, moreOn })
           <span className="bn-label">{label}</span>
         </button>
       ))}
-      <button className={inMore || moreOn ? 'on' : ''} onClick={onMore}>
-        <span className="bn-icon" aria-hidden="true">
-          ☰
-        </span>
-        <span className="bn-label">{inMore ? views.find(([id]) => id === view)?.[1] || 'More' : 'More'}</span>
-      </button>
+      {main.length < views.length && (
+        <button className={inMore || moreOn ? 'on' : ''} onClick={onMore}>
+          <span className="bn-icon" aria-hidden="true">
+            ☰
+          </span>
+          <span className="bn-label">{inMore ? views.find(([id]) => id === view)?.[1] || 'More' : 'More'}</span>
+        </button>
+      )}
     </nav>
   );
 }

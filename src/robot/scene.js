@@ -65,10 +65,41 @@ export class RobotScene {
     el.addEventListener('pointerdown', (e) => (this.down = { x: e.clientX, y: e.clientY, t: performance.now() }));
     el.addEventListener('pointerup', (e) => this.handleTap(e));
 
+    // Draw only while something can be changing: for a moment after a touch,
+    // a scroll, or any change made through the methods below. Idle, the
+    // viewer draws nothing, which saves battery on iPads and phones.
+    this.awakeUntil = 0;
+    for (const type of ['pointerdown', 'pointermove', 'wheel']) el.addEventListener(type, () => this.wake(), { passive: true });
+    for (const name of [
+      'resize',
+      'setBackground',
+      'setModel',
+      'view',
+      'setMode',
+      'setGizmoMode',
+      'paint',
+      'setSelected',
+      'setTints',
+      'setHidden',
+      'setExplode',
+      'applyTransforms',
+      'resetPart',
+      'nudge',
+      'turn',
+      'setPins',
+    ]) {
+      const fn = this[name].bind(this);
+      this[name] = (...args) => (this.wake(), fn(...args));
+    }
+
     this.resizeObserver = new ResizeObserver(() => this.resize());
     this.resizeObserver.observe(container);
     this.resize();
     this.renderer.setAnimationLoop(() => this.frame());
+  }
+
+  wake(ms = 1500) {
+    this.awakeUntil = Math.max(this.awakeUntil, performance.now() + ms);
   }
 
   resize() {
@@ -284,11 +315,15 @@ export class RobotScene {
   }
 
   frame() {
+    let moved;
     if (this.peer && this.peer.active && !this.active) {
       this.camera.position.copy(this.peer.camera.position);
       this.camera.quaternion.copy(this.peer.camera.quaternion);
       this.orbit.target.copy(this.peer.orbit.target);
-    } else this.orbit.update();
+      moved = true;
+    } else moved = this.orbit.update();
+    const now = performance.now();
+    if (!moved && !this.active && now > this.awakeUntil && !(this.peer && now <= this.peer.awakeUntil)) return;
     this.renderer.render(this.scene, this.camera);
 
     // Pin markers are HTML elements laid over the canvas.

@@ -4,6 +4,19 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '2.47',
+    date: '2026-10-26',
+    title: 'Fixes from a full checkup',
+    items: [
+      'Robot on phones: the Parts and Pins list under the 3D view is full size again (scroll down to it) instead of squeezed behind the tab bar.',
+      'The 3D robot only redraws while you move or change it, so it’s much easier on the battery.',
+      'Edit tabs keeps every tab in its place when some are turned off.',
+      'On phones, five or fewer tabs all fit in the tab bar, with no empty More.',
+      'The app opens a little faster: the name fonts load in the background.',
+      'The phone Filters sheet’s menus are full width.',
+    ],
+  },
+  {
     version: '2.46',
     date: '2026-10-26',
     title: 'Your tabs, your order',

@@ -1286,6 +1286,8 @@ h3.md-h { font-size: 16.5px; }
   .user-chip .avatar { display: none; }
   .robot-body { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(300px, 55vh) auto; }
   .robot-side { order: 2; max-height: none; }
+  /* The page scrolls here, so the robot takes its natural height and the parts list isn't squeezed under the viewer. */
+  .content.robot, .content.robot .robot-body { flex: none; }
   .viewports { order: 1; grid-auto-flow: row; grid-auto-rows: minmax(0, 1fr); }
   .robot-body.comparing { grid-template-rows: minmax(520px, 75vh) auto; }
   .version-select { max-width: none; flex: 1 1 100%; }
@@ -1773,7 +1775,7 @@ h3.md-h { font-size: 16.5px; }
 .more-tile span { font-size: 28px; line-height: 1; }
 .more-tile.on { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
 .sheet-filters { display: flex; flex-direction: column; gap: 10px; align-items: stretch; }
-.sheet-filters .filter { width: 100%; min-height: 46px; font-size: 16px; }
+.sheet-filters .filter { width: 100%; max-width: none; min-height: 46px; font-size: 16px; }
 .sheet-filters .chip { align-self: flex-start; padding: 8px 14px; font-size: 15px; }
 .me-head { display: flex; align-items: center; gap: 12px; }
 .me-head b { font-size: 17px; }

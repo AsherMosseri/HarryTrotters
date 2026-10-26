@@ -112,7 +112,7 @@ export default function TabsEditor({ all, order, hidden, canHide, onSave, onClos
                 </span>
                 <span className="grow">
                   {label[id]}
-                  {!off.has(id) && shown.indexOf(id) < 4 && <span className="tabs-phone">phone tab bar</span>}
+                  {!off.has(id) && (shown.length <= 5 || shown.indexOf(id) < 4) && <span className="tabs-phone">phone tab bar</span>}
                 </span>
                 {canHide && (
                   <label className="switch" title={off.has(id) ? 'Off for everyone' : 'On for everyone'}>

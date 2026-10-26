@@ -281,7 +281,8 @@ export default function Workspace({ store, actor, rename, renames }) {
   const order = tabOrder || (phone ? ['board', 'chat', 'shifts', 'parts'] : []);
   const rank = (id) => (order.includes(id) ? order.indexOf(id) : order.length + allViews.findIndex(([v]) => v === id));
   const shownViews = allViews.filter(([id]) => !hiddenTabs.includes(id));
-  const views = (shownViews.length ? shownViews : allViews).sort((a, b) => rank(a[0]) - rank(b[0]));
+  const byRank = (list) => [...list].sort((a, b) => rank(a[0]) - rank(b[0]));
+  const views = byRank(shownViews.length ? shownViews : allViews);
   const [editTabs, setEditTabs] = useState(false);
   const [meMenu, setMeMenu] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -1635,7 +1636,7 @@ export default function Workspace({ store, actor, rename, renames }) {
           {editTabs && (
             <TabsEditor
               all={allViews}
-              order={views.map(([id]) => id).concat(allViews.map(([id]) => id).filter((id) => !views.some(([v]) => v === id)))}
+              order={byRank(allViews).map(([id]) => id)}
               hidden={hiddenTabs}
               canHide={actor.admin && actor.name === REQUESTS_TO}
               onSave={(order, hidden) => {
