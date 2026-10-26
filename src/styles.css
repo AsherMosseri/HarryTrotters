@@ -2242,6 +2242,10 @@ body:has(.bottom-nav):has(.composer) .toast { bottom: calc(150px + env(safe-area
 .topbar .tabs button { padding: 6px 12px; font-size: 15px; font-weight: 600; color: var(--muted); border-radius: 999px; }
 .topbar .tabs button:hover { color: var(--text); background: color-mix(in srgb, var(--text) 5%, transparent); }
 .topbar .tabs button.active { background: var(--accent-soft); color: var(--accent); box-shadow: none; }
+/* iPad portrait: all tabs fit on one row (spacing shrinks with the screen, and leftover room is shared out). */
+@media (min-width: 761px) and (max-width: 1099px) {
+  .topbar .tabs button { flex: 1 0 auto; padding: 6px clamp(5px, 0.9vw, 12px); font-size: 14px; }
+}
 /* You: picture + name + ▾ opens a menu with profile, ideas, help, tabs, theme. */
 .me-wrap { position: relative; }
 .me-chip { position: relative; display: flex; align-items: center; gap: 8px; border: 0; background: transparent; border-radius: 999px; padding: 3px 10px 3px 3px; color: var(--text); font-weight: 600; }

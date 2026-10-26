@@ -16,6 +16,7 @@ export const CHANGELOG = [
       'The phone Filters sheet’s menus are full width.',
       'On iPad, chat Search, Pins, and Members open beside the chat instead of covering it, so you can still type and send. In portrait, the channel list steps aside while one is open.',
       'Bigger checkboxes and 👍/👎 buttons on phones and iPads.',
+      'iPad in portrait: all the tabs fit across the top, no more swiping the tab row to reach Team.',
     ],
   },
   {
