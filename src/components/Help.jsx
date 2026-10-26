@@ -130,7 +130,7 @@ const SECTIONS = [
       'Switch user (in your menu at the top right) signs this device out so someone else can use it. You’ll need the code again.',
       'Your menu (tap your name at the top right) picks light, dark, or automatic, and a color theme (Sunset, Ocean, Forest…) for this device.',
       '🎨 Custom… in that menu makes your own theme: any colors (even moving), a picture, GIF, or emoji pattern behind the app, and floating emoji or GIFs. 🎲 Surprise me picks for you, and 🪞 My profile matches your profile.',
-      '🗂 Edit tabs in that menu puts the tabs in your order. It follows you to every device; on a phone, your first four are the tab bar.',
+      '🗂 Edit tabs in that menu: drag the tabs into your order. It follows you to every device; on a phone, your first four are the tab bar.',
       'When the site is updated, you’ll be asked to tap Update now.',
     ],
   ],

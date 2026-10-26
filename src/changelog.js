@@ -8,7 +8,7 @@ export const CHANGELOG = [
     date: '2026-10-26',
     title: 'Your tabs, your order',
     items: [
-      'Edit tabs (in your menu at the top right, or Me on a phone) puts the tabs in the order you like. It’s saved to your profile, so it follows you to every device, and on a phone your first four are the tab bar.',
+      'Edit tabs (in your menu at the top right, or Me on a phone): drag the tabs into the order you like. It’s saved to your profile, so it follows you to every device, and on a phone your first four are the tab bar.',
       'A calmer top bar: your profile, Help, feature requests, the theme, and Check for updates now live in one menu under your name.',
       'The board’s filters fold into one Filters button that shows how many are on.',
       'Asher can turn tabs off for the whole team from Edit tabs.',

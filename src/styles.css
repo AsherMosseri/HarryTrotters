@@ -2256,10 +2256,15 @@ body:has(.bottom-nav):has(.composer) .toast { bottom: calc(150px + env(safe-area
 /* Edit tabs */
 .dialog.tabs-editor { width: min(480px, calc(100vw - 32px)); }
 .tabs-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
-.tabs-list li { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 10px; background: var(--surface-2); font-weight: 600; }
+.tabs-list { position: relative; }
+.tabs-list li {
+  position: relative; display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 6px 10px 6px 4px; border-radius: 10px;
+  background: var(--surface-2); font-weight: 600; cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none;
+}
+.tabs-list li.dragging { z-index: 2; cursor: grabbing; box-shadow: var(--shadow-lg); background: var(--surface); outline: 2px solid var(--accent); }
+.tabs-grip { width: 24px; text-align: center; color: var(--muted); font-size: 18px; line-height: 1; border-radius: 6px; }
+.tabs-grip:focus-visible { outline: 2px solid var(--accent); }
 .tabs-list li.off { opacity: 0.5; }
-.tabs-list .icon-btn { width: 32px; height: 32px; font-size: 12px; }
-.tabs-list .icon-btn:disabled { opacity: 0.3; }
 .tabs-icon { width: 24px; text-align: center; }
 .tabs-phone { margin-left: 8px; font-size: 11px; font-weight: 700; color: var(--accent); background: var(--accent-soft); border-radius: 999px; padding: 1px 7px; }
 .switch { position: relative; display: inline-block; width: 40px; height: 24px; flex: none; }
