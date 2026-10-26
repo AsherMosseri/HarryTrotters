@@ -5,6 +5,7 @@ import { Avatar, CloseIcon, DraftInput, Overlay, StatusSelect } from './common.j
 import { PartStatusSelect } from './PartsView.jsx';
 import PhotoViewer from './PhotoViewer.jsx';
 import { itemId } from '../data/diff.js';
+import { PopupAds } from './Ads.jsx';
 
 function fmtDate(iso) {
   if (!iso) return '';
@@ -468,6 +469,7 @@ export default function TaskPanel({ task, api, roster, milestones = [], parts = 
               {task.completedAt ? ` · Completed ${fullTime(task.completedAt)}` : ''}
             </p>
 
+            <PopupAds where="task" />
             <h3 className="section-title">Activity</h3>
             <Activity items={activity} milestoneName={milestoneName} />
             <div ref={feedEnd} />

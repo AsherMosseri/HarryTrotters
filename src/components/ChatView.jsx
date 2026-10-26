@@ -7,6 +7,7 @@ import Message from './chat/Message.jsx';
 import { mentionPattern } from './chat/format.jsx';
 import { EmojiManager, StickerManager } from './chat/Pickers.jsx';
 import { ChannelDialog, ChannelIcon, MembersPanel, NewDmDialog, NotifyMenu, PinsPanel, SearchPanel, slugChannel } from './chat/Panels.jsx';
+import { ChatAd, chatAdSpots, useAds } from './Ads.jsx';
 
 const GROUP_MINUTES = 5;
 const PAGE = 60;
@@ -120,6 +121,8 @@ export default function ChatView({
 
   const conv = current;
   const all = useMemo(() => [...(older[conv.key] || []), ...(messages[conv.key] || [])], [older, messages, conv.key]);
+  const ads = useAds();
+  const adSpots = chatAdSpots(ads, all.length);
   const taskById = useMemo(() => Object.fromEntries(tasks.map((t) => [t.id, t])), [tasks]);
   const emojiMap = useMemo(() => new Map(teamEmoji.map((e) => [e.name, e.url])), [teamEmoji]);
   const myRoles = people?.infoOf(actor.name)?.subteams || [];
@@ -468,6 +471,7 @@ export default function ChatView({
           </div>
         </header>
         <div className="msg-list" ref={list} onScroll={onScroll}>
+          {/* Pretend ads, every N messages (Asher's Ads page). */}
           {all.length >= PAGE && (
             <button className="btn ghost load-older" onClick={loadOlder} disabled={loadingOlder}>
               {loadingOlder ? 'Loading…' : 'Load older messages'}
@@ -490,6 +494,7 @@ export default function ChatView({
           )}
           {all.map((m, i) => {
             const prev = all[i - 1];
+            const adHere = adSpots.has(i);
             const day = dayLabel(m.at);
             const showDay = day !== lastDay;
             lastDay = day;
@@ -542,6 +547,7 @@ export default function ChatView({
                   onJump={(id) => jumpTo(id)}
                   onPerson={onPerson}
                 />
+                {adHere && <ChatAd k={i} />}
               </div>
             );
           })}

@@ -1,8 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
 import { relTime } from '../util.js';
 import { isIOS } from '../data/push.js';
+import { PopupAds } from './Ads.jsx';
 
-const ICONS = { announcement: '📣', mention: '@', assigned: '📋', due: '⏰', message: '💬', dm: '✉️', request: '💡', shift: '⏱', checkin: '🧪' };
+const ICONS = {
+  announcement: '📣',
+  mention: '@',
+  assigned: '📋',
+  due: '⏰',
+  message: '💬',
+  dm: '✉️',
+  request: '💡',
+  shift: '⏱',
+  checkin: '🧪',
+};
 
 function BellIcon() {
   return (
@@ -134,6 +145,7 @@ export default function Inbox({ items, pushStatus, onEnablePush, onDisablePush, 
             )}
           </div>
           <PushRow status={pushStatus} busy={busy} onEnable={run(onEnablePush)} onDisable={run(onDisablePush)} />
+          <PopupAds where="inbox" />
           <ul className="inbox-list">
             {items.map((n) => (
               <li key={n.id}>

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import {
   DndContext,
   pointerWithin,
@@ -14,6 +14,7 @@ import {
 import { STATUSES, priorityById } from '../config.js';
 import { AvatarStack, DueChip, PriorityBadge, CommentIcon, PlusIcon } from './common.jsx';
 import { useLocalStorage } from '../util.js';
+import { SponsoredCard, boardAdCount, useAds } from './Ads.jsx';
 
 // Drop into whichever column is under the finger/cursor; fall back to overlap.
 const collision = (args) => {
@@ -76,8 +77,22 @@ function Card({ task, onOpen }) {
   );
 }
 
+// Pretend ads: Sponsored cards after the 1st, 3rd, 5th… card; any left over go at the end.
+function adSlots(n, count) {
+  const after = new Map();
+  const tail = [];
+  for (let k = 0; k < n; k++) {
+    if (k * 2 < count) after.set(k * 2, k);
+    else tail.push(k);
+  }
+  return { after, tail };
+}
+
 function Column({ status, tasks, onOpen, onAdd }) {
   const { setNodeRef, isOver } = useDroppable({ id: status.id });
+  const ads = useAds();
+  const { after, tail } = adSlots(boardAdCount(ads, status.id), tasks.length);
+  const k0 = STATUSES.findIndex((s) => s.id === status.id) * 3;
   return (
     <section className={`column${isOver ? ' over' : ''}`} style={{ '--c': status.color }}>
       <header className="column-head">
@@ -89,10 +104,16 @@ function Column({ status, tasks, onOpen, onAdd }) {
         </button>
       </header>
       <div className="column-body" ref={setNodeRef}>
-        {tasks.map((t) => (
-          <Card key={t.id} task={t} onOpen={onOpen} />
+        {tasks.map((t, i) => (
+          <Fragment key={t.id}>
+            <Card task={t} onOpen={onOpen} />
+            {after.has(i) && <SponsoredCard slot="board" k={k0 + after.get(i)} />}
+          </Fragment>
         ))}
         {!tasks.length && <div className="column-empty">Drop tasks here</div>}
+        {tail.map((k) => (
+          <SponsoredCard key={`ad-${k}`} slot="board" k={k0 + k} />
+        ))}
       </div>
     </section>
   );
@@ -103,6 +124,9 @@ function PhoneBoard({ columns, onOpen, onAdd }) {
   const [status, setStatus] = useLocalStorage('phone-status', 'todo');
   const current = STATUSES.find((s) => s.id === status) || STATUSES[1];
   const list = columns[current.id] || [];
+  const ads = useAds();
+  const { after, tail } = adSlots(boardAdCount(ads, current.id), list.length);
+  const k0 = STATUSES.findIndex((s) => s.id === current.id) * 3;
   return (
     <div className="phone-board">
       <div className="phone-status-chips" role="tablist">
@@ -122,10 +146,16 @@ function PhoneBoard({ columns, onOpen, onAdd }) {
         ))}
       </div>
       <div className="phone-cards">
-        {list.map((t) => (
-          <button key={t.id} className={`card phone-card${t.status === 'done' ? ' is-done' : ''}`} onClick={() => onOpen(t.id)}>
-            <CardBody task={t} />
-          </button>
+        {list.map((t, i) => (
+          <Fragment key={t.id}>
+            <button className={`card phone-card${t.status === 'done' ? ' is-done' : ''}`} onClick={() => onOpen(t.id)}>
+              <CardBody task={t} />
+            </button>
+            {after.has(i) && <SponsoredCard slot="board" k={k0 + after.get(i)} />}
+          </Fragment>
+        ))}
+        {tail.map((k) => (
+          <SponsoredCard key={`ad-${k}`} slot="board" k={k0 + k} />
         ))}
         {!list.length && <p className="column-empty">Nothing in {current.short || current.label}.</p>}
         <button className="btn ghost phone-add" onClick={() => onAdd(current.id)}>

@@ -591,6 +591,26 @@ export const demoStore = {
     state.settings = { ...(state.settings || {}), ...patch };
     commit();
   },
+  async saveAdSettings(ads) {
+    state.settings = { ...(state.settings || {}), ads };
+    commit();
+  },
+  subscribeAdStats(cb) {
+    return listen(() => cb({ ...(state.adStats || {}) }));
+  },
+  async bumpAdStats(counts) {
+    const stats = { ...(state.adStats || {}) };
+    for (const [id, c] of Object.entries(counts)) {
+      const was = stats[id] || { views: 0, taps: 0 };
+      stats[id] = { views: was.views + (c.views || 0), taps: was.taps + (c.taps || 0) };
+    }
+    state.adStats = stats;
+    commit();
+  },
+  async resetAdStats() {
+    state.adStats = {};
+    commit();
+  },
 
   subscribeParts(cb) {
     return listen(() => cb([...(state.parts || [])]));

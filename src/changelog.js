@@ -4,6 +4,16 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '2.48',
+    date: '2026-10-26',
+    title: 'Pretend ads',
+    items: [
+      'See what the app would look like with ads: 20 made-up ones (Torque Juice, Zip Ties Monthly, Sleep™…) with banners, Sponsored cards, ads in chat, and the occasional full-screen ad. They’re fake: no real brands, nothing tracked, nothing sold.',
+      'Ads only show when Asher turns them on, for everyone or for picked people. Tap Remove ads to get rid of them for a while (it’s free, really).',
+      'Asher’s 📺 Ads page controls everything: how many per page, how often full-screen ads pop up, the skip timer, which ads run, a schedule, animation from Calm to CHAOS, your own ads, and very real fake earnings.',
+    ],
+  },
+  {
     version: '2.47',
     date: '2026-10-26',
     title: 'Fixes from a full checkup',

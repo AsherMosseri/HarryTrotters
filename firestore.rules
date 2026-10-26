@@ -61,6 +61,21 @@ service cloud.firestore {
       allow write: if isManager();
     }
 
+    // Pretend-ad view and tap counts (the fake earnings on the Ads page).
+    // Anyone can add a little at a time; only managers can reset them.
+    match /adStats/{id} {
+      function counts(d) { return d.keys().hasOnly(['views', 'taps']) && d.get('views', 0) is int && d.get('taps', 0) is int; }
+      allow read: if isMember();
+      allow create: if isMember() && id.matches('^[a-z0-9-]{1,40}$') && counts(request.resource.data)
+        && request.resource.data.get('views', 0) <= 500 && request.resource.data.get('taps', 0) <= 50;
+      allow update: if isMember() && counts(request.resource.data)
+        && request.resource.data.get('views', 0) >= resource.data.get('views', 0)
+        && request.resource.data.get('views', 0) <= resource.data.get('views', 0) + 500
+        && request.resource.data.get('taps', 0) >= resource.data.get('taps', 0)
+        && request.resource.data.get('taps', 0) <= resource.data.get('taps', 0) + 50;
+      allow delete: if isManager();
+    }
+
     // Parts tracker: anyone on the team. Checklists: anyone edits, managers delete.
     match /parts/{id} {
       allow read, write: if isMember();

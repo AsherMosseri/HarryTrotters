@@ -23,6 +23,7 @@ import { activeStatus } from '../people.js';
 import { Avatar, CloseIcon, Nameplate, Overlay, usePeople } from './common.jsx';
 import DecorationEditor from './DecorationEditor.jsx';
 import { DEFAULT_DECO } from './decoRender.jsx';
+import { PopupAds } from './Ads.jsx';
 
 const STATUS_IDEAS = [
   ['🔧', 'At the lab'],
@@ -358,6 +359,7 @@ export function ProfileCard({ name, actor, tasks, onClose, onMessage, onEdit, on
                 </>
               )}
             </div>
+            <PopupAds where="profile" />
           </CardBody>
         </div>
       </div>

@@ -430,6 +430,39 @@ export const firebaseStore = {
   saveSettings(patch, actor) {
     return setDoc(settingsDoc, { ...patch, updatedAt: serverTimestamp(), updatedBy: actor.name }, { merge: true });
   },
+  // The whole ads setup at once (mergeFields, so turned-off overrides go away).
+  saveAdSettings(ads, actor) {
+    return setDoc(
+      settingsDoc,
+      { ads, updatedAt: serverTimestamp(), updatedBy: actor.name },
+      { mergeFields: ['ads', 'updatedAt', 'updatedBy'] },
+    );
+  },
+  // Pretend-ad views and taps, one doc per ad, added up from every device.
+  subscribeAdStats(cb) {
+    return onSnapshot(
+      collection(db, 'adStats'),
+      (snap) => cb(Object.fromEntries(snap.docs.map((d) => [d.id, d.data()]))),
+      () => {},
+    );
+  },
+  bumpAdStats(counts) {
+    const batch = writeBatch(db);
+    for (const [id, c] of Object.entries(counts)) {
+      batch.set(
+        doc(db, 'adStats', id),
+        { views: increment(Math.min(c.views || 0, 500)), taps: increment(Math.min(c.taps || 0, 50)) },
+        { merge: true },
+      );
+    }
+    return batch.commit();
+  },
+  async resetAdStats() {
+    const snap = await getDocs(collection(db, 'adStats'));
+    const batch = writeBatch(db);
+    snap.docs.forEach((d) => batch.delete(d.ref));
+    return batch.commit();
+  },
 
   subscribeParts(cb, onError) {
     return onSnapshot(partsCol, (snap) => cb(snap.docs.map(readDoc)), onError);
@@ -473,7 +506,11 @@ export const firebaseStore = {
     return onSnapshot(doc(notesCol, personId(owner)), (snap) => cb(snap.exists() ? snap.data().notes || {} : {}), onError);
   },
   saveNote(owner, about, text) {
-    return setDoc(doc(notesCol, personId(owner)), { owner, notes: { [about]: text ? text.slice(0, 500) : deleteField() } }, { merge: true });
+    return setDoc(
+      doc(notesCol, personId(owner)),
+      { owner, notes: { [about]: text ? text.slice(0, 500) : deleteField() } },
+      { merge: true },
+    );
   },
   subscribeDiagram(id, cb, onError) {
     return onSnapshot(doc(diagramsCol, id), (snap) => cb(snap.exists() ? { id, ...snap.data() } : null), onError);

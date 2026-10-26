@@ -131,6 +131,7 @@ const SECTIONS = [
       'Your menu (tap your name at the top right) picks light, dark, or automatic, and a color theme (Sunset, Ocean, Forest…) for this device.',
       '🎨 Custom… in that menu makes your own theme: any colors (even moving), a picture, GIF, or emoji pattern behind the app, and floating emoji or GIFs. 🎲 Surprise me picks for you, and 🪞 My profile matches your profile.',
       '🗂 Edit tabs in that menu: drag the tabs into your order. It follows you to every device; on a phone, your first four are the tab bar.',
+      'Seeing ads? They’re pretend: made-up brands, nothing tracked or sold. Asher turns them on, and Remove ads on any ad turns them off for you for a while (free).',
       'When the site is updated, you’ll be asked to tap Update now.',
     ],
   ],
