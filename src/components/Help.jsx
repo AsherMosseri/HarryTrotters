@@ -18,13 +18,17 @@ const QUICK_TIPS = [
     'Turn on notifications',
     'The bell shows announcements, @mentions, tasks given to you, and what’s due tomorrow. Tap 🔔 → Turn on to get them on this device even when the app is closed.',
   ],
-  ['💡', 'Have an idea for the app?', `Tap 💡 at the top, type it, and tap Send idea. It goes straight to ${REQUESTS_TO.split(' ')[0]}.`],
+  [
+    '💡',
+    'Have an idea for the app?',
+    `Tap your name at the top right (Me on a phone) → Request a feature, type it, and tap Send idea. It goes straight to ${REQUESTS_TO.split(' ')[0]}.`,
+  ],
   [
     '📱',
     'On a phone',
     'Use the tabs at the bottom (More has the rest). On the board, pick a status at the top, tap a task to open it, and tap ＋ to add one. Tap your picture for theme, help, and more.',
   ],
-  ['🗑', 'Deleted something by mistake?', 'Tap Undo, or find it under Recently deleted in the filter row for 30 days.'],
+  ['🗑', 'Deleted something by mistake?', 'Tap Undo, or find it under Filters → Recently deleted for 30 days.'],
 ];
 
 const RULES = [
@@ -95,7 +99,7 @@ const SECTIONS = [
       'Resources: the team’s links (＋ Add link for CAD, code, and docs) and good FTC links. The ⚡ Electrical diagram shows what plugs in where; Electrical and team management can edit it.',
       '🔔 at the top of a channel: All messages, Only @mentions (the default), or Nothing. Announcements and DMs default to All.',
       'Direct messages: tap ＋ next to Direct messages (or Message on someone’s profile) to message one person or a group.',
-      'Tap anyone’s name or picture for their profile. Tap your own picture (top right) → Edit profile for a picture (GIFs stay animated), a banner, pronouns, about me, your name’s font, colors, and effect (shimmer, neon, outline, 3D pop, glitch, rainbow), a nameplate behind your name in the members list and DMs, an avatar decoration (animated ones like comets, a flame ring, or electric; or a custom one: any ring, colors, and spin, plus stickers you place, size, rotate, and animate), a profile effect (aurora, warp speed, lightning, matrix, sakura, and more, or a custom one that rains, rises, or floats any emoji, GIF, or picture you pick), profile colors (2 or 3), borders around your profile card and your messages, and a status like “🔧 At the lab”. Tap View full profile for their activity, subteammates, when they joined, and a private note only you can see. Calm chat (in the theme menu) keeps animations in chat still until you hover or tap. A green dot means they have the app open; you’ll see when someone is typing.',
+      'Tap anyone’s name or picture for their profile. Tap your name (top right, or Me on a phone) → Edit profile for a picture (GIFs stay animated), a banner, pronouns, about me, your name’s font, colors, and effect (shimmer, neon, outline, 3D pop, glitch, rainbow), a nameplate behind your name in the members list and DMs, an avatar decoration (animated ones like comets, a flame ring, or electric; or a custom one: any ring, colors, and spin, plus stickers you place, size, rotate, and animate), a profile effect (aurora, warp speed, lightning, matrix, sakura, and more, or a custom one that rains, rises, or floats any emoji, GIF, or picture you pick), profile colors (2 or 3), borders around your profile card and your messages, and a status like “🔧 At the lab”. Tap View full profile for their activity, subteammates, when they joined, and a private note only you can see. Calm chat (in the theme menu) keeps animations in chat still until you hover or tap. A green dot means they have the app open; you’ll see when someone is typing.',
     ],
   ],
   [
@@ -116,16 +120,17 @@ const SECTIONS = [
       'Phone notifications: tap 🔔 → Turn on, and allow them. Turn them on for each device you use.',
       'On iPad and iPhone the board opens only from the Home Screen app, which is what lets notifications work (iOS 16.4 or later). On a computer, it works in the browser.',
       'Turned them off by mistake? On iPad/iPhone: Settings → Notifications → 32313 Tasks.',
-      'Switch (top right) stops sending your notifications to that device.',
+      'Switch user (in your menu at the top right) stops sending your notifications to that device.',
     ],
   ],
   [
     'Your account',
     [
       'You only enter the team code once per device.',
-      'Switch (top right) signs this device out so someone else can use it. You’ll need the code again.',
-      'The sun/moon button picks light, dark, or automatic, and a color theme (Sunset, Ocean, Forest…) for this device.',
+      'Switch user (in your menu at the top right) signs this device out so someone else can use it. You’ll need the code again.',
+      'Your menu (tap your name at the top right) picks light, dark, or automatic, and a color theme (Sunset, Ocean, Forest…) for this device.',
       '🎨 Custom… in that menu makes your own theme: any colors (even moving), a picture, GIF, or emoji pattern behind the app, and floating emoji or GIFs. 🎲 Surprise me picks for you, and 🪞 My profile matches your profile.',
+      '🗂 Edit tabs in that menu puts the tabs in your order. It follows you to every device; on a phone, your first four are the tab bar.',
       'When the site is updated, you’ll be asked to tap Update now.',
     ],
   ],
@@ -186,7 +191,7 @@ export function WelcomeCard({ name, showRobot, pushStatus, onEnablePush, onClose
           <p className="muted">Here’s how the {TEAM_NAME} task board works.</p>
           <TipList showRobot={showRobot} />
           <Rules />
-          <p className="muted small">You can see these tips again anytime with the ? button at the top.</p>
+          <p className="muted small">You can see these tips again anytime with Help in your menu at the top right.</p>
           {pushStatus === 'off' ? (
             <>
               <button

@@ -2223,3 +2223,49 @@ body:has(.bottom-nav):has(.composer) .toast { bottom: calc(150px + env(safe-area
 @media (max-width: 760px) {
   .panel-backdrop.center:not(:has(> .dialog.profile-card)) { padding-top: max(11px, env(safe-area-inset-top)); background: var(--surface); }
 }
+
+/* ---------- calmer header (tablet / desktop) ---------- */
+/* Tabs: plain text with a soft pill on the open one, no heavy tray. */
+.topbar .tabs { background: transparent; padding: 0; gap: 0; }
+.topbar .tabs button { padding: 6px 12px; font-size: 15px; font-weight: 600; color: var(--muted); border-radius: 999px; }
+.topbar .tabs button:hover { color: var(--text); background: color-mix(in srgb, var(--text) 5%, transparent); }
+.topbar .tabs button.active { background: var(--accent-soft); color: var(--accent); box-shadow: none; }
+/* You: picture + name + ▾ opens a menu with profile, ideas, help, tabs, theme. */
+.me-wrap { position: relative; }
+.me-chip { position: relative; display: flex; align-items: center; gap: 8px; border: 0; background: transparent; border-radius: 999px; padding: 3px 10px 3px 3px; color: var(--text); font-weight: 600; }
+.me-chip:hover, .me-chip.on { background: var(--surface-2); }
+.me-chip .bell-badge { left: 22px; right: auto; top: -2px; }
+.me-caret { color: var(--muted); font-size: 12px; }
+.me-menu {
+  position: absolute; right: 0; top: calc(100% + 8px); z-index: 40; width: 300px; max-height: calc(100dvh - 90px); overflow-y: auto;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow-lg);
+  padding: 10px; display: flex; flex-direction: column; gap: 10px; animation: fade 0.12s ease;
+}
+.me-menu .theme-menu.inline { border: 0; box-shadow: none; padding: 0; background: transparent; }
+.me-menu .me-switch { align-self: stretch; }
+/* Filters: one button; the choices open below it. */
+.filters-wrap { position: relative; display: inline-flex; }
+.filters-pop {
+  position: absolute; left: 0; top: calc(100% + 8px); z-index: 30; width: 270px; padding: 12px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow-lg);
+  display: flex; flex-direction: column; gap: 8px; animation: fade 0.12s ease;
+}
+.filters-pop .filter { width: 100%; max-width: none; }
+.filters-pop .chip, .filters-pop .link-btn { align-self: flex-start; }
+.filters-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--muted); margin-left: 6px; vertical-align: 1px; }
+/* Edit tabs */
+.dialog.tabs-editor { width: min(480px, calc(100vw - 32px)); }
+.tabs-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.tabs-list li { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 10px; background: var(--surface-2); font-weight: 600; }
+.tabs-list li.off { opacity: 0.5; }
+.tabs-list .icon-btn { width: 32px; height: 32px; font-size: 12px; }
+.tabs-list .icon-btn:disabled { opacity: 0.3; }
+.tabs-icon { width: 24px; text-align: center; }
+.tabs-phone { margin-left: 8px; font-size: 11px; font-weight: 700; color: var(--accent); background: var(--accent-soft); border-radius: 999px; padding: 1px 7px; }
+.switch { position: relative; display: inline-block; width: 40px; height: 24px; flex: none; }
+.switch input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.switch span { position: absolute; inset: 0; border-radius: 999px; background: var(--border); transition: background 0.15s; pointer-events: none; }
+.switch span::after { content: ''; position: absolute; left: 3px; top: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: transform 0.15s; box-shadow: 0 1px 2px rgb(0 0 0 / 25%); }
+.switch input:checked + span { background: var(--accent); }
+.switch input:checked + span::after { transform: translateX(16px); }
+.switch input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }

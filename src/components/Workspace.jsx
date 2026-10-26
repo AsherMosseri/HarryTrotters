@@ -20,6 +20,7 @@ import { preparePhoto, useLocalStorage, useMedia } from '../util.js';
 import { Avatar, Overlay, PeopleContext, PlusIcon } from './common.jsx';
 import { ProfileCard, ProfileEditor } from './People.jsx';
 import ProfilePage from './ProfilePage.jsx';
+import TabsEditor from './TabsEditor.jsx';
 import TableView from './TableView.jsx';
 import BoardView from './BoardView.jsx';
 import TaskPanel from './TaskPanel.jsx';
@@ -54,6 +55,12 @@ try {
     const m = /^2\.(\d+)$/.exec(seen || '');
     if (m) localStorage.setItem('seen-version', JSON.stringify(m[1] === '0' ? '1.9' : `2.${Number(m[1]) - 1}`));
     localStorage.setItem('versions-renumbered', '1');
+  }
+  // The first 2.46 (Member since) was folded into 2.45, and 2.46 is now
+  // Edit tabs. Devices that saw the first one should still see the new one.
+  if (!localStorage.getItem('v246-merged')) {
+    if (localStorage.getItem('seen-version') === '"2.46"') localStorage.setItem('seen-version', '"2.45"');
+    localStorage.setItem('v246-merged', '1');
   }
 } catch {
   /* storage unavailable */
@@ -123,6 +130,30 @@ function ThemeMenu({
     </div>
   );
 }
+
+// A small menu that closes when you tap outside it or press Escape.
+function Popover({ wrap, className, onClose, children }) {
+  useEffect(() => {
+    const away = (e) => !e.target.closest(wrap) && onClose();
+    const esc = (e) => e.key === 'Escape' && onClose();
+    document.addEventListener('pointerdown', away);
+    window.addEventListener('keydown', esc);
+    return () => {
+      document.removeEventListener('pointerdown', away);
+      window.removeEventListener('keydown', esc);
+    };
+  }, [wrap, onClose]);
+  return (
+    <div className={className} role="dialog">
+      {children}
+    </div>
+  );
+}
+const MeMenu = ({ onClose, children }) => (
+  <Popover wrap=".me-wrap" className="me-menu" onClose={onClose}>
+    {children}
+  </Popover>
+);
 
 function ThemeIcon({ theme }) {
   const common = {
@@ -237,12 +268,25 @@ export default function Workspace({ store, actor, rename, renames }) {
     welcomed && seenVersion && seenVersion !== VERSION ? versionsSince(seenVersion) : welcomed && !seenVersion ? versionsSince(null) : null;
   const [showHelp, setShowHelp] = useState(false);
   const [savedView, setView] = useLocalStorage('view', 'board');
-  const showRobot = ROBOT_TAB_PEOPLE.includes(actor.name);
-  const views = showRobot ? VIEWS : VIEWS.filter(([id]) => id !== 'robot');
-  const view = views.some(([id]) => id === savedView) ? savedView : 'board';
-  const taskView = view === 'board' || view === 'table';
   // Phones get a slim top bar, a bottom tab bar, and sheets instead of the header's buttons.
   const phone = useMedia('(max-width: 760px)');
+  const showRobot = ROBOT_TAB_PEOPLE.includes(actor.name);
+  const [profileDocs, setProfileDocs] = useState([]);
+  // Tabs: the owner can turn tabs off for everyone (settings.hiddenTabs);
+  // each person orders their own (profile.tabOrder, on every device).
+  const allViews = showRobot ? VIEWS : VIEWS.filter(([id]) => id !== 'robot');
+  const hiddenTabs = settings.hiddenTabs || [];
+  const tabOrder = profileDocs.find((d) => d.id === personId(actor.name))?.tabOrder;
+  // No saved order: phones start with Board, Chat, Shifts, Parts on the tab bar.
+  const order = tabOrder || (phone ? ['board', 'chat', 'shifts', 'parts'] : []);
+  const rank = (id) => (order.includes(id) ? order.indexOf(id) : order.length + allViews.findIndex(([v]) => v === id));
+  const shownViews = allViews.filter(([id]) => !hiddenTabs.includes(id));
+  const views = (shownViews.length ? shownViews : allViews).sort((a, b) => rank(a[0]) - rank(b[0]));
+  const [editTabs, setEditTabs] = useState(false);
+  const [meMenu, setMeMenu] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const view = views.some(([id]) => id === savedView) ? savedView : views[0][0];
+  const taskView = view === 'board' || view === 'table';
   const [phoneSheet, setPhoneSheet] = useState(null); // 'me' | 'more' | 'filters'
   const closeSheet = useCallback(() => setPhoneSheet(null), []);
   // iPhone: opening the keyboard scrolls the whole page to show the text box,
@@ -331,7 +375,6 @@ export default function Workspace({ store, actor, rename, renames }) {
   const quiet = useCallback((what) => (e) => console.warn(what, e), []);
   const [channelDocs, setChannelDocs] = useState([]);
   const [dmDocs, setDmDocs] = useState([]);
-  const [profileDocs, setProfileDocs] = useState([]);
   const [presence, setPresence] = useState([]);
   const [teamEmoji, setTeamEmoji] = useState([]);
   const [stickers, setStickers] = useState([]);
@@ -1029,6 +1072,7 @@ export default function Workspace({ store, actor, rename, renames }) {
       setPalette('custom');
       setThemeMenu(false);
       setPhoneSheet(null);
+      setMeMenu(false);
       setStudio(true);
     },
   };
@@ -1125,41 +1169,41 @@ export default function Workspace({ store, actor, rename, renames }) {
               <Countdown date={competitionDate} />
               {shiftButton}
               {inboxButton}
-              <button
-                className="icon-btn idea-btn"
-                title="Request a feature"
-                aria-label={newRequests ? `Feature requests, ${newRequests} new` : 'Request a feature'}
-                onClick={() => setShowRequests(true)}
-              >
-                💡
-                {newRequests > 0 && <span className="bell-badge">{newRequests > 9 ? '9+' : newRequests}</span>}
-              </button>
-              <button className="icon-btn help-btn" title="Help" aria-label="Help" onClick={() => setShowHelp(true)}>
-                ?
-              </button>
-              <span className="theme-wrap">
+              <div className="user-chip me-wrap">
                 <button
-                  className={`icon-btn${themeMenu ? ' on' : ''}`}
-                  title="Theme"
-                  aria-label="Theme"
-                  onClick={() => setThemeMenu(!themeMenu)}
+                  className={`me-chip${meMenu ? ' on' : ''}`}
+                  onClick={() => setMeMenu(!meMenu)}
+                  aria-label={newRequests ? `You: ${newRequests} new feature requests` : 'You: profile, ideas, help, theme'}
+                  aria-expanded={meMenu}
                 >
-                  <ThemeIcon theme={theme} />
-                </button>
-                {themeMenu && <ThemeMenu {...themeMenuProps} onClose={() => setThemeMenu(false)} />}
-              </span>
-              <div className="user-chip">
-                <button className="avatar-btn" onClick={() => setProfileFor(actor.name)} title="Your profile" aria-label="Your profile">
                   <Avatar name={actor.name} size={30} />
+                  <span className="user-name">{actor.name.split(' ')[0]}</span>
+                  <span className="me-caret" aria-hidden="true">
+                    ▾
+                  </span>
+                  {newRequests > 0 && <span className="bell-badge">{newRequests > 9 ? '9+' : newRequests}</span>}
                 </button>
-                <span className="user-name">{actor.name.split(' ')[0]}</span>
-                <button
-                  className="link-btn"
-                  title="Not you? Switch to a different name (needs the team code again)"
-                  onClick={() => confirm('Switch user? You will need the team code again on this device.') && store.leave()}
-                >
-                  Switch
-                </button>
+                {meMenu && (
+                  <MeMenu onClose={() => setMeMenu(false)}>
+                    <div className="me-list">
+                      <button onClick={() => (setMeMenu(false), setProfileFor(actor.name))}>👤 My profile</button>
+                      <button onClick={() => (setMeMenu(false), setEditProfileFor(actor.name))}>✏️ Edit profile</button>
+                      <button onClick={() => (setMeMenu(false), setShowRequests(true))}>
+                        💡 Request a feature {newRequests > 0 && <span className="me-badge">{newRequests}</span>}
+                      </button>
+                      <button onClick={() => (setMeMenu(false), setShowHelp(true))}>❓ Help</button>
+                      <button onClick={() => (setMeMenu(false), setEditTabs(true))}>🗂 Edit tabs</button>
+                    </div>
+                    <ThemeMenu {...themeMenuProps} inline onClose={() => {}} />
+                    <UpdateCheck />
+                    <button
+                      className="btn me-switch"
+                      onClick={() => confirm('Switch user? You will need the team code again on this device.') && store.leave()}
+                    >
+                      Switch user
+                    </button>
+                  </MeMenu>
+                )}
               </div>
             </div>
           </header>
@@ -1212,7 +1256,21 @@ export default function Workspace({ store, actor, rename, renames }) {
                     Filters{filterCount ? ` · ${filterCount}` : ''}
                   </button>
                 ) : (
-                  filterControls
+                  <span className="filters-wrap">
+                    <button
+                      className={`chip${filterCount || filtersOpen ? ' on' : ''}`}
+                      onClick={() => setFiltersOpen(!filtersOpen)}
+                      aria-expanded={filtersOpen}
+                    >
+                      ⚙︎ Filters{filterCount ? ` · ${filterCount}` : ''}
+                      {trash.length > 0 && !filterCount ? <span className="filters-dot" aria-hidden="true" /> : null}
+                    </button>
+                    {filtersOpen && (
+                      <Popover wrap=".filters-wrap" className="filters-pop" onClose={() => setFiltersOpen(false)}>
+                        {filterControls}
+                      </Popover>
+                    )}
+                  </span>
                 )}
               </div>
               {!phone && (
@@ -1574,6 +1632,20 @@ export default function Workspace({ store, actor, rename, renames }) {
               }}
             />
           )}
+          {editTabs && (
+            <TabsEditor
+              all={allViews}
+              order={views.map(([id]) => id).concat(allViews.map(([id]) => id).filter((id) => !views.some(([v]) => v === id)))}
+              hidden={hiddenTabs}
+              canHide={actor.admin && actor.name === REQUESTS_TO}
+              onSave={(order, hidden) => {
+                api.saveProfile(actor.name, { tabOrder: order });
+                if (actor.admin && actor.name === REQUESTS_TO && hidden.join() !== hiddenTabs.join())
+                  api.saveSettings({ hiddenTabs: hidden });
+              }}
+              onClose={() => setEditTabs(false)}
+            />
+          )}
           {fullProfileFor && (
             <ProfilePage
               name={fullProfileFor}
@@ -1674,6 +1746,7 @@ export default function Workspace({ store, actor, rename, renames }) {
                     💡 Request a feature {newRequests > 0 && <span className="me-badge">{newRequests}</span>}
                   </button>
                   <button onClick={() => (closeSheet(), setShowHelp(true))}>❓ Help</button>
+                  <button onClick={() => (closeSheet(), setEditTabs(true))}>🗂 Edit tabs</button>
                 </div>
                 <ThemeMenu {...themeMenuProps} inline onClose={() => {}} />
                 <UpdateCheck />

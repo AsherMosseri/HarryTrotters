@@ -2,8 +2,8 @@ import { useEffect } from 'react';
 import { CloseIcon, Overlay } from './common.jsx';
 
 // Phone layout pieces: the bottom tab bar, and sheets that slide up from the bottom.
-export const PHONE_MAIN = ['board', 'chat', 'shifts', 'parts'];
-const ICONS = {
+export const PHONE_MAIN_COUNT = 4;
+export const TAB_ICONS = {
   board: '📋',
   table: '📑',
   chat: '💬',
@@ -43,14 +43,15 @@ export function Sheet({ title, onClose, children, className = '' }) {
 }
 
 export function BottomNav({ views, view, setView, badges = {}, onMore, moreOn }) {
-  const main = views.filter(([id]) => PHONE_MAIN.includes(id));
-  const inMore = !PHONE_MAIN.includes(view);
+  // Your first four tabs (Edit tabs sets the order); the rest are under More.
+  const main = views.slice(0, PHONE_MAIN_COUNT);
+  const inMore = !main.some(([id]) => id === view);
   return (
     <nav className="bottom-nav" aria-label="Tabs">
       {main.map(([id, label]) => (
         <button key={id} className={view === id ? 'on' : ''} aria-current={view === id ? 'page' : undefined} onClick={() => setView(id)}>
           <span className="bn-icon" aria-hidden="true">
-            {ICONS[id]}
+            {TAB_ICONS[id]}
             {badges[id] ? <span className="bn-badge">{badges[id] > 99 ? '99+' : badges[id]}</span> : null}
           </span>
           <span className="bn-label">{label}</span>
@@ -70,21 +71,19 @@ export function MoreSheet({ views, view, setView, onClose }) {
   return (
     <Sheet title="More" onClose={onClose}>
       <div className="more-grid">
-        {views
-          .filter(([id]) => !PHONE_MAIN.includes(id))
-          .map(([id, label]) => (
-            <button
-              key={id}
-              className={`more-tile${view === id ? ' on' : ''}`}
-              onClick={() => {
-                setView(id);
-                onClose();
-              }}
-            >
-              <span aria-hidden="true">{ICONS[id]}</span>
-              {label}
-            </button>
-          ))}
+        {views.slice(PHONE_MAIN_COUNT).map(([id, label]) => (
+          <button
+            key={id}
+            className={`more-tile${view === id ? ' on' : ''}`}
+            onClick={() => {
+              setView(id);
+              onClose();
+            }}
+          >
+            <span aria-hidden="true">{TAB_ICONS[id]}</span>
+            {label}
+          </button>
+        ))}
       </div>
     </Sheet>
   );

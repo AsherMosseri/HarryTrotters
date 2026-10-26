@@ -6,8 +6,13 @@ export const CHANGELOG = [
   {
     version: '2.46',
     date: '2026-10-26',
-    title: 'Member since',
-    items: ['“Member since” on full profiles shows August 28, 2026, when the team started.'],
+    title: 'Your tabs, your order',
+    items: [
+      'Edit tabs (in your menu at the top right, or Me on a phone) puts the tabs in the order you like. It’s saved to your profile, so it follows you to every device, and on a phone your first four are the tab bar.',
+      'A calmer top bar: your profile, Help, feature requests, the theme, and Check for updates now live in one menu under your name.',
+      'The board’s filters fold into one Filters button that shows how many are on.',
+      'Asher can turn tabs off for the whole team from Edit tabs.',
+    ],
   },
   {
     version: '2.45',
@@ -15,6 +20,7 @@ export const CHANGELOG = [
     title: 'Back where you were',
     items: [
       'Closing a pop-up you opened from another one takes you back to it, like a back button: Edit profile → back to the full profile (saving shows your change there), a teammate’s profile → back to the one you came from, a task opened from a profile → back to the profile, and Version log or Feature requests opened from Help → back to Help.',
+      '“Member since” on full profiles shows August 28, 2026, when the team started.',
     ],
   },
   {
