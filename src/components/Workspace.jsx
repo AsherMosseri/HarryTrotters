@@ -44,6 +44,20 @@ import ThemeStudio, { AppBackdrop, CUSTOM_DEFAULT, applyThemeVars, themeFromProf
 import { VERSION, versionsSince } from '../changelog.js';
 import Inbox from './Inbox.jsx';
 
+// Versions were renumbered once (2.0 became 1.9, 2.1 became 2.0, and so
+// on). Move this device's "last seen" version along so What's new doesn't
+// show again.
+try {
+  if (!localStorage.getItem('versions-renumbered')) {
+    const seen = JSON.parse(localStorage.getItem('seen-version') || 'null');
+    const m = /^2\.(\d+)$/.exec(seen || '');
+    if (m) localStorage.setItem('seen-version', JSON.stringify(m[1] === '0' ? '1.9' : `2.${Number(m[1]) - 1}`));
+    localStorage.setItem('versions-renumbered', '1');
+  }
+} catch {
+  /* storage unavailable */
+}
+
 // Light / dark / automatic, plus the app color themes.
 function ThemeMenu({
   theme,

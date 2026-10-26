@@ -2171,11 +2171,9 @@ body:has(.bottom-nav):has(.composer) .toast { bottom: calc(150px + env(safe-area
 /* Decorations that break out of the circle (ears, hats, wings...). */
 .adeco.adeco-behind { z-index: 0; }
 .adeco .ad-twitch { animation: ad-twitch 4s ease-in-out infinite; }
-.adeco .ad-twitch.late { animation-delay: -1.3s; }
-@keyframes ad-twitch { 0%, 86%, 100% { transform: rotate(0); } 90% { transform: rotate(-12deg); } 94% { transform: rotate(6deg); } }
+@keyframes ad-twitch { 0%, 86%, 100% { transform: rotate(0); } 90% { transform: rotate(var(--r, 10deg)); } 94% { transform: rotate(calc(var(--r, 10deg) * -0.4)); } }
 .adeco .ad-flop { animation: ad-flop 3s ease-in-out infinite; }
-.adeco .ad-flop.late { animation-delay: -1.5s; }
-@keyframes ad-flop { 50% { transform: rotate(var(--r, 8deg)); } }
+@keyframes ad-flop { 50% { transform: rotate(var(--r, 7deg)); } }
 .adeco .ad-sway { animation: ad-sway 3.4s ease-in-out infinite; }
 @keyframes ad-sway { 0%, 100% { transform: rotate(-3deg); } 50% { transform: rotate(4deg); } }
 .adeco .ad-bop { animation: ad-bop 0.9s ease-in-out infinite; }

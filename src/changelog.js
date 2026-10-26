@@ -6,6 +6,15 @@ export const CHANGELOG = [
   {
     version: '2.43',
     date: '2026-10-26',
+    title: 'Smoother diagram zoom',
+    items: [
+      'Pinching to zoom in the electrical diagram stays on the spot you pinched instead of sliding around. On a trackpad, scroll to move around and pinch to zoom.',
+      'Cat ears and bunny ears stay level when they move.',
+    ],
+  },
+  {
+    version: '2.42',
+    date: '2026-10-26',
     title: 'Full profiles, and lots more style',
     items: [
       'Full profiles: tap “View full profile” on anyone’s card for a big profile with About, Activity (hours, what they’re working on, what they finished), and Team (their subteammates).',
@@ -17,7 +26,7 @@ export const CHANGELOG = [
     ],
   },
   {
-    version: '2.42',
+    version: '2.41',
     date: '2026-10-26',
     title: 'Pop-ups fixed for good on iPhone and iPad',
     items: [
@@ -25,7 +34,7 @@ export const CHANGELOG = [
     ],
   },
   {
-    version: '2.41',
+    version: '2.40',
     date: '2026-10-26',
     title: 'Profiles, Nitro-style',
     items: [
@@ -38,7 +47,7 @@ export const CHANGELOG = [
     ],
   },
   {
-    version: '2.40',
+    version: '2.39',
     date: '2026-10-26',
     title: 'Real parts in the electrical diagram',
     items: [
@@ -48,7 +57,7 @@ export const CHANGELOG = [
     ],
   },
   {
-    version: '2.39',
+    version: '2.38',
     date: '2026-10-26',
     title: 'Resources and the electrical diagram',
     items: [
@@ -60,7 +69,7 @@ export const CHANGELOG = [
     ],
   },
   {
-    version: '2.38',
+    version: '2.37',
     date: '2026-10-21',
     title: 'Chat pickers on phones',
     items: [
@@ -69,7 +78,7 @@ export const CHANGELOG = [
     ],
   },
   {
-    version: '2.37',
+    version: '2.36',
     date: '2026-10-21',
     title: 'Who reacted, and managers can set status',
     items: [
@@ -81,13 +90,13 @@ export const CHANGELOG = [
     ],
   },
   {
-    version: '2.36',
+    version: '2.35',
     date: '2026-10-21',
     title: 'Version log fix',
     items: ['On phones, the Version log shows each version again instead of a stack of thin lines.'],
   },
   {
-    version: '2.35',
+    version: '2.34',
     date: '2026-10-21',
     title: 'More phone polish',
     items: [
@@ -100,7 +109,7 @@ export const CHANGELOG = [
     ],
   },
   {
-    version: '2.34',
+    version: '2.33',
     date: '2026-10-21',
     title: 'Pop-ups fit phones',
     items: [
@@ -109,7 +118,7 @@ export const CHANGELOG = [
     ],
   },
   {
-    version: '2.33',
+    version: '2.32',
     date: '2026-10-21',
     title: 'Thicker avatar rings',
     items: [
@@ -117,7 +126,7 @@ export const CHANGELOG = [
     ],
   },
   {
-    version: '2.32',
+    version: '2.31',
     date: '2026-10-21',
     title: 'Phone fixes',
     items: [
@@ -128,7 +137,7 @@ export const CHANGELOG = [
     ],
   },
   {
-    version: '2.31',
+    version: '2.30',
     date: '2026-10-21',
     title: 'A real phone layout',
     items: [
@@ -140,7 +149,7 @@ export const CHANGELOG = [
     ],
   },
   {
-    version: '2.30',
+    version: '2.29',
     date: '2026-10-21',
     title: 'Three-color gradients and custom borders',
     items: [
@@ -151,7 +160,7 @@ export const CHANGELOG = [
     ],
   },
   {
-    version: '2.29',
+    version: '2.28',
     date: '2026-10-21',
     title: 'Custom avatar decorations',
     items: [
@@ -162,7 +171,7 @@ export const CHANGELOG = [
     ],
   },
   {
-    version: '2.28',
+    version: '2.27',
     date: '2026-10-21',
     title: 'Chat follows along',
     items: [
@@ -171,7 +180,7 @@ export const CHANGELOG = [
     ],
   },
   {
-    version: '2.27',
+    version: '2.26',
     date: '2026-10-21',
     title: 'Custom themes',
     items: [
@@ -183,7 +192,7 @@ export const CHANGELOG = [
     ],
   },
   {
-    version: '2.26',
+    version: '2.25',
     date: '2026-10-21',
     title: 'Lab check-in, grades, and parts chat',
     items: [
@@ -194,19 +203,19 @@ export const CHANGELOG = [
     ],
   },
   {
-    version: '2.25',
+    version: '2.24',
     date: '2026-10-21',
     title: 'Status bar color',
     items: ['The area behind the iPad status bar matches the header (white, or dark in dark mode) instead of gray.'],
   },
   {
-    version: '2.24',
+    version: '2.23',
     date: '2026-10-21',
     title: 'Header blur, third try',
     items: ['The header is back to its normal size, with another fix for the blur under the iPad status bar.'],
   },
   {
-    version: '2.23',
+    version: '2.22',
     date: '2026-10-21',
     title: 'Header blur, another try',
     items: [
@@ -215,7 +224,7 @@ export const CHANGELOG = [
     ],
   },
   {
-    version: '2.22',
+    version: '2.21',
     date: '2026-10-21',
     title: 'Shifts',
     items: [
@@ -228,7 +237,7 @@ export const CHANGELOG = [
     ],
   },
   {
-    version: '2.21',
+    version: '2.20',
     date: '2026-10-21',
     title: 'Online dot fixes',
     items: [
@@ -237,7 +246,7 @@ export const CHANGELOG = [
     ],
   },
   {
-    version: '2.20',
+    version: '2.19',
     date: '2026-10-21',
     title: 'Check for updates',
     items: [
@@ -246,7 +255,7 @@ export const CHANGELOG = [
     ],
   },
   {
-    version: '2.19',
+    version: '2.18',
     date: '2026-10-21',
     title: 'Avatar decorations fixed',
     items: [
@@ -255,7 +264,7 @@ export const CHANGELOG = [
     ],
   },
   {
-    version: '2.18',
+    version: '2.17',
     date: '2026-10-21',
     title: 'Type an emoji to pick it',
     items: [
@@ -263,7 +272,7 @@ export const CHANGELOG = [
     ],
   },
   {
-    version: '2.17',
+    version: '2.16',
     date: '2026-10-21',
     title: 'See which tab you’re on',
     items: [
@@ -272,7 +281,7 @@ export const CHANGELOG = [
     ],
   },
   {
-    version: '2.16',
+    version: '2.15',
     date: '2026-10-21',
     title: 'Status buttons in tasks',
     items: [
@@ -281,7 +290,7 @@ export const CHANGELOG = [
     ],
   },
   {
-    version: '2.15',
+    version: '2.14',
     date: '2026-10-21',
     title: 'Feature requests',
     items: [
@@ -293,7 +302,7 @@ export const CHANGELOG = [
     ],
   },
   {
-    version: '2.14',
+    version: '2.13',
     date: '2026-10-21',
     title: 'Custom profile effects',
     items: [
@@ -302,7 +311,7 @@ export const CHANGELOG = [
     ],
   },
   {
-    version: '2.13',
+    version: '2.12',
     date: '2026-10-21',
     title: 'Reading clears notifications',
     items: [
@@ -312,7 +321,7 @@ export const CHANGELOG = [
     ],
   },
   {
-    version: '2.12',
+    version: '2.11',
     date: '2026-10-21',
     title: 'Chat opens where you left off',
     items: [
@@ -322,7 +331,7 @@ export const CHANGELOG = [
     ],
   },
   {
-    version: '2.11',
+    version: '2.10',
     date: '2026-10-21',
     title: 'Header blur fix for iPad',
     items: [
@@ -330,13 +339,13 @@ export const CHANGELOG = [
     ],
   },
   {
-    version: '2.10',
+    version: '2.9',
     date: '2026-10-21',
     title: 'Typing test removed',
     items: ['The Troubleshooting → Typing test screen in Help is gone now that the Globe + E emoji fix is in (the fix stays).'],
   },
   {
-    version: '2.9',
+    version: '2.8',
     date: '2026-10-21',
     title: 'Crisp header for good',
     items: [
@@ -344,7 +353,7 @@ export const CHANGELOG = [
     ],
   },
   {
-    version: '2.8',
+    version: '2.7',
     date: '2026-10-21',
     title: 'Emoji from Globe + E work the first time',
     items: [
@@ -352,7 +361,7 @@ export const CHANGELOG = [
     ],
   },
   {
-    version: '2.7',
+    version: '2.6',
     date: '2026-10-21',
     title: 'Typing test',
     items: [
@@ -360,7 +369,7 @@ export const CHANGELOG = [
     ],
   },
   {
-    version: '2.6',
+    version: '2.5',
     date: '2026-10-21',
     title: 'One tap is enough on iPad',
     items: [
@@ -369,7 +378,7 @@ export const CHANGELOG = [
     ],
   },
   {
-    version: '2.5',
+    version: '2.4',
     date: '2026-10-21',
     title: 'Version log',
     items: [
@@ -380,7 +389,7 @@ export const CHANGELOG = [
     ],
   },
   {
-    version: '2.4',
+    version: '2.3',
     date: '2026-10-21',
     title: 'Pop-ups stay on screen on iPad',
     items: [
@@ -390,7 +399,7 @@ export const CHANGELOG = [
     ],
   },
   {
-    version: '2.3',
+    version: '2.2',
     date: '2026-10-20',
     title: 'Nitro-style profiles and extras',
     items: [
@@ -412,7 +421,7 @@ export const CHANGELOG = [
     ],
   },
   {
-    version: '2.2',
+    version: '2.1',
     date: '2026-10-20',
     title: 'Sharper header and GIF search',
     items: [
@@ -421,7 +430,7 @@ export const CHANGELOG = [
     ],
   },
   {
-    version: '2.1',
+    version: '2.0',
     date: '2026-10-20',
     title: 'Discord-style chat',
     items: [
@@ -441,7 +450,7 @@ export const CHANGELOG = [
     ],
   },
   {
-    version: '2.0',
+    version: '1.9',
     date: '2026-10-20',
     title: 'Announcements, GIFs, and notifications',
     items: [

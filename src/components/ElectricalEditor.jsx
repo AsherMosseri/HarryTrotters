@@ -421,13 +421,27 @@ export default function ElectricalEditor({ remote, canEdit, actor, onSave, onClo
   };
   useEffect(() => {
     const svg = svgRef.current;
+    // Trackpad pinch (and Ctrl + scroll) zooms; two-finger scroll moves around.
     const wheel = (e) => {
       e.preventDefault();
-      const p = toSvg(e);
-      zoomAt(Math.exp(e.deltaY * (e.ctrlKey ? 0.01 : 0.0015)), p.x, p.y);
+      if (e.ctrlKey || e.metaKey) {
+        const p = toSvg(e);
+        zoomAt(Math.exp(e.deltaY * 0.01), p.x, p.y);
+        return;
+      }
+      const r = svg.getBoundingClientRect();
+      setView((v) => ({ ...v, x: v.x + (e.deltaX / r.width) * v.w, y: v.y + (e.deltaY / r.height) * v.h }));
     };
+    // Safari's own pinch gesture would zoom the page instead.
+    const stopGesture = (e) => e.preventDefault();
+    svg.addEventListener('gesturestart', stopGesture);
+    svg.addEventListener('gesturechange', stopGesture);
     svg.addEventListener('wheel', wheel, { passive: false });
-    return () => svg.removeEventListener('wheel', wheel);
+    return () => {
+      svg.removeEventListener('wheel', wheel);
+      svg.removeEventListener('gesturestart', stopGesture);
+      svg.removeEventListener('gesturechange', stopGesture);
+    };
   }, []);
 
   const onPointerDown = (e) => {
@@ -436,7 +450,19 @@ export default function ElectricalEditor({ remote, canEdit, actor, onSave, onClo
     pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (pointers.current.size === 2) {
       const [a, b] = [...pointers.current.values()];
-      drag.current = { mode: 'pinch', d0: Math.hypot(a.x - b.x, a.y - b.y), view0: viewRef.current };
+      // A part the first finger started dragging goes back where it was.
+      const prev = drag.current;
+      if (prev?.mode === 'part' && prev.moved) {
+        docRef.current = prev.before;
+        setDiagram(prev.before);
+      }
+      setPending(null);
+      // Zoom around the spot the fingers started on, so pinching never slides the diagram.
+      const rect = svgRef.current.getBoundingClientRect();
+      const v = viewRef.current;
+      const fx = ((a.x + b.x) / 2 - rect.left) / rect.width;
+      const fy = ((a.y + b.y) / 2 - rect.top) / rect.height;
+      drag.current = { mode: 'pinch', d0: Math.hypot(a.x - b.x, a.y - b.y), view0: v, fx, fy, ax: v.x + fx * v.w, ay: v.y + fy * v.h };
       return;
     }
     const port = e.target.closest?.('[data-port]')?.dataset.port?.split(':');
@@ -477,10 +503,9 @@ export default function ElectricalEditor({ remote, canEdit, actor, onSave, onClo
     if (g.mode === 'pinch' && pointers.current.size === 2) {
       const [a, b] = [...pointers.current.values()];
       const d = Math.hypot(a.x - b.x, a.y - b.y);
-      const f = Math.min(6000, Math.max(200, g.view0.w * (g.d0 / d))) / g.view0.w;
-      const cx = g.view0.x + (((a.x + b.x) / 2 - rect.left) / rect.width) * g.view0.w;
-      const cy = g.view0.y + (((a.y + b.y) / 2 - rect.top) / rect.height) * g.view0.h;
-      setView({ x: cx - (cx - g.view0.x) * f, y: cy - (cy - g.view0.y) * f, w: g.view0.w * f, h: g.view0.h * f });
+      const w = Math.min(6000, Math.max(200, g.view0.w * (g.d0 / Math.max(1, d))));
+      const h = (g.view0.h * w) / g.view0.w;
+      setView({ x: g.ax - g.fx * w, y: g.ay - g.fy * h, w, h });
     } else if (g.mode === 'part') {
       const p = toSvg(e);
       const x = snap(g.orig.x + p.x - g.start.x);
@@ -872,14 +897,14 @@ export default function ElectricalEditor({ remote, canEdit, actor, onSave, onClo
                       <li>＋ Add puts a part in the middle. Drag parts to move them.</li>
                       <li>To wire: tap a port, then the port to plug it into (or drag from one to the other).</li>
                       <li>Tap a part to rename it or pick which side its wires come out of.</li>
-                      <li>Drag the background to move around; pinch or scroll to zoom.</li>
+                      <li>Drag the background (or scroll) to move around; pinch to zoom, or use ＋ and −.</li>
                       <li>Changes save on their own. 🕘 Versions brings back older ones.</li>
                     </>
                   ) : (
                     <>
                       <li>Tap a part to see what it’s plugged into.</li>
                       <li>🔌 Port list shows every port in one table.</li>
-                      <li>Drag to move around; pinch or scroll to zoom.</li>
+                      <li>Drag (or scroll) to move around; pinch to zoom.</li>
                     </>
                   )}
                 </ul>

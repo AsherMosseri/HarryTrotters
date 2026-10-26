@@ -300,13 +300,14 @@ export function AnimatedDecoration({ id }) {
       </>
     );
   } else if (id === 'catears') {
+    // Mirror images that twitch together, so both tips stay level.
     body = (
       <>
         {[
-          ['M10,24 L4,-14 L40,6 Z', 'M14,18 L11,-4 L32,8 Z', ' ad-twitch'],
-          ['M90,24 L96,-14 L60,6 Z', 'M86,18 L89,-4 L68,8 Z', ' ad-twitch late'],
-        ].map(([outer, inner, cls], i) => (
-          <g key={i} className={`ad-ear${cls}`} style={{ transformOrigin: i ? '78px 16px' : '22px 16px' }}>
+          ['M10,24 L4,-14 L40,6 Z', 'M14,18 L11,-4 L32,8 Z', -1],
+          ['M90,24 L96,-14 L60,6 Z', 'M86,18 L89,-4 L68,8 Z', 1],
+        ].map(([outer, inner, side], i) => (
+          <g key={i} className="ad-ear ad-twitch" style={{ transformOrigin: i ? '78px 16px' : '22px 16px', '--r': `${side * 10}deg` }}>
             <path d={outer} fill="#334155" stroke="#0f172a" strokeWidth="2.5" strokeLinejoin="round" />
             <path d={inner} fill="#f9a8d4" />
           </g>
@@ -317,17 +318,15 @@ export function AnimatedDecoration({ id }) {
     body = (
       <>
         {[
-          [30, -12, -12],
-          [70, -12, 12],
-        ].map(([x, y, r], i) => (
-          <g
-            key={i}
-            className={`ad-ear ad-flop${i ? ' late' : ''}`}
-            style={{ transformOrigin: `${x}px 14px` }}
-            transform={`rotate(${r} ${x} 14)`}
-          >
-            <ellipse cx={x} cy={y} rx="11" ry="27" fill="#f8fafc" stroke="#94a3b8" strokeWidth="2" />
-            <ellipse cx={x} cy={y + 2} rx="5.5" ry="19" fill="#fbcfe8" />
+          [30, -1],
+          [70, 1],
+        ].map(([x, side], i) => (
+          // The tilt is on the outer group; the inner one flops (mirrored, in sync).
+          <g key={i} transform={`rotate(${side * 12} ${x} 14)`}>
+            <g className="ad-ear ad-flop" style={{ transformOrigin: `${x}px 14px`, '--r': `${side * 7}deg` }}>
+              <ellipse cx={x} cy="-12" rx="11" ry="27" fill="#f8fafc" stroke="#94a3b8" strokeWidth="2" />
+              <ellipse cx={x} cy="-10" rx="5.5" ry="19" fill="#fbcfe8" />
+            </g>
           </g>
         ))}
       </>
