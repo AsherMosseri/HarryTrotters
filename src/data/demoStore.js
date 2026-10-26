@@ -10,7 +10,7 @@ import {
   personId,
 } from './diff.js';
 import { STARTER_CHECKLISTS, starterItems } from '../checklists.js';
-import { REQUESTS_TO, ROSTER } from '../config.js';
+import { REQUESTS_TO } from '../config.js';
 
 const KEY = 'ftc32313-demo-v13';
 const listeners = new Set();
@@ -450,9 +450,7 @@ export const demoStore = {
   async refreshPush() {},
 
   subscribePeople(cb) {
-    // Sample join dates (the real app records them when each person joins).
-    const sample = ROSTER.map((name, i) => ({ id: `demo-${i}`, name, joinedAt: Date.UTC(2026, 8, 3 + i * 4) }));
-    return listen(() => cb([...sample, ...(state.people || [])]));
+    return listen(() => cb([...(state.people || [])]));
   },
 
   subscribeTasks(cb) {

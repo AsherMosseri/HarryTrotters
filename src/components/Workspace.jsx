@@ -10,6 +10,7 @@ import {
   PRIORITIES,
   REQUESTS_TO,
   TEAM_NAME,
+  TEAM_STARTED,
 } from '../config.js';
 import { ONLINE_MS, TYPING_MS, buildPeopleInfo, buildProfiles } from '../people.js';
 import { PALETTES } from '../nitro.js';
@@ -576,10 +577,6 @@ export default function Workspace({ store, actor, rename, renames }) {
   // Private notes about teammates (only you see yours).
   const [notes, setNotes] = useState({});
   useEffect(() => store.subscribeNotes(actor.name, setNotes, (e) => console.warn('notes', e)), [store, actor.name]);
-  const joinedOf = useCallback(
-    (name) => Math.min(...people.filter((p) => rename(p.name || '') === name && p.joinedAt).map((p) => p.joinedAt), Infinity),
-    [people, rename],
-  );
   const lastSeenOf = useCallback(
     (name) => Math.max(0, ...presence.filter((p) => rename(p.name || '') === name).map((p) => p.at || 0)),
     [presence, rename],
@@ -1583,7 +1580,7 @@ export default function Workspace({ store, actor, rename, renames }) {
               actor={actor}
               tasks={tasks || []}
               shifts={shifts}
-              joinedAt={Number.isFinite(joinedOf(fullProfileFor)) ? joinedOf(fullProfileFor) : 0}
+              joinedAt={TEAM_STARTED}
               lastSeen={lastSeenOf(fullProfileFor)}
               notes={notes}
               api={api}

@@ -40,6 +40,9 @@ export const GRADE_DEFAULTS = { 'Matthew Kuehl': 8, 'Cooper Mlezcko': 8 };
 export const gradeLabel = (g) => `${g}th grade`;
 export const lunchOf = (g) => (g <= 8 ? 'Middle school lunch' : 'High school lunch');
 
+// "Member since" on profiles: the day the team started (the same for everyone).
+export const TEAM_STARTED = new Date(2026, 7, 28).getTime();
+
 // Feature requests (💡) go to this person's bell and phone. Same as
 // REQUESTS_TO in functions/index.js.
 export const REQUESTS_TO = 'Asher Mosseri';
