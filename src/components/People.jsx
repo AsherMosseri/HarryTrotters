@@ -2,12 +2,25 @@
 // (pictures, about me, Nitro-style looks, status).
 import { useEffect, useRef, useState } from 'react';
 import { SUBTEAM_COLORS, gradeLabel } from '../config.js';
-import { DECORATIONS, EFFECTS, MOTIONS, NAME_FONTS, SWATCHES, effectById, gradientStops, nameStyle } from '../nitro.js';
+import FxCanvas from '../fx/FxCanvas.jsx';
+import { FX } from '../fx/effects.js';
+import {
+  DECORATIONS,
+  EFFECTS,
+  MOTIONS,
+  NAMEPLATES,
+  NAME_EFFECTS,
+  NAME_FONTS,
+  SWATCHES,
+  effectById,
+  gradientStops,
+  nameProps,
+} from '../nitro.js';
 import { DEFAULT_BORDER, borderProps } from '../borders.js';
 import BorderEditor from './BorderEditor.jsx';
 import { EmojiPicker, GifPicker } from './chat/Pickers.jsx';
 import { activeStatus } from '../people.js';
-import { Avatar, CloseIcon, usePeople } from './common.jsx';
+import { Avatar, CloseIcon, Nameplate, usePeople } from './common.jsx';
 import DecorationEditor from './DecorationEditor.jsx';
 import { DEFAULT_DECO } from './decoRender.jsx';
 
@@ -56,7 +69,14 @@ function useEscape(onClose) {
 // Drifting particles over the profile card.
 // Drifting particles over the profile card: a preset, or your own emoji,
 // GIF, or picture (custom: { kind: 'emoji' | 'image', value, motion }).
-export function ProfileEffect({ id, custom }) {
+export function ProfileEffect({ id, custom, fps, density, intro = true, replayKey }) {
+  if (FX[id]) {
+    return (
+      <div className="profile-effect fx-host" aria-hidden="true">
+        <FxCanvas id={id} fps={fps} density={density} intro={intro} replayKey={replayKey} />
+      </div>
+    );
+  }
   const e = effectById[id];
   const isCustom = id === 'custom' && custom?.value;
   if (!isCustom && (!e?.icon || id === 'custom')) return null;
@@ -166,9 +186,23 @@ export async function shrinkParticle(file) {
   return new File([blob], 'effect.png', { type: 'image/png' });
 }
 
+// Little badges in the card's corner, like Discord's: team management and
+// each subteam.
+const BADGE_ICONS = {
+  'Team Management': '🛡️',
+  CAD: '📐',
+  Mechanical: '🔧',
+  Assembly: '🔩',
+  Electrical: '⚡',
+  Programming: '💻',
+  Secretary: '📝',
+};
+
 // The card itself, also used as the live preview in the editor (with `look`
-// overriding the saved profile).
-function CardBody({ name, look, actor, tasks, children }) {
+// overriding the saved profile). Discord-style: the profile colors fill the
+// whole card, the avatar sits in a cutout in the banner with the status in a
+// bubble beside it, and the effect plays over everything.
+function CardBody({ name, look, actor, tasks, children, replayKey }) {
   const people = usePeople();
   const info = people?.infoOf(name) || {};
   const profile = { ...(people?.profileOf(name) || {}), ...look };
@@ -177,26 +211,54 @@ function CardBody({ name, look, actor, tasks, children }) {
   const open = tasks.filter((t) => t.status !== 'done' && (t.assignees || []).includes(name));
   const themed = profile.theme?.a && profile.theme?.b;
   const banner = profile.banner?.url;
+  const top = themed ? profile.theme.a : 'var(--surface)';
+  const badges = (info.subteams || []).map((s) => ({ s, icon: BADGE_ICONS[s] || '🏷️' }));
   return (
     <div
-      className={`profile-body${themed ? ' themed' : ''}`}
-      style={
-        themed ? { '--pgrad': `linear-gradient(180deg, ${gradientStops([profile.theme.a, profile.theme.m, profile.theme.b])})` } : undefined
-      }
+      className={`pc${themed ? ' themed' : ''}`}
+      style={{
+        ...(themed
+          ? { '--pc-grad': `linear-gradient(180deg, ${gradientStops([profile.theme.a, profile.theme.m, profile.theme.b])})` }
+          : {}),
+        '--pc-ring': top,
+      }}
     >
-      <ProfileEffect id={profile.effect} custom={profile.effectCustom} />
       <div
-        className="profile-banner"
-        style={banner ? { backgroundImage: `url("${banner}")` } : { background: profile.bannerColor || info.color || 'var(--accent)' }}
+        className="pc-banner"
+        style={
+          banner
+            ? { backgroundImage: `url("${banner}")` }
+            : {
+                // With profile colors, the banner is a deeper shade of the top color (like Discord).
+                background:
+                  profile.bannerColor || (themed ? `color-mix(in srgb, ${profile.theme.a} 70%, #000)` : info.color || 'var(--accent)'),
+              }
+        }
       />
-      <div className="profile-avatar">
-        <Avatar name={name} size={84} showOnline decoration={profile.decoration} decorationCustom={profile.decorationCustom} />
+      <div className="pc-head">
+        <div className="pc-avatar">
+          <Avatar name={name} size={92} showOnline decoration={profile.decoration} decorationCustom={profile.decorationCustom} />
+        </div>
+        {status && (
+          <div className="pc-bubble">
+            <p className="profile-status">
+              {status.emoji} {status.text}
+            </p>
+          </div>
+        )}
+        {badges.length > 0 && (
+          <div className="pc-badges" aria-label="Badges">
+            {badges.map((b) => (
+              <span key={b.s} className="pc-badge" title={b.s} aria-label={b.s}>
+                {b.icon}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
-      <div className="profile-inner">
-        <h2 className="display-name" style={nameStyle(profile, info.color)}>
-          {name}
-        </h2>
-        <p className="muted small">
+      <div className="pc-panel">
+        <h2 {...nameProps(profile, info.color, name, 'pc-name')}>{name}</h2>
+        <p className="pc-sub">
           {profile.pronouns && <span className="pronouns">{profile.pronouns} · </span>}
           {online ? (
             <>
@@ -207,27 +269,27 @@ function CardBody({ name, look, actor, tasks, children }) {
             'Offline'
           )}
         </p>
-        {status && (
-          <p className="profile-status">
-            {status.emoji} {status.text}
-          </p>
-        )}
         {profile.about && (
           <div className="profile-section">
             <h3>About me</h3>
             <p className="about-text">{profile.about}</p>
           </div>
         )}
-        {(info.title || info.grade) && (
-          <p className="profile-title">{[info.title, info.grade && gradeLabel(info.grade)].filter(Boolean).join(' · ')}</p>
-        )}
-        {info.subteams?.length > 0 && (
-          <div className="profile-pills">
-            {info.subteams.map((s) => (
-              <span key={s} className="pill" style={{ '--pill': SUBTEAM_COLORS[s] || 'var(--muted)' }}>
-                {s}
-              </span>
-            ))}
+        {(info.title || info.grade || info.subteams?.length > 0) && (
+          <div className="profile-section">
+            <h3>Team</h3>
+            {(info.title || info.grade) && (
+              <p className="profile-title">{[info.title, info.grade && gradeLabel(info.grade)].filter(Boolean).join(' · ')}</p>
+            )}
+            {info.subteams?.length > 0 && (
+              <div className="profile-pills">
+                {info.subteams.map((s) => (
+                  <span key={s} className="pill" style={{ '--pill': SUBTEAM_COLORS[s] || 'var(--muted)' }}>
+                    {s}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
         )}
         {info.responsibilities?.length > 0 && (
@@ -249,6 +311,7 @@ function CardBody({ name, look, actor, tasks, children }) {
         </div>
         {children}
       </div>
+      <ProfileEffect id={profile.effect} custom={profile.effectCustom} replayKey={replayKey} />
     </div>
   );
 }
@@ -436,6 +499,7 @@ export function ProfileEditor({ name, actor, api, tasks = [], onClose }) {
     effect: profile.effect || '',
     effectCustom: profile.effectCustom || null,
     nameStyle: profile.nameStyle || { font: '', colors: [] },
+    nameplate: profile.nameplate || null,
     theme: profile.theme || null,
     bannerColor: profile.bannerColor || '',
   });
@@ -627,6 +691,66 @@ export function ProfileEditor({ name, actor, api, tasks = [], onClose }) {
                       />
                     </>
                   )}
+                  <h3 className="field-label">Name effect</h3>
+                  <div className="ne-grid">
+                    {NAME_EFFECTS.map((e) => (
+                      <button
+                        key={e.id}
+                        className={`ne-choice${(look.nameStyle.effect || '') === e.id ? ' on' : ''}`}
+                        aria-pressed={(look.nameStyle.effect || '') === e.id}
+                        onClick={() => set({ nameStyle: { ...look.nameStyle, effect: e.id } })}
+                      >
+                        <span
+                          {...nameProps(
+                            { nameStyle: { ...look.nameStyle, effect: e.id } },
+                            people?.infoOf(name)?.color,
+                            name.split(' ')[0],
+                            'ne-sample',
+                          )}
+                        >
+                          {name.split(' ')[0]}
+                        </span>
+                        <span className="ne-label">{e.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <h3 className="field-label">Nameplate</h3>
+                  <p className="muted tiny">Shows behind your name in the members list and in DMs.</p>
+                  <div className="np-grid">
+                    {NAMEPLATES.map((np) => {
+                      const colors = look.nameplate?.colors || ['#6366f1', '#ec4899'];
+                      const plate = np.id === 'custom' ? { id: 'custom', colors } : np.id ? { id: np.id } : null;
+                      return (
+                        <button
+                          key={np.id}
+                          className={`np-choice${(look.nameplate?.id || '') === np.id ? ' on' : ''}`}
+                          aria-pressed={(look.nameplate?.id || '') === np.id}
+                          onClick={() => set({ nameplate: plate })}
+                        >
+                          <Nameplate plate={plate} />
+                          <span>{np.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {look.nameplate?.id === 'custom' && (
+                    <div className="row gap">
+                      {[0, 1].map((i) => (
+                        <label key={i} className="row gap-sm small">
+                          {i ? 'Right' : 'Left'}{' '}
+                          <input
+                            type="color"
+                            value={look.nameplate.colors?.[i] || (i ? '#ec4899' : '#6366f1')}
+                            onChange={(e) => {
+                              const colors = [...(look.nameplate.colors || ['#6366f1', '#ec4899'])];
+                              colors[i] = e.target.value;
+                              set({ nameplate: { id: 'custom', colors } });
+                            }}
+                          />
+                        </label>
+                      ))}
+                    </div>
+                  )}
                   <h3 className="field-label">Avatar decoration</h3>
                   <div className="choice-grid deco-grid">
                     {DECORATIONS.map((d) => (
@@ -661,10 +785,22 @@ export function ProfileEditor({ name, actor, api, tasks = [], onClose }) {
                     />
                   )}
                   <h3 className="field-label">Profile effect</h3>
-                  <div className="choice-grid">
+                  <div className="fx-tiles">
                     {EFFECTS.map((f) => (
-                      <button key={f.id} className={`choice${look.effect === f.id ? ' on' : ''}`} onClick={() => set({ effect: f.id })}>
-                        {f.icon} {f.label}
+                      <button
+                        key={f.id}
+                        className={`fx-tile${look.effect === f.id ? ' on' : ''}`}
+                        aria-pressed={look.effect === f.id}
+                        onClick={() => set({ effect: f.id })}
+                      >
+                        <span className="fx-tile-pic" aria-hidden="true">
+                          {FX[f.id] ? (
+                            <FxCanvas id={f.id} fps={30} density={2.2} intro={false} />
+                          ) : (
+                            <span className="fx-tile-icon">{f.icon || '∅'}</span>
+                          )}
+                        </span>
+                        <span className="fx-tile-label">{f.label}</span>
                       </button>
                     ))}
                   </div>

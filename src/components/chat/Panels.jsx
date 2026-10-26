@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { SUBTEAMS, SUBTEAM_COLORS } from '../../config.js';
 import { activeStatus } from '../../people.js';
-import { Avatar, CloseIcon, DisplayName, usePeople } from '../common.jsx';
+import { Avatar, CloseIcon, DisplayName, Nameplate, usePeople } from '../common.jsx';
 import { renderRich } from './format.jsx';
 import { timeOf } from './Message.jsx';
 import { useEscape } from '../../util.js';
@@ -33,6 +33,7 @@ export function MembersPanel({ names, onPerson, onClose }) {
     const status = activeStatus(people?.profileOf(n));
     return (
       <button key={n} className={`member-row${people?.isOnline(n) ? '' : ' offline'}`} onClick={(e) => onPerson(n, e)}>
+        <Nameplate plate={people?.profileOf(n)?.nameplate} />
         <Avatar name={n} size={32} showOnline />
         <span className="grow">
           <DisplayName name={n} className="member-name" />

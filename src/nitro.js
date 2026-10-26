@@ -1,5 +1,7 @@
 // Profile and app styles (the Nitro-style extras). Ids are saved in profiles,
 // so keep them stable.
+import { FX } from './fx/effects.js';
+
 export const DECORATIONS = [
   { id: '', label: 'None' },
   { id: 'rainbow', label: 'Rainbow' },
@@ -11,20 +13,21 @@ export const DECORATIONS = [
   { id: 'robot', label: 'Robot', badge: '🤖' },
   { id: 'stars', label: 'Stars', badge: '⭐' },
   { id: 'cat', label: 'Cat', badge: '🐱' },
+  { id: 'comets', label: 'Comets', anim: true },
+  { id: 'flamering', label: 'Flame ring', anim: true },
+  { id: 'electric', label: 'Electric', anim: true },
+  { id: 'halo', label: 'Halo', anim: true },
+  { id: 'ripple', label: 'Ripple', anim: true },
+  { id: 'petals', label: 'Petals', anim: true },
+  { id: 'circuit', label: 'Circuit', anim: true },
   { id: 'custom', label: 'Custom…' },
 ];
 export const decorationById = Object.fromEntries(DECORATIONS.map((d) => [d.id, d]));
 
-// Particles that drift over the profile card.
+// Profile effects: animated (fx/effects.js), or your own emoji/GIF/picture.
 export const EFFECTS = [
   { id: '', label: 'None', icon: '' },
-  { id: 'confetti', label: 'Confetti', icon: '🎉' },
-  { id: 'sparkles', label: 'Sparkles', icon: '✨' },
-  { id: 'snow', label: 'Snow', icon: '❄️' },
-  { id: 'hearts', label: 'Hearts', icon: '💖' },
-  { id: 'fire', label: 'Fire', icon: '🔥' },
-  { id: 'gears', label: 'Gears', icon: '⚙️' },
-  { id: 'bubbles', label: 'Bubbles', icon: '🫧' },
+  ...Object.entries(FX).map(([id, f]) => ({ id, label: f.label, icon: f.icon })),
   { id: 'custom', label: 'Custom…', icon: '🎨' },
 ];
 
@@ -92,19 +95,67 @@ export function gradientStops(colors, sharp = DEFAULT_SHARP) {
     .join(', ');
 }
 
-// Inline style for a display name: chosen font, one color, or a 2–3 color gradient.
+// Nameplates: animated art behind your name in the members list and DMs.
+export const NAMEPLATES = [
+  { id: '', label: 'None' },
+  { id: 'aurora', label: 'Aurora' },
+  { id: 'cyber', label: 'Cyber' },
+  { id: 'fire', label: 'Fire' },
+  { id: 'ocean', label: 'Ocean' },
+  { id: 'space', label: 'Space' },
+  { id: 'sakura', label: 'Sakura' },
+  { id: 'gold', label: 'Gold' },
+  { id: 'custom', label: 'Custom' },
+];
+
+// Display name effects, like Discord's display name styles.
+export const NAME_EFFECTS = [
+  { id: '', label: 'None' },
+  { id: 'shimmer', label: '✨ Shimmer' },
+  { id: 'neon', label: '💡 Neon' },
+  { id: 'outline', label: '✏️ Outline' },
+  { id: 'pop', label: '🧱 3D pop' },
+  { id: 'glitch', label: '📺 Glitch' },
+  { id: 'rainbow', label: '🌈 Rainbow' },
+];
+const RAINBOW = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#06b6d4', '#6366f1', '#d946ef', '#ef4444'];
+
+// Inline style for a display name: chosen font, one color, or a 2–3 color
+// gradient, plus what its effect needs (glow color, a moving gradient).
 export function nameStyle(profile, fallbackColor) {
   const s = profile?.nameStyle || {};
   const style = {};
   const font = fontById[s.font]?.css;
   if (font) style.fontFamily = font;
   const colors = (s.colors || []).filter(Boolean);
-  if (colors.length >= 2) {
-    style.backgroundImage = `linear-gradient(90deg, ${gradientStops(colors)})`;
+  const main = colors[0] || fallbackColor;
+  if (main) style['--nglow'] = main;
+  const clip = (image) => {
+    style.backgroundImage = image;
     style.WebkitBackgroundClip = 'text';
     style.backgroundClip = 'text';
     style.color = 'transparent';
-  } else if (colors.length === 1) style.color = colors[0];
-  else if (fallbackColor) style.color = fallbackColor;
+  };
+  if (s.effect === 'rainbow') {
+    clip(`linear-gradient(90deg, ${RAINBOW.join(', ')})`);
+    style.backgroundSize = '200% auto';
+  } else if (s.effect === 'shimmer' && (colors.length || fallbackColor)) {
+    // A light band sweeping across the name's colors.
+    const cs = colors.length >= 2 ? [...colors, colors[0]] : [main, `color-mix(in srgb, ${main} 35%, white)`, main];
+    clip(`linear-gradient(90deg, ${cs.join(', ')})`);
+    style.backgroundSize = '200% auto';
+  } else if (colors.length >= 2) clip(`linear-gradient(90deg, ${gradientStops(colors)})`);
+  else if (main) style.color = main;
   return style;
+}
+
+// Props for a display name element: style, the effect's class, and the
+// text (the glitch effect redraws it in its pseudo-elements).
+export function nameProps(profile, fallbackColor, name, className = '') {
+  const effect = profile?.nameStyle?.effect;
+  return {
+    className: `display-name ${className}${effect ? ` ne ne-${effect}` : ''}`,
+    style: nameStyle(profile, fallbackColor),
+    'data-text': name,
+  };
 }

@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { SUBTEAMS, SUBTEAM_COLORS } from '../config.js';
-import { Avatar, usePeople } from './common.jsx';
+import { Avatar, Nameplate, usePeople } from './common.jsx';
 import PhotoViewer from './PhotoViewer.jsx';
 import Composer from './chat/Composer.jsx';
 import Message from './chat/Message.jsx';
@@ -38,12 +38,14 @@ function TypingLine({ names }) {
 }
 
 function ConvButton({ conv, active, unread, onClick, onSettings, actor }) {
+  const people = usePeople();
   const others = conv.kind === 'dm' ? conv.people.filter((n) => n !== actor.name) : [];
   return (
     <div
       className={`conv-row${active ? ' active' : ''}${unread?.muted ? ' muted' : ''}${unread?.count && !unread.muted ? ' has-unread' : ''}`}
     >
       <button className="conv-main" onClick={onClick}>
+        {others.length === 1 && <Nameplate plate={people?.profileOf(others[0])?.nameplate} />}
         {conv.kind === 'dm' ? (
           others.length === 1 ? (
             <Avatar name={others[0]} size={24} showOnline />

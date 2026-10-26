@@ -1953,3 +1953,178 @@ h3.md-h { font-size: 16.5px; }
   .dg-bar > .icon-btn:last-child { position: sticky; right: -10px; background: var(--surface); box-shadow: -8px 0 8px var(--surface); }
   .dg-hint { white-space: normal; text-align: center; width: max-content; max-width: calc(100% - 24px); }
 }
+
+/* ---------- animated effects (fx/) ---------- */
+.fx-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; }
+.profile-effect.fx-host { z-index: 3; }
+.fx-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+.fx-tile { border: 2px solid var(--border); background: var(--surface); border-radius: 12px; padding: 0; overflow: hidden; display: flex; flex-direction: column; text-align: center; color: var(--text); }
+.fx-tile.on { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.fx-tile-pic { position: relative; height: 64px; background: linear-gradient(160deg, #1e1b4b, #312e81 55%, #0f172a); display: grid; place-items: center; }
+.fx-tile-icon { font-size: 26px; }
+.fx-tile-label { font-size: 12.5px; font-weight: 650; padding: 5px 4px 6px; }
+
+/* ---------- profile card, Discord-style ---------- */
+.dialog.profile-card { animation: pc-pop 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.15); }
+@keyframes pc-pop { from { transform: translateY(12px) scale(0.95); opacity: 0; } }
+.pc { position: relative; display: flex; flex-direction: column; background: var(--surface); }
+.pc.themed { background: var(--pc-grad); }
+.pc-banner { height: 112px; flex: none; background-size: cover; background-position: center; }
+.pc-head { position: relative; height: 54px; flex: none; }
+.pc-avatar { position: absolute; left: 16px; top: -56px; z-index: 2; }
+/* The cutout: a ring in the card's own color around the avatar. */
+.pc-avatar::before { content: ''; position: absolute; inset: -6px; border-radius: 50%; background: var(--pc-ring); }
+.pc-avatar > * { position: relative; }
+.pc-bubble {
+  position: absolute; left: 124px; top: -26px; z-index: 2; max-width: calc(100% - 140px);
+  background: var(--surface); color: var(--text); border-radius: 14px; padding: 6px 11px; box-shadow: var(--shadow-lg); font-size: 13px;
+}
+.pc-bubble::before, .pc-bubble::after { content: ''; position: absolute; border-radius: 50%; background: var(--surface); box-shadow: var(--shadow); }
+.pc-bubble::before { width: 10px; height: 10px; left: -4px; bottom: -6px; }
+.pc-bubble::after { width: 5px; height: 5px; left: -11px; bottom: -11px; }
+.pc-bubble .profile-status { margin: 0 !important; padding: 0; background: none; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.pc-badges {
+  position: absolute; right: 12px; top: 10px; display: flex; gap: 2px; padding: 3px 6px; border-radius: 10px;
+  background: color-mix(in srgb, var(--surface) 78%, transparent); box-shadow: var(--shadow);
+}
+.pc-badge { font-size: 15px; line-height: 1.3; cursor: default; }
+.pc-panel {
+  position: relative; margin: 0 12px 12px; padding: 12px 14px 14px; border-radius: 12px; display: flex; flex-direction: column;
+  background: var(--surface-2);
+}
+.pc.themed .pc-panel { background: color-mix(in srgb, var(--surface) 82%, transparent); }
+.pc-name { margin: 0; font-size: 22px; font-weight: 800; line-height: 1.2; overflow-wrap: anywhere; }
+.pc-sub { margin: 2px 0 0; font-size: 13px; color: var(--muted); }
+.pc .profile-section { margin-top: 12px; }
+.pc .profile-actions { margin-top: 14px; }
+.pc > .profile-effect { border-radius: inherit; }
+
+/* ---------- display name effects ---------- */
+.ne { display: inline-block; }
+.ne-shimmer, .ne-rainbow { animation: ne-slide 3.2s linear infinite; }
+@keyframes ne-slide { to { background-position: -200% 0; } }
+.ne-neon { filter: drop-shadow(0 0 1.5px var(--nglow, currentColor)) drop-shadow(0 0 7px var(--nglow, currentColor)); animation: ne-neon 2.6s ease-in-out infinite; }
+@keyframes ne-neon {
+  50% { filter: drop-shadow(0 0 1px var(--nglow, currentColor)) drop-shadow(0 0 3px var(--nglow, currentColor)); }
+  93% { filter: drop-shadow(0 0 1.5px var(--nglow, currentColor)) drop-shadow(0 0 7px var(--nglow, currentColor)); opacity: 1; }
+  95% { opacity: 0.55; }
+}
+.ne-outline { -webkit-text-stroke: 0.9px #0b1020; paint-order: stroke fill; filter: drop-shadow(1.5px 1.5px 0 #0b1020); }
+.ne-pop {
+  --nshade: color-mix(in srgb, var(--nglow, #64748b) 45%, #000);
+  filter: drop-shadow(1px 1px 0 var(--nshade)) drop-shadow(1px 1px 0 var(--nshade)) drop-shadow(1.5px 1.5px 0 var(--nshade));
+}
+.ne-glitch { position: relative; }
+.ne-glitch::before, .ne-glitch::after {
+  content: attr(data-text); position: absolute; left: 0; top: 0; width: 100%; white-space: nowrap; pointer-events: none;
+  clip-path: inset(100% 0 0 0);
+}
+.ne-glitch::before { -webkit-text-fill-color: #ff2e88; color: #ff2e88; animation: ne-g1 3.4s steps(1) infinite; }
+.ne-glitch::after { -webkit-text-fill-color: #22d3ee; color: #22d3ee; animation: ne-g2 3.4s steps(1) infinite; }
+@keyframes ne-g1 {
+  0%, 84%, 100% { clip-path: inset(100% 0 0 0); transform: none; }
+  86% { clip-path: inset(8% 0 58% 0); transform: translate(-3px, -1px); }
+  89% { clip-path: inset(62% 0 6% 0); transform: translate(2px, 1px); }
+  92% { clip-path: inset(32% 0 38% 0); transform: translate(-2px, 0); }
+}
+@keyframes ne-g2 {
+  0%, 85%, 100% { clip-path: inset(100% 0 0 0); transform: none; }
+  87% { clip-path: inset(48% 0 22% 0); transform: translate(3px, 1px); }
+  90% { clip-path: inset(4% 0 70% 0); transform: translate(-2px, -1px); }
+  93% { clip-path: inset(70% 0 2% 0); transform: translate(2px, 0); }
+}
+/* In chat, names animate when you hover or tap the message (like Discord). */
+.msg .ne, .msg .ne::before, .msg .ne::after { animation-play-state: paused; }
+.msg:hover .ne, .msg:hover .ne::before, .msg:hover .ne::after,
+.msg.selected .ne, .msg.selected .ne::before, .msg.selected .ne::after { animation-play-state: running; }
+@media (prefers-reduced-motion: reduce) { .ne, .ne::before, .ne::after { animation: none !important; } }
+.ne-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; }
+.ne-choice { border: 2px solid var(--border); background: var(--surface); border-radius: 12px; padding: 8px 6px 6px; display: flex; flex-direction: column; align-items: center; gap: 2px; color: var(--text); }
+.ne-choice.on { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.ne-sample { font-size: 18px; font-weight: 800; }
+.ne-label { font-size: 12px; color: var(--muted); font-weight: 600; }
+
+/* ---------- animated avatar decorations (decoRender.jsx) ---------- */
+.adeco { position: absolute; inset: calc(var(--s) * -0.3); width: calc(var(--s) * 1.6); height: calc(var(--s) * 1.6); z-index: 2; pointer-events: none; overflow: visible; }
+.adeco * { transform-box: view-box; }
+.adeco .ad-spin { transform-origin: 50px 50px; animation: deco-spin var(--spd, 4s) linear infinite; animation-delay: var(--d, 0s); }
+.adeco .ad-spin.ccw { animation-direction: reverse; }
+.adeco .ad-glow { filter: drop-shadow(0 0 3px var(--c, #fff)) drop-shadow(0 0 6px var(--c, #fff)); }
+.adeco .ad-flick { transform-box: fill-box; transform-origin: 50% 100%; animation: ad-flick 0.9s ease-in-out infinite alternate; animation-delay: var(--d, 0s); }
+@keyframes ad-flick { 0% { transform: scale(0.85, 0.7); } 40% { transform: scale(1.05, 1.15) skewX(4deg); } 100% { transform: scale(0.95, 0.95) skewX(-4deg); } }
+.adeco .ad-bolt { opacity: 0; animation: ad-bolt 0.45s steps(1) infinite; filter: drop-shadow(0 0 2px var(--c)) drop-shadow(0 0 5px var(--c)); }
+.adeco .ad-bolt1 { animation-delay: -0.15s; }
+.adeco .ad-bolt2 { animation-delay: -0.3s; }
+@keyframes ad-bolt { 0% { opacity: 1; } 33% { opacity: 0; } }
+.adeco .ad-bob { animation: ad-bob 2.4s ease-in-out infinite; }
+@keyframes ad-bob { 50% { transform: translateY(-4px); } }
+.adeco .ad-twinkle { transform-box: fill-box; transform-origin: center; animation: ad-twinkle 1.8s ease-in-out infinite; animation-delay: var(--d, 0s); }
+@keyframes ad-twinkle { 0%, 100% { transform: scale(0.2); opacity: 0.2; } 50% { transform: scale(1); opacity: 1; } }
+.adeco .ad-ripple-color { color: var(--accent); }
+.adeco .ad-ripple { transform-origin: 50px 50px; animation: ad-ripple 2.4s ease-out infinite; animation-delay: var(--d, 0s); }
+@keyframes ad-ripple { from { transform: scale(1); opacity: 0.9; } to { transform: scale(1.3); opacity: 0; } }
+.adeco .ad-flip { transform-box: fill-box; transform-origin: center; animation: ad-flip 2.2s ease-in-out infinite; animation-delay: var(--d, 0s); }
+@keyframes ad-flip { 50% { transform: scaleX(-1) rotate(25deg); } }
+.adeco .ad-march { animation: ad-march 1.2s linear infinite; }
+@keyframes ad-march { to { stroke-dashoffset: -16; } }
+.adeco .ad-pulse { animation: ad-pulse 2.2s linear infinite; }
+@keyframes ad-pulse { to { stroke-dashoffset: -346; } }
+/* In chat, decorations animate when you hover or tap the message. */
+.msg .adeco, .msg .adeco * { animation-play-state: paused; }
+.msg:hover .adeco, .msg:hover .adeco *, .msg.selected .adeco, .msg.selected .adeco * { animation-play-state: running; }
+@media (prefers-reduced-motion: reduce) { .adeco, .adeco * { animation: none !important; } }
+/* Small avatars: a ring in the decoration's colors instead. */
+.deco-anim::before { inset: calc(var(--s) * -0.08); }
+.deco-comets::before { background: conic-gradient(#a5f3fc, #f0abfc, #fde68a, #a5f3fc); }
+.deco-flamering::before { background: conic-gradient(#ef4444, #f97316, #fde047, #f97316, #ef4444); }
+.deco-electric::before { background: #22d3ee; box-shadow: 0 0 4px #22d3ee; }
+.deco-halo::before { background: #fcd34d; }
+.deco-ripple::before { background: var(--accent); }
+.deco-petals::before { background: conic-gradient(#fbcfe8, #f9a8d4, #ec4899, #fbcfe8); }
+.deco-circuit::before { background: #10b981; }
+/* Big avatars draw their own ring; no extra one under them. */
+.deco-anim:has(> .adeco)::before { display: none; }
+
+/* ---------- nameplates (members list, DMs) ---------- */
+.member-row, .conv-main { position: relative; overflow: hidden; isolation: isolate; }
+.member-row > *:not(.nameplate), .conv-main > *:not(.nameplate) { position: relative; z-index: 1; }
+.nameplate {
+  position: absolute; inset: 0; z-index: 0; pointer-events: none; border-radius: inherit;
+  /* The art sits on the right and fades out under the name, like Discord's. */
+  -webkit-mask-image: linear-gradient(to left, #000 20%, rgba(0, 0, 0, 0.55) 55%, transparent 92%);
+  mask-image: linear-gradient(to left, #000 20%, rgba(0, 0, 0, 0.55) 55%, transparent 92%);
+  background-size: 200% 100%; animation: np-slide 6s linear infinite;
+}
+@keyframes np-slide { to { background-position: -200% 0; } }
+.np-aurora { background-image: linear-gradient(100deg, #22d3ee, #4ade80, #a78bfa, #22d3ee); opacity: 0.55; }
+.np-cyber {
+  background-image: repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.14) 0 1px, transparent 1px 4px), linear-gradient(100deg, #ec4899, #8b5cf6, #22d3ee, #ec4899);
+  background-size: 100% 4px, 200% 100%; animation: np-cyber 4s linear infinite; opacity: 0.6;
+}
+@keyframes np-cyber { to { background-position: 0 40px, -200% 0; } }
+.np-fire { background-image: linear-gradient(100deg, #f97316, #ef4444, #facc15, #f97316); animation-duration: 2.5s; opacity: 0.55; }
+.np-ocean {
+  background-image: radial-gradient(ellipse at 50% 120%, rgba(255, 255, 255, 0.35) 0 20%, transparent 21%), linear-gradient(100deg, #0ea5e9, #2563eb, #06b6d4, #0ea5e9);
+  background-size: 34px 24px, 200% 100%; animation: np-ocean 5s linear infinite; opacity: 0.55;
+}
+@keyframes np-ocean { to { background-position: 68px 0, -200% 0; } }
+.np-space {
+  background-image: radial-gradient(1.2px 1.2px at 20% 30%, #fff 50%, transparent 51%), radial-gradient(1px 1px at 70% 60%, #fff 50%, transparent 51%),
+    radial-gradient(1.4px 1.4px at 45% 80%, #c4b5fd 50%, transparent 51%), linear-gradient(100deg, #1e1b4b, #4c1d95, #0f172a, #1e1b4b);
+  background-size: 40px 30px, 52px 34px, 64px 40px, 200% 100%; animation: np-space 8s linear infinite; opacity: 0.85;
+}
+@keyframes np-space { to { background-position: -40px 0, -104px 0, -64px 0, -200% 0; } }
+.np-sakura {
+  background-image: radial-gradient(ellipse 4px 2.5px at 30% 40%, #fff 50%, transparent 52%), radial-gradient(ellipse 4px 2.5px at 75% 70%, #fbcfe8 50%, transparent 52%), linear-gradient(100deg, #f9a8d4, #fda4af, #f0abfc, #f9a8d4);
+  background-size: 46px 34px, 58px 38px, 200% 100%; animation: np-sakura 7s linear infinite; opacity: 0.6;
+}
+@keyframes np-sakura { to { background-position: 46px 34px, 58px -38px, -200% 0; } }
+.np-gold { background-image: linear-gradient(100deg, #b45309, #fcd34d 45%, #fffbeb 50%, #fcd34d 55%, #b45309); animation-duration: 3.5s; opacity: 0.55; }
+.np-custom { background-image: linear-gradient(100deg, var(--np1), var(--np2), var(--np1)); opacity: 0.55; }
+@media (prefers-reduced-motion: reduce) { .nameplate { animation: none; } }
+/* The editor's preview row. */
+.np-preview { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 10px; background: var(--surface-2); }
+.np-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.np-choice { position: relative; overflow: hidden; isolation: isolate; border: 2px solid var(--border); background: var(--surface); border-radius: 10px; padding: 9px 10px; text-align: left; font-weight: 700; color: var(--text); }
+.np-choice > span:not(.nameplate) { position: relative; z-index: 1; }
+.np-choice.on { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }

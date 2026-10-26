@@ -5,6 +5,7 @@ import { preparePhoto } from '../util.js';
 import { EmojiPicker, GifPicker } from './chat/Pickers.jsx';
 import { CloseIcon } from './common.jsx';
 import { CustomEffect, ProfileEffect } from './People.jsx';
+import { FX } from '../fx/effects.js';
 
 // A custom app theme (per device, in localStorage 'custom-theme'):
 //   accent, colors [a, b], tint (how strongly the colors show, %), motion
@@ -13,15 +14,7 @@ import { CustomEffect, ProfileEffect } from './People.jsx';
 //   things: { preset } or { kind, value, motion }, like profile effects).
 export const CUSTOM_DEFAULT = { accent: '#8b5cf6', colors: ['#8b5cf6', '#06b6d4'], tint: 22, motion: '', bg: null, show: 30, fx: null };
 
-const FX_PRESETS = [
-  ['sparkles', '✨'],
-  ['snow', '❄️'],
-  ['hearts', '💖'],
-  ['bubbles', '🫧'],
-  ['confetti', '🎉'],
-  ['gears', '⚙️'],
-  ['fire', '🔥'],
-];
+const FX_PRESETS = Object.entries(FX).map(([id, f]) => [id, f.icon, f.label]);
 
 // "Match my profile": the profile's colors, banner picture, and effect.
 export function themeFromProfile(profile = {}, fallback = '') {
@@ -77,7 +70,13 @@ export function AppBackdrop({ theme: t }) {
       {t.bg?.kind === 'emoji' && t.bg.value && <div className="app-bg-pattern" style={{ backgroundImage: emojiTile(t.bg.value) }} />}
       {t.bg?.value && <div className="app-bg-veil" style={{ opacity: 1 - (t.show ?? 30) / 100 }} />}
       {t.fx && (
-        <div className="app-fx">{t.fx.preset ? <ProfileEffect id={t.fx.preset} /> : <ProfileEffect id="custom" custom={t.fx} />}</div>
+        <div className="app-fx">
+          {t.fx.preset ? (
+            <ProfileEffect id={t.fx.preset} fps={30} density={0.7} intro={false} />
+          ) : (
+            <ProfileEffect id="custom" custom={t.fx} />
+          )}
+        </div>
       )}
     </div>
   );
@@ -263,12 +262,13 @@ export default function ThemeStudio({ value, onChange, profile, profileColor, up
           <button className={`btn${!t.fx ? ' on-btn' : ''}`} onClick={() => set({ fx: null })}>
             None
           </button>
-          {FX_PRESETS.map(([id, icon]) => (
+          {FX_PRESETS.map(([id, icon, label]) => (
             <button
               key={id}
               className={`btn${t.fx?.preset === id ? ' on-btn' : ''}`}
               onClick={() => set({ fx: { preset: id } })}
-              aria-label={id}
+              aria-label={label}
+              title={label}
             >
               {icon}
             </button>

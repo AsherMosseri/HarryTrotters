@@ -1,8 +1,8 @@
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { STATUSES, PRIORITIES, statusById, priorityById } from '../config.js';
 import { colorFor, initials, dueInfo } from '../util.js';
-import { decorationById, nameStyle } from '../nitro.js';
-import { CustomDecoration } from './decoRender.jsx';
+import { decorationById, nameProps } from '../nitro.js';
+import { AnimatedDecoration, CustomDecoration } from './decoRender.jsx';
 
 // Profiles, who's online, and each person's subteams, for any component that
 // shows people (set up in Workspace; empty on the join screen).
@@ -30,6 +30,14 @@ export function Avatar({ name, size = 26, photo, showOnline = false, decoration,
         {pic}
       </CustomDecoration>
     );
+  } else if (decorationById[deco]?.anim) {
+    // Animated decorations; tiny avatars get just a matching ring.
+    pic = (
+      <span className={`deco deco-anim deco-${deco}`} style={{ width: size, height: size, '--s': `${size}px` }}>
+        {pic}
+        {size >= 28 && <AnimatedDecoration id={deco} />}
+      </span>
+    );
   } else if (deco && deco !== 'custom' && decorationById[deco]) {
     const badge = size >= 28 && decorationById[deco].badge;
     pic = (
@@ -52,10 +60,24 @@ export function Avatar({ name, size = 26, photo, showOnline = false, decoration,
 
 // A person's name in their chosen style (font, color, gradient), else their
 // subteam color.
+// A nameplate behind a row (members list, DMs): profile.nameplate is
+// { id } for a preset, or { id: 'custom', colors: [a, b] }.
+export function Nameplate({ plate }) {
+  if (!plate?.id) return null;
+  const [a, b] = plate.colors || [];
+  return (
+    <span
+      className={`nameplate np-${plate.id}`}
+      style={plate.id === 'custom' ? { '--np1': a || '#6366f1', '--np2': b || a || '#ec4899' } : undefined}
+      aria-hidden="true"
+    />
+  );
+}
+
 export function DisplayName({ name, className = '', as: Tag = 'span', ...rest }) {
   const people = usePeople();
   return (
-    <Tag className={`display-name ${className}`} style={nameStyle(people?.profileOf(name), people?.infoOf(name)?.color)} {...rest}>
+    <Tag {...nameProps(people?.profileOf(name), people?.infoOf(name)?.color, name, className)} {...rest}>
       {name}
     </Tag>
   );

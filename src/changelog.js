@@ -4,6 +4,19 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '2.41',
+    date: '2026-10-26',
+    title: 'Profiles, Nitro-style',
+    items: [
+      'A new profile card: your profile colors fill the whole card, your picture sits in a cutout in the banner with your status in a bubble beside it, and badges show your subteams.',
+      'All-new animated profile effects that open with a burst and keep going: Aurora, Fireflies, Warp speed, Sakura, Lightning, Matrix, Synthwave, Circuit, and remade Sparkles, Snow globe, Hearts, Embers, Blueprint, Bubbles, and Confetti cannon. The picker shows each one moving.',
+      'Animated avatar decorations: Comets, Flame ring, Electric, Halo, Ripple, Petals, and Circuit.',
+      'Name effects: Shimmer, Neon, Outline, 3D pop, Glitch, and Rainbow.',
+      'Nameplates: animated art behind your name in the members list and DMs (Aurora, Cyber, Fire, Ocean, Space, Sakura, Gold, or your own colors).',
+      'In chat, decorations and name effects play when you hover or tap a message, so busy channels stay calm. Custom themes can float any of the new effects too.',
+    ],
+  },
+  {
     version: '2.40',
     date: '2026-10-26',
     title: 'Real parts in the electrical diagram',
