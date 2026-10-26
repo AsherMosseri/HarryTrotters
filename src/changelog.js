@@ -4,6 +4,14 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '2.44',
+    date: '2026-10-26',
+    title: 'Nothing under the status bar',
+    items: [
+      'The electrical diagram’s buttons, task details, and full-screen pop-ups on phones start below the status bar instead of tucking under it.',
+    ],
+  },
+  {
     version: '2.43',
     date: '2026-10-26',
     title: 'Smoother diagram zoom',
