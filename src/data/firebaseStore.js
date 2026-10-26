@@ -457,6 +457,23 @@ export const firebaseStore = {
     }
     return batch.commit();
   },
+  // Ads teammates submit and book for certain dates (Asher approves them).
+  subscribeAdSubmissions(cb) {
+    return onSnapshot(
+      collection(db, 'adSubmissions'),
+      (snap) => cb(snap.docs.map(readDoc)),
+      () => cb([]),
+    );
+  },
+  submitAd(data, actor) {
+    return setDoc(doc(collection(db, 'adSubmissions')), { ...data, by: actor.name, status: 'pending', note: '', at: Date.now() });
+  },
+  updateAdSubmission(id, patch) {
+    return updateDoc(doc(db, 'adSubmissions', id), patch);
+  },
+  deleteAdSubmission(id) {
+    return deleteDoc(doc(db, 'adSubmissions', id));
+  },
   async resetAdStats() {
     const snap = await getDocs(collection(db, 'adStats'));
     const batch = writeBatch(db);

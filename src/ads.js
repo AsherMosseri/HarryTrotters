@@ -4,6 +4,8 @@
 //
 // anim: how the product emoji moves (see .ad-anim-* in styles.css).
 // sticker: the spinning corner badge. fine: the fine print.
+// action: what the button does: book (pick a day and time), order (pick how
+// many), submit (type something in), or subscribe; done is the last line.
 export const ADS = [
   {
     id: 'torque-juice',
@@ -16,6 +18,7 @@ export const ADS = [
     anim: 'bounce',
     sticker: 'NEW!',
     fine: 'Not for robots. Not for people either. Contains 9 V.',
+    action: { kind: 'order', item: 'Torque Juice 12-pack', done: 'Arriving before your next all-nighter.' },
   },
   {
     id: 'zip-ties-monthly',
@@ -28,6 +31,7 @@ export const ADS = [
     anim: 'wobble',
     sticker: 'NO ESCAPE',
     fine: 'By reading this you have subscribed. Box arrives in 3–5 business years.',
+    action: { kind: 'subscribe', done: 'Your first box ships monthly. Forever. We’ll see ourselves out.' },
   },
   {
     id: 'hot-glue-pro-max',
@@ -40,6 +44,7 @@ export const ADS = [
     anim: 'flicker',
     sticker: 'PRO',
     fine: 'Glue sold separately. Fingers sold separately. Burn cream sold separately.',
+    action: { kind: 'order', item: 'Hot Glue Pro Max', done: 'Estimated delivery: Q3 2031.' },
   },
   {
     id: 'ctrl-z-real-life',
@@ -52,6 +57,7 @@ export const ADS = [
     anim: 'spin',
     sticker: 'BETA',
     fine: 'Cannot undo buying this. Ctrl+Y not included.',
+    action: { kind: 'submit', ask: 'What do you want to undo?', done: 'Undo scheduled for yesterday.' },
   },
   {
     id: 'hex-key-finder',
@@ -64,6 +70,7 @@ export const ADS = [
     anim: 'shake',
     sticker: '50% OFF',
     fine: 'Also checks under the robot, in your hoodie pocket, and in the other couch.',
+    action: { kind: 'submit', ask: 'Where did you last see it?', done: 'Search team dispatched. Check the couch.' },
   },
   {
     id: 'battery-whisperer',
@@ -76,6 +83,7 @@ export const ADS = [
     anim: 'pulse',
     sticker: 'AI',
     fine: 'Batteries have feelings. Charge them with love and a 12 V charger.',
+    action: { kind: 'book', item: 'listening session', done: 'Bring the battery. Bring tissues.' },
   },
   {
     id: 'auto-path-psychic',
@@ -88,6 +96,7 @@ export const ADS = [
     anim: 'float',
     sticker: '100% REAL',
     fine: 'For entertainment only. Your auto will drive into the wall at 0:03.',
+    action: { kind: 'book', item: 'reading', done: 'We already knew you’d book this.' },
   },
   {
     id: 'wire-spaghetti',
@@ -100,6 +109,7 @@ export const ADS = [
     anim: 'wobble',
     sticker: 'AS SEEN ON TV',
     fine: 'Do not spray on the Control Hub. Do not spray on the electrical team.',
+    action: { kind: 'order', item: 'Wire Spaghetti Begone spray', done: 'Ships tangled. Sorry.' },
   },
   {
     id: 'sleep',
@@ -112,6 +122,7 @@ export const ADS = [
     anim: 'float',
     sticker: 'LIMITED',
     fine: 'Offer void the week before competition. And the week after.',
+    action: { kind: 'book', item: '8 hours of sleep', done: 'Slot held for you. Please arrive tired.' },
   },
   {
     id: 'competition-candle',
@@ -124,6 +135,7 @@ export const ADS = [
     anim: 'flicker',
     sticker: 'NEW SCENT',
     fine: 'Also available in “Inspection Line” and “Our Robot Is On Fire.”',
+    action: { kind: 'order', item: 'Competition Day Candle', done: 'Smells will arrive 1–2 days before the box.' },
   },
   {
     id: 'lucky-socks',
@@ -136,6 +148,7 @@ export const ADS = [
     anim: 'swing',
     sticker: 'LUCKY',
     fine: 'Luck not guaranteed. Smell guaranteed.',
+    action: { kind: 'book', item: 'sock pickup', done: 'Bring tongs. Do not ask questions.' },
   },
   {
     id: 'gear-match',
@@ -148,6 +161,7 @@ export const ADS = [
     anim: 'pulse',
     sticker: '❤ FREE',
     fine: 'Backlash may occur. Not responsible for stripped teeth.',
+    action: { kind: 'submit', ask: 'Describe your ideal gear ratio', done: '3 compatible gears found nearby. 1 is a little worn.' },
   },
   {
     id: 'robot-therapy',
@@ -160,6 +174,7 @@ export const ADS = [
     anim: 'sway',
     sticker: 'HEALING',
     fine: 'Sessions are 50 minutes or one dead battery, whichever comes first.',
+    action: { kind: 'book', item: 'session', done: 'Your robot’s first session is on the couch. Please charge it first.' },
   },
   {
     id: 'potatocad',
@@ -172,6 +187,11 @@ export const ADS = [
     anim: 'spin',
     sticker: 'AI POWERED',
     fine: 'Export formats: none. The potato keeps your files.',
+    action: {
+      kind: 'submit',
+      ask: 'Describe your robot to the potato',
+      done: 'The potato has received your design. The potato does not respond.',
+    },
   },
   {
     id: 'mom-rideshare',
@@ -184,6 +204,7 @@ export const ADS = [
     anim: 'drive',
     sticker: 'SURGE 4.5×',
     fine: 'Rides include one “Do you know what time it is?” at no extra cost.',
+    action: { kind: 'book', item: 'pickup', done: 'Driver is on the way. She has questions about your grades.' },
   },
   {
     id: 'pit-bar',
@@ -196,6 +217,7 @@ export const ADS = [
     anim: 'zoom',
     sticker: 'MEGA',
     fine: 'Eating two has been linked to designing a swerve drive at 2 AM.',
+    action: { kind: 'order', item: 'Pit Bar', done: 'Please eat only one.' },
   },
   {
     id: 'rubber-duck-pro',
@@ -208,6 +230,7 @@ export const ADS = [
     anim: 'wobble',
     sticker: 'QUACK',
     fine: 'Duck does not write code. Duck judges you silently.',
+    action: { kind: 'submit', ask: 'Name your duck', done: 'Adoption application received. The duck is reviewing your code.' },
   },
   {
     id: 'measure-once',
@@ -220,6 +243,7 @@ export const ADS = [
     anim: 'swing',
     sticker: 'ONE USE',
     fine: 'Measure twice, cut once? Not with this attitude.',
+    action: { kind: 'order', item: 'Measure Once™ tape', done: 'Measured once. Shipped once. No returns.' },
   },
   {
     id: 'judge-coach',
@@ -232,6 +256,7 @@ export const ADS = [
     anim: 'pulse',
     sticker: 'AWARD-WINNING',
     fine: '*Not guaranteed. Blinking is recommended for your health.',
+    action: { kind: 'book', item: 'coaching session', done: 'Practice saying “iterative” in the mirror until then.' },
   },
   {
     id: 'screw-gremlin',
@@ -244,6 +269,7 @@ export const ADS = [
     anim: 'shake',
     sticker: 'PROVEN*',
     fine: '*Gremlins have not been asked. Gremlins have not been found.',
+    action: { kind: 'order', item: 'can of Gremlin Repellent', done: 'Your order is missing one screw. You know why.' },
   },
 ];
 

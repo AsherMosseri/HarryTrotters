@@ -607,6 +607,24 @@ export const demoStore = {
     state.adStats = stats;
     commit();
   },
+  subscribeAdSubmissions(cb) {
+    return listen(() => cb([...(state.adSubmissions || [])]));
+  },
+  async submitAd(data, actor) {
+    state.adSubmissions = [
+      ...(state.adSubmissions || []),
+      { ...data, id: `sub${Date.now().toString(36)}`, by: actor.name, status: 'pending', note: '', at: Date.now() },
+    ];
+    commit();
+  },
+  async updateAdSubmission(id, patch) {
+    state.adSubmissions = (state.adSubmissions || []).map((x) => (x.id === id ? { ...x, ...patch } : x));
+    commit();
+  },
+  async deleteAdSubmission(id) {
+    state.adSubmissions = (state.adSubmissions || []).filter((x) => x.id !== id);
+    commit();
+  },
   async resetAdStats() {
     state.adStats = {};
     commit();

@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { ADS } from '../ads.js';
 import { STATUSES } from '../config.js';
+import { todayISO } from '../milestones.js';
 import { useEscape } from '../util.js';
 import { CloseIcon, Overlay } from './common.jsx';
 
@@ -26,6 +27,7 @@ export const AD_DEFAULTS = {
   close: 'normal',
   schedule: { on: false, days: [0, 1, 2, 3, 4, 5, 6], from: '15:00', to: '21:00', notOnShift: false },
   custom: [],
+  spots: true,
 };
 
 // Settings with every field filled in (one level of nesting).
@@ -90,13 +92,22 @@ export function inSchedule(s, now = new Date()) {
 
 // Every enabled ad, repeated by weight and spread out so the same one rarely
 // shows twice in a row.
-function buildPool(cfg) {
-  const all = [...ADS, ...(cfg.custom || [])].filter((a) => a && !cfg.off.includes(a.id));
+function buildPool(cfg, live = []) {
+  const all = [...ADS, ...(cfg.custom || []), ...live].filter((a) => a && !cfg.off.includes(a.id));
   const pool = [];
   const copies = all.map((a) => [a, WEIGHT[cfg.weights[a.id]] || WEIGHT.normal]);
   for (let round = 0; copies.some(([, n]) => n > round); round++) for (const [a, n] of copies) if (n > round) pool.push(a);
   return pool;
 }
+
+// A teammate's submitted ad as an ad. Approved ones run between from and to.
+export const submissionAd = (s) => ({
+  ...s,
+  id: `s-${s.id.toLowerCase()}`,
+  subId: s.id,
+  colors: s.colors?.length === 2 ? s.colors : ['#6c5ce7', '#ff79c6'],
+});
+const liveAds = (subs, today) => subs.filter((s) => s.status === 'approved' && s.from <= today && today <= s.to).map(submissionAd);
 
 const AdsContext = createContext({ on: false });
 export const useAds = () => useContext(AdsContext);
@@ -104,9 +115,11 @@ export const useAds = () => useContext(AdsContext);
 const SLOT = { banner: 0, board: 7, chat: 13, page: 3, popup: 11, full: 5 };
 
 // Everything the ads need, worked out once in Workspace.
-export function useAdsEngine({ settings, actor, view, shifts, api, toast }) {
+export function useAdsEngine({ settings, actor, view, shifts, submissions, api }) {
   const cfg = useMemo(() => adSettings(settings.ads), [settings.ads]);
-  const pool = useMemo(() => buildPool(cfg), [cfg]);
+  const today = todayISO();
+  const live = useMemo(() => liveAds(submissions || [], today), [submissions, today]);
+  const pool = useMemo(() => buildPool(cfg, live), [cfg, live]);
   const [tick, setTick] = useState(() => Math.floor(Date.now() / (cfg.rotate * 1000)));
   useEffect(() => {
     const t = setInterval(() => setTick(Math.floor(Date.now() / (cfg.rotate * 1000))), 2000);
@@ -177,6 +190,8 @@ export function useAdsEngine({ settings, actor, view, shifts, api, toast }) {
   }, [on, cfg.full.onOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [removing, setRemoving] = useState(false);
+  const [action, setAction] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
   const value = useMemo(
     () => ({
       on,
@@ -188,12 +203,13 @@ export function useAdsEngine({ settings, actor, view, shifts, api, toast }) {
       level: cfg.level,
       cta: (ad) => {
         track(ad, 'tap');
-        toast(`${ad.emoji} Sorry, ${ad.brand} isn’t real. It’s a pretend ad!`);
+        setAction(ad);
       },
+      openSubmit: () => setSubmitting(true),
       remove: () => setRemoving(true),
       showFull: (ad) => setFull(ad || pick('full', Math.floor(Math.random() * 7))),
     }),
-    [on, cfg, pool, tick, pick, track, toast],
+    [on, cfg, pool, tick, pick, track],
   );
   const removeAds = () => {
     const h = cfg.remove.hours;
@@ -216,6 +232,10 @@ export function useAdsEngine({ settings, actor, view, shifts, api, toast }) {
     closeFull: () => setFull(null),
     removing,
     closeRemoving: () => setRemoving(false),
+    action,
+    closeAction: () => setAction(null),
+    submitting,
+    closeSubmit: () => setSubmitting(false),
     removeAds,
     preview,
     setPreview,
@@ -306,6 +326,25 @@ function RemoveLink() {
   );
 }
 
+// "Get your spot here": teammates submit and book their own.
+function SpotLink() {
+  const { cfg, openSubmit } = useAds();
+  if (!cfg.spots) return null;
+  return (
+    <button
+      className="ad-spot"
+      onClick={(e) => {
+        e.stopPropagation();
+        openSubmit();
+      }}
+    >
+      Get your spot here
+    </button>
+  );
+}
+
+const By = ({ ad }) => (ad.by ? <span className="ad-by">Booked by {ad.by.split(' ')[0]}</span> : null);
+
 const frameClass = (level, extra) => `ad ad-${level}${extra ? ` ${extra}` : ''}`;
 
 // ---------- the banner ----------
@@ -335,6 +374,7 @@ export function AdBanner({ position }) {
         {ad.cta}
       </button>
       <div className="ad-side">
+        <SpotLink />
         <RemoveLink />
         <AdClose onClose={() => setClosedUntil(Date.now() + 120000)} />
       </div>
@@ -356,6 +396,7 @@ export function SponsoredCard({ slot, k = 0, size = 'card' }) {
     <div className={frameClass(level, `ad-card ad-card-${size}`)} style={adStyle(ad)} aria-label={`Sponsored: ${ad.brand}`}>
       <div className="ad-card-top">
         <span className="ad-label">Sponsored</span>
+        <By ad={ad} />
         <button className="ad-why" onClick={() => setWhy(!why)}>
           Why this ad?
         </button>
@@ -375,6 +416,7 @@ export function SponsoredCard({ slot, k = 0, size = 'card' }) {
         <button className="ad-cta" onClick={() => cta(ad)}>
           {ad.cta}
         </button>
+        <SpotLink />
         <RemoveLink />
       </div>
       {size === 'wide' && <p className="ad-fine">{ad.fine}</p>}
@@ -446,6 +488,7 @@ export function ChatAd({ k = 0 }) {
         <div className="ad-chat-head">
           <b>{ad.brand}</b>
           <span className="ad-label">Sponsored</span>
+          <By ad={ad} />
           <span className="spacer" />
           <AdClose onClose={() => setHidden(true)} label="Hide this ad" />
         </div>
@@ -457,6 +500,7 @@ export function ChatAd({ k = 0 }) {
             {ad.cta}
           </button>
           <Countdown />
+          <SpotLink />
           <RemoveLink />
         </div>
       </div>
@@ -525,7 +569,11 @@ export function FullScreenAd({ ad, onClose }) {
           <button className="ad-cta big" onClick={() => cta(ad)}>
             {ad.cta}
           </button>
-          <RemoveLink />
+          <By ad={ad} />
+          <div className="row gap">
+            <SpotLink />
+            <RemoveLink />
+          </div>
         </div>
         <div className="ad-marquee" aria-hidden="true">
           <span>
@@ -538,10 +586,11 @@ export function FullScreenAd({ ad, onClose }) {
   );
 }
 
-// ---------- Remove ads (pretend checkout, nothing is paid) ----------
+// ---------- Remove ads (nothing is ever charged) ----------
 
 export function RemoveAdsDialog({ price, hours, onRemove, onClose }) {
   const [step, setStep] = useState('offer');
+  const [receipt] = useState(() => `RA-${1000 + Math.floor(Math.random() * 9000)}`);
   useEscape(onClose);
   const howLong =
     hours === 'today'
@@ -569,11 +618,14 @@ export function RemoveAdsDialog({ price, hours, onRemove, onClose }) {
             </>
           ) : (
             <>
-              <div className="remove-ads-hero" aria-hidden="true">
-                🎉
+              <div className="remove-ads-hero ad-pop" aria-hidden="true">
+                ✅
               </div>
-              <h2>Just kidding, it’s free</h2>
-              <p className="muted">Nobody paid anything. Ads are off on this device {howLong}.</p>
+              <h2>Payment complete</h2>
+              <p className="muted">
+                {price} was covered in full by a promotional credit. Ads are off on this device {howLong}.
+              </p>
+              <p className="muted tiny">Receipt #{receipt}</p>
               <button
                 className="btn primary big-btn"
                 onClick={() => {
@@ -581,7 +633,7 @@ export function RemoveAdsDialog({ price, hours, onRemove, onClose }) {
                   onClose();
                 }}
               >
-                Sweet
+                Done
               </button>
             </>
           )}
@@ -634,7 +686,20 @@ const CPM = 0.0004;
 const PER_TAP = 0.05;
 const money = (n) => `$${n < 1 ? n.toFixed(4) : n.toFixed(2)}`;
 
-export function AdsSettings({ initial, roster, stats, onSave, onPreview, preview, onShowFull, onResetStats, onClose }) {
+export function AdsSettings({
+  initial,
+  roster,
+  stats,
+  submissions = [],
+  onReview,
+  onDeleteSubmission,
+  onSave,
+  onPreview,
+  preview,
+  onShowFull,
+  onResetStats,
+  onClose,
+}) {
   useEscape(onClose);
   const [cfg, setCfg] = useState(() => adSettings(initial));
   const [tab, setTab] = useState('who');
@@ -643,12 +708,13 @@ export function AdsSettings({ initial, roster, stats, onSave, onPreview, preview
   const setIn = (key, patch) => setCfg((c) => ({ ...c, [key]: { ...c[key], ...patch } }));
   const toggleIn = (list, v) => (list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
   const allAds = [...ADS, ...cfg.custom];
+  const pendingSubs = submissions.filter((x) => x.status === 'pending').length;
   const totals = Object.values(stats || {}).reduce((t, s) => ({ views: t.views + (s.views || 0), taps: t.taps + (s.taps || 0) }), {
     views: 0,
     taps: 0,
   });
   const earned = totals.views * CPM + totals.taps * PER_TAP;
-  const ranked = allAds
+  const ranked = [...allAds, ...submissions.map(submissionAd)]
     .map((a) => ({ a, v: stats?.[a.id]?.views || 0, t: stats?.[a.id]?.taps || 0 }))
     .filter((r) => r.v || r.t)
     .sort((x, y) => y.v + y.t * 20 - (x.v + x.t * 20));
@@ -672,7 +738,7 @@ export function AdsSettings({ initial, roster, stats, onSave, onPreview, preview
                   ? 'Ads are paused'
                   : `Ads are on for ${cfg.everyone ? 'everyone' : `${count} ${count === 1 ? 'person' : 'people'}`}`}
               </b>
-              <span className="muted small">Pretend ads only: made-up brands, nothing is tracked or sold.</span>
+              <span className="muted small">The team’s partners, placements, and bookings.</span>
             </div>
             <Switch checked={!cfg.paused} onChange={(v) => set({ paused: !v })} label="Ads on" />
           </div>
@@ -682,6 +748,7 @@ export function AdsSettings({ initial, roster, stats, onSave, onPreview, preview
               ['amount', 'How many'],
               ['ads', 'Ads'],
               ['yours', 'Your ads'],
+              ['subs', pendingSubs ? `Submissions (${pendingSubs})` : 'Submissions'],
               ['money', 'Earnings'],
             ].map(([id, label]) => (
               <button
@@ -937,7 +1004,7 @@ export function AdsSettings({ initial, roster, stats, onSave, onPreview, preview
                   <Switch checked={cfg.full.onOpen} onChange={(v) => setIn('full', { onOpen: v })} label="Full-screen ad on open" />
                 </Row>
                 <h4>Buttons on ads</h4>
-                <Row title="Remove ads button" hint="Pretend checkout. Nobody pays.">
+                <Row title="Remove ads button" hint="Nobody is ever charged.">
                   <Switch checked={cfg.remove.on} onChange={(v) => setIn('remove', { on: v })} label="Remove ads button" />
                 </Row>
                 {cfg.remove.on && (
@@ -1042,21 +1109,7 @@ export function AdsSettings({ initial, roster, stats, onSave, onPreview, preview
                     <p className="muted small">Write your own. They join the rotation with the built-in ones.</p>
                     <button
                       className="btn primary"
-                      onClick={() =>
-                        setEditing({
-                          id: `c-${Date.now().toString(36)}`,
-                          brand: '',
-                          emoji: '🤖',
-                          headline: '',
-                          body: '',
-                          cta: 'Buy now',
-                          colors: ['#6c5ce7', '#ff79c6'],
-                          anim: 'bounce',
-                          sticker: 'NEW!',
-                          fine: '',
-                          isNew: true,
-                        })
-                      }
+                      onClick={() => setEditing({ ...blankAd(), id: `c-${Date.now().toString(36)}`, isNew: true })}
                     >
                       ＋ New ad
                     </button>
@@ -1069,6 +1122,10 @@ export function AdsSettings({ initial, roster, stats, onSave, onPreview, preview
                   </>
                 )}
               </>
+            )}
+
+            {tab === 'subs' && (
+              <SubmissionsTab cfg={cfg} set={set} submissions={submissions} onReview={onReview} onDelete={onDeleteSubmission} />
             )}
 
             {tab === 'money' && (
@@ -1173,52 +1230,114 @@ function AdRow({ ad, cfg, set, onShow, onEdit }) {
   );
 }
 
+// The fields of an ad, shared by Asher's editor and the teammate submission form.
+function AdFields({ a, setA }) {
+  const f = (key) => ({ value: a[key] || '', onChange: (e) => setA({ ...a, [key]: e.target.value }) });
+  const act = a.action || { kind: 'order' };
+  const setAct = (patch) => setA({ ...a, action: { ...act, ...patch } });
+  return (
+    <div className="fields ad-editor-fields">
+      <label className="field-label">Brand</label>
+      <input className="input" maxLength={40} placeholder="Torque Juice" {...f('brand')} />
+      <label className="field-label">Emoji</label>
+      <input className="input ad-emoji-input" maxLength={8} {...f('emoji')} />
+      <label className="field-label">Headline</label>
+      <input className="input" maxLength={70} placeholder="Now with 400% more amps" {...f('headline')} />
+      <label className="field-label">Text</label>
+      <textarea className="input" rows={2} maxLength={160} {...f('body')} />
+      <label className="field-label">Button</label>
+      <input className="input" maxLength={28} {...f('cta')} />
+      <label className="field-label">Button does</label>
+      <select className="input" value={act.kind} onChange={(e) => setAct({ kind: e.target.value })}>
+        <option value="order">Takes an order</option>
+        <option value="book">Takes a booking (day and time)</option>
+        <option value="submit">Takes a submission (they type something)</option>
+        <option value="subscribe">Signs them up</option>
+      </select>
+      {(act.kind === 'order' || act.kind === 'book') && (
+        <>
+          <label className="field-label">{act.kind === 'book' ? 'What they book' : 'What they order'}</label>
+          <input
+            className="input"
+            maxLength={40}
+            placeholder={act.kind === 'book' ? 'session' : 'hoodie'}
+            value={act.item || ''}
+            onChange={(e) => setAct({ item: e.target.value })}
+          />
+        </>
+      )}
+      {act.kind === 'submit' && (
+        <>
+          <label className="field-label">What to ask</label>
+          <input
+            className="input"
+            maxLength={80}
+            placeholder="Describe your robot"
+            value={act.ask || ''}
+            onChange={(e) => setAct({ ask: e.target.value })}
+          />
+        </>
+      )}
+      <label className="field-label">After they tap</label>
+      <input
+        className="input"
+        maxLength={140}
+        placeholder="We’ll be in touch."
+        value={act.done || ''}
+        onChange={(e) => setAct({ done: e.target.value })}
+      />
+      <label className="field-label">Sticker</label>
+      <input className="input" maxLength={14} placeholder="NEW!" {...f('sticker')} />
+      <label className="field-label">Fine print</label>
+      <input className="input" maxLength={140} {...f('fine')} />
+      <label className="field-label">Colors</label>
+      <div className="row gap">
+        {[0, 1].map((i) => (
+          <input
+            key={i}
+            type="color"
+            className="ad-color"
+            value={a.colors[i]}
+            onChange={(e) => setA({ ...a, colors: i ? [a.colors[0], e.target.value] : [e.target.value, a.colors[1]] })}
+            aria-label={i ? 'Second color' : 'First color'}
+          />
+        ))}
+      </div>
+      <label className="field-label">Animation</label>
+      <select className="input" value={a.anim} onChange={(e) => setA({ ...a, anim: e.target.value })}>
+        {ANIMS.map((x) => (
+          <option key={x} value={x}>
+            {x[0].toUpperCase() + x.slice(1)}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+export const blankAd = () => ({
+  brand: '',
+  emoji: '🤖',
+  headline: '',
+  body: '',
+  cta: 'Buy now',
+  colors: ['#6c5ce7', '#ff79c6'],
+  anim: 'bounce',
+  sticker: 'NEW!',
+  fine: '',
+  action: { kind: 'order', item: '', done: '' },
+});
+const cleanAd = (a) => ({ ...a, brand: a.brand.trim(), headline: a.headline.trim() });
+
 function AdEditor({ ad, onSave, onCancel, onDelete }) {
   const [a, setA] = useState(ad);
-  const f = (key) => ({ value: a[key] || '', onChange: (e) => setA({ ...a, [key]: e.target.value }) });
   const ok = a.brand.trim() && a.headline.trim();
   return (
     <div className="ad-editor">
       <div className="ad-editor-preview">
         <SponsoredPreview ad={a} />
       </div>
-      <div className="fields ad-editor-fields">
-        <label className="field-label">Brand</label>
-        <input className="input" maxLength={40} placeholder="Torque Juice" {...f('brand')} />
-        <label className="field-label">Emoji</label>
-        <input className="input ad-emoji-input" maxLength={8} {...f('emoji')} />
-        <label className="field-label">Headline</label>
-        <input className="input" maxLength={70} placeholder="Now with 400% more amps" {...f('headline')} />
-        <label className="field-label">Text</label>
-        <textarea className="input" rows={2} maxLength={160} {...f('body')} />
-        <label className="field-label">Button</label>
-        <input className="input" maxLength={28} {...f('cta')} />
-        <label className="field-label">Sticker</label>
-        <input className="input" maxLength={14} placeholder="NEW!" {...f('sticker')} />
-        <label className="field-label">Fine print</label>
-        <input className="input" maxLength={140} {...f('fine')} />
-        <label className="field-label">Colors</label>
-        <div className="row gap">
-          {[0, 1].map((i) => (
-            <input
-              key={i}
-              type="color"
-              className="ad-color"
-              value={a.colors[i]}
-              onChange={(e) => setA({ ...a, colors: i ? [a.colors[0], e.target.value] : [e.target.value, a.colors[1]] })}
-              aria-label={i ? 'Second color' : 'First color'}
-            />
-          ))}
-        </div>
-        <label className="field-label">Animation</label>
-        <select className="input" value={a.anim} onChange={(e) => setA({ ...a, anim: e.target.value })}>
-          {ANIMS.map((x) => (
-            <option key={x} value={x}>
-              {x[0].toUpperCase() + x.slice(1)}
-            </option>
-          ))}
-        </select>
-      </div>
+      <AdFields a={a} setA={setA} />
       <div className="row gap">
         {!ad.isNew && (
           <button className="link-btn danger small" onClick={onDelete}>
@@ -1234,7 +1353,7 @@ function AdEditor({ ad, onSave, onCancel, onDelete }) {
           disabled={!ok}
           onClick={() => {
             const { isNew, ...clean } = a; // eslint-disable-line no-unused-vars
-            onSave({ ...clean, brand: clean.brand.trim(), headline: clean.headline.trim() });
+            onSave(cleanAd(clean));
           }}
         >
           {ad.isNew ? 'Add ad' : 'Save ad'}
@@ -1244,12 +1363,394 @@ function AdEditor({ ad, onSave, onCancel, onDelete }) {
   );
 }
 
+// ---------- tapping an ad's button: a booking, an order, a submission, or a sign-up ----------
+
+const ACT_DONE = { book: 'Booking confirmed', order: 'Order placed', submit: 'Submission received', subscribe: 'You’re subscribed' };
+const TIMES = ['3:30 PM', '6:00 PM', '9:47 PM'];
+const initials = (name) =>
+  (name || 'AD')
+    .split(/\s+/)
+    .map((w) => w[0])
+    .join('')
+    .replace(/[^A-Za-z]/g, '')
+    .slice(0, 3)
+    .toUpperCase() || 'AD';
+const ordinal = (n) => {
+  const v = n % 100;
+  return n + (['th', 'st', 'nd', 'rd'][(v - 20) % 10] || ['th', 'st', 'nd', 'rd'][v] || 'th');
+};
+function nextDays(n) {
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() + i);
+    out.push(
+      i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }),
+    );
+  }
+  return out;
+}
+// How many times this device has gone through with each ad.
+function bumpHistory(id) {
+  try {
+    const h = JSON.parse(localStorage.getItem('ad-history') || '{}');
+    h[id] = (h[id] || 0) + 1;
+    localStorage.setItem('ad-history', JSON.stringify(h));
+    return h[id];
+  } catch {
+    return 1;
+  }
+}
+
+export function AdActionDialog({ ad, onClose }) {
+  useEscape(onClose);
+  const act = ad.action || { kind: 'order' };
+  const kind = ACT_DONE[act.kind] ? act.kind : 'order';
+  const days = useMemo(() => nextDays(5), []);
+  const [day, setDay] = useState(days[1]);
+  const [time, setTime] = useState(TIMES[0]);
+  const [qty, setQty] = useState(1);
+  const [text, setText] = useState('');
+  const [done, setDone] = useState(null);
+  const item = act.item || ad.brand;
+  const finish = () => setDone({ ref: `${initials(ad.brand)}-${1000 + Math.floor(Math.random() * 9000)}`, n: bumpHistory(ad.id) });
+  const title = {
+    book: `Book a ${item}`,
+    order: `Order ${item}`,
+    submit: act.ask || 'Tell us more',
+    subscribe: `Subscribe to ${ad.brand}`,
+  }[kind];
+  return (
+    <Overlay>
+      <div className="panel-backdrop center" onClick={onClose}>
+        <div className="dialog ad-action" style={adStyle(ad)} onClick={(e) => e.stopPropagation()} role="dialog" aria-label={ad.brand}>
+          <div className="ad-action-head">
+            <span className="ad-action-emoji" aria-hidden="true">
+              {ad.emoji}
+            </span>
+            <b>{ad.brand}</b>
+            <span className="spacer" />
+            <button className="icon-btn" onClick={onClose} aria-label="Close">
+              <CloseIcon />
+            </button>
+          </div>
+          {!done ? (
+            <div className="ad-action-body">
+              <h2>{title}</h2>
+              {kind === 'book' && (
+                <>
+                  <h4>Day</h4>
+                  <div className="ads-days">
+                    {days.map((d) => (
+                      <button key={d} className={`chip${day === d ? ' on' : ''}`} aria-pressed={day === d} onClick={() => setDay(d)}>
+                        {d}
+                      </button>
+                    ))}
+                  </div>
+                  <h4>Time</h4>
+                  <div className="ads-days">
+                    {TIMES.map((t) => (
+                      <button key={t} className={`chip${time === t ? ' on' : ''}`} aria-pressed={time === t} onClick={() => setTime(t)}>
+                        {t}
+                      </button>
+                    ))}
+                  </div>
+                  <button className="btn primary big-btn" onClick={finish}>
+                    Confirm booking
+                  </button>
+                </>
+              )}
+              {kind === 'order' && (
+                <>
+                  <div className="ad-qty">
+                    <button className="btn" onClick={() => setQty(Math.max(1, qty - 1))} aria-label="One fewer">
+                      −
+                    </button>
+                    <b aria-live="polite">{qty}</b>
+                    <button className="btn" onClick={() => setQty(Math.min(99, qty + 1))} aria-label="One more">
+                      ＋
+                    </button>
+                  </div>
+                  <button className="btn primary big-btn" onClick={finish}>
+                    Place order
+                  </button>
+                </>
+              )}
+              {kind === 'submit' && (
+                <>
+                  <textarea
+                    className="input"
+                    rows={3}
+                    maxLength={200}
+                    placeholder={act.ask || 'Tell us more'}
+                    value={text}
+                    onChange={(e) => setText(e.target.value)}
+                    aria-label={act.ask || 'Your answer'}
+                  />
+                  <button className="btn primary big-btn" disabled={!text.trim()} onClick={finish}>
+                    Submit
+                  </button>
+                </>
+              )}
+              {kind === 'subscribe' && (
+                <>
+                  <p className="muted">Monthly, starting today.</p>
+                  <button className="btn primary big-btn" onClick={finish}>
+                    Subscribe
+                  </button>
+                </>
+              )}
+            </div>
+          ) : (
+            <div className="ad-action-body ad-action-done">
+              <div className="ad-pop" aria-hidden="true">
+                ✅
+              </div>
+              <h2>{ACT_DONE[kind]}</h2>
+              <p className="ad-action-detail">
+                {kind === 'book' && `${item[0].toUpperCase() + item.slice(1)} · ${day} at ${time}`}
+                {kind === 'order' && `${qty} × ${item}`}
+                {kind === 'submit' && `“${text.trim()}”`}
+                {kind === 'subscribe' && `${ad.brand} · monthly`}
+              </p>
+              <p className="muted small">Ref #{done.ref}</p>
+              {act.done && <p>{act.done}</p>}
+              {done.n > 1 && (
+                <p className="muted small">
+                  This is your {ordinal(done.n)} {ACT_DONE[kind].split(' ')[0].toLowerCase()} with {ad.brand}.
+                </p>
+              )}
+              <button className="btn primary big-btn" onClick={onClose}>
+                Done
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </Overlay>
+  );
+}
+
+// ---------- teammates submit and book their own ----------
+
+const fmtDay = (iso) => new Date(`${iso}T12:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+const addDays = (iso, n) => {
+  const d = new Date(`${iso}T12:00:00`);
+  d.setDate(d.getDate() + n);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+export function submissionStatus(s, today = todayISO()) {
+  if (s.status === 'approved') {
+    if (today < s.from) return ['approved', `Approved · starts ${fmtDay(s.from)}`];
+    if (today > s.to) return ['ended', 'Ended'];
+    return ['live', 'Live now'];
+  }
+  return (
+    {
+      pending: ['pending', 'Waiting for review'],
+      rejected: ['rejected', 'Not approved'],
+      ended: ['ended', 'Ended'],
+      withdrawn: ['ended', 'Withdrawn'],
+    }[s.status] || ['pending', s.status]
+  );
+}
+
+export function SubmitAdDialog({ mine, onSubmit, onWithdraw, onClose }) {
+  useEscape(onClose);
+  const today = todayISO();
+  const [view, setView] = useState(mine.length ? 'list' : 'form');
+  const [a, setA] = useState(blankAd);
+  const [from, setFrom] = useState(addDays(today, 1));
+  const [to, setTo] = useState(addDays(today, 7));
+  const [busy, setBusy] = useState(false);
+  const ok = a.brand.trim() && a.headline.trim() && from >= today && to >= from;
+  return (
+    <Overlay>
+      <div className="panel-backdrop center" onClick={onClose}>
+        <div className="dialog submit-ad" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Get your spot">
+          <div className="panel-head">
+            <h2>{view === 'form' ? '📣 Get your spot' : view === 'sent' ? '📨 Submitted' : '📣 Your spots'}</h2>
+            <span className="spacer" />
+            <button className="icon-btn" onClick={onClose} aria-label="Close">
+              <CloseIcon />
+            </button>
+          </div>
+          {view === 'form' && (
+            <div className="submit-ad-body">
+              <p className="muted small">Make it, pick your dates, and send it in. It goes live once it’s approved.</p>
+              <div className="ad-editor-preview">
+                <SponsoredPreview ad={a} />
+              </div>
+              <div className="row gap submit-ad-dates">
+                <label>
+                  From <input className="input" type="date" min={today} value={from} onChange={(e) => setFrom(e.target.value)} />
+                </label>
+                <label>
+                  to <input className="input" type="date" min={from} value={to} onChange={(e) => setTo(e.target.value)} />
+                </label>
+              </div>
+              <AdFields a={a} setA={setA} />
+              <div className="row gap">
+                {mine.length > 0 && (
+                  <button className="link-btn small" onClick={() => setView('list')}>
+                    Your spots ({mine.length})
+                  </button>
+                )}
+                <span className="spacer" />
+                <button className="btn" onClick={onClose}>
+                  Cancel
+                </button>
+                <button
+                  className="btn primary"
+                  disabled={!ok || busy}
+                  onClick={async () => {
+                    setBusy(true);
+                    await onSubmit({ ...cleanAd(a), from, to });
+                    setBusy(false);
+                    setView('sent');
+                  }}
+                >
+                  Submit for review
+                </button>
+              </div>
+            </div>
+          )}
+          {view === 'sent' && (
+            <div className="submit-ad-body ad-action-done">
+              <div className="ad-pop" aria-hidden="true">
+                📨
+              </div>
+              <h2>Submission received</h2>
+              <p className="muted">
+                {a.brand.trim()} · {fmtDay(from)} to {fmtDay(to)}. It goes live once it’s approved.
+              </p>
+              <button className="btn primary big-btn" onClick={() => setView('list')}>
+                See your spots
+              </button>
+            </div>
+          )}
+          {view === 'list' && (
+            <div className="submit-ad-body">
+              <ul className="ads-list">
+                {mine.map((sub) => {
+                  const [cls, label] = submissionStatus(sub, today);
+                  return (
+                    <li key={sub.id} className="ads-item" style={adStyle(submissionAd(sub))}>
+                      <span className="ads-item-art">{sub.emoji}</span>
+                      <div className="grow ads-item-text">
+                        <b>{sub.brand}</b>
+                        <span className="muted small">
+                          {fmtDay(sub.from)} to {fmtDay(sub.to)}
+                        </span>
+                        {sub.note && <span className="small">“{sub.note}”</span>}
+                      </div>
+                      <span className={`sub-status ${cls}`}>{label}</span>
+                      {sub.status === 'pending' && (
+                        <button className="link-btn small" onClick={() => onWithdraw(sub)}>
+                          Withdraw
+                        </button>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+              <button
+                className="btn primary"
+                onClick={() => {
+                  setA(blankAd());
+                  setView('form');
+                }}
+              >
+                ＋ Book a new spot
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </Overlay>
+  );
+}
+
+// Asher's review list (on the Ads page). Approving and rejecting happen right away.
+function SubmissionsTab({ cfg, set, submissions, onReview, onDelete }) {
+  const today = todayISO();
+  const groups = [
+    ['Waiting for review', submissions.filter((s) => s.status === 'pending')],
+    ['Approved', submissions.filter((s) => s.status === 'approved' && today <= s.to)],
+    ['Past', submissions.filter((s) => !(s.status === 'pending' || (s.status === 'approved' && today <= s.to)))],
+  ];
+  return (
+    <>
+      <Row title="Let people get their own spot" hint="A “Get your spot here” link on every ad.">
+        <Switch checked={cfg.spots} onChange={(v) => set({ spots: v })} label="Let people submit" />
+      </Row>
+      <p className="muted small">Approve and reject take effect right away. The switch above saves with Save.</p>
+      {groups.map(([title, list]) =>
+        list.length ? (
+          <section key={title}>
+            <h4>
+              {title} ({list.length})
+            </h4>
+            <ul className="ads-subs">
+              {list
+                .sort((x, y) => (y.at || 0) - (x.at || 0))
+                .map((sub) => {
+                  const [cls, label] = submissionStatus(sub, today);
+                  return (
+                    <li key={sub.id} className="ads-sub">
+                      <SponsoredPreview ad={submissionAd(sub)} />
+                      <div className="ads-sub-info">
+                        <span className={`sub-status ${cls}`}>{label}</span>
+                        <span className="small">
+                          <b>{sub.by}</b> · {fmtDay(sub.from)} to {fmtDay(sub.to)}
+                        </span>
+                        {sub.note && <span className="muted small">Note: {sub.note}</span>}
+                        <div className="row gap wrap">
+                          {sub.status === 'pending' && (
+                            <>
+                              <button className="btn primary" onClick={() => onReview(sub, { status: 'approved', note: '' })}>
+                                Approve
+                              </button>
+                              <button
+                                className="btn"
+                                onClick={() => {
+                                  const note = prompt('Why not? (optional, they’ll see this)', '');
+                                  if (note !== null) onReview(sub, { status: 'rejected', note: note.slice(0, 140) });
+                                }}
+                              >
+                                Reject
+                              </button>
+                            </>
+                          )}
+                          {sub.status === 'approved' && today <= sub.to && (
+                            <button className="btn" onClick={() => onReview(sub, { status: 'ended' })}>
+                              End early
+                            </button>
+                          )}
+                          <button className="link-btn danger small" onClick={() => confirm(`Delete ${sub.brand}?`) && onDelete(sub)}>
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
+            </ul>
+          </section>
+        ) : null,
+      )}
+      {!submissions.length && <p className="muted">Nothing submitted yet.</p>}
+    </>
+  );
+}
+
 // A still preview of an ad (used in the editor).
 function SponsoredPreview({ ad }) {
   return (
     <div className="ad ad-normal ad-card ad-card-card" style={adStyle(ad)}>
       <div className="ad-card-top">
         <span className="ad-label">Sponsored</span>
+        <By ad={ad} />
       </div>
       <div className="ad-card-main">
         <span className="ad-art ad-art-md" aria-hidden="true">

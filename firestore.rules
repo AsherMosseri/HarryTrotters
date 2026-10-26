@@ -76,6 +76,32 @@ service cloud.firestore {
       allow delete: if isManager();
     }
 
+    // Ads teammates submit and book for certain dates. Asher reviews them on
+    // the Ads page; approved ones run for everyone during their dates.
+    match /adSubmissions/{id} {
+      function str(v, n) { return v is string && v.size() <= n; }
+      function validAction(a) {
+        return a is map && a.keys().hasOnly(['kind', 'ask', 'done', 'item'])
+          && str(a.get('kind', ''), 12) && str(a.get('ask', ''), 80) && str(a.get('done', ''), 140) && str(a.get('item', ''), 40);
+      }
+      function validSubmission(d) {
+        return d.keys().hasOnly(['by', 'brand', 'emoji', 'headline', 'body', 'cta', 'sticker', 'fine', 'colors', 'anim', 'action', 'from', 'to', 'status', 'note', 'at'])
+          && str(d.brand, 40) && d.brand.size() > 0 && str(d.headline, 70) && d.headline.size() > 0
+          && str(d.get('emoji', ''), 16) && str(d.get('body', ''), 160) && str(d.get('cta', ''), 28) && str(d.get('sticker', ''), 14)
+          && str(d.get('fine', ''), 140) && str(d.get('anim', ''), 12) && str(d.get('note', ''), 140)
+          && d.get('colors', []) is list && d.get('colors', []).size() <= 2 && validAction(d.get('action', {}))
+          && str(d.from, 10) && str(d.to, 10) && d.from <= d.to;
+      }
+      allow read: if isMember();
+      allow create: if isMember() && validSubmission(request.resource.data) && isMe(request.resource.data.by)
+        && request.resource.data.status == 'pending';
+      allow update: if (requestsOwner() && validSubmission(request.resource.data)
+          && request.resource.data.status in ['pending', 'approved', 'rejected', 'ended'])
+        || (isMember() && isMe(resource.data.by) && resource.data.status == 'pending' && validSubmission(request.resource.data)
+          && request.resource.data.by == resource.data.by && request.resource.data.status in ['pending', 'withdrawn']);
+      allow delete: if requestsOwner() || (isMember() && isMe(resource.data.by) && resource.data.status != 'approved');
+    }
+
     // Parts tracker: anyone on the team. Checklists: anyone edits, managers delete.
     match /parts/{id} {
       allow read, write: if isMember();

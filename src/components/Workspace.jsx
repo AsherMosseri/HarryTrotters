@@ -45,7 +45,17 @@ import { CheckinGate, answerOf } from './Checkin.jsx';
 import ThemeStudio, { AppBackdrop, CUSTOM_DEFAULT, applyThemeVars, themeFromProfile } from './ThemeStudio.jsx';
 import { VERSION, versionsSince } from '../changelog.js';
 import Inbox from './Inbox.jsx';
-import { AdBanner, AdsProvider, AdsSettings, FullScreenAd, PageAds, RemoveAdsDialog, useAdsEngine } from './Ads.jsx';
+import {
+  AdActionDialog,
+  AdBanner,
+  AdsProvider,
+  AdsSettings,
+  FullScreenAd,
+  PageAds,
+  RemoveAdsDialog,
+  SubmitAdDialog,
+  useAdsEngine,
+} from './Ads.jsx';
 
 // Versions were renumbered once (2.0 became 1.9, 2.1 became 2.0, and so
 // on). Move this device's "last seen" version along so What's new doesn't
@@ -815,6 +825,10 @@ export default function Workspace({ store, actor, rename, renames }) {
       saveSettings: (patch) => store.saveSettings(patch, actor).catch(fail),
       saveAdSettings: (cfg) => store.saveAdSettings(JSON.parse(JSON.stringify(cfg)), actor).catch(fail),
       bumpAdStats: (counts) => store.bumpAdStats(counts).catch(() => {}),
+      submitAd: (data) => store.submitAd(data, actor).catch(fail),
+      withdrawAd: (sub) => store.updateAdSubmission(sub.id, { status: 'withdrawn' }).catch(fail),
+      reviewAd: (sub, patch) => store.updateAdSubmission(sub.id, patch).catch(fail),
+      deleteAdSubmission: (sub) => store.deleteAdSubmission(sub.id).catch(fail),
       createPart: (data) => store.createPart(data, actor).catch(fail),
       updatePart: (p, patch) => store.updatePart(p.id, patch, actor).catch(fail),
       deletePart: (p) => store.deletePart(p.id).catch(fail),
@@ -1124,8 +1138,9 @@ export default function Workspace({ store, actor, rename, renames }) {
   );
   // Pretend ads (Asher's 📺 Ads page controls them).
   const isOwner = actor.admin && actor.name === REQUESTS_TO;
-  const adToast = useCallback((text) => setToast({ text }), []);
-  const ads = useAdsEngine({ settings, actor, view, shifts, api, toast: adToast });
+  const [adSubs, setAdSubs] = useState([]);
+  useEffect(() => store.subscribeAdSubmissions(setAdSubs), [store]);
+  const ads = useAdsEngine({ settings, actor, view, shifts, submissions: adSubs, api });
   const [adsPage, setAdsPage] = useState(false);
   const [adStats, setAdStats] = useState({});
   useEffect(() => (adsPage ? store.subscribeAdStats(setAdStats) : undefined), [adsPage, store]);
@@ -1726,6 +1741,15 @@ export default function Workspace({ store, actor, rename, renames }) {
           </div>
           <AdBanner position="bottom" />
           {ads.full && <FullScreenAd ad={ads.full} onClose={ads.closeFull} />}
+          {ads.action && <AdActionDialog ad={ads.action} onClose={ads.closeAction} />}
+          {ads.submitting && (
+            <SubmitAdDialog
+              mine={adSubs.filter((x) => x.by === actor.name).sort((x, y) => (y.at || 0) - (x.at || 0))}
+              onSubmit={api.submitAd}
+              onWithdraw={api.withdrawAd}
+              onClose={ads.closeSubmit}
+            />
+          )}
           {ads.removing && (
             <RemoveAdsDialog
               price={ads.value.cfg.remove.price}
@@ -1739,6 +1763,9 @@ export default function Workspace({ store, actor, rename, renames }) {
               initial={settings.ads}
               roster={roster}
               stats={adStats}
+              submissions={adSubs}
+              onReview={api.reviewAd}
+              onDeleteSubmission={api.deleteAdSubmission}
               preview={ads.preview}
               onPreview={ads.setPreview}
               onShowFull={(ad) => ads.value.showFull(ad)}

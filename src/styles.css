@@ -2378,7 +2378,7 @@ body:has(.bottom-nav):has(.composer) .toast { bottom: calc(150px + env(safe-area
 .ad-close.dodge-1 { transform: translate(-46px, 26px) rotate(180deg); }
 .ad-close.dodge-2 { transform: translate(-90px, 0) scale(0.7); }
 .ad-close.dodge-3 { transform: translate(-28px, 40px) rotate(-90deg) scale(0.8); }
-.ad-remove { border: 0; background: none; color: #fff; font-size: 11.5px; font-weight: 800; text-decoration: underline; padding: 4px; cursor: pointer; opacity: 0.95; }
+.ad-remove, .ad-spot { border: 0; background: none; color: #fff; font-size: 11.5px; font-weight: 800; text-decoration: underline; padding: 4px; cursor: pointer; opacity: 0.95; }
 .ad-why { border: 0; background: none; color: #fff; font-size: 11.5px; font-weight: 700; text-decoration: underline; opacity: 0.85; padding: 2px; cursor: pointer; }
 .ad-reason { margin: 4px 0 0; font-size: 12.5px; background: rgb(0 0 0 / 25%); border-radius: 8px; padding: 5px 8px; }
 .ad-fine { margin: 6px 0 0; font-size: 10.5px; opacity: 0.8; }
@@ -2524,4 +2524,45 @@ body:has(.bottom-nav):has(.composer) .toast { bottom: calc(150px + env(safe-area
 .ad-color { width: 52px; height: 36px; border: 1px solid var(--border); border-radius: 8px; padding: 2px; background: var(--surface); }
 @media (max-width: 760px) {
   .dialog.ads-settings { width: 100%; max-height: none; }
+}
+
+/* Ad buttons: bookings, orders, submissions, sign-ups */
+.ad-by { font-size: 11px; font-weight: 800; opacity: 0.95; background: rgb(0 0 0 / 22%); border-radius: 999px; padding: 1px 7px; text-shadow: none; }
+.ad-spot { opacity: 0.9; }
+@media (max-width: 760px) { .ad-banner .ad-spot { display: none; } }
+.dialog.ad-action { width: min(420px, calc(100vw - 32px)); padding: 0; overflow: hidden; gap: 0; }
+.ad-action-head {
+  display: flex; align-items: center; gap: 10px; padding: 12px 12px 12px 16px; color: #fff; font-size: 16px;
+  background: linear-gradient(120deg, var(--ad-a), var(--ad-b)); text-shadow: 0 1px 2px rgb(0 0 0 / 25%);
+}
+.ad-action-head .icon-btn { color: #fff; }
+.ad-action-emoji { font-size: 28px; }
+.ad-action-body { display: flex; flex-direction: column; gap: 10px; padding: 16px; }
+.ad-action-body h2 { margin: 0; font-size: 20px; }
+.ad-action-body h4 { margin: 4px 0 0; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+.ad-action-body .big-btn { margin-top: 6px; }
+.ad-action-done { align-items: center; text-align: center; }
+.ad-action-done p { margin: 0; }
+.ad-action-detail { font-weight: 700; font-size: 16px; }
+.ad-qty { display: flex; align-items: center; justify-content: center; gap: 18px; }
+.ad-qty b { font-size: 30px; min-width: 2ch; text-align: center; font-variant-numeric: tabular-nums; }
+.ad-qty .btn { width: 46px; height: 46px; font-size: 22px; padding: 0; border-radius: 50%; }
+.ad-pop { font-size: 56px; animation: ad-pop 0.5s cubic-bezier(0.2, 1.6, 0.4, 1); }
+@keyframes ad-pop { from { transform: scale(0.2) rotate(-30deg); opacity: 0; } }
+.dialog.submit-ad { width: min(560px, calc(100vw - 32px)); max-height: calc(100dvh - 40px); display: flex; flex-direction: column; }
+.submit-ad-body { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding: 2px; }
+.submit-ad-dates label { display: flex; align-items: center; gap: 6px; font-weight: 700; }
+.submit-ad-dates .input { width: auto; }
+.sub-status { flex: none; font-size: 11.5px; font-weight: 800; border-radius: 999px; padding: 2px 8px; background: var(--surface); border: 1px solid var(--border); }
+.sub-status.pending { color: #8a5a00; background: #fff4d6; border-color: #f5d27a; }
+.sub-status.approved { color: #1d4ed8; background: #e0ecff; border-color: #a9c4ff; }
+.sub-status.live { color: #fff; background: #16a34a; border-color: #16a34a; }
+.sub-status.rejected { color: #b91c1c; background: #fde2e2; border-color: #f5b5b5; }
+.sub-status.ended { color: var(--muted); }
+.ads-subs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.ads-sub { display: grid; grid-template-columns: minmax(0, 260px) minmax(0, 1fr); gap: 12px; align-items: start; }
+.ads-sub-info { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+@media (max-width: 760px) {
+  .ads-sub { grid-template-columns: minmax(0, 1fr); }
+  .dialog.submit-ad { width: 100%; max-height: none; }
 }

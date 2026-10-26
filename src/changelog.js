@@ -11,7 +11,8 @@ export const CHANGELOG = [
       'A few new friends of the team may stop by from time to time. They’re very excited to meet you.',
       'Things around the app might get a little more colorful, a little more sparkly, and a little more enthusiastic than usual.',
       'Every so often, something exciting may take over your whole screen. Hang in there. It’ll pass.',
-      'There may be offers. They may end soon. They may not be real.',
+      'There may be offers. They may end soon. Bookings, orders, and submissions are open.',
+      'Want to be one of the friends? There’s a spot for you, pending review.',
     ],
   },
   {
