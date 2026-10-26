@@ -4,6 +4,14 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '2.45',
+    date: '2026-10-26',
+    title: 'Back where you were',
+    items: [
+      'Closing a pop-up you opened from another one takes you back to it, like a back button: Edit profile → back to the full profile (saving shows your change there), a teammate’s profile → back to the one you came from, a task opened from a profile → back to the profile, and Version log or Feature requests opened from Help → back to Help.',
+    ],
+  },
+  {
     version: '2.44',
     date: '2026-10-26',
     title: 'Nothing under the status bar',

@@ -557,6 +557,21 @@ export default function Workspace({ store, actor, rename, renames }) {
     [profiles, online, peopleInfo, roster],
   );
   const openPerson = useCallback((name) => setProfileFor(name), []);
+  // Going back: a pop-up opened from another pop-up returns to it when it's
+  // closed (✕, Cancel, Escape, or Save), like a phone's back button.
+  // Entries: { child, value, restore }. `value` (a name, a task id) keeps an
+  // old entry from firing when the same kind of pop-up is opened elsewhere.
+  const backStack = useRef([]);
+  const openFrom = useCallback((child, value, restore) => {
+    backStack.current = [...backStack.current.slice(-20), { child, value, restore }];
+  }, []);
+  const goBack = useCallback((child, value) => {
+    const top = backStack.current[backStack.current.length - 1];
+    if (!top || top.child !== child || (top.value !== undefined && value !== undefined && top.value !== value)) return;
+    backStack.current = backStack.current.slice(0, -1);
+    top.restore();
+  }, []);
+  const clearBack = useCallback(() => (backStack.current = []), []);
   const [fullProfileFor, setFullProfileFor] = useState(null);
   // Private notes about teammates (only you see yours).
   const [notes, setNotes] = useState({});
@@ -1399,7 +1414,17 @@ export default function Workspace({ store, actor, rename, renames }) {
           )}
 
           {openTask && (
-            <TaskPanel task={openTask} api={api} roster={roster} milestones={milestones} parts={parts} onClose={() => setOpenId(null)} />
+            <TaskPanel
+              task={openTask}
+              api={api}
+              roster={roster}
+              milestones={milestones}
+              parts={parts}
+              onClose={() => {
+                setOpenId(null);
+                goBack('task', openTask.id);
+              }}
+            />
           )}
           {newTask && (
             <NewTaskDialog
@@ -1407,9 +1432,13 @@ export default function Workspace({ store, actor, rename, renames }) {
               roster={roster}
               milestones={milestones}
               me={actor.name}
-              onClose={() => setNewTask(null)}
+              onClose={() => {
+                setNewTask(null);
+                goBack('newtask');
+              }}
               onCreate={async (data) => {
                 setNewTask(null);
+                clearBack();
                 await api.create(data);
               }}
             />
@@ -1432,10 +1461,12 @@ export default function Workspace({ store, actor, rename, renames }) {
               showRobot={showRobot}
               onClose={() => setShowHelp(false)}
               onVersionLog={() => {
+                openFrom('log', undefined, () => setShowHelp(true));
                 setShowHelp(false);
                 setShowLog(true);
               }}
               onRequests={() => {
+                openFrom('requests', undefined, () => setShowHelp(true));
                 setShowHelp(false);
                 setShowRequests(true);
               }}
@@ -1458,8 +1489,13 @@ export default function Workspace({ store, actor, rename, renames }) {
               actor={actor}
               api={api}
               focusId={showRequests === true ? null : showRequests}
-              onClose={() => setShowRequests(null)}
+              onClose={() => {
+                setShowRequests(null);
+                goBack('requests');
+              }}
               onMakeTask={(r) => {
+                const back = showRequests;
+                openFrom('newtask', undefined, () => setShowRequests(back));
                 setShowRequests(null);
                 if (r.status === 'new') api.updateRequest(r.id, { status: 'planned' });
                 setNewTask({
@@ -1470,7 +1506,15 @@ export default function Workspace({ store, actor, rename, renames }) {
               }}
             />
           )}
-          {showLog && <VersionLogDialog current={VERSION} onClose={() => setShowLog(false)} />}
+          {showLog && (
+            <VersionLogDialog
+              current={VERSION}
+              onClose={() => {
+                setShowLog(false);
+                goBack('log');
+              }}
+            />
+          )}
           {cat && <CatParty onClose={() => setCat(false)} />}
           {studio && (
             <ThemeStudio
@@ -1511,15 +1555,20 @@ export default function Workspace({ store, actor, rename, renames }) {
               tasks={tasks || []}
               onClose={() => setProfileFor(null)}
               onEdit={() => {
-                setEditProfileFor(profileFor);
+                const n = profileFor;
+                openFrom('edit', n, () => setProfileFor(n));
+                setEditProfileFor(n);
                 setProfileFor(null);
               }}
               onFull={() => {
-                setFullProfileFor(profileFor);
+                const n = profileFor;
+                openFrom('full', n, () => setProfileFor(n));
+                setFullProfileFor(n);
                 setProfileFor(null);
               }}
               onMessage={async () => {
                 const key = await api.openDm([actor.name, profileFor]);
+                clearBack();
                 setProfileFor(null);
                 if (key) {
                   setChatChannel(key);
@@ -1538,28 +1587,49 @@ export default function Workspace({ store, actor, rename, renames }) {
               lastSeen={lastSeenOf(fullProfileFor)}
               notes={notes}
               api={api}
-              onPerson={(n) => setFullProfileFor(n)}
+              onPerson={(n) => {
+                const from = fullProfileFor;
+                openFrom('full', n, () => setFullProfileFor(from));
+                setFullProfileFor(n);
+              }}
               onOpenTask={(id) => {
+                const from = fullProfileFor;
+                openFrom('task', id, () => setFullProfileFor(from));
                 setFullProfileFor(null);
                 setOpenId(id);
               }}
               onEdit={() => {
-                setEditProfileFor(fullProfileFor);
+                const n = fullProfileFor;
+                openFrom('edit', n, () => setFullProfileFor(n));
+                setEditProfileFor(n);
                 setFullProfileFor(null);
               }}
               onMessage={async () => {
                 const key = await api.openDm([actor.name, fullProfileFor]);
+                clearBack();
                 setFullProfileFor(null);
                 if (key) {
                   setChatChannel(key);
                   setView('chat');
                 }
               }}
-              onClose={() => setFullProfileFor(null)}
+              onClose={() => {
+                setFullProfileFor(null);
+                goBack('full', fullProfileFor);
+              }}
             />
           )}
           {editProfileFor && (
-            <ProfileEditor name={editProfileFor} actor={actor} api={api} tasks={tasks || []} onClose={() => setEditProfileFor(null)} />
+            <ProfileEditor
+              name={editProfileFor}
+              actor={actor}
+              api={api}
+              tasks={tasks || []}
+              onClose={() => {
+                setEditProfileFor(null);
+                goBack('edit', editProfileFor);
+              }}
+            />
           )}
         </div>
         {phone && (
