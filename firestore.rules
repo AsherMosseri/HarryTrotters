@@ -90,6 +90,12 @@ service cloud.firestore {
         return d.keys().hasOnly(['type', 'from', 'to', 'amount', 'note', 'at']) && isMe(d.from) && d.to is string
           && d.to.size() > 0 && d.to != d.from && amount(d) && shortStr(d.get('note', ''), 140);
       }
+      // Prizes from ad games and the wheel: small, and only for yourself.
+      function validPrize(d) {
+        return d.keys().hasOnly(['type', 'person', 'amount', 'what', 'label', 'until', 'at']) && isMe(d.person)
+          && d.amount is int && d.amount >= 0 && d.amount <= 20 && d.what in ['game', 'wheel'] && shortStr(d.get('label', ''), 80)
+          && (!('until' in d) || (d.until is int && d.until <= request.time.toMillis() + 8 * 86400000));
+      }
       function validGrant(d) {
         return d.keys().hasOnly(['type', 'to', 'amount', 'note', 'by', 'at']) && requestsOwner() && d.to is string
           && d.amount is int && d.amount != 0 && d.amount >= -100000 && d.amount <= 100000 && shortStr(d.get('note', ''), 140);
@@ -98,6 +104,7 @@ service cloud.firestore {
       allow create: if isMember() && request.resource.data.at is int && (
         (request.resource.data.type == 'spend' && validSpend(request.resource.data))
         || (request.resource.data.type == 'gift' && validGift(request.resource.data))
+        || (request.resource.data.type == 'prize' && validPrize(request.resource.data))
         || (request.resource.data.type == 'grant' && validGrant(request.resource.data)));
       allow update: if false;
       allow delete: if requestsOwner();

@@ -2,7 +2,8 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { ADS } from '../ads.js';
 import { STATUSES } from '../config.js';
 import { todayISO } from '../milestones.js';
-import { adFreeUntil } from '../coins.js';
+import { adFreeUntil, prizesToday } from '../coins.js';
+import { GAME_ADS } from './AdGames.jsx';
 import { PACKS, packOn } from '../adPacks.js';
 import { TARGETS, targetedAds } from '../adTargets.js';
 import { SUBTEAMS } from '../config.js';
@@ -23,7 +24,10 @@ export const AD_DEFAULTS = {
   chatEvery: 10,
   pages: { all: 1 },
   popups: 1,
-  full: { everyTabs: 4, minGap: 2, onOpen: false, skip: 5 },
+  full: { everyTabs: 4, minGap: 2, onOpen: false, skip: 5, style: 'mix', double: false },
+  games: { on: true, cap: 10 },
+  wheel: { on: true },
+  adblock: 'rare',
   weights: {},
   off: [],
   rotate: 25,
@@ -44,7 +48,7 @@ export const AD_DEFAULTS = {
 // Settings with every field filled in (one level of nesting).
 export function adSettings(raw) {
   const out = { ...AD_DEFAULTS, ...(raw || {}) };
-  for (const k of ['banner', 'board', 'pages', 'full', 'remove', 'schedule', 'weights', 'packs', 'targets'])
+  for (const k of ['banner', 'board', 'pages', 'full', 'remove', 'schedule', 'weights', 'packs', 'targets', 'games', 'wheel'])
     out[k] = { ...AD_DEFAULTS[k], ...(raw?.[k] || {}) };
   return out;
 }
@@ -143,7 +147,12 @@ export function useAdsEngine({ settings, actor, view, shifts, submissions, ledge
   const live = useMemo(() => liveAds(submissions || [], today), [submissions, today]);
   const targeted = useMemo(() => (cfg.targeted === 'off' ? [] : targetedAds(viewer)), [cfg.targeted, viewer]);
   const pool = useMemo(
-    () => buildPool(cfg, [...allBuiltIn(cfg, today, competitionDate), ...(cfg.custom || []), ...live, ...targeted], viewer),
+    () =>
+      buildPool(
+        cfg,
+        [...allBuiltIn(cfg, today, competitionDate), ...(cfg.games.on ? GAME_ADS : []), ...(cfg.custom || []), ...live, ...targeted],
+        viewer,
+      ),
     [cfg, today, competitionDate, live, targeted, viewer],
   );
   // Each slot only gets the ads allowed there.
@@ -202,7 +211,16 @@ export function useAdsEngine({ settings, actor, view, shifts, submissions, ledge
 
   // Full-screen ads: every N tab switches, at least M minutes apart, and
   // optionally once when the app opens.
+  // full = { list: [ad, maybe a second], i, video }.
   const [full, setFull] = useState(null);
+  const launchFull = (ad) => {
+    if (!ad) return;
+    const video = cfg.full.style === 'video' || (cfg.full.style === 'mix' && Math.random() < 0.5);
+    const second = cfg.full.double ? pick('full', 3 + Math.floor(Math.random() * 5)) : null;
+    setFull({ list: second && second.id !== ad.id ? [ad, second] : [ad], i: 0, video });
+  };
+  const [blockWall, setBlockWall] = useState(false);
+  const lastBlock = useRef(0);
   const switches = useRef(0);
   const lastFull = useRef(0);
   const firstView = useRef(true);
@@ -212,21 +230,56 @@ export function useAdsEngine({ settings, actor, view, shifts, submissions, ledge
       firstView.current = false;
       return;
     }
-    if (!on || !cfg.full.everyTabs) return;
+    if (!on) return;
     switches.current++;
-    if (switches.current >= cfg.full.everyTabs && Date.now() - lastFull.current >= cfg.full.minGap * 60000) {
+    if (cfg.full.everyTabs && switches.current >= cfg.full.everyTabs && Date.now() - lastFull.current >= cfg.full.minGap * 60000) {
       switches.current = 0;
       lastFull.current = Date.now();
-      setFull(pick('full', Math.floor(Math.random() * 7)));
+      launchFull(pick('full', Math.floor(Math.random() * 7)));
+      return;
+    }
+    // Now and then: "Ad blocker detected" (at least 10 minutes apart).
+    const chance = { rare: 1 / 25, often: 1 / 8 }[cfg.adblock] || 0;
+    if (chance && Date.now() - lastBlock.current > 600000 && Math.random() < chance) {
+      lastBlock.current = Date.now();
+      setBlockWall(true);
     }
   }, [view]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (on && cfg.full.onOpen && !openedOnce.current) {
       openedOnce.current = true;
       lastFull.current = Date.now();
-      setFull(pick('full'));
+      launchFull(pick('full'));
     }
   }, [on, cfg.full.onOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The prize wheel: once a day, a few seconds after ads show up.
+  const [wheel, setWheel] = useState(false);
+  const wheelShown = useRef(false);
+  const spunToday = prizesToday(actor.name, ledger, 'wheel').length > 0;
+  useEffect(() => {
+    if (!on || !cfg.wheel.on || spunToday || wheelShown.current) return;
+    // Wait until nothing else is open, so it never interrupts.
+    let t;
+    const tryShow = () => {
+      if (document.querySelector('.panel-backdrop, .ad-full, .ad-video, .sheet-backdrop')) t = setTimeout(tryShow, 5000);
+      else {
+        wheelShown.current = true;
+        setWheel(true);
+      }
+    };
+    t = setTimeout(tryShow, 3000);
+    return () => clearTimeout(t);
+  }, [on, cfg.wheel.on, spunToday]);
+  const winWheel = (seg) => {
+    if (prizesToday(actor.name, ledger, 'wheel').length) return Promise.resolve();
+    if (seg.hour) return coins.prize({ what: 'wheel', amount: 0, label: 'Prize wheel: 1 hour with no ads', until: Date.now() + 3600000 });
+    return coins.prize({ what: 'wheel', amount: seg.coins, label: seg.coins ? `Prize wheel: +${seg.coins}` : 'Prize wheel: nothing' });
+  };
+
+  // Playable ads: small prizes, up to cfg.games.cap a day.
+  const [game, setGame] = useState(null);
+  const gameCapLeft = Math.max(0, cfg.games.cap - prizesToday(actor.name, ledger, 'game').reduce((t, x) => t + x.amount, 0));
 
   const [removing, setRemoving] = useState(false);
   const [action, setAction] = useState(null);
@@ -242,12 +295,20 @@ export function useAdsEngine({ settings, actor, view, shifts, submissions, ledge
       level: cfg.level,
       cta: (ad) => {
         track(ad, 'tap');
-        setAction(ad);
+        if (ad.game) setGame(ad);
+        else setAction(ad);
       },
       openSubmit: () => setSubmitting(true),
       coins,
       remove: () => setRemoving(true),
-      showFull: (ad) => setFull(ad || pick('full', Math.floor(Math.random() * 7))),
+      showFull: (ad) => launchFull(ad || pick('full', Math.floor(Math.random() * 7))),
+      // Asher's "try it" buttons.
+      tryIt: (what, ad) => {
+        if (what === 'wheel') setWheel(true);
+        else if (what === 'block') setBlockWall(true);
+        else if (what === 'game') setGame(ad || GAME_ADS[0]);
+        else if (what === 'video') setFull({ list: [ad || pick('full') || ADS[0]], i: 0, video: true });
+      },
     }),
     [on, cfg, pool, tick, pick, track, coins],
   );
@@ -268,8 +329,25 @@ export function useAdsEngine({ settings, actor, view, shifts, submissions, ledge
   };
   return {
     value,
-    full,
-    closeFull: () => setFull(null),
+    full: full ? { ad: full.list[full.i], n: full.i + 1, total: full.list.length, video: full.video } : null,
+    closeFull: () => setFull((f) => (f && f.i < f.list.length - 1 ? { ...f, i: f.i + 1 } : null)),
+    game,
+    closeGame: () => setGame(null),
+    gameCapLeft,
+    winGame: (amount, label) => coins.prize({ what: 'game', amount, label }),
+    wheel,
+    closeWheel: () => setWheel(false),
+    winWheel,
+    blockWall,
+    closeBlock: () => setBlockWall(false),
+    payBlock: async () => {
+      await coins.spend({ what: 'adblock', amount: 1, label: 'Got past the ad blocker wall' });
+      setBlockWall(false);
+    },
+    watchBlock: () => {
+      setBlockWall(false);
+      launchFull(pick('full', 2));
+    },
     removing,
     closeRemoving: () => setRemoving(false),
     action,
@@ -837,6 +915,7 @@ export function AdsSettings({
   onUndoGrant,
   competitionDate,
   peopleStats = {},
+  onTry,
   onClose,
 }) {
   useEscape(onClose);
@@ -849,7 +928,7 @@ export function AdsSettings({
   const toggleIn = (list, v) => (list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
   const packAds = PACKS.flatMap((p) => p.ads);
   const sampleTargeted = TARGETS.map((t) => ({ id: t.id, targeted: true, ...t.make(SAMPLE_VIEWER) }));
-  const allAds = [...ADS, ...packAds, ...cfg.custom];
+  const allAds = [...ADS, ...packAds, ...GAME_ADS, ...cfg.custom];
   const today = todayISO();
   const pendingSubs = submissions.filter((x) => x.status === 'pending').length;
   const totals = Object.values(stats || {}).reduce((t, s) => ({ views: t.views + (s.views || 0), taps: t.taps + (s.taps || 0) }), {
@@ -891,6 +970,7 @@ export function AdsSettings({
               ['amount', 'How many'],
               ['ads', 'Ads'],
               ['yours', 'Your ads'],
+              ['fun', 'Fun'],
               ['subs', pendingSubs ? `Submissions (${pendingSubs})` : 'Submissions'],
               ['money', 'Earnings'],
               ['coins', 'Coins'],
@@ -1257,6 +1337,7 @@ export function AdsSettings({
                 {[
                   ['Classic', [...ADS, ...PACKS[0].ads]],
                   ...PACKS.slice(1).map((p) => [p.label, p.ads]),
+                  ['🎮 Games (also on the Fun tab)', GAME_ADS],
                   ['🎯 Targeted (shown with Cooper’s numbers as an example)', sampleTargeted],
                 ].map(([title, list]) => (
                   <section key={title}>
@@ -1314,6 +1395,75 @@ export function AdsSettings({
                     {!cfg.custom.length && <p className="muted">No ads of your own yet.</p>}
                   </>
                 )}
+              </>
+            )}
+
+            {tab === 'fun' && (
+              <>
+                <h4>Playable ads</h4>
+                <Row title="Mini-game ads" hint="Whack the gremlins, catch the Pit Bars, find the hex key. Up to 3 coins a game.">
+                  <Switch checked={cfg.games.on} onChange={(v) => setIn('games', { on: v })} label="Mini-game ads" />
+                </Row>
+                <Row title="Most coins from games a day">
+                  <Choice
+                    value={cfg.games.cap}
+                    onChange={(v) => setIn('games', { cap: v })}
+                    label="Daily game prize limit"
+                    options={[0, 5, 10, 20].map((n) => [n, String(n)])}
+                  />
+                </Row>
+                <div className="row gap wrap">
+                  {GAME_ADS.map((g) => (
+                    <button key={g.id} className="btn" onClick={() => onTry('game', g)}>
+                      {g.emoji} Try {g.game === 'whack' ? 'Whack' : g.game === 'catch' ? 'Catch' : 'Find'}
+                    </button>
+                  ))}
+                </div>
+                <h4>Prize wheel</h4>
+                <Row title="Daily prize wheel" hint="Pops up once a day: coins, an hour with no ads, or nothing.">
+                  <Switch checked={cfg.wheel.on} onChange={(v) => setIn('wheel', { on: v })} label="Prize wheel" />
+                </Row>
+                <button className="btn" onClick={() => onTry('wheel')}>
+                  🎡 Show the wheel
+                </button>
+                <h4>Full-screen style</h4>
+                <Row title="Style" hint="Video ads play like a commercial, with a progress bar and a skip button.">
+                  <Choice
+                    value={cfg.full.style}
+                    onChange={(v) => setIn('full', { style: v })}
+                    label="Full-screen style"
+                    options={[
+                      ['classic', 'Classic'],
+                      ['video', 'Video'],
+                      ['mix', 'Mix'],
+                    ]}
+                  />
+                </Row>
+                <Row title="Double feature" hint="Two in a row: “Ad 1 of 2”.">
+                  <Switch checked={cfg.full.double} onChange={(v) => setIn('full', { double: v })} label="Double feature" />
+                </Row>
+                <button className="btn" onClick={() => onTry('video')}>
+                  🎬 Show a video ad
+                </button>
+                <h4>Ad blocker detected</h4>
+                <Row
+                  title="Fake ad blocker wall"
+                  hint="Now and then when switching tabs. Pay 1 coin, watch an ad, or say you turned it off (twice)."
+                >
+                  <Choice
+                    value={cfg.adblock}
+                    onChange={(v) => set({ adblock: v })}
+                    label="Ad blocker wall"
+                    options={[
+                      ['off', 'Off'],
+                      ['rare', 'Rare'],
+                      ['often', 'Often'],
+                    ]}
+                  />
+                </Row>
+                <button className="btn" onClick={() => onTry('block')}>
+                  🛑 Show the wall
+                </button>
               </>
             )}
 
@@ -1471,7 +1621,9 @@ function PeopleStats({ roster, stats, ledger }) {
         views: st.views || 0,
         taps: st.taps || 0,
         breaks: breaks.length,
-        spent: mine.filter((x) => String(x.what).startsWith('remove') || x.what === 'skip').reduce((t, x) => t + x.amount, 0),
+        spent: mine
+          .filter((x) => String(x.what).startsWith('remove') || x.what === 'skip' || x.what === 'adblock')
+          .reduce((t, x) => t + x.amount, 0),
       };
     })
     .filter((r) => r.views || r.taps || r.breaks)

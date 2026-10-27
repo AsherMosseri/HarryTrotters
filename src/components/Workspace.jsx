@@ -57,6 +57,7 @@ import {
   useAdsEngine,
 } from './Ads.jsx';
 import { CoinsDialog, Coins } from './Coins.jsx';
+import { AdBlockWall, GameDialog, PrizeWheel, VideoAd } from './AdGames.jsx';
 import { coinSettings, wallet } from '../coins.js';
 
 // Versions were renumbered once (2.0 became 1.9, 2.1 became 2.0, and so
@@ -1166,6 +1167,7 @@ export default function Workspace({ store, actor, rename, renames }) {
       cfg: coinCfg,
       // Never more than you have (the ledger can't check this itself).
       spend: (tx) => (tx.amount > myWallet.balance ? Promise.resolve() : api.addCoins({ type: 'spend', person: actor.name, ...tx })),
+      prize: (tx) => api.addCoins({ type: 'prize', person: actor.name, ...tx }),
     }),
     [myWallet.balance, coinCfg, api, actor.name],
   );
@@ -1801,7 +1803,25 @@ export default function Workspace({ store, actor, rename, renames }) {
             )}
           </div>
           <AdBanner position="bottom" />
-          {ads.full && <FullScreenAd ad={ads.full} onClose={ads.closeFull} />}
+          {ads.full &&
+            (ads.full.video ? (
+              <VideoAd
+                key={`${ads.full.ad.id}-${ads.full.n}`}
+                ad={ads.full.ad}
+                n={ads.full.n}
+                total={ads.full.total}
+                skip={ads.value.cfg.full.skip}
+                onCta={ads.value.cta}
+                onNext={ads.closeFull}
+              />
+            ) : (
+              <FullScreenAd key={`${ads.full.ad.id}-${ads.full.n}`} ad={ads.full.ad} onClose={ads.closeFull} />
+            ))}
+          {ads.game && <GameDialog ad={ads.game} capLeft={ads.gameCapLeft} onPrize={ads.winGame} onClose={ads.closeGame} />}
+          {ads.wheel && <PrizeWheel onWin={ads.winWheel} onClose={ads.closeWheel} />}
+          {ads.blockWall && (
+            <AdBlockWall balance={myWallet.balance} onPay={ads.payBlock} onWatch={ads.watchBlock} onClose={ads.closeBlock} />
+          )}
           {coinsOpen && (
             <CoinsDialog
               actor={actor}
@@ -1846,6 +1866,7 @@ export default function Workspace({ store, actor, rename, renames }) {
               onUndoGrant={api.undoCoins}
               competitionDate={competitionDate}
               peopleStats={adPeople}
+              onTry={ads.value.tryIt}
               onClose={() => setAdsPage(false)}
             />
           )}

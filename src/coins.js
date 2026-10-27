@@ -77,6 +77,8 @@ export function ledgerItems(name, ledger = []) {
       out.push({ kind: 'gift-out', at: x.at, amount: -x.amount, icon: '🎁', label: `To ${x.to}${x.note ? `: “${x.note}”` : ''}` });
     else if (x.type === 'gift' && x.to === name)
       out.push({ kind: 'gift-in', at: x.at, amount: x.amount, icon: '🎁', label: `From ${x.from}${x.note ? `: “${x.note}”` : ''}` });
+    else if (x.type === 'prize' && x.person === name)
+      out.push({ kind: 'prize', at: x.at, amount: x.amount, icon: x.what === 'wheel' ? '🎡' : '🎮', label: x.label || 'Prize' });
     else if (x.type === 'grant' && x.to === name)
       out.push({
         kind: 'grant',
@@ -109,5 +111,14 @@ export function leaderboard(roster, data, since = 0) {
 
 // When this person's paid ad break ends (0 if none), from their purchases.
 export function adFreeUntil(name, ledger = []) {
-  return ledger.reduce((m, x) => (x.type === 'spend' && x.person === name && x.until ? Math.max(m, x.until) : m), 0);
+  return ledger.reduce(
+    (m, x) => ((x.type === 'spend' || x.type === 'prize') && x.person === name && x.until ? Math.max(m, x.until) : m),
+    0,
+  );
+}
+
+// Prizes this person has won today (games and the wheel have daily limits).
+export function prizesToday(name, ledger = [], what) {
+  const midnight = new Date().setHours(0, 0, 0, 0);
+  return ledger.filter((x) => x.type === 'prize' && x.person === name && x.at >= midnight && (!what || x.what === what));
 }
