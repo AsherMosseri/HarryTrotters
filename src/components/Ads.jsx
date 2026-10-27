@@ -2315,11 +2315,15 @@ export function AdActionDialog({ ad, onClose }) {
                 <>
                   <div className="ad-qty">
                     <button className="btn" onClick={() => setQty(Math.max(1, qty - 1))} aria-label="One fewer">
-                      −
+                      <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M5 12h14" />
+                      </svg>
                     </button>
                     <b aria-live="polite">{qty}</b>
                     <button className="btn" onClick={() => setQty(Math.min(99, qty + 1))} aria-label="One more">
-                      ＋
+                      <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M5 12h14M12 5v14" />
+                      </svg>
                     </button>
                   </div>
                   <button className="btn primary big-btn" onClick={finish}>
