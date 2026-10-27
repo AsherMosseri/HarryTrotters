@@ -4,6 +4,12 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '2.49',
+    date: '2026-10-27',
+    title: 'Rainbow and RGB nameplates',
+    items: ['Two new nameplates in Edit profile → Style: Rainbow, a smooth color slide, and RGB, fast and glowing like a gaming keyboard.'],
+  },
+  {
     version: '2.48',
     date: '2026-10-26',
     title: 'Some new friends',

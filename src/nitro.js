@@ -125,6 +125,8 @@ export const NAMEPLATES = [
   { id: 'space', label: 'Space' },
   { id: 'sakura', label: 'Sakura' },
   { id: 'gold', label: 'Gold' },
+  { id: 'rainbow', label: 'Rainbow' },
+  { id: 'rgb', label: 'RGB' },
   { id: 'custom', label: 'Custom' },
 ];
 
