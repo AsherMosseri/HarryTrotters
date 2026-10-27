@@ -1621,31 +1621,27 @@ export function AdsSettings({
                     All off
                   </button>
                 </div>
-                {[
-                  ['Classic', [...ADS, ...PACKS[0].ads]],
-                  ...PACKS.slice(1).map((p) => [p.label, p.ads]),
-                  ['🎮 Games (also on the Fun tab)', GAME_ADS],
-                  ['🎯 Targeted (shown with Cooper’s numbers as an example)', sampleTargeted],
-                ].map(([title, list]) => (
-                  <section key={title}>
-                    <h4>
-                      {title} ({list.length})
-                    </h4>
-                    <ul className="ads-list">
-                      {list.map((a) => (
-                        <AdRow
-                          key={a.id}
-                          ad={a}
-                          cfg={cfg}
-                          set={set}
-                          roster={roster}
-                          onShow={() => onShowFull(a)}
-                          onAct={a.game ? null : () => onTry('flow', a)}
-                        />
-                      ))}
-                    </ul>
-                  </section>
-                ))}
+                <AdGroups
+                  groups={[
+                    ['Classic', [...ADS, ...PACKS[0].ads]],
+                    ...PACKS.slice(1).map((p) => [p.label, p.ads]),
+                    ['🎮 Games (also on the Fun tab)', GAME_ADS],
+                    ['🎯 Targeted (shown with Cooper’s numbers as an example)', sampleTargeted],
+                  ]}
+                  cfg={cfg}
+                  set={set}
+                  row={(a) => (
+                    <AdRow
+                      key={a.id}
+                      ad={a}
+                      cfg={cfg}
+                      set={set}
+                      roster={roster}
+                      onShow={() => onShowFull(a)}
+                      onAct={a.game ? null : () => onTry('flow', a)}
+                    />
+                  )}
+                />
               </>
             )}
 
@@ -2005,6 +2001,68 @@ function PeopleStats({ roster, stats, ledger }) {
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+// The ad list, one collapsible group per pack (closed to start), with a
+// search that looks through all of them.
+function AdGroups({ groups, cfg, set, row }) {
+  const [q, setQ] = useState('');
+  const [open, setOpen] = useState(() => new Set());
+  const query = q.trim().toLowerCase();
+  const match = (a) => !query || `${a.brand} ${a.headline} ${a.body || ''}`.toLowerCase().includes(query);
+  const toggle = (title) =>
+    setOpen((o) => {
+      const next = new Set(o);
+      if (next.has(title)) next.delete(title);
+      else next.add(title);
+      return next;
+    });
+  const shown = groups.map(([title, list]) => [title, list.filter(match)]).filter(([, list]) => list.length);
+  return (
+    <div className="ads-groups">
+      <input
+        className="input ads-search"
+        type="search"
+        placeholder="Find an ad…"
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+        aria-label="Find an ad"
+      />
+      {query && !shown.length && <p className="muted small">No ads match “{q.trim()}”.</p>}
+      {shown.map(([title, list]) => {
+        const isOpen = !!query || open.has(title);
+        const all = groups.find(([t]) => t === title)[1];
+        const on = all.filter((a) => !cfg.off.includes(a.id)).length;
+        const ids = all.map((a) => a.id);
+        return (
+          <section key={title} className={`ads-group${isOpen ? ' open' : ''}`}>
+            <button className="ads-group-head" onClick={() => toggle(title)} aria-expanded={isOpen} disabled={!!query}>
+              <span className="ads-group-arrow" aria-hidden="true">
+                ▸
+              </span>
+              <b className="grow">{title}</b>
+              <span className="muted small">{query ? `${list.length} found` : `${on} of ${all.length} on`}</span>
+            </button>
+            {isOpen && (
+              <>
+                {!query && (
+                  <div className="row gap ads-group-tools">
+                    <button className="link-btn small" onClick={() => set({ off: cfg.off.filter((x) => !ids.includes(x)) })}>
+                      Turn all on
+                    </button>
+                    <button className="link-btn small" onClick={() => set({ off: [...new Set([...cfg.off, ...ids])] })}>
+                      Turn all off
+                    </button>
+                  </div>
+                )}
+                <ul className="ads-list">{list.map(row)}</ul>
+              </>
+            )}
+          </section>
+        );
+      })}
     </div>
   );
 }

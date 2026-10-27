@@ -2878,3 +2878,15 @@ body:has(.bottom-nav):has(.composer) .toast { bottom: calc(150px + env(safe-area
   .scene-catch-item { animation-duration: 6s; }
   .scene-card > span { transition: none; }
 }
+
+/* Ad center: collapsible groups of ads */
+.ads-groups { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+.ads-search { margin-bottom: 2px; }
+.ads-group { border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+.ads-group-head { display: flex; align-items: center; gap: 10px; width: 100%; padding: 12px 14px; border: 0; background: var(--surface); color: inherit; text-align: left; font-size: 15px; }
+.ads-group-head:hover:not(:disabled) { background: var(--surface-2); }
+.ads-group-head:disabled { cursor: default; opacity: 1; }
+.ads-group-arrow { display: inline-block; transition: transform 0.15s; color: var(--muted); }
+.ads-group.open .ads-group-arrow { transform: rotate(90deg); }
+.ads-group.open > .ads-list { padding: 0 8px 8px; }
+.ads-group-tools { padding: 0 14px 8px; }
