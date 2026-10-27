@@ -151,6 +151,26 @@ service cloud.firestore {
       allow delete: if requestsOwner() || (isMember() && isMe(resource.data.by) && resource.data.status != 'approved');
     }
 
+    // What happens after you book / order / submit / subscribe from an ad
+    // (adOrders.js). Only yours: you see and cancel your own. The notifications
+    // go only to the name it was made by, and only the server (adDeliveries)
+    // updates them.
+    match /adOrders/{id} {
+      function validOrder(d) {
+        return d.keys().hasOnly(['by', 'kind', 'adId', 'brand', 'emoji', 'item', 'qty', 'when', 'text', 'ref', 'at', 'sent', 'due', 'events', 'extra'])
+          && d.kind in ['order', 'book', 'submit', 'subscribe']
+          && d.brand is string && d.brand.size() <= 60 && d.item is string && d.item.size() <= 60
+          && d.emoji is string && d.emoji.size() <= 16 && d.text is string && d.text.size() <= 200
+          && d.adId is string && d.adId.size() <= 60 && d.ref is string && d.ref.size() <= 20
+          && d.qty is int && d.qty >= 1 && d.qty <= 99 && d.when is number && d.at is number
+          && d.sent == 0 && (d.due == null || d.due is number)
+          && d.events is list && d.events.size() >= 1 && d.events.size() <= 8 && d.extra is map;
+      }
+      allow read: if isMember() && isMe(resource.data.by);
+      allow create: if isMember() && isMe(request.resource.data.by) && validOrder(request.resource.data);
+      allow delete: if isMember() && isMe(resource.data.by);
+    }
+
     // Parts tracker: anyone on the team. Checklists: anyone edits, managers delete.
     match /parts/{id} {
       allow read, write: if isMember();

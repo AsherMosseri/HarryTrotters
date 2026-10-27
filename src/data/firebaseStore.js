@@ -480,6 +480,22 @@ export const firebaseStore = {
   deleteCoinTx(id) {
     return deleteDoc(doc(db, 'coins', id));
   },
+  // What happens after an ad's booking / order (see adOrders.js); only yours.
+  subscribeAdOrders(name, cb) {
+    return onSnapshot(
+      query(collection(db, 'adOrders'), where('by', '==', name)),
+      (snap) => cb(snap.docs.map(readDoc)),
+      () => cb([]),
+    );
+  },
+  async addAdOrder(order, actor) {
+    const ref = doc(collection(db, 'adOrders'));
+    await setDoc(ref, { ...order, by: actor.name });
+    return ref.id;
+  },
+  deleteAdOrder(id) {
+    return deleteDoc(doc(db, 'adOrders', id));
+  },
   // Ads teammates submit and book for certain dates (Asher approves them).
   subscribeAdSubmissions(cb) {
     return onSnapshot(

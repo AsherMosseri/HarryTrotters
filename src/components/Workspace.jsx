@@ -61,6 +61,7 @@ import {
   useAdsEngine,
 } from './Ads.jsx';
 import { CoinsDialog, Coins } from './Coins.jsx';
+import { OrderTracker, OrdersDialog, orderActive } from './AdOrders.jsx';
 import { AdBlockWall, GameDialog, PrizeWheel, VideoAd } from './AdGames.jsx';
 import { coinSettings, wallet } from '../coins.js';
 
@@ -859,6 +860,8 @@ export default function Workspace({ store, actor, rename, renames }) {
         }
       },
       submitAd: (data) => store.submitAd(data, actor).catch(fail),
+      placeAdOrder: (plan) => store.addAdOrder(plan, actor),
+      deleteAdOrder: (id) => store.deleteAdOrder(id).catch(fail),
       addCoins: (tx) => store.addCoinTx(tx).catch(fail),
       undoCoins: (tx) => store.deleteCoinTx(tx.id).catch(fail),
       withdrawAd: (sub) => store.updateAdSubmission(sub.id, { status: 'withdrawn' }).catch(fail),
@@ -1042,6 +1045,11 @@ export default function Workspace({ store, actor, rename, renames }) {
   // Where a notification points: 'task:<id>', 'chat:<channel>', or 'view:<tab>'.
   const liveTasks = useRef(tasks);
   liveTasks.current = tasks;
+  // What happens after you book / order from an ad (adOrders.js): only yours.
+  const [adOrders, setAdOrders] = useState([]);
+  useEffect(() => store.subscribeAdOrders(actor.name, setAdOrders), [store, actor.name]);
+  const [trackId, setTrackId] = useState(null);
+  const [ordersOpen, setOrdersOpen] = useState(false);
   const goTo = useCallback(
     (target) => {
       const [kind, id] = (target || '').split(/:(.*)/s);
@@ -1053,6 +1061,7 @@ export default function Workspace({ store, actor, rename, renames }) {
         setView('chat');
       } else if (kind === 'view') setView(id);
       else if (kind === 'requests') setShowRequests(id || true);
+      else if (kind === 'adorder') setTrackId(id);
       else if (kind === 'shift') {
         // "Still at the lab?": the End panel if the shift is still running.
         if (liveMyShift.current) setShiftPanel(true);
@@ -1218,6 +1227,8 @@ export default function Workspace({ store, actor, rename, renames }) {
       subteams: peopleInfo.get(name)?.subteams || [],
     };
   }, [actor.name, tasks, shifts, myWallet.balance, competitionDate, peopleInfo]);
+  const trackOrder = trackId ? adOrders.find((o) => o.id === trackId) : null;
+  const activeOrders = useMemo(() => adOrders.filter((o) => orderActive(o, Date.now())).length, [adOrders]);
   const ads = useAdsEngine({ settings, actor, view, shifts, submissions: adSubs, ledger, coins, viewer, competitionDate, api });
   botHook.current = ads.onChatSent;
   const inboxButton = (
@@ -1341,6 +1352,11 @@ export default function Workspace({ store, actor, rename, renames }) {
                             <Coins n={myWallet.balance} />
                           </span>
                         </button>
+                        {adOrders.length > 0 && (
+                          <button onClick={() => (setMeMenu(false), setOrdersOpen(true))}>
+                            📦 Orders & bookings {activeOrders > 0 && <span className="me-badge">{activeOrders}</span>}
+                          </button>
+                        )}
                         <button onClick={() => (setMeMenu(false), setEditTabs(true))}>🗂 Edit tabs</button>
                         {isOwner && <button onClick={() => (setMeMenu(false), setAdsPage(true))}>📺 Ads</button>}
                       </div>
@@ -1898,7 +1914,43 @@ export default function Workspace({ store, actor, rename, renames }) {
           )}
           {ads.splash && <TakeoverSplash ad={ads.value.takeover} />}
           {ads.couponShown && <CouponDialog coupon={ads.couponShown} onClose={ads.closeCoupon} />}
-          {ads.action && <AdActionDialog ad={ads.action} onClose={ads.closeAction} />}
+          {ads.action && (
+            <AdActionDialog
+              ad={ads.action}
+              onClose={ads.closeAction}
+              onPlace={api.placeAdOrder}
+              onTrack={(id) => {
+                ads.closeAction();
+                setTrackId(id);
+              }}
+            />
+          )}
+          {ordersOpen && (
+            <OrdersDialog
+              orders={adOrders}
+              onOpen={(id) => {
+                setOrdersOpen(false);
+                setTrackId(id);
+              }}
+              onClose={() => setOrdersOpen(false)}
+            />
+          )}
+          {trackOrder && (
+            <OrderTracker
+              key={trackOrder.id}
+              order={trackOrder}
+              ad={ads.findAd(trackOrder.adId)}
+              onClose={() => setTrackId(null)}
+              onCancel={() => {
+                setTrackId(null);
+                api.deleteAdOrder(trackOrder.id);
+              }}
+              onAgain={() => {
+                setTrackId(null);
+                ads.openAction(ads.findAd(trackOrder.adId));
+              }}
+            />
+          )}
           {ads.submitting && (
             <SubmitAdDialog
               mine={adSubs.filter((x) => x.by === actor.name).sort((x, y) => (y.at || 0) - (x.at || 0))}
@@ -1994,6 +2046,11 @@ export default function Workspace({ store, actor, rename, renames }) {
                         <Coins n={myWallet.balance} />
                       </span>
                     </button>
+                    {adOrders.length > 0 && (
+                      <button onClick={() => (closeSheet(), setOrdersOpen(true))}>
+                        📦 Orders & bookings {activeOrders > 0 && <span className="me-badge">{activeOrders}</span>}
+                      </button>
+                    )}
                     <button onClick={() => (closeSheet(), setEditTabs(true))}>🗂 Edit tabs</button>
                     {isOwner && <button onClick={() => (closeSheet(), setAdsPage(true))}>📺 Ads</button>}
                   </div>

@@ -11,6 +11,7 @@ import {
 } from './diff.js';
 import { STARTER_CHECKLISTS, starterItems } from '../checklists.js';
 import { REQUESTS_TO } from '../config.js';
+import { deliver } from '../adOrders.js';
 
 const KEY = 'ftc32313-demo-v13';
 const listeners = new Set();
@@ -645,6 +646,53 @@ export const demoStore = {
   },
   async deleteAdSubmission(id) {
     state.adSubmissions = (state.adSubmissions || []).filter((x) => x.id !== id);
+    commit();
+  },
+  // What happens after an ad's booking / order (see adOrders.js). The demo
+  // delivers the notifications itself, like the adDeliveries function does.
+  subscribeAdOrders(name, cb) {
+    const tick = () => {
+      const now = Date.now();
+      let changed = false;
+      state.adOrders = (state.adOrders || []).map((o) => {
+        if (o.due == null || o.due > now) return o;
+        const { latest, sent, due } = deliver(o, now);
+        if (latest) {
+          state.inbox = [
+            {
+              id: uid(),
+              type: 'ad',
+              icon: latest.icon,
+              title: latest.title,
+              body: latest.body,
+              open: `adorder:${o.id}`,
+              at: now,
+              read: false,
+            },
+            ...(state.inbox || []),
+          ];
+        }
+        changed = true;
+        return { ...o, sent, due };
+      });
+      if (changed) commit();
+    };
+    tick();
+    const t = setInterval(tick, 5000);
+    const off = listen(() => cb((state.adOrders || []).filter((o) => o.by === name)));
+    return () => {
+      clearInterval(t);
+      off();
+    };
+  },
+  async addAdOrder(order, actor) {
+    const id = `ord${Date.now().toString(36)}`;
+    state.adOrders = [...(state.adOrders || []), { ...order, id, by: actor.name }];
+    commit();
+    return id;
+  },
+  async deleteAdOrder(id) {
+    state.adOrders = (state.adOrders || []).filter((o) => o.id !== id);
     commit();
   },
   async resetAdStats() {

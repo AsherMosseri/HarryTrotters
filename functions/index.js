@@ -75,14 +75,14 @@ function messagePreview(m) {
   return '';
 }
 
-// Writes inbox items and sends pushes. notes: [{ to, type, title, body, open, by }]
+// Writes inbox items and sends pushes. notes: [{ to, type, title, body, open, by, icon?, quiet? }]
 async function notify(notes) {
   if (!notes.length) return;
   const rename = await renamer();
   const batch = db.batch();
   const at = Date.now();
   for (const n of notes) {
-    const { to, ...item } = n;
+    const { to, quiet, ...item } = n; // quiet only matters for the push below
     batch.set(
       db
         .collection('inbox')
@@ -113,6 +113,7 @@ async function notify(notes) {
     byPerson.set(person, [...(byPerson.get(person) || []), t.id]);
   }
   for (const n of notes) {
+    if (n.quiet) continue; // inbox only (no buzz at night)
     const list = byPerson.get(rename(n.to)) || [];
     if (!list.length) continue;
     // Data-only, so the site's service worker decides how to show it.
@@ -478,4 +479,43 @@ export const dueTomorrow = onSchedule({ schedule: '30 7 * * *', timeZone: TIME_Z
     const old = await inbox.collection('items').where('at', '<', cutoff).get();
     await Promise.all(old.docs.map((d) => d.ref.delete()));
   }
+});
+
+// After you book / order / submit / subscribe from an ad (src/adOrders.js
+// plans the timeline): every 5 minutes, send the notifications that are due.
+// Only the newest due one goes out, so a backlog doesn't buzz five times, and
+// between 10 PM and 7 AM (New York) they go to the inbox without a buzz.
+export const adDeliveries = onSchedule({ schedule: 'every 5 minutes', timeZone: TIME_ZONE }, async () => {
+  const now = Date.now();
+  const due = await db.collection('adOrders').where('due', '<=', now).limit(200).get();
+  if (due.empty) return;
+  const hour = +zoneParts(now).hour % 24;
+  const quiet = hour >= 22 || hour < 7;
+  const notes = [];
+  const batch = db.batch();
+  for (const d of due.docs) {
+    const o = d.data();
+    const events = Array.isArray(o.events) ? o.events : [];
+    let sent = Number(o.sent) || 0;
+    let latest = null;
+    while (sent < events.length && events[sent].at <= now) {
+      if (events[sent].push) latest = events[sent];
+      sent++;
+    }
+    const next = events.slice(sent).find((e) => e.push);
+    batch.update(d.ref, { sent, due: next ? next.at : null });
+    if (latest && o.by)
+      notes.push({
+        to: o.by,
+        type: 'ad',
+        icon: String(latest.icon || '📦').slice(0, 16),
+        title: String(latest.title || '').slice(0, 120),
+        body: String(latest.body || '').slice(0, 200),
+        open: `adorder:${d.id}`,
+        tag: `adorder-${d.id}`,
+        quiet,
+      });
+  }
+  await batch.commit();
+  await notify(notes);
 });

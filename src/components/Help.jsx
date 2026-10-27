@@ -134,6 +134,7 @@ const SECTIONS = [
       '🗂 Edit tabs in that menu: drag the tabs into your order. It follows you to every device; on a phone, your first four are the tab bar.',
       '🪙 Jackson coins: 15 for each task you were given that gets done (when someone else made it) and 5 an hour at the lab, up to 10 hours a day. Your balance, history, Send, and the leaderboard are in your menu.',
       'New friends showing up around the app? Their buttons take bookings, orders, and submissions. Want a spot of your own? Tap “Get your spot here” on one of them. Need a break? Look for the button that clears them away for a while.',
+      '📦 Orders & bookings (in your menu): what you ordered or booked from them, with tracking. You get a notification when it’s delivered or when it’s time (quietly at night).',
       'When the site is updated, you’ll be asked to tap Update now.',
     ],
   ],

@@ -6,6 +6,7 @@ import { adFreeUntil, prizesToday } from '../coins.js';
 import { GAME_ADS } from './AdGames.jsx';
 import { PACKS, packOn } from '../adPacks.js';
 import { TARGETS, targetedAds } from '../adTargets.js';
+import { planOrder } from '../adOrders.js';
 import { SUBTEAMS } from '../config.js';
 import { Coin, Coins, CoinsAdmin } from './Coins.jsx';
 import { useEscape } from '../util.js';
@@ -497,6 +498,8 @@ export function useAdsEngine({ settings, actor, view, shifts, submissions, ledge
     closeRemoving: () => setRemoving(false),
     action,
     closeAction: () => setAction(null),
+    openAction: setAction,
+    findAd: (id) => everyAd.find((a) => a.id === id) || null,
     submitting,
     closeSubmit: () => setSubmitting(false),
     buyRemoval,
@@ -539,7 +542,7 @@ function useTrack(ad) {
   }, [ad?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 }
 
-const adStyle = (ad) => ({ '--ad-a': ad.colors?.[0] || '#6c5ce7', '--ad-b': ad.colors?.[1] || '#00cec9' });
+export const adStyle = (ad) => ({ '--ad-a': ad.colors?.[0] || '#6c5ce7', '--ad-b': ad.colors?.[1] || '#00cec9' });
 
 export function AdArt({ ad, size = 'md' }) {
   const { level } = useAds();
@@ -2227,7 +2230,7 @@ function randomTimes(today) {
   const now = new Date();
   const from = today ? now.getHours() * 60 + now.getMinutes() + 10 : 7 * 60;
   const to = 23 * 60 + 59;
-  if (from > to - 20) return ['11:59 PM'];
+  if (from > to - 20) return [to];
   const want = 3 + Math.floor(Math.random() * 2);
   const picked = new Set();
   for (let tries = 0; picked.size < want && tries < 50; tries++) {
@@ -2238,7 +2241,7 @@ function randomTimes(today) {
     if (Math.random() < 0.65) m = Math.min(to, Math.ceil(m / 15) * 15); // usually on a quarter hour
     picked.add(Math.min(m, to));
   }
-  return [...picked].sort((a, b) => a - b).map(fmtTime);
+  return [...picked].sort((a, b) => a - b); // minutes after midnight
 }
 const initials = (name) =>
   (name || 'AD')
@@ -2275,7 +2278,11 @@ function bumpHistory(id) {
   }
 }
 
-export function AdActionDialog({ ad, onClose }) {
+const TRACK = { order: 'Track your order', book: 'See your booking', submit: 'See their reply', subscribe: 'Track your first box' };
+
+// onPlace(plan) saves what happens next (adOrders.js) and resolves to its id;
+// onTrack(id) opens the tracker.
+export function AdActionDialog({ ad, onClose, onPlace, onTrack }) {
   useEscape(onClose);
   const act = ad.action || { kind: 'order' };
   const kind = ACT_DONE[act.kind] ? act.kind : 'order';
@@ -2287,7 +2294,21 @@ export function AdActionDialog({ ad, onClose }) {
   const [text, setText] = useState('');
   const [done, setDone] = useState(null);
   const item = act.item || ad.brand;
-  const finish = () => setDone({ ref: `${initials(ad.brand)}-${1000 + Math.floor(Math.random() * 9000)}`, n: bumpHistory(ad.id) });
+  const finish = async () => {
+    const ref = `${initials(ad.brand)}-${1000 + Math.floor(Math.random() * 9000)}`;
+    setDone({ ref, n: bumpHistory(ad.id) });
+    if (!onPlace) return;
+    const at = new Date();
+    at.setDate(at.getDate() + days.indexOf(day));
+    at.setHours(0, time, 0, 0);
+    const plan = planOrder({ ad, kind, qty, when: kind === 'book' ? at.getTime() : 0, text: text.trim(), ref });
+    try {
+      const id = await onPlace(plan);
+      setDone((d) => d && { ...d, id });
+    } catch (e) {
+      console.warn('order', e);
+    }
+  };
   const title = {
     book: `Book a ${item}`,
     order: `Order ${item}`,
@@ -2333,7 +2354,7 @@ export function AdActionDialog({ ad, onClose }) {
                   <div className="ads-days">
                     {times[day].map((t) => (
                       <button key={t} className={`chip${time === t ? ' on' : ''}`} aria-pressed={time === t} onClick={() => setTime(t)}>
-                        {t}
+                        {fmtTime(t)}
                       </button>
                     ))}
                   </div>
@@ -2390,7 +2411,7 @@ export function AdActionDialog({ ad, onClose }) {
               </div>
               <h2>{ACT_DONE[kind]}</h2>
               <p className="ad-action-detail">
-                {kind === 'book' && `${item[0].toUpperCase() + item.slice(1)} · ${day} at ${time}`}
+                {kind === 'book' && `${item[0].toUpperCase() + item.slice(1)} · ${day} at ${fmtTime(time)}`}
                 {kind === 'order' && `${qty} × ${item}`}
                 {kind === 'submit' && `“${text.trim()}”`}
                 {kind === 'subscribe' && `${ad.brand} · monthly`}
@@ -2401,6 +2422,11 @@ export function AdActionDialog({ ad, onClose }) {
                 <p className="muted small">
                   This is your {ordinal(done.n)} {ACT_DONE[kind].split(' ')[0].toLowerCase()} with {ad.brand}.
                 </p>
+              )}
+              {done.id && onTrack && (
+                <button className="btn big-btn ad-track-btn" onClick={() => onTrack(done.id)}>
+                  {TRACK[kind]}
+                </button>
               )}
               <button className="btn primary big-btn" onClick={onClose}>
                 Done
