@@ -100,15 +100,30 @@ const MISS = [
   (b) => `${b} wrote you a poem. It’s mostly about the box.`,
 ];
 
-// The plan for one booking / order / submission / subscription.
-// when: the booking's time (ms). text: what you submitted.
-export function planOrder({ ad, kind, qty = 1, when = 0, text = '', ref = '', now = Date.now() }) {
+// The plan for one booking / order / submission / subscription. The ad's flow
+// (adFlows.js) can bring its own lines for each step (flow.track); vars are
+// the filled-in answers for {templates}. when: the booking's time (ms).
+export function planOrder({ ad, kind, qty = 1, when = 0, text = '', ref = '', now = Date.now(), flow = null, vars = {}, summary = [] }) {
   const brand = ad.brand;
-  const item = ad.action?.item || brand;
-  const base = { kind, adId: ad.id, brand, emoji: ad.emoji || '📦', item, qty, when, text, ref, at: now, sent: 0 };
+  const item = flow?.item || ad.action?.item || brand;
+  const allVars = { brand, item, qty: String(qty), ...vars };
+  const own = flow?.track || {};
+  // One line from the flow's own list (filled in), or from the usual ones.
+  const line = (key, fallback) => {
+    const mine = own[key];
+    return mine?.length ? fillVars(pick(mine), allVars) : typeof fallback === 'function' ? fallback() : fallback;
+  };
+  const story = (key, fallback) => {
+    const mine = own[key];
+    if (!mine?.length) return pick(fallback);
+    const x = pick(mine);
+    return { ...x, icon: x.icon || '❗', title: fillVars(x.title, allVars), body: fillVars(x.body, allVars) };
+  };
+  const base = { kind, adId: ad.id, brand, emoji: ad.emoji || '📦', item, qty, when, text, ref, at: now, sent: 0, vars: allVars, summary };
   const ev = (step, at, icon, title, body, push = false) => ({ step, at: Math.round(at), icon, title, body, push });
   const events = [];
   const extra = {};
+  const scene = flow?.scene;
 
   if (kind === 'order' || kind === 'subscribe') {
     const thing = kind === 'order' ? `${qty} × ${item}` : `your first ${brand} box`;
@@ -123,22 +138,51 @@ export function planOrder({ ad, kind, qty = 1, when = 0, text = '', ref = '', no
       ),
     );
     t += between(1, 3) * MIN;
-    events.push(ev('packed', t, '📦', 'Packed', pick(PACKED)));
+    events.push(
+      ev(
+        'packed',
+        t,
+        '📦',
+        'Packed',
+        line('packed', () => pick(PACKED)),
+      ),
+    );
     t += between(5, 15) * MIN;
-    events.push(ev('shipped', t, '🚚', 'Shipped', pick(SHIPPED)));
+    events.push(
+      ev(
+        'shipped',
+        t,
+        '🚚',
+        'Shipped',
+        line('shipped', () => pick(SHIPPED)),
+      ),
+    );
     let lost = 0;
     if (Math.random() < 0.65) {
-      const tw = pick(TWISTS.filter((x) => !x.lose || qty > 1));
+      const tw = story(
+        'twists',
+        TWISTS.filter((x) => !x.lose || qty > 1),
+      );
       t += between(10, 30) * MIN;
       events.push(ev('twist', t, tw.icon, tw.title, tw.body, true));
-      lost = tw.lose || 0;
+      lost = qty > 1 ? tw.lose || 0 : 0;
     }
     t += between(15, 40) * MIN;
-    events.push(ev('out', t, '🛵', `${cap(kind === 'order' ? `your ${item}` : 'your box')} is out for delivery`, pick(OUT), true));
+    events.push(
+      ev(
+        'out',
+        t,
+        '🛵',
+        `${cap(kind === 'order' ? `your ${item}` : 'your box')} is out for delivery`,
+        line('out', () => pick(OUT)),
+        true,
+      ),
+    );
     t += between(10, 40) * MIN;
-    const place = pick(PLACES);
+    const place = line('places', () => pick(PLACES));
     events.push(ev('delivered', t, '📬', `Delivered: ${thing}`, `${place} Tap to open it.`, true));
     Object.assign(extra, { lost, place, unbox: pick(UNBOX) });
+    if (scene?.type === 'unbox' && scene.inside?.length) extra.inside = fillVars(pick(scene.inside), allVars);
     if (kind === 'subscribe') {
       events.push(ev('renew', now + 24 * HOUR, '🔁', `Your ${brand} subscription renewed`, pick(RENEW), true));
       events.push(ev('miss', now + 72 * HOUR, '🥺', `${brand} misses you`, pick(MISS)(brand), true));
@@ -146,24 +190,47 @@ export function planOrder({ ad, kind, qty = 1, when = 0, text = '', ref = '', no
   } else if (kind === 'book') {
     const what = cap(item);
     events.push(ev('placed', now, '📅', 'Booked', `${what} with ${brand}.`));
-    events.push(ev('confirmed', now + 2 * MIN, '✅', 'Confirmed', `${brand} confirmed. They seemed excited. Weirdly excited.`));
-    if (when - now > 70 * MIN) events.push(ev('reminder', when - HOUR, '⏰', `${what} in 1 hour`, pick(REMIND)(brand), true));
+    events.push(
+      ev('confirmed', now + 2 * MIN, '✅', 'Confirmed', line('confirmed', `${brand} confirmed. They seemed excited. Weirdly excited.`)),
+    );
+    if (when - now > 70 * MIN)
+      events.push(
+        ev(
+          'reminder',
+          when - HOUR,
+          '⏰',
+          `${what} in 1 hour`,
+          line('remind', () => pick(REMIND)(brand)),
+          true,
+        ),
+      );
     if (Math.random() < 0.4 && when - now > 20 * MIN) {
-      const l = pick(LATE);
-      events.push(ev('late', when - 10 * MIN, '🐢', `${brand} is ${l.title}`, l.body, true));
+      const l = story('late', LATE);
+      events.push(ev('late', when - 10 * MIN, l.icon || '🐢', `${brand} is ${l.title}`, l.body, true));
     }
     events.push(ev('start', Math.max(when, now + 3 * MIN), '🛎️', `It’s time: ${item}`, `${brand} is ready for you. Tap to go in.`, true));
     Object.assign(extra, { line: between(2, 5), session: pick(SESSION), signoff: pick(SIGNOFF) });
   } else {
     events.push(ev('placed', now, '📨', 'Sent', `To ${brand}.`));
-    events.push(ev('review', now + between(2, 5) * MIN, '👀', 'In review', pick(REVIEW)(brand)));
-    const reply = pick(REPLIES);
+    events.push(
+      ev(
+        'review',
+        now + between(2, 5) * MIN,
+        '👀',
+        'In review',
+        line('review', () => pick(REVIEW)(brand)),
+      ),
+    );
+    const reply = line('replies', () => pick(REPLIES));
     events.push(ev('reply', now + between(10, 40) * MIN, '💬', `${brand} replied`, `“${clip(text, 40)}” — ${reply}`, true));
     Object.assign(extra, { reply });
   }
   events.sort((a, b) => a.at - b.at);
   return { ...base, events, extra, due: nextDue(events, 0) };
 }
+
+const fillVars = (text, vars) =>
+  String(text || '').replace(/\{(\w+)\}/g, (m, k) => (vars[k] == null || vars[k] === '' ? m : String(vars[k])));
 
 // When the next notification is due (null when there are none left).
 export function nextDue(events, from) {

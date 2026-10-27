@@ -157,7 +157,9 @@ service cloud.firestore {
     // updates them.
     match /adOrders/{id} {
       function validOrder(d) {
-        return d.keys().hasOnly(['by', 'kind', 'adId', 'brand', 'emoji', 'item', 'qty', 'when', 'text', 'ref', 'at', 'sent', 'due', 'events', 'extra'])
+        return d.keys().hasOnly(['by', 'kind', 'adId', 'brand', 'emoji', 'item', 'qty', 'when', 'text', 'ref', 'at', 'sent', 'due', 'events', 'extra', 'vars', 'summary'])
+          && d.get('vars', {}) is map && d.get('vars', {}).size() <= 12
+          && d.get('summary', []) is list && d.get('summary', []).size() <= 6
           && d.kind in ['order', 'book', 'submit', 'subscribe']
           && d.brand is string && d.brand.size() <= 60 && d.item is string && d.item.size() <= 60
           && d.emoji is string && d.emoji.size() <= 16 && d.text is string && d.text.size() <= 200

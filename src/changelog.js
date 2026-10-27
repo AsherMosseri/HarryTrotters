@@ -4,6 +4,16 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '2.56',
+    date: '2026-10-27',
+    title: 'Made just for you',
+    items: [
+      'Every friend asks their own questions now. Pick your pillow, your flavor, how many amps. No two orders are the same.',
+      'When it arrives (or when it’s time), it’s your turn: count sheep, crack open cans, scratch, tune, pick a card. Every one is different.',
+      'Some of them have follow-up questions after they write back.',
+    ],
+  },
+  {
     version: '2.55',
     date: '2026-10-27',
     title: 'Special delivery',

@@ -7,10 +7,12 @@ import { GAME_ADS } from './AdGames.jsx';
 import { PACKS, packOn } from '../adPacks.js';
 import { TARGETS, targetedAds } from '../adTargets.js';
 import { planOrder } from '../adOrders.js';
+import { answerText, defaults, fill, flowFor, summaryOf, templateVars } from '../adFlows.js';
+import { FlowFields } from './AdFlow.jsx';
 import { SUBTEAMS } from '../config.js';
 import { Coin, Coins, CoinsAdmin } from './Coins.jsx';
 import { useEscape } from '../util.js';
-import { CloseIcon, MinusIcon, Overlay, PlusIcon } from './common.jsx';
+import { CloseIcon, Overlay } from './common.jsx';
 
 // Pretend ads (see ads.js). Asher controls everything on the 📺 Ads page; the
 // settings live in settings.ads so they reach every device right away.
@@ -447,6 +449,7 @@ export function useAdsEngine({ settings, actor, view, shifts, submissions, ledge
         else if (what === 'game') setGame(ad || GAME_ADS[0]);
         else if (what === 'video') setFull({ list: [ad || pick('full') || ADS[0]], i: 0, video: true });
         else if (what === 'note') makeNote();
+        else if (what === 'flow') setAction(ad);
       },
     }),
     [on, cfg, pool, tick, pick, track, coins, takeover, bots],
@@ -499,7 +502,7 @@ export function useAdsEngine({ settings, actor, view, shifts, submissions, ledge
     action,
     closeAction: () => setAction(null),
     openAction: setAction,
-    findAd: (id) => everyAd.find((a) => a.id === id) || null,
+    findAd: (id) => everyAd.find((a) => a.id === id) || targeted.find((a) => a.id === id) || null,
     submitting,
     closeSubmit: () => setSubmitting(false),
     buyRemoval,
@@ -1630,7 +1633,15 @@ export function AdsSettings({
                     </h4>
                     <ul className="ads-list">
                       {list.map((a) => (
-                        <AdRow key={a.id} ad={a} cfg={cfg} set={set} roster={roster} onShow={() => onShowFull(a)} />
+                        <AdRow
+                          key={a.id}
+                          ad={a}
+                          cfg={cfg}
+                          set={set}
+                          roster={roster}
+                          onShow={() => onShowFull(a)}
+                          onAct={a.game ? null : () => onTry('flow', a)}
+                        />
                       ))}
                     </ul>
                   </section>
@@ -1673,6 +1684,7 @@ export function AdsSettings({
                           set={set}
                           roster={roster}
                           onShow={() => onShowFull(a)}
+                          onAct={() => onTry('flow', a)}
                           onEdit={() => setEditing(a)}
                         />
                       ))}
@@ -1997,7 +2009,7 @@ function PeopleStats({ roster, stats, ledger }) {
   );
 }
 
-function AdRow({ ad, cfg, set, roster = [], onShow, onEdit }) {
+function AdRow({ ad, cfg, set, roster = [], onShow, onEdit, onAct }) {
   const [open, setOpen] = useState(false);
   const off = cfg.off.includes(ad.id);
   const weight = cfg.weights[ad.id] || 'normal';
@@ -2031,6 +2043,11 @@ function AdRow({ ad, cfg, set, roster = [], onShow, onEdit }) {
             <button className="link-btn small" onClick={onShow}>
               Preview
             </button>
+            {onAct && (
+              <button className="link-btn small" onClick={onAct}>
+                Try its {{ book: 'booking', submit: 'form', subscribe: 'sign-up' }[ad.action?.kind] || 'order'}
+              </button>
+            )}
             <button className="link-btn small" onClick={() => setOpen(!open)} aria-expanded={open}>
               Who & where
             </button>
@@ -2220,29 +2237,6 @@ function AdEditor({ ad, onSave, onCancel, onDelete, onUpload }) {
 // ---------- tapping an ad's button: a booking, an order, a submission, or a sign-up ----------
 
 const ACT_DONE = { book: 'Booking confirmed', order: 'Order placed', submit: 'Submission received', subscribe: 'You’re subscribed' };
-// Fresh time slots every time the pop-up opens: mostly normal times, the odd
-// weird minute, and now and then a 3 AM slot. Today only offers times still ahead.
-const fmtTime = (m) => {
-  const h = Math.floor(m / 60) % 24;
-  return `${h % 12 || 12}:${String(m % 60).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`;
-};
-function randomTimes(today) {
-  const now = new Date();
-  const from = today ? now.getHours() * 60 + now.getMinutes() + 10 : 7 * 60;
-  const to = 23 * 60 + 59;
-  if (from > to - 20) return [to];
-  const want = 3 + Math.floor(Math.random() * 2);
-  const picked = new Set();
-  for (let tries = 0; picked.size < want && tries < 50; tries++) {
-    let m;
-    if (!today && picked.size === 0 && Math.random() < 0.2)
-      m = 60 + Math.floor(Math.random() * 4 * 60); // 1–5 AM
-    else m = from + Math.floor(Math.random() * (to - from));
-    if (Math.random() < 0.65) m = Math.min(to, Math.ceil(m / 15) * 15); // usually on a quarter hour
-    picked.add(Math.min(m, to));
-  }
-  return [...picked].sort((a, b) => a - b); // minutes after midnight
-}
 const initials = (name) =>
   (name || 'AD')
     .split(/\s+/)
@@ -2255,17 +2249,6 @@ const ordinal = (n) => {
   const v = n % 100;
   return n + (['th', 'st', 'nd', 'rd'][(v - 20) % 10] || ['th', 'st', 'nd', 'rd'][v] || 'th');
 };
-function nextDays(n) {
-  const out = [];
-  for (let i = 0; i < n; i++) {
-    const d = new Date();
-    d.setDate(d.getDate() + i);
-    out.push(
-      i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }),
-    );
-  }
-  return out;
-}
 // How many times this device has gone through with each ad.
 function bumpHistory(id) {
   try {
@@ -2282,26 +2265,38 @@ const TRACK = { order: 'Track your order', book: 'See your booking', submit: 'Se
 
 // onPlace(plan) saves what happens next (adOrders.js) and resolves to its id;
 // onTrack(id) opens the tracker.
-export function AdActionDialog({ ad, onClose, onPlace, onTrack }) {
+export function AdActionDialog({ ad, first = '', onClose, onPlace, onTrack }) {
   useEscape(onClose);
-  const act = ad.action || { kind: 'order' };
-  const kind = ACT_DONE[act.kind] ? act.kind : 'order';
-  const days = useMemo(() => nextDays(5), []);
-  const [day, setDay] = useState(days[1]);
-  const times = useMemo(() => Object.fromEntries(days.map((d, i) => [d, randomTimes(i === 0)])), [days]);
-  const [time, setTime] = useState(() => times[days[1]][0]);
-  const [qty, setQty] = useState(1);
-  const [text, setText] = useState('');
+  const flow = useMemo(() => flowFor(ad), [ad]);
+  const kind = flow.kind;
+  const [answers, setAnswers] = useState(() => defaults(flow));
+  const setAnswer = (key, value) => setAnswers((a) => ({ ...a, [key]: value }));
   const [done, setDone] = useState(null);
-  const item = act.item || ad.brand;
+  const qtyField = flow.fields.find((f) => f.type === 'qty');
+  const whenField = flow.fields.find((f) => f.type === 'when');
+  const textField = flow.fields.find((f) => f.type === 'text' && f.required);
+  const qty = qtyField ? answers[qtyField.key] : 1;
+  const when = whenField ? answers[whenField.key] : null;
+  const missing = flow.fields.some((f) => f.type === 'text' && f.required && !String(answers[f.key] || '').trim()) || (whenField && !when);
+  const vars = templateVars(flow, answers, {
+    qty: qtyField ? answerText(qtyField, qty) : '1',
+    item: flow.item,
+    brand: ad.brand,
+    first,
+    when: when?.label || '',
+  });
   const finish = async () => {
     const ref = `${initials(ad.brand)}-${1000 + Math.floor(Math.random() * 9000)}`;
-    setDone({ ref, n: bumpHistory(ad.id) });
+    setDone({ ref, n: bumpHistory(ad.id), confirm: fill(flow.confirm, vars), summary: summaryOf(flow, answers) });
     if (!onPlace) return;
-    const at = new Date();
-    at.setDate(at.getDate() + days.indexOf(day));
-    at.setHours(0, time, 0, 0);
-    const plan = planOrder({ ad, kind, qty, when: kind === 'book' ? at.getTime() : 0, text: text.trim(), ref });
+    const text = textField ? String(answers[textField.key]).trim() : '';
+    const keep = Object.fromEntries(
+      Object.entries(vars)
+        .filter(([, v]) => v !== '' && v != null)
+        .slice(0, 12)
+        .map(([k, v]) => [k, String(v).slice(0, 120)]),
+    );
+    const plan = planOrder({ ad, kind, qty, when: when?.at || 0, text, ref, flow, vars: keep, summary: summaryOf(flow, answers) });
     try {
       const id = await onPlace(plan);
       setDone((d) => d && { ...d, id });
@@ -2309,12 +2304,7 @@ export function AdActionDialog({ ad, onClose, onPlace, onTrack }) {
       console.warn('order', e);
     }
   };
-  const title = {
-    book: `Book a ${item}`,
-    order: `Order ${item}`,
-    submit: act.ask || 'Tell us more',
-    subscribe: `Subscribe to ${ad.brand}`,
-  }[kind];
+  const item = flow.item;
   return (
     <Overlay>
       <div className="panel-backdrop center" onClick={onClose}>
@@ -2331,78 +2321,11 @@ export function AdActionDialog({ ad, onClose, onPlace, onTrack }) {
           </div>
           {!done ? (
             <div className="ad-action-body">
-              <h2>{title}</h2>
-              {kind === 'book' && (
-                <>
-                  <h4>Day</h4>
-                  <div className="ads-days">
-                    {days.map((d) => (
-                      <button
-                        key={d}
-                        className={`chip${day === d ? ' on' : ''}`}
-                        aria-pressed={day === d}
-                        onClick={() => {
-                          setDay(d);
-                          setTime(times[d][0]);
-                        }}
-                      >
-                        {d}
-                      </button>
-                    ))}
-                  </div>
-                  <h4>Time</h4>
-                  <div className="ads-days">
-                    {times[day].map((t) => (
-                      <button key={t} className={`chip${time === t ? ' on' : ''}`} aria-pressed={time === t} onClick={() => setTime(t)}>
-                        {fmtTime(t)}
-                      </button>
-                    ))}
-                  </div>
-                  <button className="btn primary big-btn" onClick={finish}>
-                    Confirm booking
-                  </button>
-                </>
-              )}
-              {kind === 'order' && (
-                <>
-                  <div className="ad-qty">
-                    <button className="btn" onClick={() => setQty(Math.max(1, qty - 1))} aria-label="One fewer">
-                      <MinusIcon size={20} />
-                    </button>
-                    <b aria-live="polite">{qty}</b>
-                    <button className="btn" onClick={() => setQty(Math.min(99, qty + 1))} aria-label="One more">
-                      <PlusIcon size={20} />
-                    </button>
-                  </div>
-                  <button className="btn primary big-btn" onClick={finish}>
-                    Place order
-                  </button>
-                </>
-              )}
-              {kind === 'submit' && (
-                <>
-                  <textarea
-                    className="input"
-                    rows={3}
-                    maxLength={200}
-                    placeholder={act.ask || 'Tell us more'}
-                    value={text}
-                    onChange={(e) => setText(e.target.value)}
-                    aria-label={act.ask || 'Your answer'}
-                  />
-                  <button className="btn primary big-btn" disabled={!text.trim()} onClick={finish}>
-                    Submit
-                  </button>
-                </>
-              )}
-              {kind === 'subscribe' && (
-                <>
-                  <p className="muted">Monthly, starting today.</p>
-                  <button className="btn primary big-btn" onClick={finish}>
-                    Subscribe
-                  </button>
-                </>
-              )}
+              <h2>{fill(flow.title, vars)}</h2>
+              <FlowFields flow={flow} answers={answers} setAnswer={setAnswer} />
+              <button className="btn primary big-btn" disabled={missing} onClick={finish}>
+                {flow.cta}
+              </button>
             </div>
           ) : (
             <div className="ad-action-body ad-action-done">
@@ -2411,13 +2334,22 @@ export function AdActionDialog({ ad, onClose, onPlace, onTrack }) {
               </div>
               <h2>{ACT_DONE[kind]}</h2>
               <p className="ad-action-detail">
-                {kind === 'book' && `${item[0].toUpperCase() + item.slice(1)} · ${day} at ${fmtTime(time)}`}
+                {kind === 'book' && `${item[0].toUpperCase() + item.slice(1)} · ${when?.label || ''}`}
                 {kind === 'order' && `${qty} × ${item}`}
-                {kind === 'submit' && `“${text.trim()}”`}
-                {kind === 'subscribe' && `${ad.brand} · monthly`}
+                {kind === 'submit' && `“${String(answers[textField?.key] || '').trim()}”`}
+                {kind === 'subscribe' && item[0].toUpperCase() + item.slice(1)}
               </p>
+              {done.summary.length > 0 && (
+                <div className="flow-summary">
+                  {done.summary.map((x) => (
+                    <span key={x} className="flow-chip">
+                      {x}
+                    </span>
+                  ))}
+                </div>
+              )}
               <p className="muted small">Ref #{done.ref}</p>
-              {act.done && <p>{act.done}</p>}
+              {(done.confirm || ad.action?.done) && <p>{done.confirm || ad.action.done}</p>}
               {done.n > 1 && (
                 <p className="muted small">
                   This is your {ordinal(done.n)} {ACT_DONE[kind].split(' ')[0].toLowerCase()} with {ad.brand}.

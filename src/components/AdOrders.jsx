@@ -1,9 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { CloseIcon, Overlay } from './common.jsx';
 import { useNow } from './Shifts.jsx';
 import { useEscape } from '../util.js';
 import { KIND_NOUN, clip, progress } from '../adOrders.js';
 import { adStyle } from './Ads.jsx';
+import { ChatScene, Scene } from './AdFlow.jsx';
+import { FLOWS, flowFor } from '../adFlows.js';
 
 // What happens after an ad's booking / order / submission / subscription
 // (planned in adOrders.js): a tracker for each one, and a list of them all.
@@ -97,50 +99,56 @@ const THANKS = [
 ];
 const pickFor = (id, list) => list[[...id].reduce((t, c) => t + c.charCodeAt(0), 0) % list.length];
 
-// The delivery: tap the box a few times to open it.
-function Unbox({ order }) {
-  const key = `ad-unboxed-${order.id}`;
-  const [open, setOpen] = useState(() => readLocal(key, false));
-  const [taps, setTaps] = useState(0);
-  const got = Math.max(0, order.qty - (order.extra?.lost || 0));
-  const what = order.kind === 'subscribe' ? `${order.brand} box` : order.item;
-  if (!open)
+// The interactive part (AdFlow.jsx Scene), then how it went. Remembered on
+// this device, so it doesn't start over.
+function SceneBlock({ order, scene, after }) {
+  const key = `ad-scene-${order.id}`;
+  const legacy = scene.type === 'unbox' && readLocal(`ad-unboxed-${order.id}`, false);
+  const [result, setResult] = useState(
+    () =>
+      readLocal(key, null) ||
+      (legacy
+        ? {
+            text: `You got ${Math.max(0, order.qty - (order.extra?.lost || 0))} × ${order.item}! ${order.extra?.unbox || ''}`,
+            n: order.qty,
+          }
+        : null),
+  );
+  const vars = order.vars || {};
+  if (!result)
     return (
-      <div className="ad-unbox">
-        <button
-          className={`ad-box${taps ? ` shake-${taps}` : ''}`}
-          onClick={() => {
-            if (taps >= 2) {
-              writeLocal(key, true);
-              setOpen(true);
-            } else setTaps(taps + 1);
-          }}
-          aria-label="Open your package"
-        >
-          📦
-        </button>
-        <p className="muted small">{['Tap to open it', 'Keep going…', 'Almost…'][taps]}</p>
-      </div>
+      <Scene
+        scene={scene}
+        order={order}
+        vars={vars}
+        onDone={(text, n) => {
+          const r = { text, n: n ?? 6 };
+          writeLocal(key, r);
+          setResult(r);
+        }}
+      />
     );
+  const rain = scene.type === 'unbox' ? order.emoji : scene.emoji || order.emoji;
   return (
-    <div className="ad-unbox opened">
+    <div className="ad-unbox opened scene-result">
       <div className="ad-rain" aria-hidden="true">
-        {Array.from({ length: Math.min(12, Math.max(got, 1)) }, (_, i) => (
+        {Array.from({ length: Math.min(12, Math.max(result.n || 1, 1)) }, (_, i) => (
           <span key={i} style={{ '--i': i, '--x': `${(i * 37) % 100}%` }}>
-            {order.emoji}
+            {rain}
           </span>
         ))}
       </div>
-      <h3>You got {order.kind === 'subscribe' ? `your ${what}` : `${got} × ${what}`}!</h3>
-      <p>{order.extra?.unbox}</p>
-      {order.extra?.lost > 0 && <p className="muted small">One is missing. Customs says hi.</p>}
+      <h3>{scene.type === 'unbox' ? 'Unboxed!' : 'Done!'}</h3>
+      <p>{result.text}</p>
+      {scene.type === 'unbox' && order.extra?.lost > 0 && <p className="muted small">One is missing. Customs says hi.</p>}
+      {after && <p className="muted">{after}</p>}
       <Stars id={order.id} thanks={pickFor(order.id, THANKS)} />
     </div>
   );
 }
 
-// The appointment: the waiting room, then how it went.
-function Appointment({ order }) {
+// The appointment: the waiting room, then the thing itself.
+function Appointment({ order, scene }) {
   const key = `ad-visited-${order.id}`;
   const [stage, setStage] = useState(() => (readLocal(key, false) ? 'done' : 'ready'));
   const [line, setLine] = useState(order.extra?.line || 3);
@@ -195,6 +203,7 @@ function Appointment({ order }) {
         <p className="ad-visit-line">It’s your turn!</p>
       </div>
     );
+  if (scene) return <SceneBlock order={order} scene={scene} after={order.extra?.signoff} />;
   return (
     <div className="ad-visit">
       <div className="ad-visit-big" aria-hidden="true">
@@ -210,13 +219,15 @@ function Appointment({ order }) {
 
 const AUTO = ['This inbox is not monitored. 🤖', 'We’ve added your reply to the fridge.', 'Our intern is reading this one out loud too.'];
 
-// The conversation about what you submitted.
-function Replies({ order, now }) {
+// The conversation about what you submitted: their reply, then their
+// questions (flow.chat) or your own replies.
+function Replies({ order, now, chat }) {
   const [mine, setMine] = useState([]);
   const [text, setText] = useState('');
+  const [talked, setTalked] = useState(() => readLocal(`ad-chat-${order.id}`, false));
   const end = useRef(null);
   const replied = has(order, 'reply', now);
-  useEffect(() => end.current?.scrollIntoView({ block: 'nearest' }), [mine.length, replied]);
+  useEffect(() => end.current?.scrollIntoView?.({ block: 'nearest' }), [mine.length, replied]);
   const send = () => {
     const t = text.trim();
     if (!t) return;
@@ -242,15 +253,29 @@ function Replies({ order, now }) {
             <span />
           </div>
         )}
-        {mine.map((m, i) => (
-          <div key={i} className={`ad-bubble ${m.me ? 'me' : 'them'}`}>
-            {!m.me && <b>{order.brand}</b>}
-            {m.text}
-          </div>
-        ))}
+        {(!chat || talked) &&
+          mine.map((m, i) => (
+            <div key={i} className={`ad-bubble ${m.me ? 'me' : 'them'}`}>
+              {!m.me && <b>{order.brand}</b>}
+              {m.text}
+            </div>
+          ))}
         <span ref={end} />
       </div>
-      {replied && (
+      {replied && chat && !talked && (
+        <ChatScene
+          lines={chat}
+          brand={order.brand}
+          vars={order.vars || {}}
+          onDone={() =>
+            setTimeout(() => {
+              writeLocal(`ad-chat-${order.id}`, true);
+              setTalked(true);
+            }, 2500)
+          }
+        />
+      )}
+      {replied && (!chat || talked) && (
         <div className="row gap">
           <input
             className="input"
@@ -331,6 +356,11 @@ export function OrderTracker({ order, ad, onClose, onCancel, onAgain }) {
   const [guilt, setGuilt] = useState(0);
   const [note, setNote] = useState('');
   const { kind } = order;
+  // The ad's own flow (for its scene); none for ads without one.
+  const flow = useMemo(
+    () => (FLOWS[order.adId] ? flowFor({ id: order.adId, brand: order.brand, action: { kind, item: order.item } }) : null),
+    [order.adId, order.brand, order.item, kind],
+  );
   const delivered = has(order, 'delivered', now);
   const started = has(order, 'start', now);
   const finished = progress(order, now).finished;
@@ -373,6 +403,15 @@ export function OrderTracker({ order, ad, onClose, onCancel, onAgain }) {
           <div className="ad-action-body">
             <h2>{heading}</h2>
             {order.ref && <p className="muted small ad-track-ref">Ref #{order.ref}</p>}
+            {order.summary?.length > 0 && (
+              <div className="flow-summary">
+                {order.summary.map((x) => (
+                  <span key={x} className="flow-chip">
+                    {x}
+                  </span>
+                ))}
+              </div>
+            )}
 
             {(kind === 'order' || kind === 'subscribe') && (
               <>
@@ -382,14 +421,14 @@ export function OrderTracker({ order, ad, onClose, onCancel, onAgain }) {
                     Arriving around <b>{clock(stepAt(order, 'delivered'))}</b>
                   </p>
                 )}
-                {delivered && <Unbox order={order} />}
+                {delivered && <SceneBlock order={order} scene={flow?.scene || { type: 'unbox' }} />}
               </>
             )}
             {kind === 'book' && (
               <>
                 <p className="ad-action-detail">{dayClock(order.when || stepAt(order, 'start'))}</p>
                 {started ? (
-                  <Appointment order={order} />
+                  <Appointment order={order} scene={flow?.scene} />
                 ) : (
                   <div className="ad-countdown">
                     Starts in <b>{untilText(stepAt(order, 'start') - now)}</b>
@@ -397,7 +436,7 @@ export function OrderTracker({ order, ad, onClose, onCancel, onAgain }) {
                 )}
               </>
             )}
-            {kind === 'submit' && <Replies order={order} now={now} />}
+            {kind === 'submit' && <Replies order={order} now={now} chat={flow?.chat} />}
 
             {kind !== 'submit' &&
               !(kind === 'book' && started) &&

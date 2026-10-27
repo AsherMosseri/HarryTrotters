@@ -1917,6 +1917,7 @@ export default function Workspace({ store, actor, rename, renames }) {
           {ads.action && (
             <AdActionDialog
               ad={ads.action}
+              first={actor.name.split(' ')[0]}
               onClose={ads.closeAction}
               onPlace={api.placeAdOrder}
               onTrack={(id) => {
