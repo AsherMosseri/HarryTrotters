@@ -14,7 +14,7 @@ import {
 } from '../config.js';
 import { ONLINE_MS, TYPING_MS, buildPeopleInfo, buildProfiles } from '../people.js';
 import { PALETTES } from '../nitro.js';
-import { daysBetween, todayISO } from '../milestones.js';
+import { daysBetween, mondayOf, parseDay, todayISO } from '../milestones.js';
 import { newTaskDefaults, personId } from '../data/diff.js';
 import { preparePhoto, useLocalStorage, useMedia } from '../util.js';
 import { Avatar, Overlay, PeopleContext, PlusIcon } from './common.jsx';
@@ -826,7 +826,7 @@ export default function Workspace({ store, actor, rename, renames }) {
       },
       saveSettings: (patch) => store.saveSettings(patch, actor).catch(fail),
       saveAdSettings: (cfg) => store.saveAdSettings(JSON.parse(JSON.stringify(cfg)), actor).catch(fail),
-      bumpAdStats: (counts) => store.bumpAdStats(counts).catch(() => {}),
+      bumpAdStats: (counts) => store.bumpAdStats(counts, actor.name).catch(() => {}),
       submitAd: (data) => store.submitAd(data, actor).catch(fail),
       addCoins: (tx) => store.addCoinTx(tx).catch(fail),
       undoCoins: (tx) => store.deleteCoinTx(tx.id).catch(fail),
@@ -1169,7 +1169,36 @@ export default function Workspace({ store, actor, rename, renames }) {
     }),
     [myWallet.balance, coinCfg, api, actor.name],
   );
-  const ads = useAdsEngine({ settings, actor, view, shifts, submissions: adSubs, ledger, coins, api });
+  // The viewer's own numbers, for targeted ads that know a little too much.
+  const viewer = useMemo(() => {
+    const name = actor.name;
+    const now = Date.now();
+    const today = todayISO();
+    const monday = parseDay(mondayOf(today)).getTime();
+    const mine = (tasks || []).filter((t) => (t.assignees || []).includes(name));
+    const myShifts = shifts.filter((x) => x.person === name);
+    const ended = myShifts.filter((x) => x.end).sort((a, b) => b.end - a.end)[0];
+    const latest = [...myShifts].sort((a, b) => b.start - a.start)[0];
+    const endHour = ended ? new Date(ended.end).getHours() : -1;
+    return {
+      name,
+      first: name.split(' ')[0],
+      hoursWeek: Math.round(myShifts.filter((x) => x.start >= monday).reduce((h, x) => h + ((x.end || now) - x.start), 0) / 360000) / 10,
+      overdue: mine.filter((t) => t.status !== 'done' && t.dueDate && t.dueDate < today).length,
+      open: mine.filter((t) => t.status !== 'done').length,
+      doneWeek: mine.filter((t) => t.status === 'done' && (t.completedAt || 0) >= monday).length,
+      balance: myWallet.balance,
+      lastEndHour: endHour >= 0 && endHour < 4 ? endHour + 24 : endHour,
+      lastEndText: ended ? new Date(ended.end).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '',
+      onShift: myShifts.some((x) => !x.end),
+      daysSinceLab: latest ? Math.floor((now - (latest.end || now)) / 86400000) : 999,
+      daysToComp: daysBetween(today, competitionDate),
+      subteams: peopleInfo.get(name)?.subteams || [],
+    };
+  }, [actor.name, tasks, shifts, myWallet.balance, competitionDate, peopleInfo]);
+  const ads = useAdsEngine({ settings, actor, view, shifts, submissions: adSubs, ledger, coins, viewer, competitionDate, api });
+  const [adPeople, setAdPeople] = useState({});
+  useEffect(() => (adsPage ? store.subscribeAdPeople(setAdPeople) : undefined), [adsPage, store]);
 
   const filterCount = [filters.person && filters.person !== '__me', filters.subteam, filters.priority, filters.hideDone].filter(
     Boolean,
@@ -1815,6 +1844,8 @@ export default function Workspace({ store, actor, rename, renames }) {
               ledger={ledger}
               onGrant={(g) => api.addCoins({ type: 'grant', by: actor.name, ...g })}
               onUndoGrant={api.undoCoins}
+              competitionDate={competitionDate}
+              peopleStats={adPeople}
               onClose={() => setAdsPage(false)}
             />
           )}

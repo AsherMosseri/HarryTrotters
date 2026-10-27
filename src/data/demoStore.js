@@ -598,7 +598,15 @@ export const demoStore = {
   subscribeAdStats(cb) {
     return listen(() => cb({ ...(state.adStats || {}) }));
   },
-  async bumpAdStats(counts) {
+  subscribeAdPeople(cb) {
+    return listen(() => cb({ ...(state.adPeople || {}) }));
+  },
+  async bumpAdStats(counts, name) {
+    if (name) {
+      const was = (state.adPeople || {})[name] || { name, views: 0, taps: 0 };
+      const add = (k) => Object.values(counts).reduce((t, c) => t + (c[k] || 0), 0);
+      state.adPeople = { ...(state.adPeople || {}), [name]: { name, views: was.views + add('views'), taps: was.taps + add('taps') } };
+    }
     const stats = { ...(state.adStats || {}) };
     for (const [id, c] of Object.entries(counts)) {
       const was = stats[id] || { views: 0, taps: 0 };
@@ -641,6 +649,7 @@ export const demoStore = {
   },
   async resetAdStats() {
     state.adStats = {};
+    state.adPeople = {};
     commit();
   },
 

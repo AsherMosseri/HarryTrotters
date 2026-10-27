@@ -2627,3 +2627,16 @@ body:has(.bottom-nav):has(.composer) .toast { bottom: calc(150px + env(safe-area
 @media (max-width: 760px) {
   .dialog.coins-dialog { width: 100%; max-height: none; }
 }
+
+/* Ads page: per-ad targeting and per-person stats */
+.ads-item:has(.ads-item-row) { flex-direction: column; align-items: stretch; }
+.ads-item-row { display: flex; align-items: center; gap: 10px; }
+.ads-aimed { font-size: 11.5px; font-weight: 700; color: var(--accent); }
+.ads-target { display: flex; flex-direction: column; gap: 6px; padding: 8px 0 2px 54px; }
+.chip.small-chip { padding: 3px 9px; font-size: 12px; }
+.ads-people-stats { overflow-x: auto; }
+.ads-people-stats table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.ads-people-stats th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); padding: 4px 6px; }
+.ads-people-stats td { padding: 5px 6px; border-top: 1px solid var(--border); font-variant-numeric: tabular-nums; }
+.ads-people-stats td:first-child { font-weight: 600; white-space: nowrap; }
+@media (max-width: 760px) { .ads-target { padding-left: 0; } }

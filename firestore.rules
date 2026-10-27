@@ -103,6 +103,20 @@ service cloud.firestore {
       allow delete: if requestsOwner();
     }
 
+    // How many ads each person has seen and tapped (Asher's per-person stats).
+    match /adPeople/{id} {
+      function grows(d, k, max) {
+        return d.get(k, 0) is int && d.get(k, 0) >= resource.data.get(k, 0) && d.get(k, 0) <= resource.data.get(k, 0) + max;
+      }
+      allow read: if isMember();
+      allow create: if isMember() && id == myId() && request.resource.data.keys().hasOnly(['name', 'views', 'taps'])
+        && request.resource.data.name == myName() && request.resource.data.get('views', 0) is int && request.resource.data.get('taps', 0) is int
+        && request.resource.data.get('views', 0) <= 2000 && request.resource.data.get('taps', 0) <= 100;
+      allow update: if isMember() && id == myId() && request.resource.data.keys().hasOnly(['name', 'views', 'taps'])
+        && request.resource.data.name == resource.data.name && grows(request.resource.data, 'views', 2000) && grows(request.resource.data, 'taps', 100);
+      allow delete: if isManager();
+    }
+
     // Ads teammates submit and book for certain dates. Asher reviews them on
     // the Ads page; approved ones run for everyone during their dates.
     match /adSubmissions/{id} {

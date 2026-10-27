@@ -3,6 +3,9 @@ import { ADS } from '../ads.js';
 import { STATUSES } from '../config.js';
 import { todayISO } from '../milestones.js';
 import { adFreeUntil } from '../coins.js';
+import { PACKS, packOn } from '../adPacks.js';
+import { TARGETS, targetedAds } from '../adTargets.js';
+import { SUBTEAMS } from '../config.js';
 import { Coin, Coins, CoinsAdmin } from './Coins.jsx';
 import { useEscape } from '../util.js';
 import { CloseIcon, Overlay } from './common.jsx';
@@ -32,12 +35,16 @@ export const AD_DEFAULTS = {
   schedule: { on: false, days: [0, 1, 2, 3, 4, 5, 6], from: '15:00', to: '21:00', notOnShift: false },
   custom: [],
   spots: true,
+  packs: { classic: 'on', halloween: 'auto', competition: 'auto', winter: 'auto' },
+  targeted: 'some',
+  // Per ad: { people: [], subteams: [], slots: [] } (empty means everyone / everywhere).
+  targets: {},
 };
 
 // Settings with every field filled in (one level of nesting).
 export function adSettings(raw) {
   const out = { ...AD_DEFAULTS, ...(raw || {}) };
-  for (const k of ['banner', 'board', 'pages', 'full', 'remove', 'schedule', 'weights'])
+  for (const k of ['banner', 'board', 'pages', 'full', 'remove', 'schedule', 'weights', 'packs', 'targets'])
     out[k] = { ...AD_DEFAULTS[k], ...(raw?.[k] || {}) };
   return out;
 }
@@ -94,15 +101,26 @@ export function inSchedule(s, now = new Date()) {
   return a <= b ? t >= a && t <= b : t >= a || t <= b;
 }
 
-// Every enabled ad, repeated by weight and spread out so the same one rarely
-// shows twice in a row.
-function buildPool(cfg, live = []) {
-  const all = [...ADS, ...(cfg.custom || []), ...live].filter((a) => a && !cfg.off.includes(a.id));
+// Every ad that can run (built-in, packs in season, Asher's own, approved
+// spots, and targeted ones for this viewer), repeated by weight and spread
+// out so the same one rarely shows twice in a row.
+export function allBuiltIn(cfg, today, competitionDate) {
+  return [...ADS, ...PACKS.filter((p) => packOn(p, cfg.packs[p.id], today, competitionDate)).flatMap((p) => p.ads)];
+}
+const sees = (t, viewer) =>
+  !t ||
+  (!(t.people || []).length && !(t.subteams || []).length) ||
+  (t.people || []).includes(viewer?.name) ||
+  (t.subteams || []).some((x) => viewer?.subteams?.includes(x));
+function buildPool(cfg, extra, viewer) {
+  const all = extra.filter((a) => a && !cfg.off.includes(a.id) && sees(cfg.targets[a.id], viewer));
   const pool = [];
-  const copies = all.map((a) => [a, WEIGHT[cfg.weights[a.id]] || WEIGHT.normal]);
+  const weightOf = (a) => (a.targeted ? ({ off: 0, some: 2, lots: 6 }[cfg.targeted] ?? 2) : WEIGHT[cfg.weights[a.id]] || WEIGHT.normal);
+  const copies = all.map((a) => [a, weightOf(a)]);
   for (let round = 0; copies.some(([, n]) => n > round); round++) for (const [a, n] of copies) if (n > round) pool.push(a);
   return pool;
 }
+const SLOT_OF = { banner: 'banner', board: 'board', chat: 'chat', page: 'page', popup: 'popup', full: 'full' };
 
 // A teammate's submitted ad as an ad. Approved ones run between from and to.
 export const submissionAd = (s) => ({
@@ -119,11 +137,22 @@ export const useAds = () => useContext(AdsContext);
 const SLOT = { banner: 0, board: 7, chat: 13, page: 3, popup: 11, full: 5 };
 
 // Everything the ads need, worked out once in Workspace.
-export function useAdsEngine({ settings, actor, view, shifts, submissions, ledger, coins, api }) {
+export function useAdsEngine({ settings, actor, view, shifts, submissions, ledger, coins, viewer, competitionDate, api }) {
   const cfg = useMemo(() => adSettings(settings.ads), [settings.ads]);
   const today = todayISO();
   const live = useMemo(() => liveAds(submissions || [], today), [submissions, today]);
-  const pool = useMemo(() => buildPool(cfg, live), [cfg, live]);
+  const targeted = useMemo(() => (cfg.targeted === 'off' ? [] : targetedAds(viewer)), [cfg.targeted, viewer]);
+  const pool = useMemo(
+    () => buildPool(cfg, [...allBuiltIn(cfg, today, competitionDate), ...(cfg.custom || []), ...live, ...targeted], viewer),
+    [cfg, today, competitionDate, live, targeted, viewer],
+  );
+  // Each slot only gets the ads allowed there.
+  const slotPools = useMemo(() => {
+    const out = {};
+    for (const slot of Object.keys(SLOT_OF))
+      out[slot] = pool.filter((a) => !(cfg.targets[a.id]?.slots || []).length || cfg.targets[a.id].slots.includes(slot));
+    return out;
+  }, [pool, cfg.targets]);
   const [tick, setTick] = useState(() => Math.floor(Date.now() / (cfg.rotate * 1000)));
   useEffect(() => {
     const t = setInterval(() => setTick(Math.floor(Date.now() / (cfg.rotate * 1000))), 2000);
@@ -163,7 +192,13 @@ export function useAdsEngine({ settings, actor, view, shifts, submissions, ledge
     };
   }, [api]);
 
-  const pick = useCallback((slot, k = 0) => (pool.length ? pool[(tick + (SLOT[slot] || 0) + k * 5) % pool.length] : null), [pool, tick]);
+  const pick = useCallback(
+    (slot, k = 0) => {
+      const list = slotPools[slot] || pool;
+      return list.length ? list[(tick + (SLOT[slot] || 0) + k * 5) % list.length] : null;
+    },
+    [slotPools, pool, tick],
+  );
 
   // Full-screen ads: every N tab switches, at least M minutes apart, and
   // optionally once when the app opens.
@@ -800,6 +835,8 @@ export function AdsSettings({
   ledger = [],
   onGrant,
   onUndoGrant,
+  competitionDate,
+  peopleStats = {},
   onClose,
 }) {
   useEscape(onClose);
@@ -810,14 +847,17 @@ export function AdsSettings({
   const set = (patch) => setCfg((c) => ({ ...c, ...patch }));
   const setIn = (key, patch) => setCfg((c) => ({ ...c, [key]: { ...c[key], ...patch } }));
   const toggleIn = (list, v) => (list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
-  const allAds = [...ADS, ...cfg.custom];
+  const packAds = PACKS.flatMap((p) => p.ads);
+  const sampleTargeted = TARGETS.map((t) => ({ id: t.id, targeted: true, ...t.make(SAMPLE_VIEWER) }));
+  const allAds = [...ADS, ...packAds, ...cfg.custom];
+  const today = todayISO();
   const pendingSubs = submissions.filter((x) => x.status === 'pending').length;
   const totals = Object.values(stats || {}).reduce((t, s) => ({ views: t.views + (s.views || 0), taps: t.taps + (s.taps || 0) }), {
     views: 0,
     taps: 0,
   });
   const earned = totals.views * CPM + totals.taps * PER_TAP;
-  const ranked = [...allAds, ...submissions.map(submissionAd)]
+  const ranked = [...allAds, ...sampleTargeted, ...submissions.map(submissionAd)]
     .map((a) => ({ a, v: stats?.[a.id]?.views || 0, t: stats?.[a.id]?.taps || 0 }))
     .filter((r) => r.v || r.t)
     .sort((x, y) => y.v + y.t * 20 - (x.v + x.t * 20));
@@ -1179,19 +1219,57 @@ export function AdsSettings({
                     ]}
                   />
                 </Row>
+                <h4>Packs</h4>
+                {PACKS.map((p) => (
+                  <Row
+                    key={p.id}
+                    title={p.label}
+                    hint={`${p.note}${p.id !== 'classic' && packOn(p, 'auto', today, competitionDate) ? ' · in season now' : ''}`}
+                  >
+                    <Choice
+                      value={cfg.packs[p.id] || 'off'}
+                      onChange={(v) => setIn('packs', { [p.id]: v })}
+                      label={`${p.label} pack`}
+                      options={[['on', 'On'], ...(p.id === 'classic' ? [] : [['auto', 'In season']]), ['off', 'Off']]}
+                    />
+                  </Row>
+                ))}
+                <Row title="🎯 Targeted ads" hint="Ads that use each person’s own numbers: hours, overdue tasks, coins, subteam…">
+                  <Choice
+                    value={cfg.targeted}
+                    onChange={(v) => set({ targeted: v })}
+                    label="Targeted ads"
+                    options={[
+                      ['off', 'Off'],
+                      ['some', 'Some'],
+                      ['lots', 'Lots'],
+                    ]}
+                  />
+                </Row>
                 <div className="row gap">
                   <button className="link-btn small" onClick={() => set({ off: [] })}>
                     All on
                   </button>
-                  <button className="link-btn small" onClick={() => set({ off: allAds.map((a) => a.id) })}>
+                  <button className="link-btn small" onClick={() => set({ off: [...allAds, ...sampleTargeted].map((a) => a.id) })}>
                     All off
                   </button>
                 </div>
-                <ul className="ads-list">
-                  {allAds.map((a) => (
-                    <AdRow key={a.id} ad={a} cfg={cfg} set={set} onShow={() => onShowFull(a)} />
-                  ))}
-                </ul>
+                {[
+                  ['Classic', [...ADS, ...PACKS[0].ads]],
+                  ...PACKS.slice(1).map((p) => [p.label, p.ads]),
+                  ['🎯 Targeted (shown with Cooper’s numbers as an example)', sampleTargeted],
+                ].map(([title, list]) => (
+                  <section key={title}>
+                    <h4>
+                      {title} ({list.length})
+                    </h4>
+                    <ul className="ads-list">
+                      {list.map((a) => (
+                        <AdRow key={a.id} ad={a} cfg={cfg} set={set} roster={roster} onShow={() => onShowFull(a)} />
+                      ))}
+                    </ul>
+                  </section>
+                ))}
               </>
             )}
 
@@ -1222,7 +1300,15 @@ export function AdsSettings({
                     </button>
                     <ul className="ads-list">
                       {cfg.custom.map((a) => (
-                        <AdRow key={a.id} ad={a} cfg={cfg} set={set} onShow={() => onShowFull(a)} onEdit={() => setEditing(a)} />
+                        <AdRow
+                          key={a.id}
+                          ad={a}
+                          cfg={cfg}
+                          set={set}
+                          roster={roster}
+                          onShow={() => onShowFull(a)}
+                          onEdit={() => setEditing(a)}
+                        />
                       ))}
                     </ul>
                     {!cfg.custom.length && <p className="muted">No ads of your own yet.</p>}
@@ -1265,7 +1351,7 @@ export function AdsSettings({
                         <span>{a.emoji}</span>
                         <b className="grow">{a.brand}</b>
                         <span className="muted small">
-                          {v} view{v === 1 ? '' : 's'} · {t} tap{t === 1 ? '' : 's'}
+                          {v} view{v === 1 ? '' : 's'} · {t} tap{t === 1 ? '' : 's'} · {v ? Math.round((t / v) * 100) : 0}% tap rate
                         </span>
                       </li>
                     ))}
@@ -1273,6 +1359,8 @@ export function AdsSettings({
                 ) : (
                   <p className="muted">Nothing yet. Turn ads on for someone and check back.</p>
                 )}
+                <h4>People</h4>
+                <PeopleStats roster={roster} stats={peopleStats} ledger={ledger} />
                 <p className="muted small">Views count from every device and are sent about once a minute.</p>
                 <button className="link-btn danger small" onClick={() => confirm('Reset the earnings and counts?') && onResetStats()}>
                   Reset earnings
@@ -1311,41 +1399,165 @@ export function AdsSettings({
   );
 }
 
-function AdRow({ ad, cfg, set, onShow, onEdit }) {
+const SLOT_LABELS = [
+  ['banner', 'Banner'],
+  ['board', 'Board'],
+  ['chat', 'Chat'],
+  ['page', 'Other tabs'],
+  ['popup', 'Pop-ups'],
+  ['full', 'Full-screen'],
+];
+const SAMPLE_VIEWER = {
+  name: 'Cooper Mlezcko',
+  first: 'Cooper',
+  hoursWeek: 9.5,
+  daysSinceLab: 6,
+  overdue: 2,
+  doneWeek: 4,
+  balance: 140,
+  lastEndHour: 22,
+  lastEndText: '10:14 PM',
+  onShift: true,
+  daysToComp: 18,
+  open: 5,
+  subteams: ['Programming', 'CAD', 'Electrical'],
+};
+
+// Who sees an ad and where it can show up.
+function AdTargeting({ id, cfg, set, roster }) {
+  const t = cfg.targets[id] || {};
+  const toggle = (key, v) => {
+    const list = t[key] || [];
+    set({ targets: { ...cfg.targets, [id]: { ...t, [key]: list.includes(v) ? list.filter((x) => x !== v) : [...list, v] } } });
+  };
+  const chips = (key, items) => (
+    <div className="ads-days">
+      {items.map(([v, label]) => {
+        const on = (t[key] || []).includes(v);
+        return (
+          <button key={v} className={`chip small-chip${on ? ' on' : ''}`} aria-pressed={on} onClick={() => toggle(key, v)}>
+            {label}
+          </button>
+        );
+      })}
+    </div>
+  );
+  return (
+    <div className="ads-target">
+      <span className="muted tiny">Who sees it (pick none for everyone)</span>
+      {chips(
+        'subteams',
+        SUBTEAMS.map((x) => [x, x]),
+      )}
+      {chips(
+        'people',
+        roster.map((n) => [n, n.split(' ')[0]]),
+      )}
+      <span className="muted tiny">Where (pick none for everywhere)</span>
+      {chips('slots', SLOT_LABELS)}
+    </div>
+  );
+}
+
+// Who sees the most ads, taps the most, and pays to make them stop.
+function PeopleStats({ roster, stats, ledger }) {
+  const rows = roster
+    .map((name) => {
+      const st = stats[name] || {};
+      const mine = ledger.filter((x) => x.type === 'spend' && x.person === name);
+      const breaks = mine.filter((x) => String(x.what).startsWith('remove'));
+      return {
+        name,
+        views: st.views || 0,
+        taps: st.taps || 0,
+        breaks: breaks.length,
+        spent: mine.filter((x) => String(x.what).startsWith('remove') || x.what === 'skip').reduce((t, x) => t + x.amount, 0),
+      };
+    })
+    .filter((r) => r.views || r.taps || r.breaks)
+    .sort((a, b) => b.views - a.views);
+  if (!rows.length) return <p className="muted small">No one has seen an ad yet.</p>;
+  return (
+    <div className="ads-people-stats">
+      <table>
+        <thead>
+          <tr>
+            <th>Person</th>
+            <th>Views</th>
+            <th>Taps</th>
+            <th>Tap rate</th>
+            <th>Breaks</th>
+            <th>Coins on ads</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.name}>
+              <td>{r.name}</td>
+              <td>{r.views}</td>
+              <td>{r.taps}</td>
+              <td>{r.views ? Math.round((r.taps / r.views) * 100) : 0}%</td>
+              <td>{r.breaks}</td>
+              <td>{r.spent}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function AdRow({ ad, cfg, set, roster = [], onShow, onEdit }) {
+  const [open, setOpen] = useState(false);
   const off = cfg.off.includes(ad.id);
   const weight = cfg.weights[ad.id] || 'normal';
+  const t = cfg.targets[ad.id] || {};
+  const aimed = [
+    ...(t.subteams || []),
+    ...(t.people || []).map((n) => n.split(' ')[0]),
+    ...(t.slots || []).map((x) => SLOT_LABELS.find(([v]) => v === x)?.[1]),
+  ];
   return (
-    <li className={`ads-item${off ? ' off' : ''}`} style={adStyle(ad)}>
-      <span className="ads-item-art">{ad.emoji}</span>
-      <div className="grow ads-item-text">
-        <b>{ad.brand || 'Untitled ad'}</b>
-        <span className="muted small">{ad.headline}</span>
-        <div className="row gap ads-item-tools">
-          <Choice
-            value={weight}
-            onChange={(v) => set({ weights: { ...cfg.weights, [ad.id]: v } })}
-            label={`How often ${ad.brand} shows`}
-            options={[
-              ['rare', 'Rare'],
-              ['normal', 'Normal'],
-              ['often', 'Often'],
-            ]}
-          />
-          <button className="link-btn small" onClick={onShow}>
-            Preview
-          </button>
-          {onEdit && (
-            <button className="link-btn small" onClick={onEdit}>
-              Edit
+    <li className={`ads-item${off ? ' off' : ''}${open ? ' open' : ''}`} style={adStyle(ad)}>
+      <div className="ads-item-row">
+        <span className="ads-item-art">{ad.emoji}</span>
+        <div className="grow ads-item-text">
+          <b>{ad.brand || 'Untitled ad'}</b>
+          <span className="muted small">{ad.headline}</span>
+          {aimed.length > 0 && <span className="ads-aimed">🎯 {aimed.join(' · ')}</span>}
+          <div className="row gap ads-item-tools">
+            {!ad.targeted && (
+              <Choice
+                value={weight}
+                onChange={(v) => set({ weights: { ...cfg.weights, [ad.id]: v } })}
+                label={`How often ${ad.brand} shows`}
+                options={[
+                  ['rare', 'Rare'],
+                  ['normal', 'Normal'],
+                  ['often', 'Often'],
+                ]}
+              />
+            )}
+            <button className="link-btn small" onClick={onShow}>
+              Preview
             </button>
-          )}
+            <button className="link-btn small" onClick={() => setOpen(!open)} aria-expanded={open}>
+              Who & where
+            </button>
+            {onEdit && (
+              <button className="link-btn small" onClick={onEdit}>
+                Edit
+              </button>
+            )}
+          </div>
         </div>
+        <Switch
+          checked={!off}
+          onChange={(v) => set({ off: v ? cfg.off.filter((x) => x !== ad.id) : [...cfg.off, ad.id] })}
+          label={`Show ${ad.brand}`}
+        />
       </div>
-      <Switch
-        checked={!off}
-        onChange={(v) => set({ off: v ? cfg.off.filter((x) => x !== ad.id) : [...cfg.off, ad.id] })}
-        label={`Show ${ad.brand}`}
-      />
+      {open && <AdTargeting id={ad.id} cfg={cfg} set={set} roster={roster} />}
     </li>
   );
 }

@@ -446,8 +446,17 @@ export const firebaseStore = {
       () => {},
     );
   },
-  bumpAdStats(counts) {
+  bumpAdStats(counts, name) {
     const batch = writeBatch(db);
+    if (name) {
+      const views = Object.values(counts).reduce((t, c) => t + (c.views || 0), 0);
+      const taps = Object.values(counts).reduce((t, c) => t + (c.taps || 0), 0);
+      batch.set(
+        doc(db, 'adPeople', personId(name)),
+        { name, views: increment(Math.min(views, 2000)), taps: increment(Math.min(taps, 100)) },
+        { merge: true },
+      );
+    }
     for (const [id, c] of Object.entries(counts)) {
       batch.set(
         doc(db, 'adStats', id),
@@ -488,10 +497,18 @@ export const firebaseStore = {
   deleteAdSubmission(id) {
     return deleteDoc(doc(db, 'adSubmissions', id));
   },
+  subscribeAdPeople(cb) {
+    return onSnapshot(
+      collection(db, 'adPeople'),
+      (snap) => cb(Object.fromEntries(snap.docs.map((d) => [d.data().name, d.data()]))),
+      () => cb({}),
+    );
+  },
   async resetAdStats() {
-    const snap = await getDocs(collection(db, 'adStats'));
+    const [snap, people] = await Promise.all([getDocs(collection(db, 'adStats')), getDocs(collection(db, 'adPeople'))]);
     const batch = writeBatch(db);
     snap.docs.forEach((d) => batch.delete(d.ref));
+    people.docs.forEach((d) => batch.delete(d.ref));
     return batch.commit();
   },
 
