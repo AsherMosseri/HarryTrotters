@@ -2217,7 +2217,29 @@ function AdEditor({ ad, onSave, onCancel, onDelete, onUpload }) {
 // ---------- tapping an ad's button: a booking, an order, a submission, or a sign-up ----------
 
 const ACT_DONE = { book: 'Booking confirmed', order: 'Order placed', submit: 'Submission received', subscribe: 'You’re subscribed' };
-const TIMES = ['3:30 PM', '6:00 PM', '9:47 PM'];
+// Fresh time slots every time the pop-up opens: mostly normal times, the odd
+// weird minute, and now and then a 3 AM slot. Today only offers times still ahead.
+const fmtTime = (m) => {
+  const h = Math.floor(m / 60) % 24;
+  return `${h % 12 || 12}:${String(m % 60).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`;
+};
+function randomTimes(today) {
+  const now = new Date();
+  const from = today ? now.getHours() * 60 + now.getMinutes() + 10 : 7 * 60;
+  const to = 23 * 60 + 59;
+  if (from > to - 20) return ['11:59 PM'];
+  const want = 3 + Math.floor(Math.random() * 2);
+  const picked = new Set();
+  for (let tries = 0; picked.size < want && tries < 50; tries++) {
+    let m;
+    if (!today && picked.size === 0 && Math.random() < 0.2)
+      m = 60 + Math.floor(Math.random() * 4 * 60); // 1–5 AM
+    else m = from + Math.floor(Math.random() * (to - from));
+    if (Math.random() < 0.65) m = Math.min(to, Math.ceil(m / 15) * 15); // usually on a quarter hour
+    picked.add(Math.min(m, to));
+  }
+  return [...picked].sort((a, b) => a - b).map(fmtTime);
+}
 const initials = (name) =>
   (name || 'AD')
     .split(/\s+/)
@@ -2259,7 +2281,8 @@ export function AdActionDialog({ ad, onClose }) {
   const kind = ACT_DONE[act.kind] ? act.kind : 'order';
   const days = useMemo(() => nextDays(5), []);
   const [day, setDay] = useState(days[1]);
-  const [time, setTime] = useState(TIMES[0]);
+  const times = useMemo(() => Object.fromEntries(days.map((d, i) => [d, randomTimes(i === 0)])), [days]);
+  const [time, setTime] = useState(() => times[days[1]][0]);
   const [qty, setQty] = useState(1);
   const [text, setText] = useState('');
   const [done, setDone] = useState(null);
@@ -2293,14 +2316,22 @@ export function AdActionDialog({ ad, onClose }) {
                   <h4>Day</h4>
                   <div className="ads-days">
                     {days.map((d) => (
-                      <button key={d} className={`chip${day === d ? ' on' : ''}`} aria-pressed={day === d} onClick={() => setDay(d)}>
+                      <button
+                        key={d}
+                        className={`chip${day === d ? ' on' : ''}`}
+                        aria-pressed={day === d}
+                        onClick={() => {
+                          setDay(d);
+                          setTime(times[d][0]);
+                        }}
+                      >
                         {d}
                       </button>
                     ))}
                   </div>
                   <h4>Time</h4>
                   <div className="ads-days">
-                    {TIMES.map((t) => (
+                    {times[day].map((t) => (
                       <button key={t} className={`chip${time === t ? ' on' : ''}`} aria-pressed={time === t} onClick={() => setTime(t)}>
                         {t}
                       </button>
