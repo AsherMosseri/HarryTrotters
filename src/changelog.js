@@ -4,6 +4,15 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '2.54',
+    date: '2026-10-27',
+    title: 'Polls everyone answers, and check-ins on a schedule',
+    items: [
+      'Team management can make a poll in #announcements that everyone has to answer: like a lab check-in, the app asks when they open it until they vote.',
+      'Lab check-ins can repeat: every weekday, or on the days you pick, asked automatically at a set time (Shifts → Lab check-in → Repeat). Edit or stop it from the Shifts tab.',
+    ],
+  },
+  {
     version: '2.53',
     date: '2026-10-27',
     title: 'Friends with benefits',

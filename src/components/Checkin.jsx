@@ -171,11 +171,30 @@ export function CheckinCard({ checkin, roster, gradeOf, me, isManager, rename, o
   );
 }
 
-// Team management: ask who's going to the lab.
-export function CheckinDialog({ onDone, onClose }) {
+const WEEKDAYS = [1, 2, 3, 4, 5];
+const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const clock12 = (hhmm) => {
+  const [h, m] = (hhmm || '07:00').split(':').map(Number);
+  return `${((h + 11) % 12) + 1}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`;
+};
+// "every weekday at 7:00 AM" / "Mon, Wed, Fri at 3:00 PM"
+export function scheduleText(s) {
+  const days = [...(s.days || [])].sort();
+  const which =
+    days.join() === WEEKDAYS.join() ? 'every weekday' : days.length === 7 ? 'every day' : days.map((d) => DAY_NAMES[d]).join(', ');
+  return `${which} at ${clock12(s.time)}`;
+}
+
+// Team management: ask who's going to the lab, once or on a schedule.
+// A schedule (settings.checkinSchedule) is asked by the server at that time
+// (New York time) on those days.
+export function CheckinDialog({ schedule, onDone, onSchedule, onClose }) {
   const [date, setDate] = useState(todayISO());
-  const [question, setQuestion] = useState('Who’s going to the lab today?');
-  const [slots, setSlots] = useState(['lunch', 'after']);
+  const [question, setQuestion] = useState(schedule?.question || 'Who’s going to the lab today?');
+  const [slots, setSlots] = useState(schedule?.slots || ['lunch', 'after']);
+  const [repeat, setRepeat] = useState(!schedule?.on ? 'once' : (schedule.days || []).join() === WEEKDAYS.join() ? 'weekdays' : 'days');
+  const [days, setDays] = useState(schedule?.days || WEEKDAYS);
+  const [time, setTime] = useState(schedule?.time || '07:00');
   useEffect(() => {
     const esc = (e) => e.key === 'Escape' && onClose();
     window.addEventListener('keydown', esc);
@@ -194,16 +213,65 @@ export function CheckinDialog({ onDone, onClose }) {
               <CloseIcon />
             </button>
           </div>
-          <p className="muted small">Everyone gets a notification, and the app asks them when they open it until they answer.</p>
+          <p className="muted small">
+            Everyone gets a notification, and the app asks them when they open it until they answer.
+            {repeat !== 'once' &&
+              ' On a schedule, it’s asked automatically at that time (New York time), unless there’s already a check-in that day.'}
+          </p>
           <div className="fields">
             <label className="field-label" htmlFor="ci-q">
               Question
             </label>
             <input id="ci-q" className="input" value={question} maxLength={120} onChange={(e) => setQuestion(e.target.value)} />
-            <label className="field-label" htmlFor="ci-date">
-              Day
-            </label>
-            <input id="ci-date" type="date" className="input" value={date} min={todayISO()} onChange={(e) => setDate(e.target.value)} />
+            <span className="field-label">Repeat</span>
+            <div className="segmented">
+              {[
+                ['once', 'Just once'],
+                ['weekdays', 'Every weekday'],
+                ['days', 'Pick days'],
+              ].map(([id, label]) => (
+                <button
+                  key={id}
+                  className={`plain-seg${repeat === id ? ' on' : ''}`}
+                  aria-pressed={repeat === id}
+                  onClick={() => setRepeat(id)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            {repeat === 'once' ? (
+              <>
+                <label className="field-label" htmlFor="ci-date">
+                  Day
+                </label>
+                <input id="ci-date" type="date" className="input" value={date} min={todayISO()} onChange={(e) => setDate(e.target.value)} />
+              </>
+            ) : (
+              <>
+                {repeat === 'days' && (
+                  <>
+                    <span className="field-label">Days</span>
+                    <div className="checkin-days">
+                      {DAY_NAMES.map((n, d) => (
+                        <button
+                          key={n}
+                          className={`chip${days.includes(d) ? ' on' : ''}`}
+                          aria-pressed={days.includes(d)}
+                          onClick={() => setDays(days.includes(d) ? days.filter((x) => x !== d) : [...days, d].sort())}
+                        >
+                          {n}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+                <label className="field-label" htmlFor="ci-time">
+                  Ask at
+                </label>
+                <input id="ci-time" type="time" className="input" value={time} onChange={(e) => setTime(e.target.value)} />
+              </>
+            )}
             <span className="field-label">When</span>
             <div className="segmented">
               {SLOTS.map((s) => (
@@ -223,14 +291,73 @@ export function CheckinDialog({ onDone, onClose }) {
             <button className="btn" onClick={onClose}>
               Cancel
             </button>
-            <button
-              className="btn primary"
-              disabled={!slots.length || !question.trim() || !date}
-              onClick={() => onDone({ date, question: question.trim(), slots })}
-            >
-              Ask everyone
-            </button>
+            {repeat === 'once' ? (
+              <button
+                className="btn primary"
+                disabled={!slots.length || !question.trim() || !date}
+                onClick={() => onDone({ date, question: question.trim(), slots })}
+              >
+                Ask everyone
+              </button>
+            ) : (
+              <button
+                className="btn primary"
+                disabled={!slots.length || !question.trim() || !time || (repeat === 'days' && !days.length)}
+                onClick={() =>
+                  onSchedule({ on: true, days: repeat === 'weekdays' ? WEEKDAYS : days, time, question: question.trim(), slots })
+                }
+              >
+                Save schedule
+              </button>
+            )}
           </div>
+        </div>
+      </div>
+    </Overlay>
+  );
+}
+
+// A required poll from #announcements, not voted on yet: blocks the app,
+// like a lab check-in, until it's answered (or the poll is ended).
+export function PollGate({ msg, rename, onVote }) {
+  const [picked, setPicked] = useState([]);
+  const [busy, setBusy] = useState(false);
+  const { poll } = msg;
+  const toggle = (id) => setPicked(poll.multi ? (picked.includes(id) ? picked.filter((x) => x !== id) : [...picked, id]) : [id]);
+  return (
+    <Overlay>
+      <div className="checkin-gate" role="alertdialog" aria-labelledby="pollgate-title">
+        <div className="gate-card checkin-card">
+          <div className="logo-mark big">📊</div>
+          <h1 id="pollgate-title">{poll.question}</h1>
+          <p className="muted">
+            Poll from {firstName(rename(msg.by || ''))} in #announcements. {poll.multi ? 'Pick one or more' : 'Pick one'} to keep going.
+          </p>
+          <div className="pollgate-options">
+            {poll.options.map((o) => (
+              <button
+                key={o.id}
+                className={`pollgate-opt${picked.includes(o.id) ? ' on' : ''}`}
+                aria-pressed={picked.includes(o.id)}
+                onClick={() => toggle(o.id)}
+              >
+                <span className="poll-check">{picked.includes(o.id) ? '✓' : ''}</span>
+                {o.text}
+              </button>
+            ))}
+          </div>
+          <button
+            className="btn primary big-btn"
+            disabled={!picked.length || busy}
+            onClick={async () => {
+              setBusy(true);
+              await onVote(picked);
+              setBusy(false);
+            }}
+          >
+            {busy ? 'Saving…' : 'Vote'}
+          </button>
+          <p className="muted tiny">You can change your vote anytime in #announcements.</p>
         </div>
       </div>
     </Overlay>

@@ -302,10 +302,11 @@ export function GifPicker({ onPick, onUpload, onClose }) {
 }
 
 // Create a poll: a question, 2–10 options, one or several choices.
-export function PollDialog({ onCreate, onClose }) {
+export function PollDialog({ onCreate, onClose, canRequire = false }) {
   const [question, setQuestion] = useState('');
   const [options, setOptions] = useState(['', '']);
   const [multi, setMulti] = useState(false);
+  const [required, setRequired] = useState(false);
   useEscape(onClose);
   const filled = options.map((o) => o.trim()).filter(Boolean);
   const ok = question.trim() && filled.length >= 2;
@@ -321,6 +322,7 @@ export function PollDialog({ onCreate, onClose }) {
             onCreate({
               question: question.trim().slice(0, 200),
               multi,
+              ...(required ? { required: true } : {}),
               options: filled.slice(0, 10).map((text, i) => ({ id: String.fromCharCode(97 + i), text: text.slice(0, 80) })),
             });
           }}
@@ -367,6 +369,15 @@ export function PollDialog({ onCreate, onClose }) {
           <label className="row gap small">
             <input type="checkbox" checked={multi} onChange={(e) => setMulti(e.target.checked)} /> Allow picking more than one
           </label>
+          {canRequire && (
+            <label className="row gap small poll-required-opt">
+              <input type="checkbox" checked={required} onChange={(e) => setRequired(e.target.checked)} />
+              <span>
+                <b>Everyone has to answer</b>
+                <span className="muted"> · like a lab check-in, the app asks when they open it until they vote</span>
+              </span>
+            </label>
+          )}
           <button className="btn primary big-btn" disabled={!ok}>
             Post poll
           </button>

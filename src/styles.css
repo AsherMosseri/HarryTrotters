@@ -2735,3 +2735,18 @@ body:has(.bottom-nav):has(.composer) .toast { bottom: calc(150px + env(safe-area
 .ad-pic-preview { width: 48px; height: 48px; object-fit: cover; border-radius: 10px; border: 1px solid var(--border); }
 .btn.disabled { opacity: 0.6; pointer-events: none; }
 .ads-select { width: auto; max-width: 260px; }
+
+/* Required polls and scheduled lab check-ins */
+.poll-required-opt { align-items: flex-start; padding: 8px 10px; border-radius: 10px; background: var(--accent-soft); }
+.poll-required-opt input { margin-top: 3px; }
+.poll-required { color: var(--accent); font-weight: 700; }
+.pollgate-options { display: flex; flex-direction: column; gap: 8px; text-align: left; align-self: stretch; width: 100%; }
+.pollgate-opt {
+  display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 12px; border: 2px solid var(--border); background: var(--surface);
+  color: var(--text); font-weight: 700; font-size: 16px; cursor: pointer; text-align: left;
+}
+.pollgate-opt.on { border-color: var(--accent); background: var(--accent-soft); }
+.pollgate-opt .poll-check { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--border); display: grid; place-items: center; font-size: 13px; flex: none; }
+.pollgate-opt.on .poll-check { border-color: var(--accent); background: var(--accent); color: #fff; }
+.checkin-days { display: flex; flex-wrap: wrap; gap: 6px; }
+.checkin-schedule { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 14px; margin-bottom: 12px; border-radius: 12px; background: var(--surface); border: 1px solid var(--border); }

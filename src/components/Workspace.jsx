@@ -41,7 +41,7 @@ import { VersionLogDialog, WhatsNew } from './VersionLog.jsx';
 import { RequestsDialog } from './Requests.jsx';
 import { BottomNav, MoreSheet, Sheet } from './PhoneChrome.jsx';
 import ShiftsView, { ShiftButton } from './Shifts.jsx';
-import { CheckinGate, answerOf } from './Checkin.jsx';
+import { CheckinGate, PollGate, answerOf } from './Checkin.jsx';
 import ThemeStudio, { AppBackdrop, CUSTOM_DEFAULT, applyThemeVars, themeFromProfile } from './ThemeStudio.jsx';
 import { VERSION, versionsSince } from '../changelog.js';
 import Inbox from './Inbox.jsx';
@@ -729,6 +729,19 @@ export default function Workspace({ store, actor, rename, renames }) {
     return fresh[fresh.length - 1] || null;
   }, [chat, chatRead, actor.uid]);
   const unreadMentions = Object.values(unread).reduce((s, u) => s + u.mentions, 0);
+  // A required poll in #announcements this person hasn't voted on yet (asked
+  // when they open the app, like a lab check-in).
+  const pendingPoll = useMemo(() => {
+    const me = personId(actor.name);
+    return (chat.announcements || []).find(
+      (m) =>
+        m.poll?.required &&
+        !m.poll.closed &&
+        !m.deleted &&
+        rename(m.by || '') !== actor.name &&
+        !Object.values(m.votes || {}).some((v) => v?.[me]),
+    );
+  }, [chat, actor.name, rename]);
 
   // Mark the open channel read while it's on screen.
   useEffect(() => {
@@ -1576,6 +1589,7 @@ export default function Workspace({ store, actor, rename, renames }) {
                 onOpenMine={() => setShiftPanel(true)}
                 onOpenTask={setOpenId}
                 checkins={upcomingCheckins}
+                checkinSchedule={settings.checkinSchedule}
                 gradeOf={gradeOf}
               />
             ) : view === 'resources' ? (
@@ -1720,6 +1734,15 @@ export default function Workspace({ store, actor, rename, renames }) {
                 profileColor={myColor}
                 upload={(file, oldPath) => api.uploadEffectImage(actor.name, file, oldPath)}
                 onClose={() => setStudio(false)}
+              />
+            )}
+            {!pendingCheckin && pendingPoll && (
+              <PollGate
+                msg={pendingPoll}
+                rename={rename}
+                onVote={async (ids) => {
+                  for (const id of ids) await api.vote('announcements', pendingPoll, id, true);
+                }}
               />
             )}
             {pendingCheckin && (

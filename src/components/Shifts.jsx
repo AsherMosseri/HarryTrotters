@@ -3,7 +3,7 @@ import { SUBTEAMS } from '../config.js';
 import { addDays, mondayOf, parseDay, toISO, todayISO } from '../milestones.js';
 import { firstName } from '../util.js';
 import { Avatar, AvatarStack, CloseIcon, Overlay, PlusIcon } from './common.jsx';
-import { CheckinCard, CheckinDialog } from './Checkin.jsx';
+import { CheckinCard, CheckinDialog, scheduleText } from './Checkin.jsx';
 
 const MIN = 60000;
 const HOUR = 60 * MIN;
@@ -475,6 +475,7 @@ export default function ShiftsView({
   onOpenMine,
   onOpenTask,
   checkins = [],
+  checkinSchedule,
   gradeOf,
 }) {
   const now = useNow(30000);
@@ -547,6 +548,29 @@ export default function ShiftsView({
         )}
       </div>
 
+      {checkinSchedule?.on && (
+        <div className="checkin-schedule">
+          <span>
+            🔁 Lab check-in is asked <b>{scheduleText(checkinSchedule)}</b>
+          </span>
+          {isManager && (
+            <>
+              <span className="spacer" />
+              <button className="link-btn small" onClick={() => setDialog('checkin')}>
+                Edit
+              </button>
+              <button
+                className="link-btn small danger"
+                onClick={() =>
+                  confirm('Stop asking automatically?') && api.saveSettings({ checkinSchedule: { ...checkinSchedule, on: false } })
+                }
+              >
+                Stop
+              </button>
+            </>
+          )}
+        </div>
+      )}
       {checkins.map((c) => (
         <CheckinCard
           key={c.id}
@@ -874,9 +898,14 @@ export default function ShiftsView({
       )}
       {dialog === 'checkin' && (
         <CheckinDialog
+          schedule={checkinSchedule}
           onClose={() => setDialog(null)}
           onDone={async (data) => {
             await api.addCheckin(data);
+            setDialog(null);
+          }}
+          onSchedule={async (sched) => {
+            await api.saveSettings({ checkinSchedule: { ...sched, by: actor.name } });
             setDialog(null);
           }}
         />

@@ -77,6 +77,7 @@ const SECTIONS = [
       'You get a reminder after 4 hours on shift and an hour before a shift you said you’d come to. A shift left running past midnight ends at the last time you used the app (marked auto-ended).',
       'Edit your own past shifts’ notes, subteam, and tasks. Team management fixes times.',
       'Lab check-in: when team management asks who’s going to the lab, the app asks you when you open it. Answer Yes or No for lunch and after school; change it later in the Shifts tab.',
+      'Required polls work the same way: a poll in #announcements that everyone has to answer pops up until you vote.',
     ],
   ],
   [
@@ -145,7 +146,7 @@ const MANAGER_TIPS = [
   'Chat: post in #announcements (everyone gets a notification), use @everyone, delete any message, and remove reactions (🚫☺ on a message).',
   'Channels: ＋ next to Channels adds one; ⚙ on a channel renames it, sets its topic and subteam color, moves it up or down, or deletes it.',
   'Team emoji: open 😊 and tap ＋ under Team emoji to add your own (:name:), or remove them. Stickers: open 🎫 and tap ＋.',
-  'Shifts tab: 🧪 Lab check-in asks everyone who’s going to the lab (lunch / after school). Lunch is split by middle and high school lunch using each person’s grade, which you set on the Team tab (Edit).',
+  'Shifts tab: 🧪 Lab check-in asks everyone who’s going to the lab (lunch / after school). Lunch is split by middle and high school lunch using each person’s grade, which you set on the Team tab (Edit). Repeat makes it ask by itself every weekday, or on the days you pick, at a set time. In #announcements, polls can be set so everyone has to answer.',
   'Shifts tab: Clock in… several people at once, End anyone’s shift, Plan a shift (once or weekly), set the season hours goal, add a missed shift, fix or delete any shift, and Export CSV.',
   'DMs: you can read every DM (under Team DMs) but can’t post in other people’s. You can change anyone’s profile picture and custom status from their profile (Edit profile → Status).',
 ];

@@ -68,6 +68,7 @@ function Poll({ m, actor, onVote, onEnd, canEnd }) {
       <div className="poll-q">📊 {m.poll.question}</div>
       <div className="muted tiny">
         {closed ? 'Poll ended' : m.poll.multi ? 'Pick one or more' : 'Pick one'} · {voters.size} {voters.size === 1 ? 'vote' : 'votes'}
+        {m.poll.required && !closed && <span className="poll-required"> · Everyone has to answer</span>}
       </div>
       {m.poll.options.map((o, i) => {
         const mine = !!votes[o.id]?.[me];

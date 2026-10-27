@@ -405,6 +405,40 @@ export const shiftChecks = onSchedule({ schedule: 'every 15 minutes', timeZone: 
   await notify(notes);
 });
 
+// Lab check-ins on a schedule (Shifts → Lab check-in → Repeat): on the chosen
+// days, at the chosen time (New York time), once a day. Skipped when the day
+// already has a check-in, and if it's more than 6 hours past the time (so a
+// late deploy doesn't ask at night). onCheckin then notifies everyone.
+export const scheduledCheckin = onSchedule({ schedule: 'every 15 minutes', timeZone: TIME_ZONE }, async () => {
+  const s = (await db.doc('settings/team').get()).get('checkinSchedule');
+  if (!s?.on || !(s.slots || []).length || !/^\d\d:\d\d$/.test(s.time || '')) return;
+  const today = localDate(0);
+  const weekday = new Date(`${today}T12:00:00Z`).getUTCDay();
+  if (!(s.days || []).includes(weekday)) return;
+  const at = zonedMs(today, s.time);
+  const now = Date.now();
+  if (now < at || now > at + 6 * HOUR) return;
+  const existing = await db.collection('checkins').where('date', '==', today).limit(1).get();
+  if (!existing.empty) return;
+  try {
+    await db
+      .collection('checkins')
+      .doc(`auto-${today}`)
+      .create({
+        date: today,
+        question: s.question || 'Who’s going to the lab today?',
+        slots: s.slots,
+        answers: {},
+        by: s.by || 'Team management',
+        byUid: '',
+        auto: true,
+        at: now,
+      });
+  } catch (e) {
+    if (e.code !== 6) throw e; // 6 = already exists (another run got there first)
+  }
+});
+
 function formatDate(iso) {
   const d = new Date(`${iso}T12:00:00Z`);
   return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' });

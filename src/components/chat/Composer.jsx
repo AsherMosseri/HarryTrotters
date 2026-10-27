@@ -314,7 +314,13 @@ export default function Composer({
           </span>
         </div>
       )}
-      {panel === 'poll' && <PollDialog onCreate={(poll) => sendExtra({ poll, text: '', votes: {} })} onClose={() => setPanel(null)} />}
+      {panel === 'poll' && (
+        <PollDialog
+          canRequire={conv === 'announcements'}
+          onCreate={(poll) => sendExtra({ poll, text: '', votes: {} })}
+          onClose={() => setPanel(null)}
+        />
+      )}
       {suggest && options.length > 0 && (
         <ul className="suggest">
           {options.map((o, i) => (
