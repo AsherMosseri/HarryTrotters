@@ -158,7 +158,7 @@ export default function Inbox({ items, pushStatus, onEnablePush, onDisablePush, 
                   }}
                 >
                   <span className={`inbox-icon type-${n.type}`} aria-hidden="true">
-                    {ICONS[n.type] || '🔔'}
+                    {n.icon || ICONS[n.type] || '🔔'}
                   </span>
                   <span className="inbox-text">
                     <b>{n.title}</b>

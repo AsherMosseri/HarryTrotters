@@ -6,6 +6,7 @@ import { CloseIcon, Overlay } from './common.jsx';
 // ads, and the "ad blocker detected" wall. Prizes are Jackson coins (small,
 // with a daily limit), written by the caller.
 
+const pic = (ad) => (ad.image ? <img className="ad-img" src={ad.image} alt="" /> : ad.emoji);
 const style = (ad) => ({ '--ad-a': ad.colors?.[0] || '#6c5ce7', '--ad-b': ad.colors?.[1] || '#00cec9' });
 
 // Ads you play. The button opens the game instead of an order or booking.
@@ -385,7 +386,7 @@ export function VideoAd({ ad, n, total, skip, onCta, onNext }) {
         <div className="ad-video-stage" style={style(ad)}>
           {scene === 0 && (
             <div className="vscene vs-zoom" key="0">
-              <span className="vs-emoji">{ad.emoji}</span>
+              <span className="vs-emoji">{pic(ad)}</span>
               <h2>{ad.brand}</h2>
             </div>
           )}
@@ -396,13 +397,13 @@ export function VideoAd({ ad, n, total, skip, onCta, onNext }) {
           )}
           {scene === 2 && (
             <div className="vscene vs-slide" key="2">
-              <span className="vs-emoji small">{ad.emoji}</span>
+              <span className="vs-emoji small">{pic(ad)}</span>
               <p>{ad.body}</p>
             </div>
           )}
           {scene >= 3 && (
             <div className="vscene vs-zoom" key="3">
-              <span className="vs-emoji">{ad.emoji}</span>
+              <span className="vs-emoji">{pic(ad)}</span>
               <h2>{ad.brand}</h2>
               <button className="ad-cta big" onClick={() => onCta(ad)}>
                 {ad.cta}

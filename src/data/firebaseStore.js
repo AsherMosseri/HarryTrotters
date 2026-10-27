@@ -816,6 +816,13 @@ export const firebaseStore = {
     if (oldPath) await deleteObject(fileRef(storage, oldPath)).catch(() => {});
     return { url: await getDownloadURL(r), path };
   },
+  // A picture or GIF for an ad (Asher's own or a teammate's booked spot).
+  async uploadAdImage(name, blob) {
+    const gif = blob.type === 'image/gif';
+    const r = fileRef(storage, `adpics/${personId(name)}-${itemId()}.${gif ? 'gif' : 'jpg'}`);
+    await uploadBytes(r, blob, { contentType: gif ? 'image/gif' : 'image/jpeg' });
+    return getDownloadURL(r);
+  },
   async removeBanner(name, oldPath) {
     await this.saveProfile(name, { banner: null });
     if (oldPath) await deleteObject(fileRef(storage, oldPath)).catch(() => {});

@@ -65,6 +65,16 @@ service firebase.storage {
         && request.resource.contentType.matches('image/(png|gif|jpeg|webp)') && request.resource.size < 2 * 1024 * 1024;
     }
 
+    // Pictures and GIFs for ads (Asher's own and teammates' booked spots).
+    match /adpics/{file} {
+      allow get: if isMember();
+      allow delete: if isManager() || (isMember() && file.matches(myPersonId() + '-.*'));
+      allow create: if isMember() && file.matches(myPersonId() + '-.*') && (
+        (request.resource.contentType == 'image/jpeg' && request.resource.size < 1024 * 1024)
+        || (request.resource.contentType == 'image/gif' && request.resource.size < 4 * 1024 * 1024)
+      );
+    }
+
     // Files sent in chat (any kind, up to 25 MB): videos, PDFs, CAD files…
     match /files/{conv}/{file} {
       allow get, delete: if isMember();

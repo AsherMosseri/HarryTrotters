@@ -924,6 +924,9 @@ export const demoStore = {
     await this.saveProfile(name, { photo });
     return photo;
   },
+  async uploadAdImage(name, blob) {
+    return dataUrl(blob);
+  },
   async uploadBanner(name, blob) {
     await this.saveProfile(name, { banner: { url: await dataUrl(blob), path: '' } });
   },

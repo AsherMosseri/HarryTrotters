@@ -7,7 +7,7 @@ import Message from './chat/Message.jsx';
 import { mentionPattern } from './chat/format.jsx';
 import { EmojiManager, StickerManager } from './chat/Pickers.jsx';
 import { ChannelDialog, ChannelIcon, MembersPanel, NewDmDialog, NotifyMenu, PinsPanel, SearchPanel, slugChannel } from './chat/Panels.jsx';
-import { ChatAd, chatAdSpots, useAds } from './Ads.jsx';
+import { BotReplies, ChatAd, chatAdSpots, useAds } from './Ads.jsx';
 
 const GROUP_MINUTES = 5;
 const PAGE = 60;
@@ -551,6 +551,7 @@ export default function ChatView({
               </div>
             );
           })}
+          <BotReplies conv={conv.key} />
         </div>
         {newBelow && (
           <button

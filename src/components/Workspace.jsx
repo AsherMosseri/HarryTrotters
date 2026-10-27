@@ -50,7 +50,11 @@ import {
   AdBanner,
   AdsProvider,
   AdsSettings,
+  CouponDialog,
   FullScreenAd,
+  TakeoverSplash,
+  TakeoverStrip,
+  takeoverStyle,
   PageAds,
   RemoveAdsDialog,
   SubmitAdDialog,
@@ -331,6 +335,7 @@ export default function Workspace({ store, actor, rename, renames }) {
   const [openId, setOpenId] = useState(null);
   const [newTask, setNewTask] = useState(null);
   const [toast, setToast] = useState(null); // { text, action?: { label, run } }
+  const botHook = useRef(null); // brand bots hear chat messages (set once ads are ready)
   const [tasksError, setTasksError] = useState('');
 
   const fail = useCallback((e) => {
@@ -828,6 +833,18 @@ export default function Workspace({ store, actor, rename, renames }) {
       saveSettings: (patch) => store.saveSettings(patch, actor).catch(fail),
       saveAdSettings: (cfg) => store.saveAdSettings(JSON.parse(JSON.stringify(cfg)), actor).catch(fail),
       bumpAdStats: (counts) => store.bumpAdStats(counts, actor.name).catch(() => {}),
+      // Pictures for ads: GIFs as they are (up to 4 MB), others shrunk to 480 px.
+      uploadAdImage: async (file) => {
+        try {
+          const gif = file.type === 'image/gif';
+          if (gif && file.size > 4 * 1024 * 1024) throw new Error('That GIF is over 4 MB.');
+          const blob = gif ? file : (await preparePhoto(file)).thumb;
+          return await store.uploadAdImage(actor.name, blob);
+        } catch (e) {
+          fail(e);
+          return '';
+        }
+      },
       submitAd: (data) => store.submitAd(data, actor).catch(fail),
       addCoins: (tx) => store.addCoinTx(tx).catch(fail),
       undoCoins: (tx) => store.deleteCoinTx(tx.id).catch(fail),
@@ -871,6 +888,7 @@ export default function Workspace({ store, actor, rename, renames }) {
       saveRobotLayout: (data) => store.saveRobotLayout(data, actor).catch(fail),
       deleteRobotLayout: (id) => store.deleteRobotLayout(id).catch(fail),
       sendMessage: (conv, data, photoFiles) => {
+        botHook.current?.(conv, data?.text);
         store.setPresence(actor, { typing: '', typingAt: 0 }).catch(() => {});
         typingSent.current = 0;
         return store.sendMessage(conv, data, actor, photoFiles).catch(fail);
@@ -1071,17 +1089,6 @@ export default function Workspace({ store, actor, rename, renames }) {
       }}
     />
   );
-  const inboxButton = (
-    <Inbox
-      items={inbox}
-      pushStatus={pushStatus}
-      onEnablePush={enablePush}
-      onDisablePush={disablePush}
-      onOpen={goTo}
-      onMarkRead={(ids) => store.markInboxRead(actor.name, ids).catch(fail)}
-      onClear={(ids) => store.clearInbox(actor.name, ids).catch(fail)}
-    />
-  );
   const themeMenuProps = {
     calm,
     setCalm,
@@ -1199,6 +1206,38 @@ export default function Workspace({ store, actor, rename, renames }) {
     };
   }, [actor.name, tasks, shifts, myWallet.balance, competitionDate, peopleInfo]);
   const ads = useAdsEngine({ settings, actor, view, shifts, submissions: adSubs, ledger, coins, viewer, competitionDate, api });
+  botHook.current = ads.onChatSent;
+  const inboxButton = (
+    <Inbox
+      items={[
+        ...inbox,
+        ...ads.notes.map((n) => ({
+          id: n.id,
+          type: 'ad',
+          icon: n.coupon ? '🎟️' : n.emoji,
+          title: n.title,
+          body: n.body,
+          at: n.at,
+          read: n.read,
+          open: { ad: n.id },
+        })),
+      ].sort((a, b) => (b.at || 0) - (a.at || 0))}
+      pushStatus={pushStatus}
+      onEnablePush={enablePush}
+      onDisablePush={disablePush}
+      onOpen={(open) => (open?.ad ? ads.openNote(open.ad) : goTo(open))}
+      onMarkRead={(ids) => {
+        ads.markNotesRead(ids.filter((x) => String(x).startsWith('adn-')));
+        const real = ids.filter((x) => !String(x).startsWith('adn-'));
+        if (real.length) store.markInboxRead(actor.name, real).catch(fail);
+      }}
+      onClear={(ids) => {
+        ads.clearNotes(ids.filter((x) => String(x).startsWith('adn-')));
+        const real = ids.filter((x) => !String(x).startsWith('adn-'));
+        if (real.length) store.clearInbox(actor.name, real).catch(fail);
+      }}
+    />
+  );
   const [adPeople, setAdPeople] = useState({});
   useEffect(() => (adsPage ? store.subscribeAdPeople(setAdPeople) : undefined), [adsPage, store]);
 
@@ -1209,7 +1248,7 @@ export default function Workspace({ store, actor, rename, renames }) {
   return (
     <PeopleContext.Provider value={peopleCtx}>
       <AdsProvider value={ads.value}>
-        <div className={`app${view === 'chat' || view === 'robot' ? ' chat-mode' : ''}`}>
+        <div className={`app${view === 'chat' || view === 'robot' ? ' chat-mode' : ''}`} style={takeoverStyle(ads.value.takeover)}>
           {store.mode === 'demo' && (
             <div className="demo-banner">
               Demo mode — sample data saved only in this browser. <a href="./">Go to the real board</a>
@@ -1306,6 +1345,7 @@ export default function Workspace({ store, actor, rename, renames }) {
               </div>
             </header>
           )}
+          <TakeoverStrip />
           <AdBanner position="top" />
           {/* Only this area scrolls; the header stays put above it. */}
           <div className="app-scroll">
@@ -1833,17 +1873,26 @@ export default function Workspace({ store, actor, rename, renames }) {
               onClose={() => setCoinsOpen(false)}
             />
           )}
+          {ads.splash && <TakeoverSplash ad={ads.value.takeover} />}
+          {ads.couponShown && <CouponDialog coupon={ads.couponShown} onClose={ads.closeCoupon} />}
           {ads.action && <AdActionDialog ad={ads.action} onClose={ads.closeAction} />}
           {ads.submitting && (
             <SubmitAdDialog
               mine={adSubs.filter((x) => x.by === actor.name).sort((x, y) => (y.at || 0) - (x.at || 0))}
               onSubmit={api.submitAd}
               onWithdraw={api.withdrawAd}
+              onUpload={api.uploadAdImage}
               onClose={ads.closeSubmit}
             />
           )}
           {ads.removing && (
-            <RemoveAdsDialog prices={coinCfg.prices} balance={myWallet.balance} onBuy={ads.buyRemoval} onClose={ads.closeRemoving} />
+            <RemoveAdsDialog
+              prices={coinCfg.prices}
+              balance={myWallet.balance}
+              coupon={ads.coupon}
+              onBuy={ads.buyRemoval}
+              onClose={ads.closeRemoving}
+            />
           )}
           {adsPage && (
             <AdsSettings
@@ -1867,6 +1916,7 @@ export default function Workspace({ store, actor, rename, renames }) {
               competitionDate={competitionDate}
               peopleStats={adPeople}
               onTry={ads.value.tryIt}
+              onUploadImage={api.uploadAdImage}
               onClose={() => setAdsPage(false)}
             />
           )}

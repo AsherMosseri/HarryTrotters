@@ -2696,3 +2696,42 @@ body:has(.bottom-nav):has(.composer) .toast { bottom: calc(150px + env(safe-area
 .ad-block-icon { font-size: 54px; }
 .ad-block.shake { animation: ad-shake 0.4s ease-in-out 2; }
 @media (prefers-reduced-motion: reduce) { .wheel { transition-duration: 0.01s; } .vs-zoom, .vs-slide, .ad-block.shake { animation: none; } }
+
+/* Takeover day, brand bots, coupons, ad pictures */
+.takeover-strip { flex: none; display: flex; align-items: center; gap: 10px; margin: 0 12px 6px; padding: 6px 12px; border-radius: 12px; min-height: 46px; }
+.takeover-label { font-size: 11.5px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; opacity: 0.9; }
+.takeover-strip .ad-brand { font-size: 15px; }
+.takeover-head { font-size: 13px; opacity: 0.95; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.takeover-strip .ad-cta { min-height: 30px; padding: 5px 12px; font-size: 12.5px; }
+@media (max-width: 760px) { .takeover-head, .takeover-strip .ad-art { display: none; } .takeover-label { font-size: 10px; } }
+.takeover-splash {
+  position: fixed; inset: 0; z-index: 250; border-radius: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+  font-weight: 700; animation: ad-shift 3s ease-in-out infinite, fade 0.15s ease;
+}
+.takeover-splash .ad-brand { font-size: 28px; }
+.takeover-spinner { width: 34px; height: 34px; border-radius: 50%; border: 4px solid rgb(255 255 255 / 35%); border-top-color: #fff; animation: ad-spin 0.8s linear infinite; }
+.bot-reply { display: flex; gap: 10px; margin: 10px 12px; padding: 10px 12px; border-radius: 12px; background: color-mix(in srgb, var(--ad-a) 10%, var(--surface)); border: 1px dashed color-mix(in srgb, var(--ad-a) 50%, var(--border)); }
+.bot-avatar { flex: none; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: linear-gradient(135deg, var(--ad-a), var(--ad-b)); }
+.bot-main { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.bot-head { display: flex; align-items: center; gap: 6px; }
+.bot-tag { font-size: 10px; font-weight: 900; color: #fff; background: #5865f2; border-radius: 4px; padding: 1px 5px; }
+.bot-text { margin: 0; }
+.bot-reply .ad-cta { min-height: 30px; padding: 5px 14px; font-size: 13px; background: linear-gradient(135deg, var(--ad-a), var(--ad-b)); color: #fff; }
+.bot-only { margin: 0; }
+.dialog.coupon-dialog { width: min(380px, calc(100vw - 32px)); text-align: center; align-items: center; gap: 8px; }
+.coupon-dialog h2 { margin: 4px 0 0; }
+.coupon {
+  display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 14px 26px; border-radius: 12px; border: 2px dashed #b45309;
+  background: repeating-linear-gradient(45deg, #fff7d6, #fff7d6 10px, #ffefb0 10px, #ffefb0 20px); color: #7a4b00; font-weight: 800;
+  animation: ad-pop 0.5s cubic-bezier(0.2, 1.6, 0.4, 1);
+}
+.coupon-pct { font-size: 30px; font-weight: 900; }
+.coupon-applied { margin: 0; font-weight: 800; color: #15803d; }
+.remove-ads-price { display: inline-flex; align-items: center; gap: 8px; }
+.ad-img { width: 1em; height: 1em; object-fit: cover; border-radius: 22%; display: block; }
+.ads-item-art .ad-img, .ad-action-emoji .ad-img { width: 100%; height: 100%; border-radius: 10px; }
+.ad-action-emoji .ad-img { width: 28px; height: 28px; }
+.ad-pic-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ad-pic-preview { width: 48px; height: 48px; object-fit: cover; border-radius: 10px; border: 1px solid var(--border); }
+.btn.disabled { opacity: 0.6; pointer-events: none; }
+.ads-select { width: auto; max-width: 260px; }

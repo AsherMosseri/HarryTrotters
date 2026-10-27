@@ -28,6 +28,11 @@ export const AD_DEFAULTS = {
   games: { on: true, cap: 10 },
   wheel: { on: true },
   adblock: 'rare',
+  // One sponsor takes over the app for the day (colors, a strip, loading screens).
+  takeover: { on: false, ad: 'random', splash: true },
+  bots: true,
+  // A pretend notification every N hours (0 = never); some are coupons.
+  notes: { every: 3, coupons: true },
   weights: {},
   off: [],
   rotate: 25,
@@ -48,7 +53,21 @@ export const AD_DEFAULTS = {
 // Settings with every field filled in (one level of nesting).
 export function adSettings(raw) {
   const out = { ...AD_DEFAULTS, ...(raw || {}) };
-  for (const k of ['banner', 'board', 'pages', 'full', 'remove', 'schedule', 'weights', 'packs', 'targets', 'games', 'wheel'])
+  for (const k of [
+    'banner',
+    'board',
+    'pages',
+    'full',
+    'remove',
+    'schedule',
+    'weights',
+    'packs',
+    'targets',
+    'games',
+    'wheel',
+    'takeover',
+    'notes',
+  ])
     out[k] = { ...AD_DEFAULTS[k], ...(raw?.[k] || {}) };
   return out;
 }
@@ -134,6 +153,41 @@ export const submissionAd = (s) => ({
   colors: s.colors?.length === 2 ? s.colors : ['#6c5ce7', '#ff79c6'],
 });
 const liveAds = (subs, today) => subs.filter((s) => s.status === 'approved' && s.from <= today && today <= s.to).map(submissionAd);
+
+const readJson = (k, d) => {
+  try {
+    return JSON.parse(localStorage.getItem(k)) ?? d;
+  } catch {
+    return d;
+  }
+};
+const writeJson = (k, v) => {
+  try {
+    localStorage.setItem(k, JSON.stringify(v));
+  } catch {
+    /* storage unavailable */
+  }
+};
+const handle = (brand) => brand.toLowerCase().replace(/[^a-z0-9]/g, '');
+const BOT_LINES = [
+  (ad) => `You rang? ${ad.emoji} ${ad.headline}.`,
+  (ad) => `Did someone say ${ad.brand}? ${ad.body}`,
+  (ad) => `Hi! ${ad.brand} here. ${ad.headline}. Want in?`,
+  (ad) => `${ad.emoji}${ad.emoji}${ad.emoji} ${ad.brand.toUpperCase()} ${ad.emoji}${ad.emoji}${ad.emoji} ${ad.headline}!`,
+];
+// What a pretend notification says, depending on what the ad's button does.
+const NOTE_KINDS = [
+  (ad) => ({ title: `${ad.brand}: ${ad.headline}`, body: ad.body }),
+  (ad) => ({ title: `${ad.brand} is trending on your team 🔥`, body: 'Everyone’s talking about it. Probably.' }),
+  (ad) => ({ title: `Last chance: ${ad.brand}`, body: `${ad.headline}. Offer ends soon.` }),
+  (ad) =>
+    ({
+      order: { title: `Your ${ad.action.item || 'order'} is on its way 🚚`, body: `${ad.brand} shipped it. Tap to track it.` },
+      book: { title: `Reminder: your ${ad.action.item || 'booking'} is coming up 📅`, body: `${ad.brand} is looking forward to it.` },
+      submit: { title: `${ad.brand} replied to your submission 💬`, body: 'They said it was “very interesting.” Tap to see.' },
+      subscribe: { title: `Your ${ad.brand} subscription renewed 🔁`, body: 'Thanks for being a loyal customer. Forever.' },
+    })[ad.action?.kind] || { title: `${ad.brand} has a message for you`, body: ad.headline },
+];
 
 const AdsContext = createContext({ on: false });
 export const useAds = () => useContext(AdsContext);
@@ -281,6 +335,86 @@ export function useAdsEngine({ settings, actor, view, shifts, submissions, ledge
   const [game, setGame] = useState(null);
   const gameCapLeft = Math.max(0, cfg.games.cap - prizesToday(actor.name, ledger, 'game').reduce((t, x) => t + x.amount, 0));
 
+  // Takeover day: one sponsor for the whole day ("random" picks a new one each day).
+  const everyAd = useMemo(
+    () => [...allBuiltIn(cfg, today, competitionDate), ...(cfg.custom || []), ...live],
+    [cfg, today, competitionDate, live],
+  );
+  const takeover = useMemo(() => {
+    if (!on || !cfg.takeover.on) return null;
+    if (cfg.takeover.ad !== 'random') return everyAd.find((a) => a.id === cfg.takeover.ad) || null;
+    const day = Math.floor(new Date(`${today}T12:00:00`).getTime() / 86400000);
+    return everyAd.length ? everyAd[day % everyAd.length] : null;
+  }, [on, cfg.takeover, everyAd, today]);
+  const [splash, setSplash] = useState(false);
+  const splashFirst = useRef(true);
+  useEffect(() => {
+    if (splashFirst.current) {
+      splashFirst.current = false;
+      return;
+    }
+    if (!takeover || !cfg.takeover.splash) return;
+    setSplash(true);
+    const t = setTimeout(() => setSplash(false), 900);
+    return () => clearTimeout(t);
+  }, [view]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Brand bots: mention @TorqueJuice in chat and it answers (only you see it).
+  const [bots, setBots] = useState([]);
+  const onChatSent = useCallback(
+    (conv, text) => {
+      if (!on || !cfg.bots || !text) return;
+      const words = [...String(text).matchAll(/@([a-z0-9]{4,})/gi)].map((m) => m[1].toLowerCase());
+      const ad = words.length ? everyAd.find((a) => words.some((w) => handle(a.brand).startsWith(w))) : null;
+      if (!ad) return;
+      setTimeout(() => {
+        setBots((list) => [
+          ...list,
+          { id: `bot-${Date.now()}`, conv, ad, text: BOT_LINES[Math.floor(Math.random() * BOT_LINES.length)](ad), at: Date.now() },
+        ]);
+      }, 900);
+    },
+    [on, cfg.bots, everyAd],
+  );
+
+  // Pretend notifications (some are coupons for Remove ads), kept on this device.
+  const [notes, setNotes] = useState(() => readJson('ad-notes', []));
+  const [coupons, setCoupons] = useState(() => readJson('ad-coupons', []));
+  const saveNotes = (list) => {
+    const next = list.slice(0, 20);
+    writeJson('ad-notes', next);
+    setNotes(next);
+  };
+  const saveCoupons = (list) => {
+    writeJson('ad-coupons', list);
+    setCoupons(list);
+  };
+  const makeNote = () => {
+    if (!everyAd.length) return;
+    {
+      writeJson('ad-note-last', Date.now());
+      const ad = everyAd[Math.floor(Math.random() * everyAd.length)];
+      const coupon = cfg.notes.coupons && Math.random() < 0.4 ? [10, 15, 20, 25, 50][Math.floor(Math.random() * 5)] : 0;
+      const text = coupon
+        ? { title: `${ad.brand} sent you a coupon 🎟️`, body: `${coupon}% off Remove ads. Tap to save it.` }
+        : NOTE_KINDS[Math.floor(Math.random() * NOTE_KINDS.length)](ad);
+      saveNotes([
+        { id: `adn-${Date.now()}`, at: Date.now(), adId: ad.id, emoji: ad.emoji, coupon, read: false, ...text },
+        ...readJson('ad-notes', []),
+      ]);
+    }
+  };
+  useEffect(() => {
+    if (!on || !cfg.notes.every) return;
+    const check = () => Date.now() - readJson('ad-note-last', 0) >= cfg.notes.every * 3600000 && makeNote();
+    check();
+    const t = setInterval(check, 60000);
+    return () => clearInterval(t);
+  }, [on, cfg.notes.every, cfg.notes.coupons, everyAd]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [couponShown, setCouponShown] = useState(null);
+  const liveCoupons = coupons.filter((c) => c.expires > Date.now());
+  const bestCoupon = liveCoupons.reduce((b, c) => (!b || c.pct > b.pct ? c : b), null);
+
   const [removing, setRemoving] = useState(false);
   const [action, setAction] = useState(null);
   const [submitting, setSubmitting] = useState(false);
@@ -300,6 +434,9 @@ export function useAdsEngine({ settings, actor, view, shifts, submissions, ledge
       },
       openSubmit: () => setSubmitting(true),
       coins,
+      takeover,
+      bots,
+      dismissBot: (id) => setBots((list) => list.filter((b) => b.id !== id)),
       remove: () => setRemoving(true),
       showFull: (ad) => launchFull(ad || pick('full', Math.floor(Math.random() * 7))),
       // Asher's "try it" buttons.
@@ -308,15 +445,23 @@ export function useAdsEngine({ settings, actor, view, shifts, submissions, ledge
         else if (what === 'block') setBlockWall(true);
         else if (what === 'game') setGame(ad || GAME_ADS[0]);
         else if (what === 'video') setFull({ list: [ad || pick('full') || ADS[0]], i: 0, video: true });
+        else if (what === 'note') makeNote();
       },
     }),
-    [on, cfg, pool, tick, pick, track, coins],
+    [on, cfg, pool, tick, pick, track, coins, takeover, bots],
   );
   // Remove ads, paid for in Jackson coins. The purchase is in the ledger, so
   // it works on every device the person uses.
   const buyRemoval = (choice) => {
     const until = choice === 'today' ? new Date().setHours(23, 59, 59, 999) : Date.now() + (choice === 'week' ? 7 * 24 : 1) * 3600000;
-    return coins.spend({ what: `remove-${choice}`, amount: coins.cfg.prices[choice], label: `Removed ads ${HOW_LONG[choice]}`, until });
+    const price = couponPrice(coins.cfg.prices[choice], bestCoupon);
+    if (bestCoupon) saveCoupons(coupons.filter((c) => c.id !== bestCoupon.id));
+    return coins.spend({
+      what: `remove-${choice}`,
+      amount: price,
+      label: `Removed ads ${HOW_LONG[choice]}${bestCoupon ? ` (${bestCoupon.pct}% coupon)` : ''}`,
+      until,
+    });
   };
   const setPreview = (mins) => {
     const until = mins ? Date.now() + mins * 60000 : 0;
@@ -355,6 +500,27 @@ export function useAdsEngine({ settings, actor, view, shifts, submissions, ledge
     submitting,
     closeSubmit: () => setSubmitting(false),
     buyRemoval,
+    coupon: bestCoupon,
+    splash: splash && takeover,
+    onChatSent,
+    notes,
+    markNotesRead: (ids) => saveNotes(notes.map((n) => (ids.includes(n.id) ? { ...n, read: true } : n))),
+    clearNotes: (ids) => saveNotes(notes.filter((n) => !ids.includes(n.id))),
+    openNote: (id) => {
+      const n = notes.find((x) => x.id === id);
+      if (!n) return;
+      saveNotes(notes.map((x) => (x.id === id ? { ...x, read: true } : x)));
+      if (n.coupon) {
+        const c = { id: n.id, pct: n.coupon, brand: n.title.split(' sent you')[0], expires: Date.now() + 3 * 86400000 };
+        if (!coupons.some((x) => x.id === n.id)) saveCoupons([...coupons, c]);
+        setCouponShown(c);
+      } else {
+        const ad = everyAd.find((a) => a.id === n.adId);
+        if (ad) setAction(ad);
+      }
+    },
+    couponShown,
+    closeCoupon: () => setCouponShown(null),
     preview,
     setPreview,
   };
@@ -379,7 +545,9 @@ export function AdArt({ ad, size = 'md' }) {
   const { level } = useAds();
   return (
     <span className={`ad-art ad-art-${size}`} aria-hidden="true">
-      <span className={`ad-emoji ad-anim-${ad.anim || 'bounce'}`}>{ad.emoji || '✨'}</span>
+      <span className={`ad-emoji ad-anim-${ad.anim || 'bounce'}`}>
+        {ad.image ? <img className="ad-img" src={ad.image} alt="" /> : ad.emoji || '✨'}
+      </span>
       <i className="ad-spark s1">✦</i>
       <i className="ad-spark s2">✦</i>
       <i className="ad-spark s3">✧</i>
@@ -788,12 +956,115 @@ export function FullScreenAd({ ad, onClose }) {
   );
 }
 
+// ---------- takeover day ----------
+
+// A strip under the header: "Today’s app is brought to you by…".
+export function TakeoverStrip() {
+  const { takeover, cta } = useAds();
+  useTrack(takeover);
+  if (!takeover) return null;
+  return (
+    <div className="ad ad-normal takeover-strip" style={adStyle(takeover)} role="complementary" aria-label={`Sponsor: ${takeover.brand}`}>
+      <span className="takeover-label">Today’s app is brought to you by</span>
+      <AdArt ad={takeover} size="sm" />
+      <b className="ad-brand">{takeover.brand}</b>
+      <span className="ad-head takeover-head">{takeover.headline}</span>
+      <span className="spacer" />
+      <button className="ad-cta" onClick={() => cta(takeover)}>
+        {takeover.cta}
+      </button>
+    </div>
+  );
+}
+
+// A quick "loading" screen between tabs on takeover days.
+export function TakeoverSplash({ ad }) {
+  return (
+    <Overlay>
+      <div className="ad ad-normal takeover-splash" style={adStyle(ad)} aria-hidden="true">
+        <AdArt ad={ad} size="xl" />
+        <div className="takeover-spinner" />
+        <span>Loading… brought to you by</span>
+        <b className="ad-brand">{ad.brand}</b>
+      </div>
+    </Overlay>
+  );
+}
+
+// The colors a takeover gives the app.
+export const takeoverStyle = (ad) =>
+  ad ? { '--accent': ad.colors[0], '--accent-soft': `color-mix(in srgb, ${ad.colors[0]} 16%, var(--surface))` } : undefined;
+
+// ---------- brand bots in chat ----------
+
+export function BotReplies({ conv }) {
+  const { bots, dismissBot, cta } = useAds();
+  const mine = (bots || []).filter((b) => b.conv === conv);
+  const last = useRef(null);
+  useEffect(() => {
+    last.current?.scrollIntoView({ block: 'end', behavior: 'smooth' });
+  }, [mine.length]);
+  if (!mine.length) return null;
+  return mine.map((b) => (
+    <div key={b.id} className="bot-reply" style={adStyle(b.ad)} ref={last}>
+      <span className="bot-avatar">
+        <AdArt ad={b.ad} size="sm" />
+      </span>
+      <div className="bot-main">
+        <div className="bot-head">
+          <b>{b.ad.brand}</b>
+          <span className="bot-tag">BOT</span>
+        </div>
+        <p className="bot-text">{b.text}</p>
+        <button className="ad-cta" onClick={() => cta(b.ad)}>
+          {b.ad.cta}
+        </button>
+        <p className="bot-only muted tiny">
+          👁 Only you can see this ·{' '}
+          <button className="link-btn tiny" onClick={() => dismissBot(b.id)}>
+            Dismiss
+          </button>
+        </p>
+      </div>
+    </div>
+  ));
+}
+
+// ---------- coupons ----------
+
+export function CouponDialog({ coupon, onClose }) {
+  useEscape(onClose);
+  return (
+    <Overlay>
+      <div className="panel-backdrop center" onClick={onClose}>
+        <div className="dialog coupon-dialog" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Coupon">
+          <div className="coupon">
+            <span className="coupon-pct">{coupon.pct}% OFF</span>
+            <span>Remove ads</span>
+            <span className="muted tiny">from {coupon.brand}</span>
+          </div>
+          <h2>Coupon saved 🎟️</h2>
+          <p className="muted">
+            It comes off automatically next time you remove ads. Use it by{' '}
+            {new Date(coupon.expires).toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })}.
+          </p>
+          <button className="btn primary big-btn" onClick={onClose}>
+            Nice
+          </button>
+        </div>
+      </div>
+    </Overlay>
+  );
+}
+
 // ---------- Remove ads (nothing is ever charged) ----------
 
 const HOW_LONG = { hour: 'for 1 hour', today: 'for the rest of today', week: 'for a week' };
+export const couponPrice = (price, coupon) => (coupon ? Math.max(1, Math.ceil((price * (100 - coupon.pct)) / 100)) : price);
 
-export function RemoveAdsDialog({ prices, balance, onBuy, onClose }) {
+export function RemoveAdsDialog({ prices, balance, coupon, onBuy, onClose }) {
   const [done, setDone] = useState(null);
+  const [paid, setPaid] = useState(0);
   const [busy, setBusy] = useState(false);
   const [receipt] = useState(() => `RA-${1000 + Math.floor(Math.random() * 9000)}`);
   useEscape(onClose);
@@ -810,20 +1081,29 @@ export function RemoveAdsDialog({ prices, balance, onBuy, onClose }) {
               <p className="muted">
                 You have <Coins n={balance} />. Earn more by finishing tasks and putting in hours at the lab.
               </p>
+              {coupon && (
+                <p className="coupon-applied">
+                  🎟️ {coupon.pct}% off coupon from {coupon.brand} applied
+                </p>
+              )}
               <div className="remove-ads-options">
                 {['hour', 'today', 'week'].map((k) => (
                   <button
                     key={k}
                     className="remove-ads-option"
-                    disabled={busy || balance < prices[k]}
+                    disabled={busy || balance < couponPrice(prices[k], coupon)}
                     onClick={async () => {
                       setBusy(true);
+                      setPaid(couponPrice(prices[k], coupon));
                       await onBuy(k);
                       setDone(k);
                     }}
                   >
                     <span>{HOW_LONG[k][4].toUpperCase() + HOW_LONG[k].slice(5)}</span>
-                    <Coins n={prices[k]} />
+                    <span className="remove-ads-price">
+                      {coupon && <s className="muted">{prices[k]}</s>}
+                      <Coins n={couponPrice(prices[k], coupon)} />
+                    </span>
                   </button>
                 ))}
               </div>
@@ -838,7 +1118,7 @@ export function RemoveAdsDialog({ prices, balance, onBuy, onClose }) {
               </div>
               <h2>Payment complete</h2>
               <p className="muted">
-                Paid <Coins n={prices[done]} />. Ads are off {HOW_LONG[done]}, on all your devices.
+                Paid <Coins n={paid} />. Ads are off {HOW_LONG[done]}, on all your devices.
               </p>
               <p className="muted tiny">Receipt #{receipt}</p>
               <button className="btn primary big-btn" onClick={onClose}>
@@ -916,6 +1196,7 @@ export function AdsSettings({
   competitionDate,
   peopleStats = {},
   onTry,
+  onUploadImage,
   onClose,
 }) {
   useEscape(onClose);
@@ -1359,6 +1640,7 @@ export function AdsSettings({
                 {editing ? (
                   <AdEditor
                     ad={editing}
+                    onUpload={onUploadImage}
                     onCancel={() => setEditing(null)}
                     onSave={(ad) => {
                       const exists = cfg.custom.some((c) => c.id === ad.id);
@@ -1444,6 +1726,59 @@ export function AdsSettings({
                 </Row>
                 <button className="btn" onClick={() => onTry('video')}>
                   🎬 Show a video ad
+                </button>
+                <h4>Takeover day</h4>
+                <Row title="Sponsor takes over the app" hint="Their colors, a “brought to you by” strip, and loading screens between tabs.">
+                  <Switch checked={cfg.takeover.on} onChange={(v) => setIn('takeover', { on: v })} label="Takeover day" />
+                </Row>
+                {cfg.takeover.on && (
+                  <>
+                    <Row title="Sponsor">
+                      <select
+                        className="input ads-select"
+                        value={cfg.takeover.ad}
+                        onChange={(e) => setIn('takeover', { ad: e.target.value })}
+                        aria-label="Sponsor"
+                      >
+                        <option value="random">A different one every day</option>
+                        {[...ADS, ...packAds, ...cfg.custom].map((a) => (
+                          <option key={a.id} value={a.id}>
+                            {a.emoji} {a.brand}
+                          </option>
+                        ))}
+                      </select>
+                    </Row>
+                    <Row title="Loading screens between tabs">
+                      <Switch checked={cfg.takeover.splash} onChange={(v) => setIn('takeover', { splash: v })} label="Loading screens" />
+                    </Row>
+                  </>
+                )}
+                <h4>Chat</h4>
+                <Row
+                  title="Brand bots"
+                  hint="Mention a brand in chat (like @TorqueJuice) and it answers. Only the person who mentioned it sees the answer."
+                >
+                  <Switch checked={cfg.bots} onChange={(v) => set({ bots: v })} label="Brand bots" />
+                </Row>
+                <h4>Notifications</h4>
+                <Row title="Notifications from our friends" hint="Shows up in the 🔔 like a real notification.">
+                  <Choice
+                    value={cfg.notes.every}
+                    onChange={(v) => setIn('notes', { every: v })}
+                    label="How often"
+                    options={[
+                      [0, 'Never'],
+                      [1, 'Every hour'],
+                      [3, 'Every 3 h'],
+                      [6, 'Every 6 h'],
+                    ]}
+                  />
+                </Row>
+                <Row title="Some are coupons" hint="10–50% off Remove ads. Saved when tapped, good for 3 days.">
+                  <Switch checked={cfg.notes.coupons} onChange={(v) => setIn('notes', { coupons: v })} label="Coupons" />
+                </Row>
+                <button className="btn" onClick={() => onTry('note')}>
+                  🔔 Send me one now
                 </button>
                 <h4>Ad blocker detected</h4>
                 <Row
@@ -1672,7 +2007,7 @@ function AdRow({ ad, cfg, set, roster = [], onShow, onEdit }) {
   return (
     <li className={`ads-item${off ? ' off' : ''}${open ? ' open' : ''}`} style={adStyle(ad)}>
       <div className="ads-item-row">
-        <span className="ads-item-art">{ad.emoji}</span>
+        <span className="ads-item-art">{ad.image ? <img className="ad-img" src={ad.image} alt="" /> : ad.emoji}</span>
         <div className="grow ads-item-text">
           <b>{ad.brand || 'Untitled ad'}</b>
           <span className="muted small">{ad.headline}</span>
@@ -1715,7 +2050,8 @@ function AdRow({ ad, cfg, set, roster = [], onShow, onEdit }) {
 }
 
 // The fields of an ad, shared by Asher's editor and the teammate submission form.
-function AdFields({ a, setA }) {
+function AdFields({ a, setA, onUpload }) {
+  const [uploading, setUploading] = useState(false);
   const f = (key) => ({ value: a[key] || '', onChange: (e) => setA({ ...a, [key]: e.target.value }) });
   const act = a.action || { kind: 'order' };
   const setAct = (patch) => setA({ ...a, action: { ...act, ...patch } });
@@ -1725,6 +2061,37 @@ function AdFields({ a, setA }) {
       <input className="input" maxLength={40} placeholder="Torque Juice" {...f('brand')} />
       <label className="field-label">Emoji</label>
       <input className="input ad-emoji-input" maxLength={8} {...f('emoji')} />
+      {onUpload && (
+        <>
+          <label className="field-label">Picture</label>
+          <div className="ad-pic-row">
+            {a.image && <img className="ad-pic-preview" src={a.image} alt="" />}
+            <label className={`btn${uploading ? ' disabled' : ''}`}>
+              {uploading ? 'Uploading…' : a.image ? 'Change picture' : '📷 Add a picture or GIF'}
+              <input
+                type="file"
+                accept="image/*"
+                hidden
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  e.target.value = '';
+                  if (!file) return;
+                  setUploading(true);
+                  const url = await onUpload(file);
+                  setUploading(false);
+                  if (url) setA({ ...a, image: url });
+                }}
+              />
+            </label>
+            {a.image && (
+              <button type="button" className="link-btn small" onClick={() => setA({ ...a, image: '' })}>
+                Remove
+              </button>
+            )}
+            <span className="muted tiny">Shows instead of the emoji. GIFs stay animated.</span>
+          </div>
+        </>
+      )}
       <label className="field-label">Headline</label>
       <input className="input" maxLength={70} placeholder="Now with 400% more amps" {...f('headline')} />
       <label className="field-label">Text</label>
@@ -1813,7 +2180,7 @@ export const blankAd = () => ({
 });
 const cleanAd = (a) => ({ ...a, brand: a.brand.trim(), headline: a.headline.trim() });
 
-function AdEditor({ ad, onSave, onCancel, onDelete }) {
+function AdEditor({ ad, onSave, onCancel, onDelete, onUpload }) {
   const [a, setA] = useState(ad);
   const ok = a.brand.trim() && a.headline.trim();
   return (
@@ -1821,7 +2188,7 @@ function AdEditor({ ad, onSave, onCancel, onDelete }) {
       <div className="ad-editor-preview">
         <SponsoredPreview ad={a} />
       </div>
-      <AdFields a={a} setA={setA} />
+      <AdFields a={a} setA={setA} onUpload={onUpload} />
       <div className="row gap">
         {!ad.isNew && (
           <button className="link-btn danger small" onClick={onDelete}>
@@ -1910,7 +2277,7 @@ export function AdActionDialog({ ad, onClose }) {
         <div className="dialog ad-action" style={adStyle(ad)} onClick={(e) => e.stopPropagation()} role="dialog" aria-label={ad.brand}>
           <div className="ad-action-head">
             <span className="ad-action-emoji" aria-hidden="true">
-              {ad.emoji}
+              {ad.image ? <img className="ad-img" src={ad.image} alt="" /> : ad.emoji}
             </span>
             <b>{ad.brand}</b>
             <span className="spacer" />
@@ -2039,7 +2406,7 @@ export function submissionStatus(s, today = todayISO()) {
   );
 }
 
-export function SubmitAdDialog({ mine, onSubmit, onWithdraw, onClose }) {
+export function SubmitAdDialog({ mine, onSubmit, onWithdraw, onUpload, onClose }) {
   useEscape(onClose);
   const today = todayISO();
   const [view, setView] = useState(mine.length ? 'list' : 'form');
@@ -2073,7 +2440,7 @@ export function SubmitAdDialog({ mine, onSubmit, onWithdraw, onClose }) {
                   to <input className="input" type="date" min={from} value={to} onChange={(e) => setTo(e.target.value)} />
                 </label>
               </div>
-              <AdFields a={a} setA={setA} />
+              <AdFields a={a} setA={setA} onUpload={onUpload} />
               <div className="row gap">
                 {mine.length > 0 && (
                   <button className="link-btn small" onClick={() => setView('list')}>
@@ -2238,7 +2605,9 @@ function SponsoredPreview({ ad }) {
       </div>
       <div className="ad-card-main">
         <span className="ad-art ad-art-md" aria-hidden="true">
-          <span className={`ad-emoji ad-anim-${ad.anim}`}>{ad.emoji || '✨'}</span>
+          <span className={`ad-emoji ad-anim-${ad.anim}`}>
+            {ad.image ? <img className="ad-img" src={ad.image} alt="" /> : ad.emoji || '✨'}
+          </span>
         </span>
         <div className="ad-text">
           <b className="ad-brand">{ad.brand || 'Your brand'}</b>
