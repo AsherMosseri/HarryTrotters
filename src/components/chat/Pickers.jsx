@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { GIPHY_API_KEY } from '../../config.js';
-import { CloseIcon, Overlay } from '../common.jsx';
+import { CloseIcon, Overlay, PlusIcon } from '../common.jsx';
 import { GROUPS, GROUP_ICONS, emojiList, firstEmoji, loadEmoji, recentEmoji, searchEmoji, rememberEmoji } from './emoji.js';
 import { isTouch } from '../../util.js';
 
@@ -86,7 +86,7 @@ export function EmojiPicker({ onPick, onClose, teamEmoji = [], canManage, onMana
               ))}
               {canManage && !q && (
                 <button className="emoji-add" onClick={onManage} title="Add or remove team emoji">
-                  ＋
+                  <PlusIcon size={18} />
                 </button>
               )}
             </div>
@@ -409,7 +409,7 @@ export function StickerPicker({ stickers, onPick, onClose, canManage, onManage }
           ))}
           {canManage && !q && (
             <button className="emoji-add sticker-add" onClick={onManage} title="Add or remove stickers">
-              ＋
+              <PlusIcon size={26} />
             </button>
           )}
         </div>

@@ -287,11 +287,14 @@ export function CommentIcon() {
   );
 }
 
-export function PlusIcon() {
+// Drawn instead of typed so they sit dead center: the ＋ and − characters
+// have different metrics in every font.
+export function PlusIcon({ size = 16 }) {
   return (
     <svg
-      width="16"
-      height="16"
+      className="pm-icon"
+      width={size}
+      height={size}
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -300,6 +303,24 @@ export function PlusIcon() {
       aria-hidden="true"
     >
       <path d="M12 5v14M5 12h14" />
+    </svg>
+  );
+}
+
+export function MinusIcon({ size = 16 }) {
+  return (
+    <svg
+      className="pm-icon"
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.6"
+      strokeLinecap="round"
+      aria-hidden="true"
+    >
+      <path d="M5 12h14" />
     </svg>
   );
 }

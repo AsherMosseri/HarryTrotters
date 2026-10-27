@@ -124,6 +124,8 @@ a { color: var(--accent); }
 }
 .icon-btn:hover { background: var(--surface-2); color: var(--text); }
 .icon-btn.small { width: 28px; height: 28px; }
+/* Buttons that are just a drawn ＋ (icon-btn, .fab and .ad-qty already center). */
+.side-add, .emoji-add { display: inline-grid; place-items: center; }
 .link-btn { border: 0; background: none; padding: 4px; color: var(--accent); font-weight: 600; }
 .link-btn.danger { color: var(--danger); }
 .input {
@@ -2558,7 +2560,6 @@ body:has(.bottom-nav):has(.composer) .toast { bottom: calc(150px + env(safe-area
 .ad-qty { display: flex; align-items: center; justify-content: center; gap: 18px; }
 .ad-qty b { font-size: 30px; min-width: 2ch; text-align: center; font-variant-numeric: tabular-nums; }
 .ad-qty .btn { width: 46px; height: 46px; padding: 0; border-radius: 50%; justify-content: center; }
-.ad-qty .btn svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2.5; stroke-linecap: round; }
 .ad-pop { font-size: 56px; animation: ad-pop 0.5s cubic-bezier(0.2, 1.6, 0.4, 1); }
 @keyframes ad-pop { from { transform: scale(0.2) rotate(-30deg); opacity: 0; } }
 .dialog.submit-ad { width: min(560px, calc(100vw - 32px)); max-height: calc(100dvh - 40px); display: flex; flex-direction: column; }

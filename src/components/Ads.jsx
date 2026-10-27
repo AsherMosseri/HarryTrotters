@@ -9,7 +9,7 @@ import { TARGETS, targetedAds } from '../adTargets.js';
 import { SUBTEAMS } from '../config.js';
 import { Coin, Coins, CoinsAdmin } from './Coins.jsx';
 import { useEscape } from '../util.js';
-import { CloseIcon, Overlay } from './common.jsx';
+import { CloseIcon, MinusIcon, Overlay, PlusIcon } from './common.jsx';
 
 // Pretend ads (see ads.js). Asher controls everything on the 📺 Ads page; the
 // settings live in settings.ads so they reach every device right away.
@@ -2315,15 +2315,11 @@ export function AdActionDialog({ ad, onClose }) {
                 <>
                   <div className="ad-qty">
                     <button className="btn" onClick={() => setQty(Math.max(1, qty - 1))} aria-label="One fewer">
-                      <svg viewBox="0 0 24 24" aria-hidden="true">
-                        <path d="M5 12h14" />
-                      </svg>
+                      <MinusIcon size={20} />
                     </button>
                     <b aria-live="polite">{qty}</b>
                     <button className="btn" onClick={() => setQty(Math.min(99, qty + 1))} aria-label="One more">
-                      <svg viewBox="0 0 24 24" aria-hidden="true">
-                        <path d="M5 12h14M12 5v14" />
-                      </svg>
+                      <PlusIcon size={20} />
                     </button>
                   </div>
                   <button className="btn primary big-btn" onClick={finish}>

@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { SUBTEAMS, SUBTEAM_COLORS } from '../../config.js';
 import { preparePhoto } from '../../util.js';
-import { Avatar, CloseIcon, StatusDot, usePeople } from '../common.jsx';
+import { Avatar, CloseIcon, PlusIcon, StatusDot, usePeople } from '../common.jsx';
 import { prefixLines, wrapSelection } from './format.jsx';
 import { emojiList, loadEmoji, rememberEmoji, searchEmoji } from './emoji.js';
 import { EmojiPicker, GifPicker, PollDialog, StickerPicker } from './Pickers.jsx';
@@ -391,7 +391,7 @@ export default function Composer({
               aria-label="Add"
               title="Add"
             >
-              ＋
+              <PlusIcon size={20} />
             </button>
             {panel === 'more' && (
               <div className="composer-more" ref={moreMenu}>

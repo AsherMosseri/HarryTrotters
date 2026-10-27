@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { SUBTEAMS, SUBTEAM_COLORS } from '../config.js';
-import { Avatar, Nameplate, usePeople } from './common.jsx';
+import { Avatar, Nameplate, PlusIcon, usePeople } from './common.jsx';
 import PhotoViewer from './PhotoViewer.jsx';
 import Composer from './chat/Composer.jsx';
 import Message from './chat/Message.jsx';
@@ -293,7 +293,7 @@ export default function ChatView({
         <h2>Channels</h2>
         {isManager && (
           <button className="side-add" onClick={() => setDialog({ type: 'channel' })} title="New channel" aria-label="New channel">
-            ＋
+            <PlusIcon />
           </button>
         )}
       </div>
@@ -311,7 +311,7 @@ export default function ChatView({
       <div className="side-section">
         <h2>Direct messages</h2>
         <button className="side-add" onClick={() => setDialog({ type: 'dm' })} title="New message" aria-label="New direct message">
-          ＋
+          <PlusIcon />
         </button>
       </div>
       {convs.dms.map((c) => (

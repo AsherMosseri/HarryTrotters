@@ -16,7 +16,7 @@ import {
 } from '../electrical.js';
 import { itemId } from '../data/diff.js';
 import { fullTime } from '../util.js';
-import { CloseIcon, Overlay } from './common.jsx';
+import { CloseIcon, MinusIcon, Overlay, PlusIcon } from './common.jsx';
 
 const SNAP = 10;
 const snap = (v) => Math.round(v / SNAP) * SNAP;
@@ -693,10 +693,10 @@ export default function ElectricalEditor({ remote, canEdit, actor, onSave, onClo
             />
             <div className="dg-zoom">
               <button className="icon-btn" onClick={() => zoomAt(0.8, view.x + view.w / 2, view.y + view.h / 2)} aria-label="Zoom in">
-                ＋
+                <PlusIcon />
               </button>
               <button className="icon-btn" onClick={() => zoomAt(1.25, view.x + view.w / 2, view.y + view.h / 2)} aria-label="Zoom out">
-                −
+                <MinusIcon />
               </button>
               <button className="icon-btn" onClick={() => setView(fitView(parts, svgRef.current))} aria-label="Fit" title="Fit">
                 ⤢

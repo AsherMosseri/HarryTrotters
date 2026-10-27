@@ -1947,7 +1947,7 @@ export default function Workspace({ store, actor, rename, renames }) {
             <>
               {taskView && (
                 <button className="fab" onClick={() => setNewTask({ status: 'todo' })} aria-label="New task">
-                  ＋
+                  <PlusIcon size={26} />
                 </button>
               )}
               <BottomNav
