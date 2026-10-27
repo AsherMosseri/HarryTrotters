@@ -2,6 +2,8 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { ADS } from '../ads.js';
 import { STATUSES } from '../config.js';
 import { todayISO } from '../milestones.js';
+import { adFreeUntil } from '../coins.js';
+import { Coin, Coins, CoinsAdmin } from './Coins.jsx';
 import { useEscape } from '../util.js';
 import { CloseIcon, Overlay } from './common.jsx';
 
@@ -117,7 +119,7 @@ export const useAds = () => useContext(AdsContext);
 const SLOT = { banner: 0, board: 7, chat: 13, page: 3, popup: 11, full: 5 };
 
 // Everything the ads need, worked out once in Workspace.
-export function useAdsEngine({ settings, actor, view, shifts, submissions, api }) {
+export function useAdsEngine({ settings, actor, view, shifts, submissions, ledger, coins, api }) {
   const cfg = useMemo(() => adSettings(settings.ads), [settings.ads]);
   const today = todayISO();
   const live = useMemo(() => liveAds(submissions || [], today), [submissions, today]);
@@ -135,7 +137,7 @@ export function useAdsEngine({ settings, actor, view, shifts, submissions, api }
   const chosen = cfg.everyone ? !cfg.except.includes(actor.name) : cfg.people.includes(actor.name);
   const on =
     pool.length > 0 &&
-    removedUntil <= now &&
+    Math.max(removedUntil, adFreeUntil(actor.name, ledger)) <= now &&
     (preview || (!cfg.paused && chosen && inSchedule(cfg.schedule) && !(cfg.schedule.on && cfg.schedule.notOnShift && onShift)));
 
   // Views and taps are counted here and sent in batches (fake earnings).
@@ -208,16 +210,17 @@ export function useAdsEngine({ settings, actor, view, shifts, submissions, api }
         setAction(ad);
       },
       openSubmit: () => setSubmitting(true),
+      coins,
       remove: () => setRemoving(true),
       showFull: (ad) => setFull(ad || pick('full', Math.floor(Math.random() * 7))),
     }),
-    [on, cfg, pool, tick, pick, track],
+    [on, cfg, pool, tick, pick, track, coins],
   );
-  const removeAds = () => {
-    const h = cfg.remove.hours;
-    const until = h === 'today' ? new Date().setHours(23, 59, 59, 999) : Date.now() + Number(h) * 3600000;
-    writeNum(removedKey, until);
-    setRemovedUntil(until);
+  // Remove ads, paid for in Jackson coins. The purchase is in the ledger, so
+  // it works on every device the person uses.
+  const buyRemoval = (choice) => {
+    const until = choice === 'today' ? new Date().setHours(23, 59, 59, 999) : Date.now() + (choice === 'week' ? 7 * 24 : 1) * 3600000;
+    return coins.spend({ what: `remove-${choice}`, amount: coins.cfg.prices[choice], label: `Removed ads ${HOW_LONG[choice]}`, until });
   };
   const setPreview = (mins) => {
     const until = mins ? Date.now() + mins * 60000 : 0;
@@ -238,7 +241,7 @@ export function useAdsEngine({ settings, actor, view, shifts, submissions, api }
     closeAction: () => setAction(null),
     submitting,
     closeSubmit: () => setSubmitting(false),
-    removeAds,
+    buyRemoval,
     preview,
     setPreview,
   };
@@ -593,8 +596,9 @@ const CONFETTI = Array.from({ length: 28 }, (_, i) => ({
 }));
 
 export function FullScreenAd({ ad, onClose }) {
-  const { cfg, cta, level, track } = useAds();
+  const { cfg, cta, level, track, coins } = useAds();
   const skip = cfg.full.skip;
+  const skipPrice = coins?.cfg.prices.skip ?? 0;
   const [left, setLeft] = useState(skip);
   useEffect(() => {
     track(ad, 'view');
@@ -628,6 +632,17 @@ export function FullScreenAd({ ad, onClose }) {
         <div className="ad-full-top">
           <span className="ad-label">Ad</span>
           <span className="spacer" />
+          {left > 0 && coins && coins.balance >= skipPrice && (
+            <button
+              className="ad-skip ad-skip-pay"
+              onClick={async () => {
+                await coins.spend({ what: 'skip', amount: skipPrice, label: `Skipped a ${ad.brand} ad` });
+                onClose();
+              }}
+            >
+              ⏭ Skip now for <Coin size={13} /> {skipPrice}
+            </button>
+          )}
           {left > 0 ? (
             <span className="ad-skip">{skip >= 30 ? `This ad can’t be skipped… for ${left} s` : `Skip in ${left}…`}</span>
           ) : (
@@ -662,30 +677,43 @@ export function FullScreenAd({ ad, onClose }) {
 
 // ---------- Remove ads (nothing is ever charged) ----------
 
-export function RemoveAdsDialog({ price, hours, onRemove, onClose }) {
-  const [step, setStep] = useState('offer');
+const HOW_LONG = { hour: 'for 1 hour', today: 'for the rest of today', week: 'for a week' };
+
+export function RemoveAdsDialog({ prices, balance, onBuy, onClose }) {
+  const [done, setDone] = useState(null);
+  const [busy, setBusy] = useState(false);
   const [receipt] = useState(() => `RA-${1000 + Math.floor(Math.random() * 9000)}`);
   useEscape(onClose);
-  const howLong =
-    hours === 'today'
-      ? 'for the rest of today'
-      : Number(hours) >= 168
-        ? 'for a week'
-        : `for ${hours} hour${Number(hours) === 1 ? '' : 's'}`;
   return (
     <Overlay>
       <div className="panel-backdrop center" onClick={onClose}>
         <div className="dialog remove-ads" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Remove ads">
-          {step === 'offer' ? (
+          {!done ? (
             <>
               <div className="remove-ads-hero" aria-hidden="true">
                 🚫📺
               </div>
               <h2>Remove ads</h2>
-              <p className="muted">Enjoy the Harry Trotters app with zero ads {howLong}. No zip ties. No Torque Juice. Just tasks.</p>
-              <button className="btn primary big-btn" onClick={() => setStep('done')}>
-                Pay {price}
-              </button>
+              <p className="muted">
+                You have <Coins n={balance} />. Earn more by finishing tasks and putting in hours at the lab.
+              </p>
+              <div className="remove-ads-options">
+                {['hour', 'today', 'week'].map((k) => (
+                  <button
+                    key={k}
+                    className="remove-ads-option"
+                    disabled={busy || balance < prices[k]}
+                    onClick={async () => {
+                      setBusy(true);
+                      await onBuy(k);
+                      setDone(k);
+                    }}
+                  >
+                    <span>{HOW_LONG[k][4].toUpperCase() + HOW_LONG[k].slice(5)}</span>
+                    <Coins n={prices[k]} />
+                  </button>
+                ))}
+              </div>
               <button className="link-btn" onClick={onClose}>
                 No thanks, I love ads
               </button>
@@ -697,16 +725,10 @@ export function RemoveAdsDialog({ price, hours, onRemove, onClose }) {
               </div>
               <h2>Payment complete</h2>
               <p className="muted">
-                {price} was covered in full by a promotional credit. Ads are off on this device {howLong}.
+                Paid <Coins n={prices[done]} />. Ads are off {HOW_LONG[done]}, on all your devices.
               </p>
               <p className="muted tiny">Receipt #{receipt}</p>
-              <button
-                className="btn primary big-btn"
-                onClick={() => {
-                  onRemove();
-                  onClose();
-                }}
-              >
+              <button className="btn primary big-btn" onClick={onClose}>
                 Done
               </button>
             </>
@@ -772,10 +794,17 @@ export function AdsSettings({
   preview,
   onShowFull,
   onResetStats,
+  coinsInitial,
+  onSaveCoins,
+  coinBalances = {},
+  ledger = [],
+  onGrant,
+  onUndoGrant,
   onClose,
 }) {
   useEscape(onClose);
   const [cfg, setCfg] = useState(() => adSettings(initial));
+  const [coinCfg, setCoinCfg] = useState(coinsInitial);
   const [tab, setTab] = useState('who');
   const [editing, setEditing] = useState(null);
   const set = (patch) => setCfg((c) => ({ ...c, ...patch }));
@@ -824,6 +853,7 @@ export function AdsSettings({
               ['yours', 'Your ads'],
               ['subs', pendingSubs ? `Submissions (${pendingSubs})` : 'Submissions'],
               ['money', 'Earnings'],
+              ['coins', 'Coins'],
             ].map(([id, label]) => (
               <button
                 key={id}
@@ -1078,34 +1108,10 @@ export function AdsSettings({
                   <Switch checked={cfg.full.onOpen} onChange={(v) => setIn('full', { onOpen: v })} label="Full-screen ad on open" />
                 </Row>
                 <h4>Buttons on ads</h4>
-                <Row title="Remove ads button" hint="Nobody is ever charged.">
+                <Row title="Remove ads button" hint="People pay in Jackson coins.">
                   <Switch checked={cfg.remove.on} onChange={(v) => setIn('remove', { on: v })} label="Remove ads button" />
                 </Row>
-                {cfg.remove.on && (
-                  <>
-                    <Row title="Price shown">
-                      <input
-                        className="input ads-price"
-                        value={cfg.remove.price}
-                        maxLength={12}
-                        onChange={(e) => setIn('remove', { price: e.target.value })}
-                        aria-label="Price"
-                      />
-                    </Row>
-                    <Row title="Removes ads for">
-                      <Choice
-                        value={cfg.remove.hours}
-                        onChange={(v) => setIn('remove', { hours: v })}
-                        label="How long"
-                        options={[
-                          [1, '1 hour'],
-                          ['today', 'Today'],
-                          [168, 'A week'],
-                        ]}
-                      />
-                    </Row>
-                  </>
-                )}
+                {cfg.remove.on && <p className="muted small">Its prices, in Jackson coins, are on the Coins tab.</p>}
                 <Row title="The ✕ button">
                   <Choice
                     value={cfg.close}
@@ -1229,6 +1235,18 @@ export function AdsSettings({
               <SubmissionsTab cfg={cfg} set={set} submissions={submissions} onReview={onReview} onDelete={onDeleteSubmission} />
             )}
 
+            {tab === 'coins' && (
+              <CoinsAdmin
+                cfg={coinCfg}
+                setCfg={setCoinCfg}
+                roster={roster}
+                balances={coinBalances}
+                ledger={ledger}
+                onGrant={onGrant}
+                onUndo={onUndoGrant}
+              />
+            )}
+
             {tab === 'money' && (
               <>
                 <div className="ads-earned">
@@ -1280,6 +1298,7 @@ export function AdsSettings({
               className="btn primary"
               onClick={() => {
                 onSave(cfg);
+                onSaveCoins(coinCfg);
                 onClose();
               }}
             >

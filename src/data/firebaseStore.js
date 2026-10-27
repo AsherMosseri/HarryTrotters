@@ -457,6 +457,20 @@ export const firebaseStore = {
     }
     return batch.commit();
   },
+  // Jackson coins ledger: spending, gifts, and Asher's bonuses.
+  subscribeCoins(cb) {
+    return onSnapshot(
+      collection(db, 'coins'),
+      (snap) => cb(snap.docs.map(readDoc)),
+      () => cb([]),
+    );
+  },
+  addCoinTx(tx) {
+    return setDoc(doc(collection(db, 'coins')), { ...tx, at: Date.now() });
+  },
+  deleteCoinTx(id) {
+    return deleteDoc(doc(db, 'coins', id));
+  },
   // Ads teammates submit and book for certain dates (Asher approves them).
   subscribeAdSubmissions(cb) {
     return onSnapshot(

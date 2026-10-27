@@ -4,6 +4,16 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '2.50',
+    date: '2026-10-27',
+    title: 'Jackson coins',
+    items: [
+      'Meet Jackson coins (named after Jackson, with his blessing). Get 15 for every task you were given that gets done (when someone else made the task), and 5 for every hour at the lab, up to 10 hours a day. It counts all the way back to August 28.',
+      'Your balance and history are in your menu (Me on a phone). Send coins to a teammate, and see who’s earned the most this week and this season.',
+      'Coins buy you a break from our new friends: an hour, the rest of the day, or a whole week. The big ones can be skipped on the spot.',
+    ],
+  },
+  {
     version: '2.49',
     date: '2026-10-27',
     title: 'Rainbow and RGB nameplates',

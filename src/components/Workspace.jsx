@@ -56,6 +56,8 @@ import {
   SubmitAdDialog,
   useAdsEngine,
 } from './Ads.jsx';
+import { CoinsDialog, Coins } from './Coins.jsx';
+import { coinSettings, wallet } from '../coins.js';
 
 // Versions were renumbered once (2.0 became 1.9, 2.1 became 2.0, and so
 // on). Move this device's "last seen" version along so What's new doesn't
@@ -826,6 +828,8 @@ export default function Workspace({ store, actor, rename, renames }) {
       saveAdSettings: (cfg) => store.saveAdSettings(JSON.parse(JSON.stringify(cfg)), actor).catch(fail),
       bumpAdStats: (counts) => store.bumpAdStats(counts).catch(() => {}),
       submitAd: (data) => store.submitAd(data, actor).catch(fail),
+      addCoins: (tx) => store.addCoinTx(tx).catch(fail),
+      undoCoins: (tx) => store.deleteCoinTx(tx.id).catch(fail),
       withdrawAd: (sub) => store.updateAdSubmission(sub.id, { status: 'withdrawn' }).catch(fail),
       reviewAd: (sub, patch) => store.updateAdSubmission(sub.id, patch).catch(fail),
       deleteAdSubmission: (sub) => store.deleteAdSubmission(sub.id).catch(fail),
@@ -1140,10 +1144,32 @@ export default function Workspace({ store, actor, rename, renames }) {
   const isOwner = actor.admin && actor.name === REQUESTS_TO;
   const [adSubs, setAdSubs] = useState([]);
   useEffect(() => store.subscribeAdSubmissions(setAdSubs), [store]);
-  const ads = useAdsEngine({ settings, actor, view, shifts, submissions: adSubs, api });
   const [adsPage, setAdsPage] = useState(false);
   const [adStats, setAdStats] = useState({});
-  useEffect(() => (adsPage ? store.subscribeAdStats(setAdStats) : undefined), [adsPage, store]);
+  useEffect(() => store.subscribeAdStats(setAdStats), [store]);
+
+  // Jackson coins: earned from tasks and hours (and, for Asher, the ad money);
+  // spending, gifts, and bonuses are in the ledger.
+  const [ledger, setLedger] = useState([]);
+  useEffect(() => store.subscribeCoins(setLedger), [store]);
+  const [coinsOpen, setCoinsOpen] = useState(false);
+  const coinCfg = useMemo(() => coinSettings(settings.coins), [settings.coins]);
+  const coinData = useMemo(
+    () => ({ tasks: tasks || [], shifts, adStats, ledger, cfg: coinCfg }),
+    [tasks, shifts, adStats, ledger, coinCfg],
+  );
+  const walletOf = useCallback((name) => wallet(name, { ...coinData, owner: name === REQUESTS_TO }), [coinData]);
+  const myWallet = useMemo(() => walletOf(actor.name), [walletOf, actor.name]);
+  const coins = useMemo(
+    () => ({
+      balance: myWallet.balance,
+      cfg: coinCfg,
+      // Never more than you have (the ledger can't check this itself).
+      spend: (tx) => (tx.amount > myWallet.balance ? Promise.resolve() : api.addCoins({ type: 'spend', person: actor.name, ...tx })),
+    }),
+    [myWallet.balance, coinCfg, api, actor.name],
+  );
+  const ads = useAdsEngine({ settings, actor, view, shifts, submissions: adSubs, ledger, coins, api });
 
   const filterCount = [filters.person && filters.person !== '__me', filters.subteam, filters.priority, filters.hideDone].filter(
     Boolean,
@@ -1226,6 +1252,12 @@ export default function Workspace({ store, actor, rename, renames }) {
                           💡 Request a feature {newRequests > 0 && <span className="me-badge">{newRequests}</span>}
                         </button>
                         <button onClick={() => (setMeMenu(false), setShowHelp(true))}>❓ Help</button>
+                        <button onClick={() => (setMeMenu(false), setCoinsOpen(true))}>
+                          🪙 Jackson coins{' '}
+                          <span className="me-coins">
+                            <Coins n={myWallet.balance} />
+                          </span>
+                        </button>
                         <button onClick={() => (setMeMenu(false), setEditTabs(true))}>🗂 Edit tabs</button>
                         {isOwner && <button onClick={() => (setMeMenu(false), setAdsPage(true))}>📺 Ads</button>}
                       </div>
@@ -1741,6 +1773,17 @@ export default function Workspace({ store, actor, rename, renames }) {
           </div>
           <AdBanner position="bottom" />
           {ads.full && <FullScreenAd ad={ads.full} onClose={ads.closeFull} />}
+          {coinsOpen && (
+            <CoinsDialog
+              actor={actor}
+              wallet={myWallet}
+              roster={roster}
+              data={coinData}
+              cfg={coinCfg}
+              onGift={(g) => (g.amount <= myWallet.balance ? api.addCoins({ type: 'gift', from: actor.name, ...g }) : Promise.resolve())}
+              onClose={() => setCoinsOpen(false)}
+            />
+          )}
           {ads.action && <AdActionDialog ad={ads.action} onClose={ads.closeAction} />}
           {ads.submitting && (
             <SubmitAdDialog
@@ -1751,12 +1794,7 @@ export default function Workspace({ store, actor, rename, renames }) {
             />
           )}
           {ads.removing && (
-            <RemoveAdsDialog
-              price={ads.value.cfg.remove.price}
-              hours={ads.value.cfg.remove.hours}
-              onRemove={ads.removeAds}
-              onClose={ads.closeRemoving}
-            />
+            <RemoveAdsDialog prices={coinCfg.prices} balance={myWallet.balance} onBuy={ads.buyRemoval} onClose={ads.closeRemoving} />
           )}
           {adsPage && (
             <AdsSettings
@@ -1771,6 +1809,12 @@ export default function Workspace({ store, actor, rename, renames }) {
               onShowFull={(ad) => ads.value.showFull(ad)}
               onResetStats={() => store.resetAdStats()}
               onSave={(cfg) => api.saveAdSettings(cfg)}
+              coinsInitial={coinCfg}
+              onSaveCoins={(c) => JSON.stringify(c) !== JSON.stringify(coinCfg) && api.saveSettings({ coins: c })}
+              coinBalances={Object.fromEntries(roster.map((n) => [n, walletOf(n).balance]))}
+              ledger={ledger}
+              onGrant={(g) => api.addCoins({ type: 'grant', by: actor.name, ...g })}
+              onUndoGrant={api.undoCoins}
               onClose={() => setAdsPage(false)}
             />
           )}
@@ -1819,6 +1863,12 @@ export default function Workspace({ store, actor, rename, renames }) {
                       💡 Request a feature {newRequests > 0 && <span className="me-badge">{newRequests}</span>}
                     </button>
                     <button onClick={() => (closeSheet(), setShowHelp(true))}>❓ Help</button>
+                    <button onClick={() => (closeSheet(), setCoinsOpen(true))}>
+                      🪙 Jackson coins{' '}
+                      <span className="me-coins">
+                        <Coins n={myWallet.balance} />
+                      </span>
+                    </button>
                     <button onClick={() => (closeSheet(), setEditTabs(true))}>🗂 Edit tabs</button>
                     {isOwner && <button onClick={() => (closeSheet(), setAdsPage(true))}>📺 Ads</button>}
                   </div>

@@ -607,6 +607,20 @@ export const demoStore = {
     state.adStats = stats;
     commit();
   },
+  subscribeCoins(cb) {
+    return listen(() => cb([...(state.coins || [])]));
+  },
+  async addCoinTx(tx) {
+    state.coins = [
+      ...(state.coins || []),
+      { ...tx, id: `c${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`, at: Date.now() },
+    ];
+    commit();
+  },
+  async deleteCoinTx(id) {
+    state.coins = (state.coins || []).filter((x) => x.id !== id);
+    commit();
+  },
   subscribeAdSubmissions(cb) {
     return listen(() => cb([...(state.adSubmissions || [])]));
   },

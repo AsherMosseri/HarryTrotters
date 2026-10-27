@@ -2577,3 +2577,53 @@ body:has(.bottom-nav):has(.composer) .toast { bottom: calc(150px + env(safe-area
   .ads-sub { grid-template-columns: minmax(0, 1fr); }
   .dialog.submit-ad { width: 100%; max-height: none; }
 }
+
+/* ---------- Jackson coins (Coins.jsx) ---------- */
+.jcoin {
+  display: inline-grid; place-items: center; flex: none; width: var(--jc); height: var(--jc); border-radius: 50%;
+  font-size: calc(var(--jc) * 0.58); font-weight: 900; line-height: 1; color: #7a4b00; font-family: Georgia, 'Times New Roman', serif;
+  background: radial-gradient(circle at 32% 28%, #fff6c4, #ffd34d 38%, #e8a317 72%, #b97a06);
+  box-shadow: inset 0 0 0 calc(var(--jc) * 0.08) #c88a0c, 0 1px 2px rgb(0 0 0 / 25%); vertical-align: -0.18em; text-shadow: 0 1px 0 rgb(255 255 255 / 50%);
+}
+.jcoins { display: inline-flex; align-items: center; gap: 0.3em; font-weight: 800; font-variant-numeric: tabular-nums; }
+.me-coins { margin-left: auto; font-size: 13px; }
+.me-list button:has(.me-coins) { display: flex; align-items: center; gap: 6px; }
+.dialog.coins-dialog { width: min(520px, calc(100vw - 32px)); max-height: calc(100dvh - 40px); display: flex; flex-direction: column; gap: 10px; }
+.coins-dialog .panel-head h2 { display: flex; align-items: center; gap: 8px; }
+.coins-balance {
+  display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 14px; border-radius: 14px; text-align: center;
+  background: linear-gradient(135deg, #fff7d6, #ffe08a); color: #4a3200;
+}
+.coins-balance .muted { color: #7a5a14; }
+.coins-balance b { font-size: 34px; }
+.coins-tabs, .coins-range { display: flex; }
+.coins-tabs button, .coins-range button { flex: 1; }
+.coins-body { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 2px; }
+.coins-history { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.coins-history li { display: flex; align-items: center; gap: 10px; padding: 8px 4px; border-bottom: 1px solid var(--border); }
+.coins-history li:last-child { border-bottom: 0; }
+.coins-history .grow { display: flex; flex-direction: column; min-width: 0; }
+.coins-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.coins-icon { width: 26px; text-align: center; font-size: 18px; flex: none; }
+.coins-plus { color: #15803d; font-variant-numeric: tabular-nums; }
+.coins-minus { color: var(--danger); font-variant-numeric: tabular-nums; }
+.coins-sent { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 16px 0; text-align: center; }
+.coins-sent h3 { margin: 0; display: flex; align-items: center; gap: 6px; }
+.coins-board { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.coins-board li { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 10px; background: var(--surface-2); font-weight: 600; }
+.coins-board li.me { outline: 2px solid var(--accent); }
+.coins-rank { width: 26px; text-align: center; font-weight: 800; color: var(--muted); }
+.coins-num { width: 96px; }
+.coins-grant .input:not(.coins-num):not(.grow) { width: auto; max-width: 220px; }
+.coins-grant .grow { min-width: 160px; flex: 1; }
+.remove-ads-options { display: flex; flex-direction: column; gap: 8px; align-self: stretch; }
+.remove-ads-option {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px; border-radius: 12px; cursor: pointer;
+  border: 2px solid var(--border); background: var(--surface); color: var(--text); font-weight: 700; font-size: 15px;
+}
+.remove-ads-option:hover:not(:disabled) { border-color: var(--accent); background: var(--accent-soft); }
+.remove-ads-option:disabled { opacity: 0.45; cursor: not-allowed; }
+.ad-skip-pay { border: 0; color: #3d2c00; background: #ffd54a; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; text-shadow: none; }
+@media (max-width: 760px) {
+  .dialog.coins-dialog { width: 100%; max-height: none; }
+}

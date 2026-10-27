@@ -131,6 +131,7 @@ const SECTIONS = [
       'Your menu (tap your name at the top right) picks light, dark, or automatic, and a color theme (Sunset, Ocean, Forest…) for this device.',
       '🎨 Custom… in that menu makes your own theme: any colors (even moving), a picture, GIF, or emoji pattern behind the app, and floating emoji or GIFs. 🎲 Surprise me picks for you, and 🪞 My profile matches your profile.',
       '🗂 Edit tabs in that menu: drag the tabs into your order. It follows you to every device; on a phone, your first four are the tab bar.',
+      '🪙 Jackson coins: 15 for each task you were given that gets done (when someone else made it) and 5 an hour at the lab, up to 10 hours a day. Your balance, history, Send, and the leaderboard are in your menu.',
       'New friends showing up around the app? Their buttons take bookings, orders, and submissions. Want a spot of your own? Tap “Get your spot here” on one of them. Need a break? Look for the button that clears them away for a while.',
       'When the site is updated, you’ll be asked to tap Update now.',
     ],
