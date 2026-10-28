@@ -4,6 +4,12 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '2.65',
+    date: '2026-10-28',
+    title: 'Animations keep going',
+    items: ['Animations in chat no longer stop while you scroll or pinch. They keep playing the whole time.'],
+  },
+  {
     version: '2.64',
     date: '2026-10-28',
     title: 'Badge fix',

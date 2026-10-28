@@ -2257,8 +2257,6 @@ body:has(.bottom-nav):has(.composer) .toast { bottom: calc(150px + env(safe-area
   .calm-chat :is(.msg, .member-row, .conv-row):not(.selected):not(.active) .gif-av > img { visibility: hidden; }
   .calm-chat :is(.msg, .member-row, .conv-row):not(.selected):not(.active) .gif-av > canvas { visibility: visible; }
 }
-/* Everything in the chat holds still while it scrolls (smoother on iPad). */
-.chat-scrolling *, .chat-scrolling *::before, .chat-scrolling *::after { animation-play-state: paused !important; }
 .calm-toggle { display: flex; gap: 10px; align-items: flex-start; margin-top: 4px; padding: 8px 10px; border-radius: 10px; background: var(--surface-2); cursor: pointer; }
 .calm-toggle input { margin-top: 3px; accent-color: var(--accent); }
 .calm-toggle > span { display: flex; flex-direction: column; font-size: 14px; }
