@@ -4,6 +4,15 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '2.67',
+    date: '2026-10-28',
+    title: 'Clearer command cards',
+    items: [
+      '/roll and the casino’s /dice show real dice with dots, big enough to read on iPad (the little ⚀ symbols were tiny).',
+      '/avatar leaves room for avatar decorations, so they don’t run over the name, and the name is bigger. /whois and /ship got the same breathing room.',
+    ],
+  },
+  {
     version: '2.66',
     date: '2026-10-28',
     title: 'Everything animates',

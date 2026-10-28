@@ -2,6 +2,7 @@ import { Avatar, DisplayName } from '../common.jsx';
 import { COMMANDS, GROUPS } from '../../commands.js';
 import { CASINO_CARDS, CasinoBody, ECONOMY_CARDS } from './Casino.jsx';
 import { ARCADE_CARDS, ArcadeBody } from './Arcade.jsx';
+import { Die } from './Die.jsx';
 import { priorityById } from '../../config.js';
 import { daysBetween, todayISO } from '../../teamCommands.js';
 
@@ -25,7 +26,6 @@ const Name = ({ name, onPerson }) => (
   <DisplayName as="button" name={name} className="name-btn cmd-name" onClick={onPerson ? (e) => onPerson(name, e) : undefined} />
 );
 
-const DIE = ['', '⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
 const TEAM_CARDS = ['task', 'overdue', 'shift', 'match', 'standup'];
 const dayText = (iso) => {
   const d = daysBetween(todayISO(), iso);
@@ -228,7 +228,10 @@ function Body({ c, by, onPerson }) {
     case 'avatar':
       return (
         <div className="cmd-avatar">
-          <Avatar name={c.to} size={160} />
+          {/* Room around it for the decoration, so it doesn't run over the name. */}
+          <span className="cmd-avatar-pic">
+            <Avatar name={c.to} size={140} />
+          </span>
           <Name name={c.to} onPerson={onPerson} />
         </div>
       );
@@ -275,15 +278,19 @@ function Body({ c, by, onPerson }) {
       return (
         <div className="cmd-roll">
           <div className="cmd-dice">
-            {c.rolls.map((r, i) => (
-              <span key={i} className={`cmd-die${c.sides === 6 ? ' face' : ''}`} style={{ '--i': i }}>
-                {c.sides === 6 ? DIE[r] : r}
-              </span>
-            ))}
-            {c.plus ? <span className="muted">{c.plus > 0 ? `+${c.plus}` : c.plus}</span> : null}
+            {c.rolls.map((r, i) =>
+              c.sides === 6 ? (
+                <Die key={i} n={r} i={i} />
+              ) : (
+                <span key={i} className="cmd-die" style={{ '--i': i }}>
+                  {r}
+                </span>
+              ),
+            )}
+            {c.plus ? <span className="cmd-plus">{c.plus > 0 ? `+${c.plus}` : c.plus}</span> : null}
           </div>
-          <div>
-            🎲 {c.spec}: <b className="cmd-total">{c.total}</b>
+          <div className="cmd-roll-total">
+            {c.spec} = <b className="cmd-total">{c.total}</b>
           </div>
         </div>
       );

@@ -2,13 +2,13 @@ import { useEffect, useRef, useState } from 'react';
 import { Avatar } from '../common.jsx';
 import { HL_NAMES, MINES_TILES, crashMultiplier, handValue, hlChance, hlStep, minesMultiplier } from '../../../functions/shared/casino.js';
 import { serverNow } from '../../serverTime.js';
+import { Die } from './Die.jsx';
 
 // The Jackson coins economy and casino cards (the play function rolls; these
 // show it). Live games (blackjack, crash, mines, high-low) have buttons for
 // the person playing; onMove(move) sends it to the server.
 
 const coins = (n) => `${n} 🪙`;
-const DIE = ['', '⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
 // Animate only when it just happened (not when scrolling back through chat).
 const fresh = (m) => serverNow() - m.at < 8000;
 
@@ -52,13 +52,19 @@ function Dice({ c }) {
       <div className="casino-vs">
         <div>
           <div className="muted tiny">You</div>
-          <span className="cmd-die face">{DIE[c.game.you[0]]}</span>
-          <span className="cmd-die face">{DIE[c.game.you[1]]}</span> <b>{a}</b>
+          <div className="dice-row">
+            <Die n={c.game.you[0]} i={0} />
+            <Die n={c.game.you[1]} i={1} />
+            <b className="cmd-total">{a}</b>
+          </div>
         </div>
         <div>
           <div className="muted tiny">House 🤖</div>
-          <span className="cmd-die face">{DIE[c.game.house[0]]}</span>
-          <span className="cmd-die face">{DIE[c.game.house[1]]}</span> <b>{b}</b>
+          <div className="dice-row">
+            <Die n={c.game.house[0]} i={0} />
+            <Die n={c.game.house[1]} i={1} />
+            <b className="cmd-total">{b}</b>
+          </div>
         </div>
       </div>
       <Outcome c={c} />

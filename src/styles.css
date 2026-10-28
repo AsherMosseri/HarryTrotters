@@ -3002,7 +3002,10 @@ html.kb-open .toast { bottom: auto; top: calc(var(--vvt) + var(--vvh) - 64px); }
 .cmd-stats { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 6px; font-size: 13px; color: var(--muted); }
 .cmd-stats b { color: var(--text); }
 .cmd-onshift { margin-top: 4px; }
-.cmd-avatar { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.cmd-avatar { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+/* Decorations reach about 30% past the picture; keep them off the name. */
+.cmd-avatar-pic { display: block; padding: 34px 40px 40px; }
+.cmd-avatar .cmd-name { font-size: 20px; }
 .cmd-8ball-answer { display: flex; align-items: center; gap: 10px; font-size: 17px; font-weight: 800; }
 .cmd-8ball-answer.yes { color: #16a34a; } .cmd-8ball-answer.no { color: #dc2626; } .cmd-8ball-answer.maybe { color: #d97706; }
 .cmd-ball { font-size: 34px; animation: cmd-shake 0.6s ease-in-out 2; }
@@ -3013,7 +3016,18 @@ html.kb-open .toast { bottom: auto; top: calc(var(--vvt) + var(--vvh) - 64px); }
 .cmd-coin.edge { transform: rotate(90deg) scaleX(0.35); animation: none; }
 .cmd-dice { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .cmd-die { min-width: 34px; height: 34px; padding: 0 6px; display: grid; place-items: center; border-radius: 8px; background: var(--surface); border: 1px solid var(--border); font-weight: 800; animation: cmd-roll 0.6s calc(var(--i) * 0.08s) ease-out both; }
-.cmd-die.face { font-size: 34px; border: 0; background: none; padding: 0; font-weight: 400; }
+.cmd-plus { font-weight: 800; font-size: 17px; color: var(--muted); padding: 0 4px; }
+.cmd-roll { display: flex; flex-direction: column; gap: 8px; }
+.cmd-roll-total { font-size: 15px; }
+/* Dice with pips (chat/Die.jsx). */
+.die {
+  --die: 40px; width: var(--die); height: var(--die); flex: none; display: inline-grid; grid-template: repeat(3, 1fr) / repeat(3, 1fr);
+  padding: calc(var(--die) * 0.13); border-radius: calc(var(--die) * 0.22); background: #fff;
+  box-shadow: inset 0 -3px 0 rgb(0 0 0 / 14%), 0 1px 3px rgb(0 0 0 / 35%);
+  animation: cmd-roll 0.6s calc(var(--i) * 0.08s) ease-out both;
+}
+.die > .pip { place-self: center; width: 72%; aspect-ratio: 1; border-radius: 50%; background: #1f2937; }
+.dice-row { display: flex; align-items: center; gap: 6px; margin-top: 2px; }
 @keyframes cmd-roll { from { transform: rotate(-400deg) scale(0.3); opacity: 0; } }
 .cmd-total { font-size: 18px; }
 .cmd-choose { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
@@ -3083,7 +3097,7 @@ html.kb-open .toast { bottom: auto; top: calc(var(--vvt) + var(--vvh) - 64px); }
 @keyframes slot-spin { from { transform: translateY(0); } to { transform: translateY(-400px); } }
 .slot-strip.spin { transform: translateY(-400px); }
 .casino-vs { display: flex; gap: 22px; }
-.casino-vs .cmd-die.face { font-size: 30px; }
+.casino-vs .die { --die: 36px; }
 .cmd-coin.still { animation: none; }
 .casino-roulette { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .roulette-wheel { font-size: 34px; display: inline-block; }
@@ -3254,3 +3268,6 @@ html.kb-open .toast { bottom: auto; top: calc(var(--vvt) + var(--vvh) - 64px); }
   .dialog.cmd-admin { height: min(820px, calc(var(--vvh, 100dvh) - 40px)); }
 }
 .cmd-admin .ads-body { flex-shrink: 1; }
+/* Avatar decorations reach past the picture: keep them off the text beside it. */
+.cmd-whois > .avatar-btn, .cmd-whois > .deco, .cmd-whois > .avatar { margin: 8px 6px 8px 8px; }
+.cmd-ship-pair { gap: 18px; padding: 6px 8px; }
