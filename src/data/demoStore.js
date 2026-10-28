@@ -491,6 +491,12 @@ function nextFridayLocal(now) {
   if (d.getTime() <= now) d.setDate(d.getDate() + 7);
   return d.getTime();
 }
+// Change fields on a command card's cmd (the open lottery card).
+function setCard({ conv, id }, fields) {
+  const list = state.chat?.[conv];
+  if (!list) return;
+  state.chat = { ...state.chat, [conv]: list.map((x) => (x.id === id ? { ...x, cmd: { ...x.cmd, ...fields } } : x)) };
+}
 
 let reminderTimer = null;
 function startReminders() {
@@ -918,10 +924,18 @@ export const demoStore = {
       const tickets = { ...(lot.tickets || {}) };
       if (n) tickets[me] = (tickets[me] || 0) + n;
       const pot = (lot.pot || 0) + cost;
-      state.lottery = { pot, tickets, drawAt, round: lot.round || 1, last: lot.last || null };
+      const people = Object.keys(tickets).length;
+      // One open lottery card at a time (like the play function).
+      const open = lot.open && (state.chat?.[lot.open.conv] || []).some((x) => x.id === lot.open.id) ? lot.open : null;
       if (n) setBank(me, casino.bankAfter(mine, me, -cost, { icon: '🎟️', label: `Lottery: ${n} ticket${n > 1 ? 's' : ''}` }, {}, now));
-      post({ bought: n || 0, mine: tickets[me] || 0, pot, drawAt, people: Object.keys(tickets).length, last: lot.last || null });
-      return done({ ok: true });
+      if (!open) {
+        const m = post({ bought: n || 0, mine: tickets[me] || 0, pot, drawAt, people, last: lot.last || null });
+        state.lottery = { pot, tickets, drawAt, round: lot.round || 1, last: lot.last || null, open: { conv, id: m.id } };
+        return done({ ok: true });
+      }
+      state.lottery = { pot, tickets, drawAt, round: lot.round || 1, last: lot.last || null, open };
+      setCard(open, { pot, people });
+      return done({ ok: true, note: casino.lotteryNote(n, tickets[me] || 0, pot, open.conv, conv) });
     }
     if (isCasino) {
       const bet = casino.parseBet(words[0], balance);
@@ -1041,6 +1055,7 @@ export const demoStore = {
       ),
     };
     const last = { winner, pot: lot.pot, tickets: theirs, of: total, people: entries.length, at: now };
+    if (lot.open) setCard(lot.open, { closed: true, pot: lot.pot, people: entries.length, winner });
     state.lottery = { pot: 0, tickets: {}, drawAt: nextFridayLocal(now + 60000), round: (lot.round || 1) + 1, last };
     const m = {
       id: uid(),

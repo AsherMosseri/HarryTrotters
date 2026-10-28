@@ -4,6 +4,16 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '2.71',
+    date: '2026-10-28',
+    title: 'Chat fixes and one lottery',
+    items: [
+      'Fixed: text could follow you into every channel (for example after picking a command from /help or editing a message) and get saved as each channel’s draft. Drafts stay in their own channel now.',
+      'Return (Enter) sends your message again, on iPad and phone too. Shift+Return starts a new line.',
+      'Only one lottery is open at a time: the first /lottery of the week posts the card, and more tickets (typed or with its Buy buttons) go on that card. It shows the live pot, and older lottery cards show as closed.',
+    ],
+  },
+  {
     version: '2.70',
     date: '2026-10-28',
     title: 'Lab log',

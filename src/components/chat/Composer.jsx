@@ -47,9 +47,6 @@ const saveDraft = (conv, text) => {
     /* storage unavailable */
   }
 };
-// On a touch screen, Return makes a new line (the Send button sends), like
-// texting. With a mouse, Enter sends and Shift+Enter makes a new line.
-const returnIsNewLine = () => window.matchMedia?.('(pointer: coarse)').matches;
 
 export default function Composer({
   conv,
@@ -597,6 +594,7 @@ export default function Composer({
         <textarea
           ref={box}
           rows={1}
+          enterKeyHint="send"
           value={text}
           onChange={onChange}
           onPaste={(e) => {
@@ -630,7 +628,8 @@ export default function Composer({
             if (mod && ['b', 'i', 'u'].includes(e.key.toLowerCase())) {
               e.preventDefault();
               format(['wrap', { b: '**', i: '*', u: '__' }[e.key.toLowerCase()]]);
-            } else if (e.key === 'Enter' && !e.shiftKey && (mod || !returnIsNewLine())) {
+            } else if (e.key === 'Enter' && !e.shiftKey) {
+              // Return sends; Shift+Return makes a new line.
               e.preventDefault();
               send();
             } else if (e.key === 'Escape') {

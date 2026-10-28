@@ -404,3 +404,14 @@ export function bankAfter(bank, name, delta, entry, extra = {}, now = Date.now()
       : bank.recent || [];
   return { ...bank, ...extra, name, net: (bank.net || 0) + delta, stats, recent, since: bank.since || now };
 }
+
+// What /lottery tells you when the round's card is already open: the
+// tickets went on that card. `go` offers a jump when it's in another channel.
+export function lotteryNote(bought, mine, pot, openConv, conv) {
+  const tickets = `${mine} ticket${mine === 1 ? '' : 's'}`;
+  return {
+    title: bought ? `🎟️ Bought ${bought} ticket${bought > 1 ? 's' : ''}` : '🎟️ The lottery is already open',
+    body: `You have ${tickets} in. Pot: ${pot} coins.${openConv === conv ? ' The lottery card is higher up in this channel.' : ` The lottery card is in #${openConv}.`}`,
+    ...(openConv !== conv && { go: openConv }),
+  };
+}

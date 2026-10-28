@@ -63,6 +63,7 @@ import {
 import CommandsPage from './CommandsPage.jsx';
 import { CoinsDialog, Coins } from './Coins.jsx';
 import { LabLogContext, LabLogDialog } from './LabLog.jsx';
+import { LotteryContext } from './chat/Casino.jsx';
 import { dayOf, hoursOn, logId, missingLogDay } from '../labLog.js';
 import { OrderTracker, OrdersDialog, orderActive } from './AdOrders.jsx';
 import { setServerSkew } from '../serverTime.js';
@@ -264,10 +265,12 @@ const CHAT_PAGE = 60;
 const EMPTY_FILTERS = { q: '', person: '', subteam: '', priority: '', statuses: [], hideDone: false };
 
 // What components deep in the app read: people (profiles, who's online) and the lab log.
-function Contexts({ people, lab, children }) {
+function Contexts({ people, lab, lottery, children }) {
   return (
     <PeopleContext.Provider value={people}>
-      <LabLogContext.Provider value={lab}>{children}</LabLogContext.Provider>
+      <LabLogContext.Provider value={lab}>
+        <LotteryContext.Provider value={lottery}>{children}</LotteryContext.Provider>
+      </LabLogContext.Provider>
     </PeopleContext.Provider>
   );
 }
@@ -1406,7 +1409,7 @@ export default function Workspace({ store, actor, rename, renames }) {
   ).length;
 
   return (
-    <Contexts people={peopleCtx} lab={labCtx}>
+    <Contexts people={peopleCtx} lab={labCtx} lottery={lottery}>
       <AdsProvider value={ads.value}>
         <div className={`app${view === 'chat' || view === 'robot' ? ' chat-mode' : ''}`} style={takeoverStyle(ads.value.takeover)}>
           {store.mode === 'demo' && (

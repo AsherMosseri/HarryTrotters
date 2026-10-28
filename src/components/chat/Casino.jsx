@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { Avatar } from '../common.jsx';
 import { HL_NAMES, MINES_TILES, crashMultiplier, handValue, hlChance, hlStep, minesMultiplier } from '../../../functions/shared/casino.js';
 import { serverNow } from '../../serverTime.js';
@@ -9,6 +9,8 @@ import { Die } from './Die.jsx';
 // the person playing; onMove(move) sends it to the server.
 
 const coins = (n) => `${n} 🪙`;
+// The lottery doc (pot, tickets, draw time, and which card is open), live.
+export const LotteryContext = createContext(null);
 // Animate only when it just happened (not when scrolling back through chat).
 const fresh = (m) => serverNow() - m.at < 8000;
 
@@ -286,7 +288,9 @@ function HighLow({ c, mine, act }) {
   );
 }
 
-function Lottery({ c, onBuy }) {
+function Lottery({ m, c, me, onBuy }) {
+  const lot = useContext(LotteryContext);
+  const [error, setError] = useState('');
   if (c.draw)
     return (
       <div className="casino-lottery">
@@ -296,30 +300,59 @@ function Lottery({ c, onBuy }) {
         </div>
       </div>
     );
-  const when = new Date(c.drawAt).toLocaleString(undefined, { weekday: 'long', hour: 'numeric', minute: '2-digit' });
+  // Only one lottery card is open at a time; the rest are closed. A card
+  // posted a moment ago counts as open until the lottery doc catches up.
+  const isOpen = lot?.open?.id === m.id;
+  const fresh = !lot?.open && !c.closed && Date.now() - m.at < 60000;
+  if (!isOpen && !fresh)
+    return (
+      <div className="casino-lottery closed">
+        <div>🎟️ Lottery · closed</div>
+        <div className="cmd-big">Pot: {coins(c.pot || 0)}</div>
+        {lot && (
+          <div className="small muted">
+            {c.closed
+              ? c.winner
+                ? `${c.winner} won it.`
+                : 'Nobody bought a ticket.'
+              : 'There’s a newer lottery card. Type /lottery to find it.'}
+          </div>
+        )}
+      </div>
+    );
+  const tickets = isOpen ? lot.tickets || {} : null;
+  const mine = tickets ? tickets[me] || 0 : c.mine || 0;
+  const people = tickets ? Object.keys(tickets).length : c.people || 0;
+  const pot = isOpen ? lot.pot || 0 : c.pot || 0;
+  const last = isOpen ? lot.last : c.last;
+  const when = new Date(isOpen ? lot.drawAt : c.drawAt).toLocaleString(undefined, { weekday: 'long', hour: 'numeric', minute: '2-digit' });
+  const buy = async (n) => {
+    const r = await onBuy(n);
+    setError(r?.ok ? '' : r?.note?.title || '');
+  };
   return (
     <div className="casino-lottery">
-      <div>{c.bought ? `🎟️ Bought ${c.bought} ticket${c.bought > 1 ? 's' : ''}` : '🎟️ The lottery'}</div>
-      <div className="cmd-big">Pot: {coins(c.pot)}</div>
+      <div>🎟️ The lottery</div>
+      <div className="cmd-big">Pot: {coins(pot)}</div>
       <div className="small">
-        {c.mine ? `${c.mine} ticket${c.mine > 1 ? 's' : ''} in` : 'No tickets yet'} · {c.people} player{c.people === 1 ? '' : 's'} · draw{' '}
-        {when}
+        {mine ? `${mine} ticket${mine > 1 ? 's' : ''} in` : 'No tickets yet'} · {people} player{people === 1 ? '' : 's'} · draw {when}
       </div>
-      {c.last && (
+      {last && (
         <div className="muted tiny">
-          Last winner: {c.last.winner} ({coins(c.last.pot)})
+          Last winner: {last.winner} ({coins(last.pot)})
         </div>
       )}
       {onBuy && (
         <div className="casino-buttons">
-          <button className="btn" onClick={() => onBuy(1)}>
+          <button className="btn" onClick={() => buy(1)}>
             Buy 1 (5 🪙)
           </button>
-          <button className="btn" onClick={() => onBuy(5)}>
+          <button className="btn" onClick={() => buy(5)}>
             Buy 5 (25 🪙)
           </button>
         </div>
       )}
+      {error && <div className="casino-error">{error}</div>}
     </div>
   );
 }
@@ -461,7 +494,7 @@ export function CasinoBody({ m, me, Name, onMove, onBuy }) {
     crash: <Crash c={c} mine={mine} act={act} />,
     mines: <Mines c={c} mine={mine} act={act} />,
     highlow: <HighLow c={c} mine={mine} act={act} />,
-    lottery: <Lottery c={c} onBuy={onBuy} />,
+    lottery: <Lottery m={m} c={c} me={me} onBuy={onBuy} />,
   }[c.name];
   return (
     <>

@@ -777,6 +777,10 @@ export const play = onCall({ maxInstances: 5, invoker: 'public' }, async (req) =
 
     if (game === 'lottery') {
       const lot = (await tx.get(lotteryRef)).data() || {};
+      // One lottery card is open at a time: the round's first /lottery posts
+      // it, and later tickets (typed, or its Buy buttons) go on that card.
+      const openRef = lot.open ? db.doc(`channels/${lot.open.conv}/messages/${lot.open.id}`) : null;
+      const open = openRef && (await tx.get(openRef)).exists ? lot.open : null;
       const drawAt = lot.drawAt && lot.drawAt > now ? lot.drawAt : nextFriday(now);
       const n = words[0] ? casino.parseBet(words[0], Math.floor(balance / casino.TICKET)) : 0;
       if (words[0] && (!n || n < 1)) return note('How many tickets?', `Tickets are ${casino.TICKET} coins. Try: /lottery 3`);
@@ -785,11 +789,16 @@ export const play = onCall({ maxInstances: 5, invoker: 'public' }, async (req) =
       const tickets = { ...(lot.tickets || {}) };
       if (n) tickets[me] = (tickets[me] || 0) + n;
       const pot = (lot.pot || 0) + cost;
-      tx.set(lotteryRef, { pot, tickets, drawAt, round: lot.round || 1, last: lot.last || null });
+      const people = Object.keys(tickets).length;
+      tx.set(lotteryRef, { pot, tickets, drawAt, round: lot.round || 1, last: lot.last || null, open: open || { conv, id: msgRef.id } });
       if (n)
         tx.set(bankRef(me), casino.bankAfter(myBank, me, -cost, { icon: '🎟️', label: `Lottery: ${n} ticket${n > 1 ? 's' : ''}` }, {}, now));
-      post(tx, { bought: n || 0, mine: tickets[me] || 0, pot, drawAt, people: Object.keys(tickets).length, last: lot.last || null });
-      return { ok: true };
+      if (!open) {
+        post(tx, { bought: n || 0, mine: tickets[me] || 0, pot, drawAt, people, last: lot.last || null });
+        return { ok: true };
+      }
+      tx.update(openRef, { 'cmd.pot': pot, 'cmd.people': people });
+      return { ok: true, note: casino.lotteryNote(n, tickets[me] || 0, pot, open.conv, conv) };
     }
 
     if (isArcade) {
@@ -899,7 +908,11 @@ export const drawLottery = onSchedule({ schedule: '0 18 * * 5', timeZone: TIME_Z
   const now = Date.now();
   await db.runTransaction(async (tx) => {
     const lot = (await tx.get(lotteryRef)).data();
+    // The round's open card closes (unless someone deleted it).
+    const openRef = lot?.open ? db.doc(`channels/${lot.open.conv}/messages/${lot.open.id}`) : null;
+    const openCard = openRef && (await tx.get(openRef)).exists;
     if (!lot || !lot.pot || !Object.keys(lot.tickets || {}).length) {
+      if (openCard) tx.update(openRef, { 'cmd.closed': true, 'cmd.pot': 0, 'cmd.people': 0, 'cmd.winner': null });
       tx.set(lotteryRef, { pot: 0, tickets: {}, drawAt: nextFriday(now + 60000), round: (lot?.round || 0) + 1, last: lot?.last || null });
       return;
     }
@@ -908,6 +921,7 @@ export const drawLottery = onSchedule({ schedule: '0 18 * * 5', timeZone: TIME_Z
     let r = Math.floor(Math.random() * total);
     const [winner, theirs] = entries.find(([, n]) => (r -= n) < 0) || entries[0];
     const bank = (await tx.get(bankRef(winner))).data() || {};
+    if (openCard) tx.update(openRef, { 'cmd.closed': true, 'cmd.pot': lot.pot, 'cmd.people': entries.length, 'cmd.winner': winner });
     tx.set(bankRef(winner), casino.bankAfter(bank, winner, lot.pot, { icon: '🎟️', label: `Won the lottery (${lot.pot} coins)` }, {}, now));
     const last = { winner, pot: lot.pot, tickets: theirs, of: total, people: entries.length, at: now };
     tx.set(lotteryRef, { pot: 0, tickets: {}, drawAt: nextFriday(now + 60000), round: (lot.round || 1) + 1, last });

@@ -124,6 +124,16 @@ export default function ChatView({
   const pendingJump = useRef(null);
 
   const conv = current;
+  // Switching conversations drops the reply, edit, and picked command right
+  // away, before the new conversation's composer first renders, so they
+  // can't land in its text (and its saved draft).
+  const [stateFor, setStateFor] = useState(conv.key);
+  if (stateFor !== conv.key) {
+    setStateFor(conv.key);
+    setReplyTo(null);
+    setEditing(null);
+    setUseCmd(null);
+  }
   const all = useMemo(() => [...(older[conv.key] || []), ...(messages[conv.key] || [])], [older, messages, conv.key]);
   const ads = useAds();
   const adSpots = chatAdSpots(ads, all.length);
@@ -180,8 +190,6 @@ export default function ChatView({
 
   useLayoutEffect(() => {
     setSelected(null);
-    setReplyTo(null);
-    setEditing(null);
     setNewBelow(false);
     setNotifyOpen(false);
     lastCount.current = all.length;

@@ -78,7 +78,7 @@ const SECTIONS = [
       'Edit your own past shifts’ notes, subteam, and tasks. Team management fixes times.',
       'Lab check-in: when team management asks who’s going to the lab, the app asks you when you open it. Answer Yes or No for lunch and after school; change it later in the Shifts tab.',
       'Required polls work the same way: a poll in #announcements that everyone has to answer pops up until you vote (or write your answer).',
-      'Drafts: anything you type and don’t send stays in that channel’s box until you come back. On iPad and phone, Return starts a new line and Send sends; with a keyboard and mouse, Enter sends and Shift+Enter starts a new line.',
+      'Drafts: anything you type and don’t send stays in that channel’s box until you come back. Return (Enter) sends; Shift+Return starts a new line.',
     ],
   ],
   [
@@ -96,7 +96,7 @@ const SECTIONS = [
       '#general is for everyone; each subteam has its own channel. A number means unread messages (red means someone @mentioned you, your subteam, or @everyone).',
       'Type @ to mention someone, @Programming (or any subteam) to ping that subteam, # to link a task, and : for emoji (like :fire:).',
       'Tap Aa for text styles: bold, italic, bold italic, underline, strikethrough, big/medium/small headings, small gray text, quotes, lists, code, and ||spoilers|| (hidden until tapped). You can also type them: **bold**, *italic*, ***bold italic***, __underline__, ~~strike~~, # Big, ## Medium, ### Small, -# small text, > quote.',
-      'Casino and coins: in #arcade, bet Jackson coins on /slots, /blackjack, /crash, /mines, /highlow, /roulette, /dice, /coinflip, or the Friday /lottery. Anywhere: /daily, /work (only while you’re clocked in), /beg, /rob, /give, /balance, /leaderboard. The server rolls everything.',
+      'Casino and coins: in #arcade, bet Jackson coins on /slots, /blackjack, /crash, /mines, /highlow, /roulette, /dice, /coinflip, or the Friday /lottery (one lottery card is open at a time; more tickets go on it). Anywhere: /daily, /work (only while you’re clocked in), /beg, /rob, /give, /balance, /leaderboard. The server rolls everything.',
       'Games in #arcade: challenge anyone (or @Trotbot) to /rps, /tictactoe, /connect4, or /duel, with an optional bet. Everyone can jump into /trivia, /hangman, /typerace, and /heist.',
       'Team commands, anywhere: /task Fix the intake @Cooper friday, /mytasks (check them off right in chat), /overdue, /shift (clock in or out; /shift who), /match 20 45 15 win #7 (saves to the Match Log), /standup.',
       'Type / for commands (Trotbot answers): /help lists them all. Try /8ball, /roll 2d6, /remind 2h charge batteries, /pet @someone, /whois @someone, or /afk lunch.',
