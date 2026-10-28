@@ -3194,3 +3194,23 @@ html.kb-open .toast { bottom: auto; top: calc(var(--vvt) + var(--vvh) - 64px); }
 .cmd-mytask .task-chip { flex: 1; min-width: 0; justify-content: flex-start; }
 .cmd-mytask .late { color: #dc2626; font-weight: 700; font-size: 12px; white-space: nowrap; }
 .cmd-mytask.done .task-chip { text-decoration: line-through; opacity: 0.6; }
+
+/* ---------- Asher's Commands page (CommandsPage.jsx) ---------- */
+.cmd-admin-group { display: flex; flex-direction: column; gap: 4px; }
+.cmd-admin-head { display: flex; align-items: center; gap: 8px; }
+.cmd-admin-row { display: flex; align-items: center; gap: 10px; padding: 4px 6px; border-radius: 8px; }
+.cmd-admin-row:hover { background: var(--surface-2); }
+.cmd-admin-row code { font-weight: 800; color: var(--accent); min-width: 92px; }
+.cmd-admin-row.off code { color: var(--muted); text-decoration: line-through; }
+.cmd-house { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; }
+.cmd-house > div { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: 12px; background: var(--surface-2); }
+.cmd-admin .pos { color: #16a34a; } .cmd-admin .neg { color: #dc2626; }
+.cmd-house-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.cmd-house-table th { text-align: right; font-size: 12px; color: var(--muted); font-weight: 700; padding: 4px 6px; }
+.cmd-house-table td { text-align: right; padding: 5px 6px; border-top: 1px solid var(--border); font-variant-numeric: tabular-nums; }
+.cmd-house-table th:first-child, .cmd-house-table td:first-child { text-align: left; }
+.cmd-house-lists { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+@media (min-width: 761px) {
+  .dialog.cmd-admin { height: min(820px, calc(var(--vvh, 100dvh) - 40px)); }
+}
+.cmd-admin .ads-body { flex-shrink: 1; }

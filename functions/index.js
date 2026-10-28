@@ -14,6 +14,7 @@ import { fetchPage, firstLink, readPreview } from './preview.js';
 import { coinSettings, wallet } from './shared/coins.js';
 import * as casino from './shared/casino.js';
 import * as arcade from './shared/arcade.js';
+import { blocked, serverGroup } from './shared/commandRules.js';
 
 // Functions run next to the database. The deploy workflow writes location.json
 // from the database's location; nam5 (the US multi-region) pairs with us-central1.
@@ -709,9 +710,9 @@ export const play = onCall({ maxInstances: 5, invoker: 'public' }, async (req) =
   const isCasino = casino.CASINO.includes(game);
   const isArcade = arcade.MULTI.includes(game);
   if (!isCasino && !isArcade && !casino.ECONOMY.includes(game)) throw new HttpsError('invalid-argument', 'Unknown command.');
-  if (isCasino && conv !== 'arcade')
-    return { note: { title: '🎰 Take it to #arcade', body: 'Casino games only run in #arcade.', go: 'arcade' } };
-  if (isArcade && conv !== 'arcade') return { note: { title: '🕹️ Take it to #arcade', body: 'Games run in #arcade.', go: 'arcade' } };
+  // Asher's switches: off, or not allowed in this channel (read fresh, not cached).
+  const stop = blocked(game, serverGroup(game), conv, (await db.doc('settings/team').get()).get('commands'));
+  if (stop) return { note: stop };
   const roster = isArcade ? (await db.collection('people').get()).docs.map((d) => data.rename(d.get('name') || '')).filter(Boolean) : [];
   const msgRef = db.collection(`channels/${conv}/messages`).doc();
   const text = `/${game}${words.length ? ` ${words.join(' ')}` : ''}`.slice(0, 200);

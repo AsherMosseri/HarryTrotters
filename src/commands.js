@@ -7,6 +7,7 @@
 // line (casino, economy, arcade games) roll on the server instead.
 
 import { overdueTasks, parseMatch, parseTask, seasonRecord, todayISO } from './teamCommands.js';
+import { blocked, isOff } from '../functions/shared/commandRules.js';
 
 export const GROUPS = [
   ['basics', '🧰 Basics'],
@@ -97,11 +98,13 @@ export function parseCommand(text) {
 }
 
 // Commands that start with what you've typed so far ("/r" → remind, roll, rate).
-export function matchCommands(typed) {
+// Ones Asher turned off (cfg.off) aren't offered.
+export function matchCommands(typed, cfg) {
   const q = typed.toLowerCase();
-  const starts = COMMANDS.filter((c) => c.name.startsWith(q));
+  const on = COMMANDS.filter((c) => !isOff(c.name, cfg));
+  const starts = on.filter((c) => c.name.startsWith(q));
   const inside = q
-    ? COMMANDS.filter(
+    ? on.filter(
         (c) =>
           !c.name.startsWith(q) &&
           (c.name.includes(q) ||
@@ -420,6 +423,9 @@ export async function runCommand({ cmd, args }, ctx) {
     post: { text: `/${cmd.name}${args ? ` ${args}` : ''}`, cmd: { ...result, name: cmd.name }, ...extra },
   });
   const need = (what) => ({ note: { title: `/${cmd.name} needs ${what}`, body: `Try: /${cmd.name} ${cmd.args}` } });
+  // Turned off, or not in this channel (Asher's Commands page).
+  const stop = blocked(cmd.name, cmd.group, ctx.conv, ctx.commandCfg);
+  if (stop) return { note: stop };
   // Casino and economy: the server rolls and posts the card (functions/index.js play).
   if (cmd.server) {
     const r = await ctx.play(cmd.name, args ? args.split(/\s+/) : []);
@@ -449,7 +455,7 @@ export async function runCommand({ cmd, args }, ctx) {
       return card({ to, amount, line: `sent you ${amount} Jackson coins` }, { mentions: [to] });
     }
     case 'help':
-      return { note: { title: 'Commands', help: true } };
+      return { note: { title: 'Commands', help: true, off: ctx.commandCfg?.off || [] } };
 
     case 'task': {
       const t = parseTask(args, ctx.roster, me);

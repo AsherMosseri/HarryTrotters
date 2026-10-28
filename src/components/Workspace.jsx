@@ -60,6 +60,7 @@ import {
   SubmitAdDialog,
   useAdsEngine,
 } from './Ads.jsx';
+import CommandsPage from './CommandsPage.jsx';
 import { CoinsDialog, Coins } from './Coins.jsx';
 import { OrderTracker, OrdersDialog, orderActive } from './AdOrders.jsx';
 import { setServerSkew } from '../serverTime.js';
@@ -1180,6 +1181,7 @@ export default function Workspace({ store, actor, rename, renames }) {
   const [adSubs, setAdSubs] = useState([]);
   useEffect(() => store.subscribeAdSubmissions(setAdSubs), [store]);
   const [adsPage, setAdsPage] = useState(false);
+  const [commandsPage, setCommandsPage] = useState(false);
   const [adStats, setAdStats] = useState({});
   useEffect(() => store.subscribeAdStats(setAdStats), [store]);
 
@@ -1205,6 +1207,7 @@ export default function Workspace({ store, actor, rename, renames }) {
     roster,
     lottery,
     team: {
+      commandCfg: settings.commands || {},
       tasks: tasks || [],
       runs: () => runs,
       createRun: (data) => api.createRun(data),
@@ -1434,6 +1437,7 @@ export default function Workspace({ store, actor, rename, renames }) {
                         )}
                         <button onClick={() => (setMeMenu(false), setEditTabs(true))}>🗂 Edit tabs</button>
                         {isOwner && <button onClick={() => (setMeMenu(false), setAdsPage(true))}>📺 Ads</button>}
+                        {isOwner && <button onClick={() => (setMeMenu(false), setCommandsPage(true))}>🤖 Commands</button>}
                       </div>
                       <ThemeMenu {...themeMenuProps} inline onClose={() => {}} />
                       <UpdateCheck />
@@ -2045,6 +2049,16 @@ export default function Workspace({ store, actor, rename, renames }) {
               onClose={ads.closeRemoving}
             />
           )}
+          {commandsPage && (
+            <CommandsPage
+              cfg={settings.commands}
+              channels={convs.channels}
+              bank={bank}
+              lottery={lottery}
+              onSave={(commands) => api.saveSettings({ commands })}
+              onClose={() => setCommandsPage(false)}
+            />
+          )}
           {adsPage && (
             <AdsSettings
               initial={settings.ads}
@@ -2129,6 +2143,7 @@ export default function Workspace({ store, actor, rename, renames }) {
                     )}
                     <button onClick={() => (closeSheet(), setEditTabs(true))}>🗂 Edit tabs</button>
                     {isOwner && <button onClick={() => (closeSheet(), setAdsPage(true))}>📺 Ads</button>}
+                    {isOwner && <button onClick={() => (closeSheet(), setCommandsPage(true))}>🤖 Commands</button>}
                   </div>
                   <ThemeMenu {...themeMenuProps} inline onClose={() => {}} />
                   <UpdateCheck />

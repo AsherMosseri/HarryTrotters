@@ -4,6 +4,15 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '2.62',
+    date: '2026-10-28',
+    title: 'Command controls',
+    items: [
+      'Commands can now be turned off, or kept to certain channels. If one’s off or doesn’t work where you are, Trotbot tells you (and where to go instead).',
+      'The / menu and /help only show commands that are on.',
+    ],
+  },
+  {
     version: '2.61',
     date: '2026-10-28',
     title: 'Games and team commands',

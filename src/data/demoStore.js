@@ -14,6 +14,7 @@ import { REQUESTS_TO } from '../config.js';
 import { deliver } from '../adOrders.js';
 import * as casino from '../../functions/shared/casino.js';
 import * as arcade from '../../functions/shared/arcade.js';
+import { blocked, serverGroup } from '../../functions/shared/commandRules.js';
 
 const KEY = 'ftc32313-demo-v13';
 const listeners = new Set();
@@ -826,12 +827,11 @@ export const demoStore = {
     if (conv.startsWith('dm:') || conv === 'announcements')
       return note('Not here.', 'Use #arcade for the casino, or any channel for the rest.');
     const isCasino = casino.CASINO.includes(game);
-    if (isCasino && conv !== 'arcade')
-      return { note: { title: '🎰 Take it to #arcade', body: 'Casino games only run in #arcade.', go: 'arcade' } };
+    const stop = blocked(game, serverGroup(game), conv, state.settings?.commands);
+    if (stop) return { note: stop };
     const balance = balanceOf(me);
     const mine = bank(me);
     if (arcade.MULTI.includes(game)) {
-      if (conv !== 'arcade') return { note: { title: '🕹️ Take it to #arcade', body: 'Games run in #arcade.', go: 'arcade' } };
       const r = arcade.start(game, { me, words, roster, balance, bank: mine, now });
       if (r.error) return note(r.error);
       payOut(r.money);

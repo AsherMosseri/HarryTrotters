@@ -1140,7 +1140,7 @@ export function RemoveAdsDialog({ prices, balance, coupon, onBuy, onClose }) {
 
 // ---------- Asher's Ads page ----------
 
-const Switch = ({ checked, onChange, label }) => (
+export const Switch = ({ checked, onChange, label }) => (
   <label className="switch" title={label}>
     <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} aria-label={label} />
     <span />
@@ -1166,7 +1166,7 @@ function Choice({ value, options, onChange, label }) {
   );
 }
 
-const Row = ({ title, hint, children }) => (
+export const Row = ({ title, hint, children }) => (
   <div className="ads-row">
     <div className="ads-row-text">
       <b>{title}</b>

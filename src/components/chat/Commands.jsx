@@ -458,10 +458,10 @@ export function CommandNote({ note, onDismiss, onUse, onGo, tasks = [], onOpenTa
       )}
       {note.help && (
         <div className="cmd-help">
-          {GROUPS.map(([g, label]) => (
+          {GROUPS.filter(([g]) => COMMANDS.some((c) => c.group === g && !(note.off || []).includes(c.name))).map(([g, label]) => (
             <section key={g}>
               <h4>{label}</h4>
-              {COMMANDS.filter((c) => c.group === g).map((c) => (
+              {COMMANDS.filter((c) => c.group === g && !(note.off || []).includes(c.name)).map((c) => (
                 <button key={c.name} className="cmd-help-row" onClick={() => onUse(c)}>
                   <code>/{c.name}</code>
                   {c.args && <span className="muted small">{c.args}</span>}

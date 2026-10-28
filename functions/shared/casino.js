@@ -387,6 +387,12 @@ export function bankAfter(bank, name, delta, entry, extra = {}, now = Date.now()
     if (shown > 0) stats.won = (stats.won || 0) + shown;
     if (shown < 0) stats.lost = (stats.lost || 0) - shown;
     stats.best = Math.max(stats.best || 0, shown);
+    // Per game, for the house's numbers on Asher's Commands page.
+    const g = { ...(stats.games?.[entry.game] || {}) };
+    g.played = (g.played || 0) + 1;
+    if (shown > 0) g.won = (g.won || 0) + shown;
+    if (shown < 0) g.lost = (g.lost || 0) - shown;
+    stats.games = { ...(stats.games || {}), [entry.game]: g };
   }
   const recent =
     entry && shown

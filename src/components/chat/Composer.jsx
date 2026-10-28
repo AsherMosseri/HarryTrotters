@@ -118,7 +118,8 @@ export default function Composer({
   const options = useMemo(() => {
     if (!suggest) return [];
     const q = suggest.query.toLowerCase();
-    if (suggest.kind === '/') return matchCommands(q).map((c) => ({ type: 'cmd', key: c.name, insert: `/${c.name}`, c }));
+    if (suggest.kind === '/')
+      return matchCommands(q, api.team().commandCfg).map((c) => ({ type: 'cmd', key: c.name, insert: `/${c.name}`, c }));
     if (suggest.kind === '@') {
       const out = [];
       if (!isDm && isManager && 'everyone'.startsWith(q)) out.push({ type: 'everyone', key: 'everyone', insert: '@everyone' });
@@ -264,6 +265,7 @@ export default function Composer({
         actor,
         roster,
         ...team,
+        conv,
         tasks,
         subteam: team.subteamOf(conv),
         createTask: api.create,
