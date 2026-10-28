@@ -1218,6 +1218,8 @@ h3.md-h { font-size: 16.5px; }
   position: absolute; top: 2px; right: 1px; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 999px;
   display: grid; place-items: center; font-size: 10.5px; font-weight: 800; background: var(--danger); color: #fff;
   border: 2px solid var(--surface);
+  /* Above avatar decorations (they sit at z-index 2). */
+  z-index: 5;
 }
 .inbox-pop {
   position: absolute; right: -8px; top: calc(100% + 6px); z-index: 40; width: min(380px, calc(100vw - 24px));

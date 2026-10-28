@@ -4,6 +4,12 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '2.64',
+    date: '2026-10-28',
+    title: 'Badge fix',
+    items: ['The red count on your profile picture (top right) shows on top of your avatar decoration instead of hiding behind it.'],
+  },
+  {
     version: '2.63',
     date: '2026-10-28',
     title: 'Smoother chat on iPad',
