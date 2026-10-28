@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { personId } from '../../data/diff.js';
 import { CommandCard, Trotbot } from './Commands.jsx';
-import { Avatar, DisplayName, StatusDot, usePeople } from '../common.jsx';
+import { AutoTextarea, Avatar, DisplayName, StatusDot, usePeople } from '../common.jsx';
 import { borderProps } from '../../borders.js';
 import { isJumbo, renderRich } from './format.jsx';
 import { EmojiPicker } from './Pickers.jsx';
@@ -57,7 +57,95 @@ function LinkPreview({ p, canHide, onHide }) {
   );
 }
 
-function Poll({ m, actor, onVote, onEnd, canEnd }) {
+// A written-answer poll: everyone types their own answer (votes.text).
+function TextPoll({ m, actor, onAnswer, onEnd, canEnd }) {
+  const me = personId(actor.name);
+  const answers = Object.entries(m.votes?.text || {})
+    .map(([id, a]) => ({ id, ...a }))
+    .sort((a, b) => (a.at || 0) - (b.at || 0));
+  const mine = m.votes?.text?.[me];
+  const closed = !!m.poll.closed;
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+  const [all, setAll] = useState(false);
+  const shown = all ? answers : answers.slice(0, 5);
+  const save = async () => {
+    await onAnswer(draft);
+    setEditing(false);
+  };
+  return (
+    <div className="poll poll-text" onClick={(e) => e.stopPropagation()}>
+      <div className="poll-q">✍️ {m.poll.question}</div>
+      <div className="muted tiny">
+        {closed ? 'Poll ended' : 'Write your answer'} · {answers.length} {answers.length === 1 ? 'answer' : 'answers'}
+        {m.poll.required && !closed && <span className="poll-required"> · Everyone has to answer</span>}
+      </div>
+      {!closed && (!mine || editing) && (
+        <div className="poll-answer-box">
+          <AutoTextarea
+            className="input"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder="Your answer"
+            maxLength={1000}
+            aria-label="Your answer"
+          />
+          <div className="row gap">
+            <button className="btn primary small-btn" disabled={!draft.trim()} onClick={save}>
+              {mine ? 'Save' : 'Send'}
+            </button>
+            {editing && (
+              <button className="btn small-btn" onClick={() => setEditing(false)}>
+                Cancel
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+      {shown.length > 0 && (
+        <ul className="poll-answers">
+          {shown.map((a) => (
+            <li key={a.id} className={a.id === me ? 'mine' : ''}>
+              <Avatar name={a.name} size={22} />
+              <div className="grow">
+                <b className="small">{a.name}</b>
+                <div className="poll-answer-text">{a.text}</div>
+              </div>
+              {a.id === me && !closed && !editing && (
+                <button
+                  className="link-btn small"
+                  onClick={() => {
+                    setDraft(a.text);
+                    setEditing(true);
+                  }}
+                >
+                  Edit
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      {answers.length > 5 && (
+        <button className="link-btn small" onClick={() => setAll(!all)}>
+          {all ? 'Show fewer' : `Show all ${answers.length} answers`}
+        </button>
+      )}
+      {canEnd && !closed && (
+        <button className="link-btn small" onClick={onEnd}>
+          End poll
+        </button>
+      )}
+    </div>
+  );
+}
+
+function Poll({ m, actor, onVote, onEnd, canEnd, onAnswer }) {
+  if (m.poll.kind === 'text') return <TextPoll m={m} actor={actor} onAnswer={onAnswer} onEnd={onEnd} canEnd={canEnd} />;
+  return <ChoicePoll m={m} actor={actor} onVote={onVote} onEnd={onEnd} canEnd={canEnd} />;
+}
+
+function ChoicePoll({ m, actor, onVote, onEnd, canEnd }) {
   const me = personId(actor.name);
   const votes = m.votes || {};
   const counts = m.poll.options.map((o) => Object.keys(votes[o.id] || {}).length);
@@ -328,6 +416,7 @@ export default function Message({
                 actor={actor}
                 canEnd={mine || isManager}
                 onVote={(optionId, on) => api.vote(conv, m, optionId, on)}
+                onAnswer={(text) => api.answerPoll(conv, m, text)}
                 onEnd={() => api.editMessage(conv, m.id, { poll: { ...m.poll, closed: true } })}
               />
             )}

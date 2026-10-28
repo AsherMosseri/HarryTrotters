@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { GIPHY_API_KEY } from '../../config.js';
-import { CloseIcon, Overlay, PlusIcon } from '../common.jsx';
+import { AutoTextarea, CloseIcon, Overlay, PlusIcon } from '../common.jsx';
 import { GROUPS, GROUP_ICONS, emojiList, firstEmoji, loadEmoji, recentEmoji, searchEmoji, rememberEmoji } from './emoji.js';
 import { isTouch } from '../../util.js';
 
@@ -304,12 +304,14 @@ export function GifPicker({ onPick, onUpload, onClose }) {
 // Create a poll: a question, 2–10 options, one or several choices.
 export function PollDialog({ onCreate, onClose, canRequire = false, initialQuestion = '' }) {
   const [question, setQuestion] = useState(initialQuestion);
+  // 'choices': pick from options; 'text': everyone writes their own answer.
+  const [kind, setKind] = useState('choices');
   const [options, setOptions] = useState(['', '']);
   const [multi, setMulti] = useState(false);
   const [required, setRequired] = useState(false);
   useEscape(onClose);
   const filled = options.map((o) => o.trim()).filter(Boolean);
-  const ok = question.trim() && filled.length >= 2;
+  const ok = question.trim() && (kind === 'text' || filled.length >= 2);
   return (
     <Overlay>
       <div className="panel-backdrop center" onClick={onClose}>
@@ -320,10 +322,14 @@ export function PollDialog({ onCreate, onClose, canRequire = false, initialQuest
             e.preventDefault();
             if (!ok) return;
             onCreate({
-              question: question.trim().slice(0, 200),
-              multi,
+              question: question.trim().slice(0, 500),
               ...(required ? { required: true } : {}),
-              options: filled.slice(0, 10).map((text, i) => ({ id: String.fromCharCode(97 + i), text: text.slice(0, 80) })),
+              ...(kind === 'text'
+                ? { kind: 'text', multi: false, options: [] }
+                : {
+                    multi,
+                    options: filled.slice(0, 10).map((text, i) => ({ id: String.fromCharCode(97 + i), text: text.slice(0, 200) })),
+                  }),
             });
           }}
         >
@@ -334,41 +340,64 @@ export function PollDialog({ onCreate, onClose, canRequire = false, initialQuest
               <CloseIcon />
             </button>
           </div>
-          <input
+          <div className="segmented poll-kind" role="radiogroup" aria-label="Kind of poll">
+            {[
+              ['choices', '☑️ Choices'],
+              ['text', '✍️ Written answer'],
+            ].map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                role="radio"
+                aria-checked={kind === id}
+                className={`plain-seg${kind === id ? ' on' : ''}`}
+                onClick={() => setKind(id)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <AutoTextarea
             className="input big"
             autoFocus={!isTouch}
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
-            placeholder="Ask a question"
+            placeholder={kind === 'text' ? 'Ask a question everyone answers in their own words' : 'Ask a question'}
+            maxLength={500}
           />
-          {options.map((o, i) => (
-            <div key={i} className="row gap">
-              <input
-                className="input grow"
-                value={o}
-                onChange={(e) => setOptions(options.map((x, j) => (j === i ? e.target.value : x)))}
-                placeholder={`Option ${i + 1}`}
-              />
-              {options.length > 2 && (
-                <button
-                  type="button"
-                  className="icon-btn small"
-                  onClick={() => setOptions(options.filter((_, j) => j !== i))}
-                  aria-label="Remove option"
-                >
-                  <CloseIcon />
-                </button>
-              )}
-            </div>
-          ))}
-          {options.length < 10 && (
+          {kind === 'text' && <p className="muted small poll-kind-hint">Everyone types their own answer. Answers show under the poll.</p>}
+          {kind === 'choices' &&
+            options.map((o, i) => (
+              <div key={i} className="row gap">
+                <AutoTextarea
+                  className="input grow"
+                  value={o}
+                  onChange={(e) => setOptions(options.map((x, j) => (j === i ? e.target.value : x)))}
+                  placeholder={`Option ${i + 1}`}
+                  maxLength={200}
+                />
+                {options.length > 2 && (
+                  <button
+                    type="button"
+                    className="icon-btn small"
+                    onClick={() => setOptions(options.filter((_, j) => j !== i))}
+                    aria-label="Remove option"
+                  >
+                    <CloseIcon />
+                  </button>
+                )}
+              </div>
+            ))}
+          {kind === 'choices' && options.length < 10 && (
             <button type="button" className="link-btn" onClick={() => setOptions([...options, ''])}>
               ＋ Add option
             </button>
           )}
-          <label className="row gap small">
-            <input type="checkbox" checked={multi} onChange={(e) => setMulti(e.target.checked)} /> Allow picking more than one
-          </label>
+          {kind === 'choices' && (
+            <label className="row gap small">
+              <input type="checkbox" checked={multi} onChange={(e) => setMulti(e.target.checked)} /> Allow picking more than one
+            </label>
+          )}
           {canRequire && (
             <label className="row gap small poll-required-opt">
               <input type="checkbox" checked={required} onChange={(e) => setRequired(e.target.checked)} />

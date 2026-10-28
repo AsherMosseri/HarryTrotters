@@ -923,7 +923,12 @@ export const demoStore = {
       game === 'daily'
         ? casino.daily(mine, day(now), day(now - 86400000))
         : game === 'work'
-          ? casino.work(mine, now)
+          ? casino.work(mine, now, Math.random, {
+              onShift: (state.shifts || []).some((x) => !x.end && x.person === me),
+              tasks: (state.tasks || [])
+                .filter((t) => t.status !== 'done' && !t.deletedAt && (t.assignees || []).includes(me))
+                .map((t) => t.title || 'a task'),
+            })
           : casino.beg(mine, now);
     if (r.error) return note(r.error);
     const label = { daily: `Daily coins (streak ${r.card.streak})`, work: `Work: ${r.card.job}`, beg: 'Begging' }[game];
@@ -1214,6 +1219,16 @@ export const demoStore = {
       if (on) votes[optionId][me] = actor.name;
       else delete votes[optionId][me];
       return { ...m, votes };
+    });
+  },
+  // A written-answer poll: votes.text[person] = { name, text, at } (empty text removes it).
+  async answerPoll(conv, msg, text, actor) {
+    const me = personId(actor.name);
+    updateMsg(conv, msg.id, (m) => {
+      const answers = { ...(m.votes?.text || {}) };
+      if (text) answers[me] = { name: actor.name, text, at: Date.now() };
+      else delete answers[me];
+      return { ...m, votes: { ...(m.votes || {}), text: answers } };
     });
   },
   async pin(conv, id, on, actor) {

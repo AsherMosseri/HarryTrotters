@@ -342,10 +342,14 @@ export function daily(bank, day, yesterday) {
   return { amount, card: { amount, streak }, bank: { daily: { day, streak } } };
 }
 
-export function work(bank, now, rng = Math.random) {
+// /work pays only while you're clocked in at the lab, for one of your real
+// open tasks (or a lab chore if you don't have any).
+export function work(bank, now, rng = Math.random, { onShift = false, tasks = [] } = {}) {
+  if (!onShift) return { error: 'Clock in at the lab first. /work only pays while you’re on a shift (try /shift).' };
   const left = cooldownLeft(bank, 'work', now);
   if (left) return { error: `You’re tired. Work again in ${minutesText(left)}.` };
-  const [icon, job, joke] = pickOf(rng, JOBS);
+  const task = tasks.length ? pickOf(rng, tasks) : '';
+  const [icon, job, joke] = task ? ['🛠️', `worked on “${task}”`, 'Real work, real coins.'] : pickOf(rng, JOBS);
   const amount = rint(rng, 10, 30);
   return { amount, card: { amount, icon, job, joke }, bank: { cooldowns: { ...bank.cooldowns, work: now } } };
 }

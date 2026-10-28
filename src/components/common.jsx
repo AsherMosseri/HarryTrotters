@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef, useState } from 'react';
+import { createContext, forwardRef, useContext, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from 'react';
 import { STATUSES, PRIORITIES, statusById, priorityById } from '../config.js';
 import { colorFor, initials, dueInfo } from '../util.js';
 import { decorationById, nameProps } from '../nitro.js';
@@ -112,6 +112,20 @@ export function Nameplate({ plate }) {
 // Safari on iPhone and iPad clips and misplaces fixed pop-ups that live
 // inside a scrolling element (they ended up under the top bar or between
 // the top bar and the tab bar).
+// A text box for more than a few words: it grows with what you type (up to
+// maxHeight, then scrolls), and Return makes a new line.
+export const AutoTextarea = forwardRef(function AutoTextarea({ maxHeight = 220, className = '', value, ...props }, ref) {
+  const inner = useRef(null);
+  useImperativeHandle(ref, () => inner.current);
+  useLayoutEffect(() => {
+    const el = inner.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight + 2, maxHeight)}px`;
+  }, [value, maxHeight]);
+  return <textarea ref={inner} rows={1} value={value} className={`${className} auto-grow`} {...props} />;
+});
+
 export function Overlay({ children }) {
   return typeof document === 'undefined' ? children : createPortal(children, document.body);
 }

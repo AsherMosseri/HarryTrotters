@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { lunchOf } from '../config.js';
 import { addDays, parseDay, todayISO } from '../milestones.js';
 import { firstName } from '../util.js';
-import { Avatar, CloseIcon, Overlay } from './common.jsx';
+import { AutoTextarea, Avatar, CloseIcon, Overlay } from './common.jsx';
 
 export const SLOTS = [
   { id: 'lunch', label: 'Lunch', icon: '🥪' },
@@ -319,8 +319,10 @@ export function CheckinDialog({ schedule, onDone, onSchedule, onClose }) {
 
 // A required poll from #announcements, not voted on yet: blocks the app,
 // like a lab check-in, until it's answered (or the poll is ended).
-export function PollGate({ msg, rename, onVote }) {
+export function PollGate({ msg, rename, onVote, onAnswer }) {
   const [picked, setPicked] = useState([]);
+  const [answer, setAnswer] = useState('');
+  const written = msg.poll.kind === 'text';
   const [busy, setBusy] = useState(false);
   const { poll } = msg;
   const toggle = (id) => setPicked(poll.multi ? (picked.includes(id) ? picked.filter((x) => x !== id) : [...picked, id]) : [id]);
@@ -331,9 +333,20 @@ export function PollGate({ msg, rename, onVote }) {
           <div className="logo-mark big">📊</div>
           <h1 id="pollgate-title">{poll.question}</h1>
           <p className="muted">
-            Poll from {firstName(rename(msg.by || ''))} in #announcements. {poll.multi ? 'Pick one or more' : 'Pick one'} to keep going.
+            Poll from {firstName(rename(msg.by || ''))} in #announcements.{' '}
+            {written ? 'Write your answer' : poll.multi ? 'Pick one or more' : 'Pick one'} to keep going.
           </p>
-          <div className="pollgate-options">
+          {written && (
+            <AutoTextarea
+              className="input"
+              value={answer}
+              onChange={(e) => setAnswer(e.target.value)}
+              placeholder="Your answer"
+              maxLength={1000}
+              autoFocus
+            />
+          )}
+          <div className="pollgate-options" hidden={written}>
             {poll.options.map((o) => (
               <button
                 key={o.id}
@@ -348,16 +361,16 @@ export function PollGate({ msg, rename, onVote }) {
           </div>
           <button
             className="btn primary big-btn"
-            disabled={!picked.length || busy}
+            disabled={(written ? !answer.trim() : !picked.length) || busy}
             onClick={async () => {
               setBusy(true);
-              await onVote(picked);
+              await (written ? onAnswer(answer) : onVote(picked));
               setBusy(false);
             }}
           >
-            {busy ? 'Saving…' : 'Vote'}
+            {busy ? 'Saving…' : written ? 'Send answer' : 'Vote'}
           </button>
-          <p className="muted tiny">You can change your vote anytime in #announcements.</p>
+          <p className="muted tiny">You can change your {written ? 'answer' : 'vote'} anytime in #announcements.</p>
         </div>
       </div>
     </Overlay>

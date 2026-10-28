@@ -56,7 +56,7 @@ export const COMMANDS = [
 
   { name: 'balance', group: 'economy', args: '@person', desc: 'How many Jackson coins (yours or theirs)' },
   { name: 'daily', group: 'economy', args: '', desc: 'Free coins once a day (streaks pay more)', server: true },
-  { name: 'work', group: 'economy', args: '', desc: 'Do a lab job for coins (once an hour)', server: true },
+  { name: 'work', group: 'economy', args: '', desc: 'Coins for your work, while you’re clocked in (once an hour)', server: true },
   { name: 'beg', group: 'economy', args: '', desc: 'Ask around for coins. No promises.', server: true },
   { name: 'give', group: 'economy', args: '@person amount', desc: 'Send someone coins' },
   { name: 'rob', group: 'economy', args: '@person', desc: '35% chance to steal some. Or pay a fine.', server: true },

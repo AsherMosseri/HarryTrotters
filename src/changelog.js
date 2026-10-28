@@ -4,6 +4,18 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '2.69',
+    date: '2026-10-28',
+    title: 'Written polls, drafts, and new lines',
+    items: [
+      'Polls can ask for a written answer: pick ✍️ Written answer when you make one. Everyone types their own answer, and the answers show under the poll. You can edit yours. Required polls in #announcements work this way too.',
+      'Unsent messages stay put: type something, go to another channel or tab, and it’s still there when you come back.',
+      'On iPad and phone, Return starts a new line in chat (tap Send to send). With a keyboard and mouse, Enter sends and Shift+Enter starts a new line. Poll questions, options, and answers can have more than one line, and the boxes grow as you type.',
+      'Jackson coins has two leaderboards: 💰 Most coins (everyone’s balance, same as /leaderboard) and 🛠️ Earned by working (tasks, lab hours, and bonuses only).',
+      '/work only pays while you’re clocked in at the lab, and it’s for one of your real open tasks.',
+    ],
+  },
+  {
     version: '2.68',
     date: '2026-10-28',
     title: 'Decorations stay out of the way',

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { RobotScene } from '../robot/scene.js';
 import { loadModel, diffModels } from '../robot/model.js';
 import { relTime, useEscape } from '../util.js';
-import { CloseIcon, Overlay, PlusIcon, StatusDot } from './common.jsx';
+import { AutoTextarea, CloseIcon, Overlay, PlusIcon, StatusDot } from './common.jsx';
 
 // Models are kept per version so switching back is instant. A model object can
 // only be shown in one viewport at a time, so compare loads its own copy.
@@ -127,7 +127,7 @@ function UploadDialog({ onClose, onUpload }) {
             <label className="field-label" htmlFor="rv-notes">
               Notes
             </label>
-            <input
+            <AutoTextarea
               id="rv-notes"
               className="input"
               value={notes}

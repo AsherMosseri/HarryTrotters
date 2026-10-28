@@ -27,6 +27,30 @@ const FORMATS = [
   ['▒', 'Spoiler (hidden until tapped)', ['wrap', '||']],
 ];
 
+// Unsent messages, per conversation, on this device: they're still there when
+// you come back from another channel or tab.
+const DRAFTS = 'chat-drafts';
+const readDrafts = () => {
+  try {
+    return JSON.parse(localStorage.getItem(DRAFTS)) || {};
+  } catch {
+    return {};
+  }
+};
+const saveDraft = (conv, text) => {
+  try {
+    const all = readDrafts();
+    if (text.trim()) all[conv] = text;
+    else delete all[conv];
+    localStorage.setItem(DRAFTS, JSON.stringify(all));
+  } catch {
+    /* storage unavailable */
+  }
+};
+// On a touch screen, Return makes a new line (the Send button sends), like
+// texting. With a mouse, Enter sends and Shift+Enter makes a new line.
+const returnIsNewLine = () => window.matchMedia?.('(pointer: coarse)').matches;
+
 export default function Composer({
   conv,
   label,
@@ -50,7 +74,7 @@ export default function Composer({
   useCommand,
 }) {
   const people = usePeople();
-  const [text, setText] = useState('');
+  const [text, setText] = useState(() => readDrafts()[conv] || '');
   const [taskIds, setTaskIds] = useState([]);
   const [photo, setPhoto] = useState(null); // { file, preview }
   const [suggest, setSuggest] = useState(null); // { kind: '@' | '#' | ':', query, start, end }
@@ -91,6 +115,9 @@ export default function Composer({
     box.current.focus();
     box.current.setSelectionRange(pos[0], pos[1]);
   }, [text]);
+  useEffect(() => {
+    if (!editing) saveDraft(conv, text);
+  }, [conv, text, editing]);
   useEffect(() => {
     const el = box.current;
     if (!el) return;
@@ -204,7 +231,8 @@ export default function Composer({
   };
 
   const reset = () => {
-    setText('');
+    // After editing a message, your unsent draft comes back.
+    setText(editing ? readDrafts()[conv] || '' : '');
     setTaskIds([]);
     setPhoto(null);
     setSuggest(null);
@@ -602,7 +630,7 @@ export default function Composer({
             if (mod && ['b', 'i', 'u'].includes(e.key.toLowerCase())) {
               e.preventDefault();
               format(['wrap', { b: '**', i: '*', u: '__' }[e.key.toLowerCase()]]);
-            } else if (e.key === 'Enter' && !e.shiftKey) {
+            } else if (e.key === 'Enter' && !e.shiftKey && (mod || !returnIsNewLine())) {
               e.preventDefault();
               send();
             } else if (e.key === 'Escape') {

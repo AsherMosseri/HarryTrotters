@@ -611,6 +611,16 @@ const LABEL = {
 };
 const note = (title, body = '') => ({ note: { title, body } });
 
+// /work: is this person clocked in right now (read fresh, not cached), and
+// what are their open tasks?
+async function workContext(me, data) {
+  const open = await db.collection('shifts').where('end', '==', null).get();
+  return {
+    onShift: open.docs.some((d) => data.rename(d.get('person') || '') === me),
+    tasks: data.tasks.filter((t) => t.status !== 'done' && (t.assignees || []).includes(me)).map((t) => t.title || 'a task'),
+  };
+}
+
 // Multiplayer games pay several people at once: read every bank first (a
 // transaction reads before it writes), then apply each change in order.
 async function payOut(tx, money, banks, now) {
@@ -840,7 +850,7 @@ export const play = onCall({ maxInstances: 5, invoker: 'public' }, async (req) =
       game === 'daily'
         ? casino.daily(myBank, nyDay(now), nyDay(now - 86400000))
         : game === 'work'
-          ? casino.work(myBank, now)
+          ? casino.work(myBank, now, Math.random, await workContext(me, data))
           : casino.beg(myBank, now);
     if (r.error) return note(r.error);
     const label = { daily: `Daily coins (streak ${r.card.streak})`, work: `Work: ${r.card.job}`, beg: 'Begging' }[game];

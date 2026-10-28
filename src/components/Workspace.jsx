@@ -925,6 +925,7 @@ export default function Workspace({ store, actor, rename, renames }) {
         store.setPresence(actor, { typing: conv, typingAt: Date.now(), at: Date.now() }).catch(() => {});
       },
       vote: (conv, msg, optionId, on) => store.vote(conv, msg, optionId, actor, on).catch(fail),
+      answerPoll: (conv, msg, text) => store.answerPoll(conv, msg, text.trim().slice(0, 1000), actor).catch(fail),
       pin: (conv, id, on) => store.pin(conv, id, on, actor).catch(fail),
       subscribePins: (conv, cb) => store.subscribePins(conv, cb, fail),
       hidePreview: (conv, id) => store.hidePreview(conv, id).catch(fail),
@@ -1841,6 +1842,7 @@ export default function Workspace({ store, actor, rename, renames }) {
                 onVote={async (ids) => {
                   for (const id of ids) await api.vote('announcements', pendingPoll, id, true);
                 }}
+                onAnswer={(text) => api.answerPoll('announcements', pendingPoll, text)}
               />
             )}
             {pendingCheckin && (

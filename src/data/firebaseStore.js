@@ -751,6 +751,16 @@ export const firebaseStore = {
     return updateDoc(doc(convCol(conv), msg.id), ...args);
   },
 
+  // A written-answer poll: votes.text[person] = { name, text, at } (empty text removes it).
+  answerPoll(conv, msg, text, actor) {
+    const me = personId(actor.name);
+    return updateDoc(
+      doc(convCol(conv), msg.id),
+      new FieldPath('votes', 'text', me),
+      text ? { name: actor.name, text, at: Date.now() } : deleteField(),
+    );
+  },
+
   pin(conv, id, on, actor) {
     return updateDoc(doc(convCol(conv), id), { pinned: on, pinnedBy: on ? actor.name : '', pinnedAt: on ? Date.now() : 0 });
   },

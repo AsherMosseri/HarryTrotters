@@ -3271,3 +3271,16 @@ html.kb-open .toast { bottom: auto; top: calc(var(--vvt) + var(--vvh) - 64px); }
 /* Avatar decorations reach past the picture: keep them off the text beside it. */
 .cmd-whois > .avatar-btn, .cmd-whois > .deco, .cmd-whois > .avatar { margin: 8px 6px 8px 8px; }
 .cmd-ship-pair { gap: 18px; padding: 8px 8px 10px; }
+/* Text boxes that grow as you type (common.jsx AutoTextarea). */
+.auto-grow { resize: none; overflow-y: auto; line-height: 1.4; }
+/* Written-answer polls */
+.poll-kind { display: flex; }
+.poll-kind button { flex: 1; }
+.poll-kind-hint { margin: -4px 0 0; }
+.poll-answer-box { display: flex; flex-direction: column; gap: 6px; }
+.poll-answers { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.poll-answers li { display: flex; gap: 8px; align-items: flex-start; padding: 6px 8px; border-radius: 10px; background: var(--surface); }
+.poll-answers li.mine { outline: 1px solid var(--accent); }
+.poll-answer-text { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; }
+/* Poll questions and options can have line breaks. */
+.poll-q, .poll-opt .grow, .pollgate-opt, .checkin-card h1 { white-space: pre-wrap; overflow-wrap: anywhere; }

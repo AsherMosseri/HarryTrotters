@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { leaderboard } from '../coins.js';
+import { leaderboard, wallet as walletOf } from '../coins.js';
+import { REQUESTS_TO } from '../config.js';
 import { mondayOf, parseDay, todayISO } from '../milestones.js';
 import { relTime, useEscape } from '../util.js';
 import { Avatar, CloseIcon, Overlay } from './common.jsx';
@@ -23,12 +24,23 @@ export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onClose 
   useEscape(onClose);
   const [tab, setTab] = useState('wallet');
   const [range, setRange] = useState('week');
+  // Two boards: what everyone has now (matches balances and /leaderboard),
+  // and what they earned by working (tasks, lab hours, grants).
+  const [kind, setKind] = useState('coins');
   const [to, setTo] = useState('');
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
   const [sent, setSent] = useState(null);
   const monday = parseDay(mondayOf(todayISO())).getTime();
-  const board = useMemo(() => leaderboard(roster, data, range === 'week' ? monday : 0), [roster, data, range, monday]);
+  const board = useMemo(
+    () =>
+      kind === 'coins'
+        ? roster
+            .map((name) => ({ name, coins: walletOf(name, { ...data, owner: name === REQUESTS_TO }).balance }))
+            .sort((a, b) => b.coins - a.coins)
+        : leaderboard(roster, data, range === 'week' ? monday : 0),
+    [kind, roster, data, range, monday],
+  );
   const n = Math.floor(Number(amount));
   const canSend = to && n > 0 && n <= wallet.balance;
   const others = roster.filter((x) => x !== actor.name);
@@ -171,19 +183,36 @@ export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onClose 
               <>
                 <div className="segmented coins-range">
                   {[
-                    ['week', 'This week'],
-                    ['season', 'This season'],
+                    ['coins', '💰 Most coins'],
+                    ['earned', '🛠️ Earned by working'],
                   ].map(([id, label]) => (
                     <button
                       key={id}
-                      className={`plain-seg${range === id ? ' on' : ''}`}
-                      aria-pressed={range === id}
-                      onClick={() => setRange(id)}
+                      className={`plain-seg${kind === id ? ' on' : ''}`}
+                      aria-pressed={kind === id}
+                      onClick={() => setKind(id)}
                     >
                       {label}
                     </button>
                   ))}
                 </div>
+                {kind === 'earned' && (
+                  <div className="segmented coins-range">
+                    {[
+                      ['week', 'This week'],
+                      ['season', 'This season'],
+                    ].map(([id, label]) => (
+                      <button
+                        key={id}
+                        className={`plain-seg${range === id ? ' on' : ''}`}
+                        aria-pressed={range === id}
+                        onClick={() => setRange(id)}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 <ol className="coins-board">
                   {board.map((r, i) => (
                     <li key={r.name} className={r.name === actor.name ? 'me' : ''}>
@@ -194,7 +223,11 @@ export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onClose 
                     </li>
                   ))}
                 </ol>
-                <p className="muted tiny">Earned from tasks, hours, and bonuses. Gifts don’t count.</p>
+                <p className="muted tiny">
+                  {kind === 'coins'
+                    ? 'Everyone’s balance right now: everything earned, won, given, and spent.'
+                    : 'Only coins earned by working: finished tasks, hours at the lab, and bonuses from team management. Casino, /daily, gifts, and spending don’t count.'}
+                </p>
               </>
             )}
           </div>
