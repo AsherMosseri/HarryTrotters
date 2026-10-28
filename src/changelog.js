@@ -4,6 +4,14 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '2.66',
+    date: '2026-10-28',
+    title: 'Everything animates',
+    items: [
+      'Calm chat is now off by default, so decorations, name effects, borders, and nameplates in chat animate all the time. Want it calmer? Turn Calm chat on in the theme menu.',
+    ],
+  },
+  {
     version: '2.65',
     date: '2026-10-28',
     title: 'Animations keep going',

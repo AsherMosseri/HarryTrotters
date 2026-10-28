@@ -272,8 +272,9 @@ export default function Workspace({ store, actor, rename, renames }) {
   const [robot, setRobot] = useState({ versions: [], pins: [], layouts: [] });
   const [chat, setChat] = useState({}); // { [channelId]: newest messages }
   const [chatChannel, setChatChannel] = useLocalStorage('chat-channel', 'general');
-  // Calm chat (on by default, per device): animations in chat wait for hover or tap.
-  const [calm, setCalm] = useLocalStorage('calm-chat', true);
+  // Calm chat (off by default, per device): when on, animations in chat wait
+  // for hover or tap. A new key, so the old saved "on" doesn't stick.
+  const [calm, setCalm] = useLocalStorage('calm-chat-v2', false);
   useEffect(() => {
     document.documentElement.classList.toggle('calm-chat', calm !== false);
   }, [calm]);
