@@ -302,8 +302,8 @@ export function GifPicker({ onPick, onUpload, onClose }) {
 }
 
 // Create a poll: a question, 2–10 options, one or several choices.
-export function PollDialog({ onCreate, onClose, canRequire = false }) {
-  const [question, setQuestion] = useState('');
+export function PollDialog({ onCreate, onClose, canRequire = false, initialQuestion = '' }) {
+  const [question, setQuestion] = useState(initialQuestion);
   const [options, setOptions] = useState(['', '']);
   const [multi, setMulti] = useState(false);
   const [required, setRequired] = useState(false);

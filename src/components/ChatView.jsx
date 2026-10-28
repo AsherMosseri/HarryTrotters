@@ -4,6 +4,7 @@ import { Avatar, Nameplate, PlusIcon, usePeople } from './common.jsx';
 import PhotoViewer from './PhotoViewer.jsx';
 import Composer from './chat/Composer.jsx';
 import Message from './chat/Message.jsx';
+import { CommandNote } from './chat/Commands.jsx';
 import { mentionPattern } from './chat/format.jsx';
 import { EmojiManager, StickerManager } from './chat/Pickers.jsx';
 import { ChannelDialog, ChannelIcon, MembersPanel, NewDmDialog, NotifyMenu, PinsPanel, SearchPanel, slugChannel } from './chat/Panels.jsx';
@@ -102,6 +103,9 @@ export default function ChatView({
   const [selected, setSelected] = useState(null);
   const [replyTo, setReplyTo] = useState(null);
   const [editing, setEditing] = useState(null);
+  // Slash-command notes only you see, per conversation (gone on reload).
+  const [notes, setNotes] = useState({});
+  const [useCmd, setUseCmd] = useState(null);
   const [older, setOlder] = useState({});
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [viewing, setViewing] = useState(null);
@@ -552,6 +556,14 @@ export default function ChatView({
             );
           })}
           <BotReplies conv={conv.key} />
+          {(notes[conv.key] || []).map((n) => (
+            <CommandNote
+              key={n.id}
+              note={n}
+              onDismiss={() => setNotes((all) => ({ ...all, [conv.key]: all[conv.key].filter((x) => x.id !== n.id) }))}
+              onUse={(c) => setUseCmd({ ...c, at: Date.now() })}
+            />
+          ))}
         </div>
         {newBelow && (
           <button
@@ -589,6 +601,14 @@ export default function ChatView({
             stickers={stickers}
             onManageStickers={() => setDialog({ type: 'stickers' })}
             onTyping={() => api.typing(conv.key)}
+            useCommand={useCmd}
+            onNote={(n) => {
+              setNotes((all) => ({
+                ...all,
+                [conv.key]: [...(all[conv.key] || []).slice(-4), { ...n, id: `${Date.now()}-${Math.random()}` }],
+              }));
+              requestAnimationFrame(() => list.current && (list.current.scrollTop = list.current.scrollHeight));
+            }}
             onDone={() => {
               setReplyTo(null);
               setEditing(null);

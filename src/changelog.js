@@ -4,6 +4,19 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '2.59',
+    date: '2026-10-28',
+    title: 'Slash commands, part 1',
+    items: [
+      'Type / in any chat to see commands, like Discord. Trotbot 🤖 answers. 28 so far:',
+      'Basics: /help, /ping, /whois @someone (hours, tasks, coins), /avatar, /countdown, /afk (Trotbot tells people who @ you), /remind (10m, 2h, tomorrow 7am, friday 3pm…), /poll.',
+      'Text fun: /me, /shrug, /tableflip, /unflip, /spoiler, /mock, /clap.',
+      'Random: /8ball, /flip, /roll 2d6, /choose a | b, /rate, /ship, /wyr (everyone votes), /fortune.',
+      'Actions: /pet, /hug, /highfive, /bonk, /wave @someone. They get a notification.',
+      'Coming next: Jackson coins casino, then multiplayer games and team commands.',
+    ],
+  },
+  {
     version: '2.58',
     date: '2026-10-28',
     title: 'The keyboard stays out of the way',

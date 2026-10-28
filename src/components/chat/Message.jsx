@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { personId } from '../../data/diff.js';
+import { CommandCard, Trotbot } from './Commands.jsx';
 import { Avatar, DisplayName, StatusDot, usePeople } from '../common.jsx';
 import { borderProps } from '../../borders.js';
 import { isJumbo, renderRich } from './format.jsx';
@@ -295,12 +296,14 @@ export default function Message({
           </div>
         ) : (
           <>
-            {m.text && !m.poll && (
-              <div className={`msg-text${jumbo ? ' jumbo' : ''} ${frame.className}`} style={frame.style}>
-                {renderRich(m.text, ctx)}
+            {m.text && !m.poll && (!m.cmd || m.cmd.name === 'me') && (
+              <div className={`msg-text${jumbo ? ' jumbo' : ''}${m.cmd ? ' msg-me' : ''} ${frame.className}`} style={frame.style}>
+                {m.cmd ? <em>{renderRich(m.text, ctx)}</em> : renderRich(m.text, ctx)}
                 {m.editedAt && <span className="muted tiny edited"> (edited)</span>}
               </div>
             )}
+            {m.cmd && m.cmd.name !== 'me' && m.cmd.name !== 'wyr' && <CommandCard m={m} onPerson={onPerson} />}
+            {m.cmd?.name === 'wyr' && <Trotbot name="wyr" />}
             {m.poll && (
               <Poll
                 m={m}
@@ -428,7 +431,7 @@ export default function Message({
           <button onClick={() => onMakeTask(m)} title="Make a task from this message">
             ＋Task
           </button>
-          {mine && !m.poll && (
+          {mine && !m.poll && !m.cmd && (
             <button onClick={() => onEdit(m)} title="Edit">
               ✏️
             </button>

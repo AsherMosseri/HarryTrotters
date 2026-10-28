@@ -12,7 +12,7 @@ import {
   TEAM_NAME,
   TEAM_STARTED,
 } from '../config.js';
-import { ONLINE_MS, TYPING_MS, buildPeopleInfo, buildProfiles } from '../people.js';
+import { ONLINE_MS, TYPING_MS, activeStatus, buildPeopleInfo, buildProfiles } from '../people.js';
 import { PALETTES } from '../nitro.js';
 import { daysBetween, mondayOf, parseDay, todayISO } from '../milestones.js';
 import { newTaskDefaults, personId } from '../data/diff.js';
@@ -755,6 +755,9 @@ export default function Workspace({ store, actor, rename, renames }) {
   milestonesRef.current = milestones;
 
   // Store calls wrapped with the signed-in person and error reporting.
+  // What slash commands look up (commands.js): filled in further down, once
+  // coins and shifts are known; api reads it when a command runs.
+  const cmdData = useRef({});
   const api = useMemo(
     () => ({
       create: async (data) => {
@@ -887,6 +890,10 @@ export default function Workspace({ store, actor, rename, renames }) {
       deleteRobotPin: (id) => store.deleteRobotPin(id).catch(fail),
       saveRobotLayout: (data) => store.saveRobotLayout(data, actor).catch(fail),
       deleteRobotLayout: (id) => store.deleteRobotLayout(id).catch(fail),
+      ping: () => store.ping(),
+      whois: (name) => cmdData.current.whois(name),
+      countdown: () => cmdData.current.countdown(),
+      addReminder: (r) => store.addReminder(r, actor),
       sendMessage: (conv, data, photoFiles) => {
         botHook.current?.(conv, data?.text);
         store.setPresence(actor, { typing: '', typingAt: 0 }).catch(() => {});
@@ -1174,6 +1181,45 @@ export default function Workspace({ store, actor, rename, renames }) {
   );
   const walletOf = useCallback((name) => wallet(name, { ...coinData, owner: name === REQUESTS_TO }), [coinData]);
   const myWallet = useMemo(() => walletOf(actor.name), [walletOf, actor.name]);
+  cmdData.current = {
+    whois: (name) => {
+      const mine = shifts.filter((x) => x.person === name);
+      const hours = (list) => Math.round(list.reduce((t, x) => t + ((x.end || Date.now()) - x.start), 0) / 360000) / 10;
+      const monday = parseDay(mondayOf(todayISO())).getTime();
+      const theirs = (tasks || []).filter((t) => (t.assignees || []).includes(name));
+      const st = activeStatus(profiles.get(name));
+      return {
+        subteams: peopleInfo.get(name)?.subteams || [],
+        week: hours(mine.filter((x) => x.start >= monday)),
+        hours: hours(mine),
+        done: theirs.filter((t) => t.status === 'done').length,
+        open: theirs.filter((t) => t.status !== 'done').length,
+        coins: walletOf(name).balance,
+        onShift: mine.some((x) => !x.end),
+        status: st ? `${st.emoji || ''} ${st.text || ''}`.trim() : '',
+      };
+    },
+    countdown: () => {
+      if (!competitionDate) return null;
+      const days = Math.max(0, daysBetween(todayISO(), competitionDate));
+      const hype =
+        days === 0
+          ? 'GO GO GO. Charge everything. 🔋'
+          : days <= 3
+            ? 'Final stretch. Check the zip ties. Check them again. 🔥'
+            : days <= 7
+              ? 'One week. Drive practice every day. 🏎️'
+              : days <= 21
+                ? 'Time to finish the robot and start the notebook. 📓'
+                : 'Plenty of time. (There is never plenty of time.) ⏳';
+      return {
+        days,
+        hype,
+        label: COMPETITION.name,
+        date: parseDay(competitionDate).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' }),
+      };
+    },
+  };
   const coins = useMemo(
     () => ({
       balance: myWallet.balance,

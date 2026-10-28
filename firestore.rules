@@ -151,6 +151,17 @@ service cloud.firestore {
       allow delete: if requestsOwner() || (isMember() && isMe(resource.data.by) && resource.data.status != 'approved');
     }
 
+    // /remind: your own reminders. The reminders function sends each one to
+    // your inbox (and phone) when it's due, then deletes it.
+    match /reminders/{id} {
+      allow read, delete: if isMember() && isMe(resource.data.by);
+      allow create: if isMember() && isMe(request.resource.data.by)
+        && request.resource.data.keys().hasOnly(['by', 'at', 'text', 'conv', 'created'])
+        && request.resource.data.at is number && request.resource.data.text is string
+        && request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 200
+        && request.resource.data.conv is string && request.resource.data.conv.size() <= 120;
+    }
+
     // What happens after you book / order / submit / subscribe from an ad
     // (adOrders.js). Only yours: you see and cancel your own. The notifications
     // go only to the name it was made by, and only the server (adDeliveries)

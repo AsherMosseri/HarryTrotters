@@ -5,6 +5,9 @@ import { Avatar, CloseIcon, PlusIcon, StatusDot, usePeople } from '../common.jsx
 import { prefixLines, wrapSelection } from './format.jsx';
 import { emojiList, loadEmoji, rememberEmoji, searchEmoji } from './emoji.js';
 import { EmojiPicker, GifPicker, PollDialog, StickerPicker } from './Pickers.jsx';
+import { matchCommands, parseCommand, runCommand } from '../../commands.js';
+import { CommandOption } from './Commands.jsx';
+import { relTime } from '../../util.js';
 
 // The formatting bar: [label, title, what it does].
 const FORMATS = [
@@ -41,6 +44,10 @@ export default function Composer({
   onManageEmoji,
   onTyping,
   isDm,
+  // Slash commands: onNote shows a note only you see; useCommand ("/name ")
+  // fills the box (from /help).
+  onNote = () => {},
+  useCommand,
 }) {
   const people = usePeople();
   const [text, setText] = useState('');
@@ -56,6 +63,7 @@ export default function Composer({
   const fileInput = useRef(null);
   const anyFileInput = useRef(null);
   const [upload, setUpload] = useState(null); // { name, progress }
+  const [pollQuestion, setPollQuestion] = useState('');
   const caretAfterUpdate = useRef(null);
 
   useEffect(() => {
@@ -68,6 +76,13 @@ export default function Composer({
   useEffect(() => {
     if (replyTo) box.current?.focus();
   }, [replyTo]);
+  // A command picked from /help.
+  useEffect(() => {
+    if (!useCommand) return;
+    const t = `/${useCommand.name} `;
+    setText(t);
+    caretAfterUpdate.current = [t.length, t.length];
+  }, [useCommand]);
   // Put the cursor where it belongs after inserting text, before the next keystroke lands.
   useLayoutEffect(() => {
     const pos = caretAfterUpdate.current;
@@ -103,6 +118,7 @@ export default function Composer({
   const options = useMemo(() => {
     if (!suggest) return [];
     const q = suggest.query.toLowerCase();
+    if (suggest.kind === '/') return matchCommands(q).map((c) => ({ type: 'cmd', key: c.name, insert: `/${c.name}`, c }));
     if (suggest.kind === '@') {
       const out = [];
       if (!isDm && isManager && 'everyone'.startsWith(q)) out.push({ type: 'everyone', key: 'everyone', insert: '@everyone' });
@@ -145,6 +161,13 @@ export default function Composer({
     onTyping?.();
     const caret = e.target.selectionStart;
     const before = value.slice(0, caret);
+    // "/" at the very start: the command menu.
+    const slash = !editing && /^\/([a-z0-9]{0,20})$/i.exec(before);
+    if (slash) {
+      setSuggest({ kind: '/', query: slash[1], start: 0, end: caret });
+      setActive(0);
+      return;
+    }
     const m = /(^|\s)([@#])([^\s@#]{0,30})$/.exec(before) || /(^|\s)(:)([a-z0-9_+-]{2,30})$/i.exec(before);
     if (m?.[2] === ':' && !emojiList()) loadEmoji().then(() => setEmojiReady(true));
     setSuggest(m ? { kind: m[2], query: m[3], start: caret - m[3].length - 1, end: caret } : null);
@@ -232,9 +255,41 @@ export default function Composer({
     setPhoto({ file: prepared, preview: URL.createObjectURL(prepared.thumb) });
   };
 
+  // Trotbot's side of a command (see commands.js).
+  const runSlash = async (parsed) => {
+    setSending(true);
+    try {
+      const result = await runCommand(parsed, {
+        actor,
+        roster,
+        ping: api.ping,
+        whois: api.whois,
+        countdown: api.countdown,
+        setAfk: (reason) => api.saveProfile(actor.name, { afk: { reason, since: Date.now() } }),
+        addReminder: (at, what) => api.addReminder({ at, text: what, conv }),
+      });
+      if (result.post) {
+        await api.sendMessage(conv, { mentions: [], taskIds: [], replyTo: replyInfo(), roles: [], everyone: false, ...result.post });
+        reset();
+      } else if (result.note) {
+        onNote(result.note);
+        reset();
+      } else if (result.poll !== undefined) {
+        setText('');
+        setSuggest(null);
+        setPollQuestion(result.poll);
+        setPanel('poll');
+      }
+    } finally {
+      setSending(false);
+    }
+  };
+
   const send = async () => {
     const body = text.trim();
     if ((!body && !photo) || sending) return;
+    const parsed = !editing && !photo && parseCommand(body);
+    if (parsed) return runSlash(parsed);
     // @Subteam pings that subteam; @everyone (team management only) pings everyone.
     const everyone = !isDm && isManager && /@everyone(?![\w])/.test(body);
     const roles = isDm ? [] : SUBTEAMS.filter((s) => body.includes(`@${s}`));
@@ -249,12 +304,27 @@ export default function Composer({
         await api.editMessage(conv, editing.id, { text: body, mentions, taskIds: linked, roles, everyone });
       } else {
         await api.sendMessage(conv, { text: body, mentions, taskIds: linked, replyTo: replyInfo(), roles, everyone }, photo?.file);
+        // AFK: you're back once you talk; and anyone you @ who's away gets mentioned.
+        if (people?.profileOf(actor.name)?.afk) {
+          api.saveProfile(actor.name, { afk: null });
+          onNote({ title: '👋 Welcome back!', body: 'I removed your AFK.' });
+        }
+        for (const n of named) {
+          const afk = n !== actor.name && people?.profileOf(n)?.afk;
+          if (afk)
+            onNote({
+              title: `💤 ${n.split(' ')[0]} is AFK: ${afk.reason}`,
+              body: `Since ${relTime(afk.since)}. They’ll see it when they’re back.`,
+            });
+        }
       }
       reset();
     } finally {
       setSending(false);
     }
   };
+
+  const cmdHint = !editing && text.startsWith('/') ? parseCommand(text.split(/\s/)[0])?.cmd : null;
 
   return (
     <div className="composer">
@@ -316,16 +386,21 @@ export default function Composer({
       )}
       {panel === 'poll' && (
         <PollDialog
+          initialQuestion={pollQuestion}
           canRequire={conv === 'announcements'}
           onCreate={(poll) => sendExtra({ poll, text: '', votes: {} })}
-          onClose={() => setPanel(null)}
+          onClose={() => {
+            setPanel(null);
+            setPollQuestion('');
+          }}
         />
       )}
       {suggest && options.length > 0 && (
-        <ul className="suggest">
+        <ul className={`suggest${suggest.kind === '/' ? ' suggest-cmds' : ''}`}>
           {options.map((o, i) => (
             <li key={o.key}>
               <button className={i === active ? 'active' : ''} onMouseDown={(e) => e.preventDefault()} onClick={() => pick(o)}>
+                {o.type === 'cmd' && <CommandOption c={o.c} />}
                 {o.type === 'person' && (
                   <>
                     <Avatar name={o.name} size={22} showOnline /> {o.name}
@@ -363,6 +438,13 @@ export default function Composer({
             </li>
           ))}
         </ul>
+      )}
+      {!suggest && cmdHint && (
+        <div className="cmd-hint">
+          <code>/{cmdHint.name}</code>
+          {cmdHint.args && <span className="cmd-opt-args">{cmdHint.args}</span>}
+          <span className="muted small">{cmdHint.desc}</span>
+        </div>
       )}
       {formatBar && (
         <div className="format-bar" role="toolbar" aria-label="Formatting">
@@ -479,7 +561,12 @@ export default function Composer({
               }
               if (e.key === 'Enter' || e.key === 'Tab') {
                 e.preventDefault();
-                pick(options[active] || options[0]);
+                const opt = options[active] || options[0];
+                // "/ping" + Enter: it's complete and needs nothing more, so send it.
+                if (e.key === 'Enter' && opt.type === 'cmd' && opt.c.name === suggest.query.toLowerCase() && !opt.c.args) {
+                  setSuggest(null);
+                  send();
+                } else pick(opt);
                 return;
               }
             }
@@ -496,7 +583,7 @@ export default function Composer({
             }
           }}
           placeholder={`Message ${label}`}
-          title="@ to mention, # to link a task, : for emoji"
+          title="/ for commands, @ to mention, # to link a task, : for emoji"
         />
         <button
           className={`icon-btn${formatBar ? ' on' : ''}`}

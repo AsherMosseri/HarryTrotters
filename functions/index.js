@@ -519,3 +519,25 @@ export const adDeliveries = onSchedule({ schedule: 'every 5 minutes', timeZone: 
   await batch.commit();
   await notify(notes);
 });
+
+// /remind in chat: every minute, send the reminders that are due to their
+// person's inbox (and phone), then delete them.
+export const reminders = onSchedule({ schedule: 'every 1 minutes', timeZone: TIME_ZONE }, async () => {
+  const due = await db.collection('reminders').where('at', '<=', Date.now()).limit(200).get();
+  if (due.empty) return;
+  const notes = due.docs
+    .map((d) => d.data())
+    .filter((r) => r.by && r.text)
+    .map((r) => ({
+      to: r.by,
+      type: 'reminder',
+      icon: '⏰',
+      title: 'Reminder',
+      body: String(r.text).slice(0, 200),
+      open: r.conv ? `chat:${r.conv}` : '',
+    }));
+  await notify(notes);
+  const batch = db.batch();
+  for (const d of due.docs) batch.delete(d.ref);
+  await batch.commit();
+});

@@ -413,6 +413,34 @@ function listen(fn) {
   return () => listeners.delete(fn);
 }
 
+let reminderTimer = null;
+function startReminders() {
+  if (reminderTimer) return;
+  const tick = () => {
+    const now = Date.now();
+    const due = (state.reminders || []).filter((r) => r.at <= now);
+    if (!due.length) return;
+    state.reminders = state.reminders.filter((r) => r.at > now);
+    state.inbox = [
+      ...due.map((r) => ({
+        id: uid(),
+        type: 'reminder',
+        icon: '⏰',
+        title: 'Reminder',
+        body: r.text,
+        open: r.conv ? `chat:${r.conv}` : '',
+        at: now,
+        read: false,
+      })),
+      ...(state.inbox || []),
+    ];
+    commit();
+  };
+  tick();
+  reminderTimer = setInterval(tick, 5000);
+}
+if ((state.reminders || []).length) startReminders();
+
 export const demoStore = {
   mode: 'demo',
 
@@ -694,6 +722,15 @@ export const demoStore = {
   async deleteAdOrder(id) {
     state.adOrders = (state.adOrders || []).filter((o) => o.id !== id);
     commit();
+  },
+  async ping() {
+    return 18 + Math.floor(Math.random() * 40);
+  },
+  // /remind: the demo delivers them itself, like the reminders function does.
+  async addReminder({ at, text, conv }, actor) {
+    state.reminders = [...(state.reminders || []), { id: uid(), by: actor.name, at, text, conv: conv || '' }];
+    commit();
+    startReminders();
   },
   async resetAdStats() {
     state.adStats = {};

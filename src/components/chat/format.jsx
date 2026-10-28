@@ -28,6 +28,8 @@ function Spoiler({ children }) {
 // Inline patterns, in priority order when two start at the same place.
 function inlineRules(ctx) {
   const rules = [
+    // \_ \* and friends: show the character itself (so ¯\_(ツ)_/¯ survives).
+    { re: /\\([\\`*_~|#>-])/, render: (m) => m[1] },
     { re: /`([^`\n]+)`/, render: (m, k) => <code key={k}>{m[1]}</code> },
     { re: /\|\|([\s\S]+?)\|\|/, render: (m, k) => <Spoiler key={k}>{inline(m[1], ctx)}</Spoiler> },
     { re: /\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/, render: (m, k) => link(m[2], inline(m[1], ctx), k) },

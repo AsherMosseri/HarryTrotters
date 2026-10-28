@@ -7,6 +7,7 @@ import {
   collection,
   doc,
   getDoc,
+  getDocFromServer,
   onSnapshot,
   serverTimestamp,
   writeBatch,
@@ -799,6 +800,16 @@ export const firebaseStore = {
   // Profiles: picture, status, and notification settings, one doc per person.
   subscribeProfiles(cb, onError) {
     return onSnapshot(profilesCol, (snap) => cb(snap.docs.map(readDoc)), onError);
+  },
+  // /ping: one round trip to the server.
+  async ping() {
+    const t = performance.now();
+    await getDocFromServer(doc(db, 'settings', 'team')).catch(() => {});
+    return Math.round(performance.now() - t);
+  },
+  // /remind: the reminders function sends it to your 🔔 (and phone) when it's time.
+  addReminder({ at, text, conv }, actor) {
+    return setDoc(doc(collection(db, 'reminders')), { by: actor.name, at, text, conv: conv || '', created: Date.now() });
   },
   saveProfile(name, patch) {
     return setDoc(doc(profilesCol, personId(name)), { ...patch, name, updatedAt: Date.now() }, { merge: true });
