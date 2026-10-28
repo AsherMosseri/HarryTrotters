@@ -4,6 +4,14 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '2.73',
+    date: '2026-10-28',
+    title: 'Swipe to close',
+    items: [
+      'On a phone, the grey bar at the top of the You, More, and Filters sheets works now: swipe it down (or tap it) to close the sheet. When the sheet is scrolled to the top, pulling down anywhere on it closes it too.',
+    ],
+  },
+  {
     version: '2.72',
     date: '2026-10-28',
     title: 'Reopen polls',

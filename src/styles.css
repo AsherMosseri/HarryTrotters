@@ -1783,7 +1783,9 @@ h3.md-h { font-size: 16.5px; }
   animation: sheet-up 0.2s ease;
 }
 @keyframes sheet-up { from { transform: translateY(48px); opacity: 0; } }
-.sheet-grip { width: 42px; height: 5px; border-radius: 3px; background: var(--border); align-self: center; margin: 6px 0 0; flex: none; }
+.sheet-top { position: sticky; top: -4px; z-index: 3; margin: -4px -16px 0; padding: 0 16px 6px; background: var(--surface); display: flex; flex-direction: column; flex: none; }
+.sheet-grip-btn { align-self: center; flex: none; padding: 10px 40px 8px; background: none; border: 0; min-height: 0; cursor: grab; touch-action: none; }
+.sheet-grip { display: block; width: 42px; height: 5px; border-radius: 3px; background: var(--border); }
 .sheet-head { display: flex; align-items: center; }
 .sheet-head h2 { margin: 0; font-size: 19px; }
 .sheet-body { display: flex; flex-direction: column; gap: 12px; }
