@@ -4,6 +4,16 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '2.58',
+    date: '2026-10-28',
+    title: 'The keyboard stays out of the way',
+    items: [
+      'On iPhone and iPad, the keyboard no longer covers the message box, Send, or the newest messages. The app fits itself into the space above the keyboard.',
+      'Same for every pop-up, side panel, and sheet: the box you’re typing in stays in view, and the bottom tabs and ＋ button step aside until you’re done.',
+      'Also fixed for the iPad’s shortcut bar when you use a hardware keyboard.',
+    ],
+  },
+  {
     version: '2.57',
     date: '2026-10-28',
     title: 'Gears',

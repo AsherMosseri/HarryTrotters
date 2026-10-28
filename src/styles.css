@@ -350,7 +350,7 @@ textarea.draft { resize: none; overflow: hidden; }
 .panel-backdrop.center { justify-content: center; align-items: flex-start; padding: 6vh 16px 16px; overflow-y: auto; }
 /* Tall pop-ups scroll inside themselves (the title stays put) instead of the
    whole backdrop scrolling, which iPad Safari would bounce back. */
-.panel-backdrop.center > .dialog { max-height: calc(100dvh - 6vh - 16px); overflow-y: auto; overscroll-behavior: contain; }
+.panel-backdrop.center > .dialog { max-height: calc(var(--vvh, 100dvh) - 6vh - 16px); overflow-y: auto; overscroll-behavior: contain; }
 .panel-backdrop.center > .dialog > * { flex-shrink: 0; }
 .panel-backdrop.center > .dialog > .panel-head:first-child { position: sticky; top: 0; z-index: 5; background: var(--surface); }
 @keyframes fade { from { opacity: 0; } }
@@ -796,7 +796,7 @@ div.org-member { cursor: default; }
 .help-sections li + li { margin-top: 4px; }
 
 /* ---------- chat ---------- */
-.app.chat-mode { height: 100vh; height: 100dvh; min-height: 0; }
+.app.chat-mode { height: 100vh; height: var(--vvh, 100dvh); min-height: 0; }
 .content.chat { flex: 1; min-height: 0; display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 12px; padding-bottom: 12px; }
 .tab-badge {
   display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; margin-left: 6px;
@@ -1218,7 +1218,7 @@ h3.md-h { font-size: 16.5px; }
 .inbox-pop {
   position: absolute; right: -8px; top: calc(100% + 6px); z-index: 40; width: min(380px, calc(100vw - 24px));
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-lg);
-  display: flex; flex-direction: column; max-height: min(560px, calc(100dvh - 90px));
+  display: flex; flex-direction: column; max-height: min(560px, calc(var(--vvh, 100dvh) - 90px));
 }
 .inbox-head { display: flex; align-items: center; gap: 8px; padding: 12px 14px 8px; }
 .inbox-head h2 { margin: 0; font-size: 16px; }
@@ -1385,7 +1385,7 @@ h3.md-h { font-size: 16.5px; }
 @media (prefers-reduced-motion: reduce) { .profile-effect { display: none; } }
 
 /* profile editor */
-.dialog.profile-editor { width: min(820px, calc(100vw - 32px)); max-height: calc(100dvh - 6vh - 16px); overflow-y: auto; }
+.dialog.profile-editor { width: min(820px, calc(100vw - 32px)); max-height: calc(var(--vvh, 100dvh) - 6vh - 16px); overflow-y: auto; }
 /* The title and ✕ stay put while the editor scrolls under them. */
 .dialog.profile-editor > .panel-head { position: sticky; top: 0; z-index: 5; background: var(--surface); }
 .editor-grid { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 18px; align-items: start; }
@@ -1623,7 +1623,7 @@ h3.md-h { font-size: 16.5px; }
 .parts-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(320px, 400px); align-items: start; }
 .content.chat.embedded {
   grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr);
-  position: sticky; top: 12px; height: calc(100dvh - 190px); min-height: 420px; padding: 12px 16px 12px 0;
+  position: sticky; top: 12px; height: calc(var(--vvh, 100dvh) - 190px); min-height: 420px; padding: 12px 16px 12px 0;
 }
 @media (max-width: 1099px) {
   .parts-layout { grid-template-columns: minmax(0, 1fr); }
@@ -1684,7 +1684,7 @@ h3.md-h { font-size: 16.5px; }
 .app-fx .profile-effect span { font-size: 26px; animation-duration: calc(var(--d) * 2.5); }
 .app-fx .profile-effect img { width: 40px; height: 40px; }
 @media (prefers-reduced-motion: reduce) { .app-backdrop.shift { animation: none; } }
-.dialog.theme-studio { width: min(560px, calc(100vw - 32px)); max-height: calc(100dvh - 6vh - 16px); overflow-y: auto; }
+.dialog.theme-studio { width: min(560px, calc(100vw - 32px)); max-height: calc(var(--vvh, 100dvh) - 6vh - 16px); overflow-y: auto; }
 .dialog.theme-studio > .panel-head { position: sticky; top: 0; z-index: 5; background: var(--surface); }
 .studio-backdrop { background: rgb(10 12 20 / 12%); }
 .studio-h { margin: 6px 0 0; font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
@@ -1770,7 +1770,7 @@ h3.md-h { font-size: 16.5px; }
 }
 .sheet-backdrop { align-items: flex-end; justify-content: stretch; }
 .sheet {
-  width: 100%; max-height: 88dvh; overflow-y: auto; overscroll-behavior: contain; background: var(--surface); border-radius: 20px 20px 0 0;
+  width: 100%; max-height: calc(var(--vvh, 100dvh) * 0.88); overflow-y: auto; overscroll-behavior: contain; background: var(--surface); border-radius: 20px 20px 0 0;
   padding: 4px 16px max(18px, env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 12px; box-shadow: var(--shadow-lg);
   animation: sheet-up 0.2s ease;
 }
@@ -1821,7 +1821,7 @@ h3.md-h { font-size: 16.5px; }
 .phone-add { align-self: center; }
 @media (max-width: 760px) {
   /* What's new fits: the whole card scrolls instead of cutting text off. */
-  .dialog.whats-new { max-height: calc(100dvh - 24px); overflow-y: auto; }
+  .dialog.whats-new { max-height: calc(var(--vvh, 100dvh) - 24px); overflow-y: auto; }
   .whats-new-version { max-height: none; overflow: visible; }
   /* Parts: cards instead of a wide table. */
   .parts-grid thead { display: none; }
@@ -1883,7 +1883,7 @@ body:has(.bottom-nav):has(.composer) .toast { bottom: calc(150px + env(safe-area
   /* Chat pickers (emoji, stickers, GIFs, reactions) open near the top, so the keyboard never hides them. */
   .composer :is(.composer-emoji, .sticker-picker, .gif-picker), .msg-actions .reaction-picker {
     position: fixed; top: calc(env(safe-area-inset-top) + 64px); bottom: auto; left: 8px; right: 8px; width: auto; margin: 0;
-    max-height: min(480px, calc(100dvh - env(safe-area-inset-top) - 160px)); overflow-y: auto; overscroll-behavior: contain; z-index: 45;
+    max-height: min(480px, calc(var(--vvh, 100dvh) - env(safe-area-inset-top) - 160px)); overflow-y: auto; overscroll-behavior: contain; z-index: 45;
   }
 }
 
@@ -2266,7 +2266,7 @@ body:has(.bottom-nav):has(.composer) .toast { bottom: calc(150px + env(safe-area
 .me-chip .bell-badge { left: 22px; right: auto; top: -2px; }
 .me-caret { color: var(--muted); font-size: 12px; }
 .me-menu {
-  position: absolute; right: 0; top: calc(100% + 8px); z-index: 40; width: 300px; max-height: calc(100dvh - 90px); overflow-y: auto;
+  position: absolute; right: 0; top: calc(100% + 8px); z-index: 40; width: 300px; max-height: calc(var(--vvh, 100dvh) - 90px); overflow-y: auto;
   background: var(--surface); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow-lg);
   padding: 10px; display: flex; flex-direction: column; gap: 10px; animation: fade 0.12s ease;
 }
@@ -2497,7 +2497,7 @@ body:has(.bottom-nav):has(.composer) .toast { bottom: calc(150px + env(safe-area
 .remove-ads .big-btn { align-self: stretch; }
 
 /* Asher's Ads page */
-.dialog.ads-settings { width: min(660px, calc(100vw - 32px)); max-height: calc(100dvh - 40px); display: flex; flex-direction: column; gap: 10px; }
+.dialog.ads-settings { width: min(660px, calc(100vw - 32px)); max-height: calc(var(--vvh, 100dvh) - 40px); display: flex; flex-direction: column; gap: 10px; }
 .ads-pause { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 12px; background: var(--surface-2); }
 .ads-pause .grow { display: flex; flex-direction: column; }
 .ads-tabs { display: flex; overflow-x: auto; }
@@ -2562,7 +2562,7 @@ body:has(.bottom-nav):has(.composer) .toast { bottom: calc(150px + env(safe-area
 .ad-qty .btn { width: 46px; height: 46px; padding: 0; border-radius: 50%; justify-content: center; }
 .ad-pop { font-size: 56px; animation: ad-pop 0.5s cubic-bezier(0.2, 1.6, 0.4, 1); }
 @keyframes ad-pop { from { transform: scale(0.2) rotate(-30deg); opacity: 0; } }
-.dialog.submit-ad { width: min(560px, calc(100vw - 32px)); max-height: calc(100dvh - 40px); display: flex; flex-direction: column; }
+.dialog.submit-ad { width: min(560px, calc(100vw - 32px)); max-height: calc(var(--vvh, 100dvh) - 40px); display: flex; flex-direction: column; }
 .submit-ad-body { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding: 2px; }
 .submit-ad-dates label { display: flex; align-items: center; gap: 6px; font-weight: 700; }
 .submit-ad-dates .input { width: auto; }
@@ -2590,7 +2590,7 @@ body:has(.bottom-nav):has(.composer) .toast { bottom: calc(150px + env(safe-area
 .jcoins { display: inline-flex; align-items: center; gap: 0.3em; font-weight: 800; font-variant-numeric: tabular-nums; }
 .me-coins { margin-left: auto; font-size: 13px; }
 .me-list button:has(.me-coins) { display: flex; align-items: center; gap: 6px; }
-.dialog.coins-dialog { width: min(520px, calc(100vw - 32px)); max-height: calc(100dvh - 40px); display: flex; flex-direction: column; gap: 10px; }
+.dialog.coins-dialog { width: min(520px, calc(100vw - 32px)); max-height: calc(var(--vvh, 100dvh) - 40px); display: flex; flex-direction: column; gap: 10px; }
 .coins-dialog .panel-head h2 { display: flex; align-items: center; gap: 8px; }
 .coins-balance {
   display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 14px; border-radius: 14px; text-align: center;
@@ -2669,7 +2669,7 @@ body:has(.bottom-nav):has(.composer) .toast { bottom: calc(150px + env(safe-area
 .wheel-label { position: absolute; left: 50%; top: 50%; width: 92px; margin: -10px 0 0 -46px; text-align: center; font-weight: 900; font-size: 14px; color: #fff; text-shadow: 0 1px 3px rgb(0 0 0 / 50%); transform-origin: 50% 50%; }
 .ad-video { position: fixed; inset: 0; z-index: 300; background: #000; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: max(14px, env(safe-area-inset-top)) 12px max(10px, env(safe-area-inset-bottom)); }
 .ad-video-stage {
-  position: relative; width: min(960px, 100%, calc((100dvh - 80px) * 16 / 9)); aspect-ratio: 16 / 9; overflow: hidden; border-radius: 6px; color: #fff;
+  position: relative; width: min(960px, 100%, calc((var(--vvh, 100dvh) - 80px) * 16 / 9)); aspect-ratio: 16 / 9; overflow: hidden; border-radius: 6px; color: #fff;
   background: linear-gradient(120deg, var(--ad-a), var(--ad-b), var(--ad-a)); background-size: 220% 220%; animation: ad-shift 5s ease-in-out infinite;
   text-shadow: 0 2px 6px rgb(0 0 0 / 35%);
 }
@@ -2755,7 +2755,7 @@ body:has(.bottom-nav):has(.composer) .toast { bottom: calc(150px + env(safe-area
 
 /* After an ad's booking / order: the tracker (AdOrders.jsx) */
 .ad-track-btn { width: 100%; justify-content: center; }
-.dialog.ad-track { max-height: calc(100dvh - 32px); display: flex; flex-direction: column; }
+.dialog.ad-track { max-height: calc(var(--vvh, 100dvh) - 32px); display: flex; flex-direction: column; }
 .ad-track .ad-action-body { overflow-y: auto; min-height: 0; }
 .ad-track-kind { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; padding: 2px 8px; border-radius: 999px; background: rgb(255 255 255 / 22%); }
 .ad-track-ref { margin: -6px 0 0; }
@@ -2814,7 +2814,7 @@ body:has(.bottom-nav):has(.composer) .toast { bottom: calc(150px + env(safe-area
 @keyframes ad-typing { 50% { transform: translateY(-4px); opacity: 0.5; } }
 .ad-chat-note { margin: 0; text-align: center; font-size: 12px; color: var(--muted); }
 
-.dialog.ad-orders { width: min(440px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow-y: auto; }
+.dialog.ad-orders { width: min(440px, calc(100vw - 32px)); max-height: calc(var(--vvh, 100dvh) - 32px); overflow-y: auto; }
 .ad-orders h2 { margin: 0; font-size: 19px; }
 .ad-orders h4 { margin: 8px 0 0; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
 .ad-orders-row { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); text-align: left; color: inherit; }
@@ -2918,3 +2918,22 @@ body:has(.bottom-nav):has(.composer) .toast { bottom: calc(150px + env(safe-area
   animation: np-gear 4s linear infinite;
 }
 @media (prefers-reduced-motion: reduce) { .np-gear::before, .np-gear::after { animation: none; } }
+
+/* ---------- on-screen keyboard (keyboard.js) ----------
+   While it's open, only the part of the screen above it counts: the app and
+   every full-screen layer fit into that space (--vvt is where it starts,
+   --vvh how tall it is), and what's pinned to the bottom steps aside. */
+html.kb-open #root { position: fixed; left: 0; right: 0; top: var(--vvt); height: var(--vvh); }
+html.kb-open .panel-backdrop,
+html.kb-open .checkin-gate,
+html.kb-open .update-gate,
+html.kb-open .dg-screen { inset: auto 0; top: var(--vvt); height: var(--vvh); }
+html.kb-open .panel-backdrop.center { padding-top: 12px; padding-bottom: 12px; }
+html.kb-open .panel-backdrop.center > .dialog { max-height: calc(var(--vvh) - 24px); }
+html.kb-open .bottom-nav,
+html.kb-open .fab,
+html.kb-open .ad-banner-bottom { display: none; }
+/* The keyboard covers the home-bar area, so no extra space for it. */
+html.kb-open .panel,
+html.kb-open .sheet { padding-bottom: 12px; }
+html.kb-open .toast { bottom: auto; top: calc(var(--vvt) + var(--vvh) - 64px); }

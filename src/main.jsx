@@ -5,8 +5,10 @@ import { reloadOnceForNewVersion } from './data/store.js';
 import UpdateGate from './components/UpdateGate.jsx';
 import './styles.css';
 import { installEmojiKeyFix } from './emojiKeyFix.js';
+import { installKeyboardFit } from './keyboard.js';
 
 installEmojiKeyFix();
+installKeyboardFit();
 
 window.addEventListener('vite:preloadError', (e) => {
   if (reloadOnceForNewVersion()) e.preventDefault();
