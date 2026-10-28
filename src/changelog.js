@@ -4,6 +4,15 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '2.57',
+    date: '2026-10-28',
+    title: 'Gears',
+    items: [
+      'New Gear nameplate: a steel plate with two gears turning behind your name (Edit profile → Style).',
+      'New Gear name effect: your name in brushed steel (or your own colors, polished) with a little gear spinning after it.',
+    ],
+  },
+  {
     version: '2.56',
     date: '2026-10-27',
     title: 'Made just for you',

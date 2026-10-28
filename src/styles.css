@@ -2890,3 +2890,31 @@ body:has(.bottom-nav):has(.composer) .toast { bottom: calc(150px + env(safe-area
 .ads-group.open .ads-group-arrow { transform: rotate(90deg); }
 .ads-group.open > .ads-list { padding: 0 8px 8px; }
 .ads-group-tools { padding: 0 14px 8px; }
+
+/* Gear nameplate: a steel plate with two meshed gears turning on the right. */
+.np-gear {
+  background-image: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.07) 0 1px, transparent 1px 3px), linear-gradient(100deg, #334155, #64748b 40%, #cbd5e1 50%, #64748b 60%, #334155);
+  background-size: 100% 100%, 200% 100%; animation-duration: 7s; opacity: 0.75;
+}
+.np-gear::before, .np-gear::after {
+  content: ''; position: absolute; top: 50%; aspect-ratio: 1; background: #e2e8f0;
+  -webkit-mask: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'><circle cx='20' cy='20' r='15.5' fill='none' stroke='%23000' stroke-width='5' stroke-dasharray='4.058 4.058'/><circle cx='20' cy='20' r='10' fill='none' stroke='%23000' stroke-width='7'/><circle cx='20' cy='20' r='2.6'/></svg>") center / contain no-repeat;
+  mask: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'><circle cx='20' cy='20' r='15.5' fill='none' stroke='%23000' stroke-width='5' stroke-dasharray='4.058 4.058'/><circle cx='20' cy='20' r='10' fill='none' stroke='%23000' stroke-width='7'/><circle cx='20' cy='20' r='2.6'/></svg>") center / contain no-repeat;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.4));
+}
+/* A 52px and a 32px gear, centers 32px apart so the teeth overlap; the small
+   one turns the other way, faster by the size ratio, so they look meshed. */
+.np-gear::before { right: 8px; width: 52px; translate: 0 -50%; animation: np-gear 6s linear infinite; }
+.np-gear::after { right: 50px; width: 32px; translate: 0 -50%; animation: np-gear 3.7s linear infinite reverse; background: #94a3b8; }
+@keyframes np-gear { to { rotate: 360deg; } }
+
+/* Gear name effect: steel text and a little gear turning after the name. */
+.ne-gear { animation: ne-slide 3.4s linear infinite; filter: drop-shadow(0 1px 0 rgba(15, 23, 42, 0.55)); }
+.ne-gear::after {
+  content: ''; display: inline-block; width: 0.82em; height: 0.82em; margin-left: 0.22em; vertical-align: -0.08em;
+  background: var(--nglow, #94a3b8);
+  -webkit-mask: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'><circle cx='20' cy='20' r='15.5' fill='none' stroke='%23000' stroke-width='5' stroke-dasharray='4.058 4.058'/><circle cx='20' cy='20' r='10' fill='none' stroke='%23000' stroke-width='7'/><circle cx='20' cy='20' r='2.6'/></svg>") center / contain no-repeat;
+  mask: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'><circle cx='20' cy='20' r='15.5' fill='none' stroke='%23000' stroke-width='5' stroke-dasharray='4.058 4.058'/><circle cx='20' cy='20' r='10' fill='none' stroke='%23000' stroke-width='7'/><circle cx='20' cy='20' r='2.6'/></svg>") center / contain no-repeat;
+  animation: np-gear 4s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) { .np-gear::before, .np-gear::after { animation: none; } }

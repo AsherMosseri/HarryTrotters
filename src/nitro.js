@@ -127,6 +127,7 @@ export const NAMEPLATES = [
   { id: 'gold', label: 'Gold' },
   { id: 'rainbow', label: 'Rainbow' },
   { id: 'rgb', label: 'RGB' },
+  { id: 'gear', label: 'Gear' },
   { id: 'custom', label: 'Custom' },
 ];
 
@@ -145,6 +146,7 @@ export const NAME_EFFECTS = [
   { id: 'toon', label: '💥 Toon' },
   { id: 'sparkle', label: '✨ Glitter' },
   { id: 'pulse', label: '💓 Pulse' },
+  { id: 'gear', label: '⚙️ Gear' },
 ];
 const RAINBOW = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#06b6d4', '#6366f1', '#d946ef', '#ef4444'];
 
@@ -184,6 +186,16 @@ export function nameStyle(profile, fallbackColor) {
       `radial-gradient(circle at 20% 30%, #fff 0 1.2px, transparent 1.6px), radial-gradient(circle at 70% 60%, #fff 0 1px, transparent 1.4px), radial-gradient(circle at 45% 80%, #fff 0 1.3px, transparent 1.7px), ${base}`,
     );
     style.backgroundSize = '14px 14px, 18px 18px, 22px 22px, 100% 100%';
+  } else if (s.effect === 'gear') {
+    // Brushed steel (or your colors, polished), with a light sweeping across.
+    const metal = colors.length
+      ? colors.length >= 2
+        ? colors
+        : [main, `color-mix(in srgb, ${main} 55%, #0f172a)`]
+      : ['#64748b', '#94a3b8'];
+    clip(`linear-gradient(100deg, ${metal[1]}, ${metal[0]} 30%, #f8fafc 48%, ${metal[0]} 66%, ${metal[1]})`);
+    style.backgroundSize = '220% auto';
+    if (!colors.length) style['--nglow'] = '#94a3b8';
   } else if (s.effect === 'rainbow') {
     clip(`linear-gradient(90deg, ${RAINBOW.join(', ')})`);
     style.backgroundSize = '200% auto';
