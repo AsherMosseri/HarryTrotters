@@ -4,6 +4,15 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '2.72',
+    date: '2026-10-28',
+    title: 'Reopen polls',
+    items: [
+      'End poll asks you to confirm first, so a stray tap won’t close it.',
+      'Ended polls can be reopened: tap Reopen poll (whoever made the poll, or team management). Votes and answers are kept.',
+    ],
+  },
+  {
     version: '2.71',
     date: '2026-10-28',
     title: 'Chat fixes and one lottery',

@@ -1035,6 +1035,8 @@ h3.md-h { font-size: 16.5px; }
 .edited { white-space: nowrap; }
 .poll { margin: 4px 0; padding: 10px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); max-width: 440px; display: flex; flex-direction: column; gap: 6px; }
 .poll-q { font-weight: 700; }
+.poll-confirm { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 10px; background: var(--accent-soft); }
+.poll-confirm > span { flex-basis: 100%; }
 .poll-opt {
   position: relative; display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 10px; text-align: left;
   border: 1px solid var(--border); border-radius: 8px; background: var(--surface); overflow: hidden; font-weight: 600;

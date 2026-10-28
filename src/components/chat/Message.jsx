@@ -58,7 +58,7 @@ function LinkPreview({ p, canHide, onHide }) {
 }
 
 // A written-answer poll: everyone types their own answer (votes.text).
-function TextPoll({ m, actor, onAnswer, onEnd, canEnd }) {
+function TextPoll({ m, actor, onAnswer, onEnd, onReopen, canEnd }) {
   const me = personId(actor.name);
   const answers = Object.entries(m.votes?.text || {})
     .map(([id, a]) => ({ id, ...a }))
@@ -131,21 +131,52 @@ function TextPoll({ m, actor, onAnswer, onEnd, canEnd }) {
           {all ? 'Show fewer' : `Show all ${answers.length} answers`}
         </button>
       )}
-      {canEnd && !closed && (
-        <button className="link-btn small" onClick={onEnd}>
-          End poll
-        </button>
-      )}
+      {canEnd && <PollControls closed={closed} onEnd={onEnd} onReopen={onReopen} />}
     </div>
   );
 }
 
-function Poll({ m, actor, onVote, onEnd, canEnd, onAnswer }) {
-  if (m.poll.kind === 'text') return <TextPoll m={m} actor={actor} onAnswer={onAnswer} onEnd={onEnd} canEnd={canEnd} />;
-  return <ChoicePoll m={m} actor={actor} onVote={onVote} onEnd={onEnd} canEnd={canEnd} />;
+// Ending a poll asks first; an ended poll can be reopened. For its poster
+// and team management.
+function PollControls({ closed, onEnd, onReopen }) {
+  const [asking, setAsking] = useState(false);
+  if (closed)
+    return (
+      <button className="link-btn small" onClick={onReopen}>
+        Reopen poll
+      </button>
+    );
+  if (!asking)
+    return (
+      <button className="link-btn small" onClick={() => setAsking(true)}>
+        End poll
+      </button>
+    );
+  return (
+    <div className="poll-confirm" role="group" aria-label="End this poll?">
+      <span className="small">End this poll? No one can vote until it’s reopened.</span>
+      <button
+        className="btn small-btn danger"
+        onClick={() => {
+          setAsking(false);
+          onEnd();
+        }}
+      >
+        End poll
+      </button>
+      <button className="btn small-btn" onClick={() => setAsking(false)}>
+        Cancel
+      </button>
+    </div>
+  );
 }
 
-function ChoicePoll({ m, actor, onVote, onEnd, canEnd }) {
+function Poll({ m, actor, onVote, onEnd, onReopen, canEnd, onAnswer }) {
+  if (m.poll.kind === 'text') return <TextPoll m={m} actor={actor} onAnswer={onAnswer} onEnd={onEnd} onReopen={onReopen} canEnd={canEnd} />;
+  return <ChoicePoll m={m} actor={actor} onVote={onVote} onEnd={onEnd} onReopen={onReopen} canEnd={canEnd} />;
+}
+
+function ChoicePoll({ m, actor, onVote, onEnd, onReopen, canEnd }) {
   const me = personId(actor.name);
   const votes = m.votes || {};
   const counts = m.poll.options.map((o) => Object.keys(votes[o.id] || {}).length);
@@ -182,11 +213,7 @@ function ChoicePoll({ m, actor, onVote, onEnd, canEnd }) {
           </button>
         );
       })}
-      {canEnd && !closed && (
-        <button className="link-btn small" onClick={onEnd}>
-          End poll
-        </button>
-      )}
+      {canEnd && <PollControls closed={closed} onEnd={onEnd} onReopen={onReopen} />}
     </div>
   );
 }
@@ -418,6 +445,7 @@ export default function Message({
                 onVote={(optionId, on) => api.vote(conv, m, optionId, on)}
                 onAnswer={(text) => api.answerPoll(conv, m, text)}
                 onEnd={() => api.editMessage(conv, m.id, { poll: { ...m.poll, closed: true } })}
+                onReopen={() => api.editMessage(conv, m.id, { poll: { ...m.poll, closed: false } })}
               />
             )}
             {m.gif && <img className="msg-gif" src={m.gif.url} alt={m.gif.title || 'GIF'} loading="lazy" />}
