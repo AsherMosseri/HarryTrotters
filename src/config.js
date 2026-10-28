@@ -100,7 +100,11 @@ export const CHANNELS = [
   // Also shown inside the Parts tab.
   { id: 'parts', subteam: '' },
   ...SUBTEAMS.map((s) => ({ id: s.toLowerCase().replace(/[^a-z0-9]+/g, '-'), subteam: s })),
+  // The Jackson coins casino (/slots, /blackjack…). Trotbot runs the house.
+  { id: 'arcade', subteam: '', topic: '🎰 Casino and games. Trotbot runs the house. Type / to play.' },
 ];
+// Where the Cloud Functions run (next to the database, nam5 → us-central1).
+export const FUNCTIONS_REGION = 'us-central1';
 
 // GIF search in chat. Get a free key at developers.giphy.com (it's public by
 // design, like the Firebase config). Leave empty to allow GIF uploads only.

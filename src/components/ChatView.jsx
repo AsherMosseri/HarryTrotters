@@ -562,6 +562,7 @@ export default function ChatView({
               note={n}
               onDismiss={() => setNotes((all) => ({ ...all, [conv.key]: all[conv.key].filter((x) => x.id !== n.id) }))}
               onUse={(c) => setUseCmd({ ...c, at: Date.now() })}
+              onGo={(id) => setCurrent(id)}
             />
           ))}
         </div>

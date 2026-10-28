@@ -11,6 +11,8 @@ export const GROUPS = [
   ['text', '✍️ Text fun'],
   ['random', '🎲 Random'],
   ['actions', '🤗 Actions'],
+  ['economy', '🪙 Jackson coins'],
+  ['casino', '🎰 Casino (in #arcade)'],
 ];
 
 // name, group, args (shown as a hint), what it does
@@ -46,6 +48,24 @@ export const COMMANDS = [
   { name: 'highfive', group: 'actions', args: '@person', desc: 'Up top!' },
   { name: 'bonk', group: 'actions', args: '@person', desc: 'Cartoon bonk 🔨' },
   { name: 'wave', group: 'actions', args: '@person', desc: 'Say hi' },
+
+  { name: 'balance', group: 'economy', args: '@person', desc: 'How many Jackson coins (yours or theirs)' },
+  { name: 'daily', group: 'economy', args: '', desc: 'Free coins once a day (streaks pay more)', server: true },
+  { name: 'work', group: 'economy', args: '', desc: 'Do a lab job for coins (once an hour)', server: true },
+  { name: 'beg', group: 'economy', args: '', desc: 'Ask around for coins. No promises.', server: true },
+  { name: 'give', group: 'economy', args: '@person amount', desc: 'Send someone coins' },
+  { name: 'rob', group: 'economy', args: '@person', desc: '35% chance to steal some. Or pay a fine.', server: true },
+  { name: 'leaderboard', group: 'economy', args: '', desc: 'Who has the most coins' },
+
+  { name: 'slots', group: 'casino', args: 'bet', desc: 'Spin: three of a kind pays up to 500×', server: true },
+  { name: 'dice', group: 'casino', args: 'bet', desc: 'Your 2 dice vs the house’s', server: true },
+  { name: 'coinflip', group: 'casino', args: 'bet heads|tails', desc: 'Double or nothing', server: true },
+  { name: 'roulette', group: 'casino', args: 'bet red|black|even|odd|low|high|0–36', desc: 'Spin the wheel', server: true },
+  { name: 'blackjack', group: 'casino', args: 'bet', desc: 'Beat the dealer to 21', server: true },
+  { name: 'crash', group: 'casino', args: 'bet', desc: 'Cash out before the rocket crashes', server: true },
+  { name: 'mines', group: 'casino', args: 'bet bombs', desc: 'Open tiles, dodge the bombs, cash out', server: true },
+  { name: 'highlow', group: 'casino', args: 'bet', desc: 'Higher or lower? Keep the streak going', server: true },
+  { name: 'lottery', group: 'casino', args: 'tickets', desc: `Tickets are 5 coins; Friday's draw takes the pot`, server: true },
 ];
 export const commandByName = Object.fromEntries(COMMANDS.map((c) => [c.name, c]));
 
@@ -379,7 +399,34 @@ export async function runCommand({ cmd, args }, ctx) {
     post: { text: `/${cmd.name}${args ? ` ${args}` : ''}`, cmd: { ...result, name: cmd.name }, ...extra },
   });
   const need = (what) => ({ note: { title: `/${cmd.name} needs ${what}`, body: `Try: /${cmd.name} ${cmd.args}` } });
+  // Casino and economy: the server rolls and posts the card (functions/index.js play).
+  if (cmd.server) {
+    const r = await ctx.play(cmd.name, args ? args.split(/\s+/) : []);
+    return r?.note ? { note: r.note } : { done: true };
+  }
   switch (cmd.name) {
+    case 'balance': {
+      const who = args ? findPerson(args, ctx.roster) : me;
+      if (!who) return { note: { title: `Who’s “${args}”?`, body: 'Try: /balance @name' } };
+      const w = ctx.wallet(who);
+      return card(
+        { to: who, balance: w.balance, earned: w.earned, casino: w.casino, played: w.stats.played || 0, best: w.stats.best || 0 },
+        { mentions: [] },
+      );
+    }
+    case 'leaderboard':
+      return card({ top: ctx.richest() });
+    case 'give': {
+      const to = findPerson(args, ctx.roster);
+      const amount = +(/(\d+)\s*$/.exec(args)?.[1] || /\b(\d+)\b/.exec(args)?.[1] || 0);
+      if (!to || !amount) return { note: { title: 'Give who how much?', body: 'Try: /give @Cooper 20' } };
+      if (to === me) return { note: { title: 'That’s you.', body: 'Your coins are already yours.' } };
+      const have = ctx.wallet(me).balance;
+      if (amount > have) return { note: { title: `You only have ${have} coins.` } };
+      if (amount > 5000) return { note: { title: 'That’s a lot.', body: 'Up to 5000 at a time.' } };
+      await ctx.gift(to, amount);
+      return card({ to, amount, line: `sent you ${amount} Jackson coins` }, { mentions: [to] });
+    }
     case 'help':
       return { note: { title: 'Commands', help: true } };
     case 'ping': {

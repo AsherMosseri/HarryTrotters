@@ -27,7 +27,8 @@ import {
   where,
 } from 'firebase/firestore';
 import { getStorage, ref as fileRef, uploadBytes, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
-import { firebaseConfig, VAPID_KEY } from '../config.js';
+import { getFunctions, httpsCallable } from 'firebase/functions';
+import { FUNCTIONS_REGION, firebaseConfig, VAPID_KEY } from '../config.js';
 import { pushSupport } from './push.js';
 import {
   describeChanges,
@@ -806,6 +807,26 @@ export const firebaseStore = {
     const t = performance.now();
     await getDocFromServer(doc(db, 'settings', 'team')).catch(() => {});
     return Math.round(performance.now() - t);
+  },
+  // The casino and economy (slash commands): the play function rolls,
+  // checks balances, and posts the result. Returns { ok } or { note }.
+  async play(req) {
+    const call = httpsCallable(getFunctions(app, FUNCTIONS_REGION), 'play');
+    return (await call(req)).data;
+  },
+  subscribeBank(cb) {
+    return onSnapshot(
+      collection(db, 'bank'),
+      (snap) => cb(Object.fromEntries(snap.docs.map((d) => [d.data().name, d.data()]))),
+      () => cb({}),
+    );
+  },
+  subscribeLottery(cb) {
+    return onSnapshot(
+      doc(db, 'lottery', 'current'),
+      (snap) => cb(snap.data() || null),
+      () => cb(null),
+    );
   },
   // /remind: the reminders function sends it to your 🔔 (and phone) when it's time.
   addReminder({ at, text, conv }, actor) {

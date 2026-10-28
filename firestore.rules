@@ -151,6 +151,19 @@ service cloud.firestore {
       allow delete: if requestsOwner() || (isMember() && isMe(resource.data.by) && resource.data.status != 'approved');
     }
 
+    // The casino and economy: everyone's winnings and losses, and the Friday
+    // lottery, readable by the team; only the play function writes them.
+    match /bank/{id} {
+      allow read: if isMember();
+    }
+    match /lottery/{id} {
+      allow read: if isMember();
+    }
+    // Decks, mine spots, and crash points: the server only.
+    match /gameSecrets/{id} {
+      allow read, write: if false;
+    }
+
     // /remind: your own reminders. The reminders function sends each one to
     // your inbox (and phone) when it's due, then deletes it.
     match /reminders/{id} {
@@ -238,7 +251,18 @@ service cloud.firestore {
       let m = request.resource.data;
       return m.byUid == request.auth.uid
         && m.text is string && m.text.size() <= 4000
-        && (m.get('everyone', false) == false || isManager());
+        && (m.get('everyone', false) == false || isManager())
+        && !serverCommand(m);
+    }
+    // Casino and economy results only come from the server (the play
+    // function), so nobody can post a fake jackpot.
+    function serverCommand(m) {
+      return 'cmd' in m && m.cmd is map && m.cmd.get('name', '') in
+        ['slots', 'dice', 'coinflip', 'roulette', 'blackjack', 'crash', 'mines', 'highlow', 'lottery', 'daily', 'work', 'beg', 'rob'];
+    }
+    // ...or change one afterwards (team management can still edit/delete).
+    function keepsCmd() {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(['cmd', 'bot']);
     }
     // Changes anyone in the conversation may make to someone else's message:
     // reactions, poll votes, and pins.
@@ -258,7 +282,7 @@ service cloud.firestore {
     match /channels/{channelId}/messages/{msgId} {
       allow read: if isMember();
       allow create: if isMember() && validMessage() && (channelId != 'announcements' || isManager());
-      allow update: if isMember() && (resource.data.byUid == request.auth.uid || isManager() || sharedChange());
+      allow update: if isMember() && (isManager() || ((resource.data.byUid == request.auth.uid || sharedChange()) && keepsCmd()));
       allow delete: if isManager();
     }
 
@@ -278,7 +302,7 @@ service cloud.firestore {
         allow read: if isMember() && (isManager() || inPeople(dmPeople()));
         allow create: if isMember() && validMessage() && inPeople(dmPeople());
         allow update: if isMember() && (isManager() || (inPeople(dmPeople())
-          && (resource.data.byUid == request.auth.uid || sharedChange())));
+          && (resource.data.byUid == request.auth.uid || sharedChange()) && keepsCmd()));
         allow delete: if isManager();
       }
     }

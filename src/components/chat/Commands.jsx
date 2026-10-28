@@ -1,5 +1,6 @@
 import { Avatar, DisplayName } from '../common.jsx';
 import { COMMANDS, GROUPS } from '../../commands.js';
+import { CASINO_CARDS, CasinoBody, ECONOMY_CARDS } from './Casino.jsx';
 
 // What slash commands look like in chat (commands.js does the work): the
 // Trotbot card on a command's message, and the notes only you can see.
@@ -218,17 +219,22 @@ function Body({ c, by, onPerson }) {
   }
 }
 
-export function CommandCard({ m, onPerson }) {
+export function CommandCard({ m, onPerson, me, onMove, onBuy }) {
+  const money = CASINO_CARDS.includes(m.cmd.name) || ECONOMY_CARDS.includes(m.cmd.name);
   return (
-    <div className={`cmd-card cmd-card-${m.cmd.name}`}>
+    <div className={`cmd-card cmd-card-${m.cmd.name}${money ? ' cmd-money' : ''}`}>
       <Trotbot name={m.cmd.name} />
-      <Body c={m.cmd} by={m.by} onPerson={onPerson} />
+      {money ? (
+        <CasinoBody m={m} me={me} onMove={onMove} onBuy={onBuy} Name={({ name }) => <Name name={name} onPerson={onPerson} />} />
+      ) : (
+        <Body c={m.cmd} by={m.by} onPerson={onPerson} />
+      )}
     </div>
   );
 }
 
 // A note only you can see (/help, confirmations, "who's that?").
-export function CommandNote({ note, onDismiss, onUse }) {
+export function CommandNote({ note, onDismiss, onUse, onGo }) {
   return (
     <div className="cmd-note" role="status">
       <div className="cmd-head">
@@ -244,6 +250,11 @@ export function CommandNote({ note, onDismiss, onUse }) {
       </div>
       <b className="cmd-note-title">{note.title}</b>
       {note.body && <div className="small">{note.body}</div>}
+      {note.go && onGo && (
+        <button className="btn primary cmd-go" onClick={() => onGo(note.go)}>
+          Go to #{note.go}
+        </button>
+      )}
       {note.help && (
         <div className="cmd-help">
           {GROUPS.map(([g, label]) => (
@@ -258,7 +269,7 @@ export function CommandNote({ note, onDismiss, onUse }) {
               ))}
             </section>
           ))}
-          <p className="muted tiny">More coming: casino, games, and team commands.</p>
+          <p className="muted tiny">More coming: multiplayer games and team commands.</p>
         </div>
       )}
     </div>

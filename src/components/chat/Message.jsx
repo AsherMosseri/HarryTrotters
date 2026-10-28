@@ -264,7 +264,11 @@ export default function Message({
       }}
     >
       <div className="msg-gutter">
-        {first ? (
+        {first && m.bot ? (
+          <span className="cmd-bot big" aria-hidden="true">
+            🤖
+          </span>
+        ) : first ? (
           <button className="avatar-btn" onClick={(e) => onPerson(m.by, e)} aria-label={m.by}>
             <Avatar name={m.by} size={36} />
           </button>
@@ -275,7 +279,13 @@ export default function Message({
       <div className="msg-body">
         {first && (
           <div className="msg-head">
-            <DisplayName as="button" name={m.by} className="name-btn" onClick={(e) => onPerson(m.by, e)} />{' '}
+            {m.bot ? (
+              <>
+                <b>Trotbot</b> <span className="cmd-tag">BOT</span>
+              </>
+            ) : (
+              <DisplayName as="button" name={m.by} className="name-btn" onClick={(e) => onPerson(m.by, e)} />
+            )}{' '}
             <span className="muted tiny">{timeOf(m.at)}</span>
             {m.pinned && (
               <span className="muted tiny" title={`Pinned by ${m.pinnedBy}`}>
@@ -302,7 +312,15 @@ export default function Message({
                 {m.editedAt && <span className="muted tiny edited"> (edited)</span>}
               </div>
             )}
-            {m.cmd && m.cmd.name !== 'me' && m.cmd.name !== 'wyr' && <CommandCard m={m} onPerson={onPerson} />}
+            {m.cmd && m.cmd.name !== 'me' && m.cmd.name !== 'wyr' && (
+              <CommandCard
+                m={m}
+                onPerson={onPerson}
+                me={actor.name}
+                onMove={(move) => api.play({ action: 'move', conv, msgId: m.id, move })}
+                onBuy={(n) => api.play({ action: 'run', game: 'lottery', args: [String(n)], conv })}
+              />
+            )}
             {m.cmd?.name === 'wyr' && <Trotbot name="wyr" />}
             {m.poll && (
               <Poll

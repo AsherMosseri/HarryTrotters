@@ -62,6 +62,7 @@ import {
 } from './Ads.jsx';
 import { CoinsDialog, Coins } from './Coins.jsx';
 import { OrderTracker, OrdersDialog, orderActive } from './AdOrders.jsx';
+import { setServerSkew } from '../serverTime.js';
 import { AdBlockWall, GameDialog, PrizeWheel, VideoAd } from './AdGames.jsx';
 import { coinSettings, wallet } from '../coins.js';
 
@@ -510,7 +511,7 @@ export default function Workspace({ store, actor, rename, renames }) {
   const convs = useMemo(() => {
     const docs = Object.fromEntries(channelDocs.map((d) => [d.id, d]));
     const merged = new Map(
-      CHANNELS.map((c, i) => [c.id, { id: c.id, name: c.id, subteam: c.subteam, announce: !!c.announce, order: i, topic: '' }]),
+      CHANNELS.map((c, i) => [c.id, { id: c.id, name: c.id, subteam: c.subteam, announce: !!c.announce, order: i, topic: c.topic || '' }]),
     );
     for (const d of channelDocs)
       merged.set(d.id, { ...(merged.get(d.id) || { name: d.id, order: 99 }), ...d, announce: d.id === 'announcements' });
@@ -891,6 +892,15 @@ export default function Workspace({ store, actor, rename, renames }) {
       saveRobotLayout: (data) => store.saveRobotLayout(data, actor).catch(fail),
       deleteRobotLayout: (id) => store.deleteRobotLayout(id).catch(fail),
       ping: () => store.ping(),
+      play: (req) =>
+        store
+          .play(req, actor, { balanceOf: (n) => cmdData.current.wallet(n).balance, roster: cmdData.current.roster })
+          .then((r) => (setServerSkew(r?.serverNow), r))
+          .catch((e) => ({ note: { title: 'Trotbot couldn’t do that', body: e.message || String(e) } })),
+      wallet: (name) => cmdData.current.wallet(name),
+      richest: () => cmdData.current.richest(),
+      lottery: () => cmdData.current.lottery,
+      gift: (to, amount, note) => store.addCoinTx({ type: 'gift', from: actor.name, to, amount, note: note || '', at: Date.now() }),
       whois: (name) => cmdData.current.whois(name),
       countdown: () => cmdData.current.countdown(),
       addReminder: (r) => store.addReminder(r, actor),
@@ -1175,13 +1185,30 @@ export default function Workspace({ store, actor, rename, renames }) {
   useEffect(() => store.subscribeCoins(setLedger), [store]);
   const [coinsOpen, setCoinsOpen] = useState(false);
   const coinCfg = useMemo(() => coinSettings(settings.coins), [settings.coins]);
+  // Casino and economy winnings/losses (bank) and the Friday lottery; the
+  // play function writes them.
+  const [bank, setBank] = useState({});
+  useEffect(() => store.subscribeBank(setBank), [store]);
+  const [lottery, setLottery] = useState(null);
+  useEffect(() => store.subscribeLottery(setLottery), [store]);
   const coinData = useMemo(
-    () => ({ tasks: tasks || [], shifts, adStats, ledger, cfg: coinCfg }),
-    [tasks, shifts, adStats, ledger, coinCfg],
+    () => ({ tasks: tasks || [], shifts, adStats, ledger, bank, cfg: coinCfg }),
+    [tasks, shifts, adStats, ledger, bank, coinCfg],
   );
   const walletOf = useCallback((name) => wallet(name, { ...coinData, owner: name === REQUESTS_TO }), [coinData]);
   const myWallet = useMemo(() => walletOf(actor.name), [walletOf, actor.name]);
   cmdData.current = {
+    roster,
+    lottery,
+    wallet: (name) => {
+      const w = walletOf(name);
+      return { balance: w.balance, earned: w.earned, casino: bank[name]?.net || 0, stats: bank[name]?.stats || {} };
+    },
+    richest: () =>
+      roster
+        .map((n) => ({ name: n, coins: walletOf(n).balance }))
+        .sort((a, b) => b.coins - a.coins)
+        .slice(0, 10),
     whois: (name) => {
       const mine = shifts.filter((x) => x.person === name);
       const hours = (list) => Math.round(list.reduce((t, x) => t + ((x.end || Date.now()) - x.start), 0) / 360000) / 10;

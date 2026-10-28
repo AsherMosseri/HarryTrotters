@@ -4,6 +4,17 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '2.60',
+    date: '2026-10-28',
+    title: 'Jackson coins casino',
+    items: [
+      'New #arcade channel: the casino. Trotbot runs the house, and every roll happens on the server, so nobody can fake a jackpot. No betting limit: bet anything you have (all, half, 25%…).',
+      'Casino: /slots, /dice, /coinflip, /roulette, /blackjack (hit, stand, double), /crash (cash out before the rocket blows up), /mines (pick tiles, dodge bombs), /highlow, and /lottery (5-coin tickets, drawn Fridays at 6 PM; one ticket takes the whole pot).',
+      'Coins: /daily (streaks pay more), /work (a lab job, hourly), /beg, /rob @someone (35% chance… or pay them a fine), /give @someone, /balance, /leaderboard.',
+      'Your wins and losses show up in your Jackson coins history.',
+    ],
+  },
+  {
     version: '2.59',
     date: '2026-10-28',
     title: 'Slash commands, part 1',

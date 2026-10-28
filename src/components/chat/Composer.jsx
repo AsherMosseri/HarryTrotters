@@ -267,12 +267,18 @@ export default function Composer({
         countdown: api.countdown,
         setAfk: (reason) => api.saveProfile(actor.name, { afk: { reason, since: Date.now() } }),
         addReminder: (at, what) => api.addReminder({ at, text: what, conv }),
+        play: (game, args) => api.play({ action: 'run', game, args, conv, replyTo: replyInfo() }),
+        wallet: api.wallet,
+        richest: api.richest,
+        gift: api.gift,
       });
       if (result.post) {
         await api.sendMessage(conv, { mentions: [], taskIds: [], replyTo: replyInfo(), roles: [], everyone: false, ...result.post });
         reset();
       } else if (result.note) {
         onNote(result.note);
+        reset();
+      } else if (result.done) {
         reset();
       } else if (result.poll !== undefined) {
         setText('');

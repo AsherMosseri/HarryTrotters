@@ -5,11 +5,14 @@ import { readFileSync } from 'node:fs';
 import { setGlobalOptions } from 'firebase-functions/v2';
 import { onDocumentCreated, onDocumentWritten } from 'firebase-functions/v2/firestore';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
+import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { logger } from 'firebase-functions';
 import { initializeApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getMessaging } from 'firebase-admin/messaging';
 import { fetchPage, firstLink, readPreview } from './preview.js';
+import { coinSettings, wallet } from './shared/coins.js';
+import * as casino from './shared/casino.js';
 
 // Functions run next to the database. The deploy workflow writes location.json
 // from the database's location; nam5 (the US multi-region) pairs with us-central1.
@@ -66,6 +69,7 @@ function plainText(text) {
 }
 
 function messagePreview(m) {
+  if (m.cmd?.line) return clip(m.cmd.line);
   if (m.poll) return `📊 ${clip(m.poll.question)}`;
   if (m.sticker) return `sent a sticker: ${m.sticker.name}`;
   if (m.files?.length && !m.text) return `📎 ${m.files[0].name}`;
@@ -540,4 +544,299 @@ export const reminders = onSchedule({ schedule: 'every 1 minutes', timeZone: TIM
   const batch = db.batch();
   for (const d of due.docs) batch.delete(d.ref);
   await batch.commit();
+});
+
+// ---------- Jackson coins casino and economy (slash commands) ----------
+// The house: every roll, card, and coin change for /slots, /blackjack,
+// /daily, /rob… happens here, so nobody can fake a win. Each person's
+// winnings and losses live in bank/{personId}, which only this writes; the
+// app adds it to what they earned (functions/shared/coins.js). The rules
+// and odds are in functions/shared/casino.js (demo mode runs the same file).
+
+// Tasks, shifts, and the ledger change slowly; keep them for 20 seconds so a
+// run of bets doesn't reread the whole database every time.
+let coinCache = { at: 0, data: null };
+async function coinData() {
+  if (coinCache.data && Date.now() - coinCache.at < 20000) return coinCache.data;
+  const rename = await renamer();
+  const [tasks, shifts, coins, adStats, team] = await Promise.all([
+    db.collection('tasks').get(),
+    db.collection('shifts').get(),
+    db.collection('coins').get(),
+    db.collection('adStats').get(),
+    db.doc('settings/team').get(),
+  ]);
+  // Same as the app: assignees by their current names, deleted tasks left out.
+  const taskList = tasks.docs
+    .map((d) => d.data())
+    .filter((t) => !t.deletedAt)
+    .map((t) => (t.assignees ? { ...t, assignees: [...new Set(t.assignees.map(rename))] } : t));
+  const data = {
+    rename,
+    tasks: taskList,
+    shifts: shifts.docs.map((d) => d.data()),
+    ledger: coins.docs.map((d) => d.data()),
+    adStats: Object.fromEntries(adStats.docs.map((d) => [d.id, d.data()])),
+    cfg: coinSettings(team.get('coins')),
+  };
+  coinCache = { at: Date.now(), data };
+  return data;
+}
+const balanceOf = (name, bank, data) => wallet(name, { ...data, owner: name === REQUESTS_TO, bank: { [name]: bank } }).balance;
+const bankRef = (name) => db.doc(`bank/${personId(name)}`);
+const nyDay = (ms) => new Date(ms).toLocaleDateString('en-CA', { timeZone: TIME_ZONE });
+
+const ICON = {
+  slots: '🎰',
+  dice: '🎲',
+  coinflip: '🪙',
+  roulette: '🎡',
+  blackjack: '🃏',
+  crash: '🚀',
+  mines: '💣',
+  highlow: '🔼',
+  lottery: '🎟️',
+};
+const LABEL = {
+  slots: 'Slots',
+  dice: 'Dice',
+  coinflip: 'Coin flip',
+  roulette: 'Roulette',
+  blackjack: 'Blackjack',
+  crash: 'Crash',
+  mines: 'Mines',
+  highlow: 'High-low',
+};
+const note = (title, body = '') => ({ note: { title, body } });
+
+// The Friday lottery: one doc, drawn by drawLottery.
+const lotteryRef = db.doc('lottery/current');
+function nextFriday(now = Date.now()) {
+  for (let i = 0; i < 8; i++) {
+    const day = new Date(now + i * 86400000).toLocaleDateString('en-CA', { timeZone: TIME_ZONE });
+    const at = zonedMs(day, '18:00');
+    if (new Date(`${day}T12:00:00Z`).getUTCDay() === 5 && at > now) return at;
+  }
+  return now + 7 * 86400000;
+}
+
+export const play = onCall({ maxInstances: 5, invoker: 'public' }, async (req) => {
+  const uid = req.auth?.uid;
+  if (!uid) throw new HttpsError('unauthenticated', 'Sign in first.');
+  const member = await db.doc(`members/${uid}`).get();
+  if (!member.exists) throw new HttpsError('permission-denied', 'Join the team first.');
+  const data = await coinData();
+  const me = data.rename(member.get('name'));
+  const { action, game, conv = '', args = [], msgId, move, replyTo = null } = req.data || {};
+  const now = Date.now();
+  const words = (Array.isArray(args) ? args : []).map(String).slice(0, 6);
+
+  // A move in a running game (or a peek at a crash).
+  if (action === 'move') {
+    if (!/^[\w-]{1,40}$/.test(conv) || !/^[\w-]{1,40}$/.test(msgId || '')) throw new HttpsError('invalid-argument', 'Which game?');
+    const msgRef = db.doc(`channels/${conv}/messages/${msgId}`);
+    const secretRef = db.doc(`gameSecrets/${msgId}`);
+    return db.runTransaction(async (tx) => {
+      const [msg, secret] = await Promise.all([tx.get(msgRef), tx.get(secretRef)]);
+      const c = msg.get('cmd');
+      if (!msg.exists || !c || !secret.exists) return note('That game is gone.');
+      const player = data.rename(msg.get('by'));
+      if (move !== 'peek' && player !== me) return note('That’s not your game.');
+      if (c.status !== 'playing') return { ok: true };
+      const bank = (await tx.get(bankRef(player))).data() || {};
+      // Doubling down puts in the bet again, so it has to be there.
+      if (move === 'double' && balanceOf(player, bank, data) < c.bet) return note('Not enough coins to double.');
+      const r = casino.moveGame(c.name, { ...c.game, status: c.status }, secret.data(), String(move), c.bet, now);
+      if (r.error) return note(r.error);
+      // Still flying: nothing to write.
+      if (move === 'peek' && !r.done) return { ok: true, serverNow: now };
+      const bet = c.bet + (r.extraBet || 0);
+      const { status, ...game } = r.pub;
+      const update = { 'cmd.game': game, 'cmd.status': status, 'cmd.bet': bet };
+      if (r.done) {
+        // The bet was taken when the game started (and again when doubling):
+        // pay back what it won; the history shows the overall result.
+        const net = r.payout - bet;
+        const entry = {
+          game: c.name,
+          icon: ICON[c.name],
+          label: `${LABEL[c.name]}: ${net >= 0 ? `won ${net}` : `lost ${-net}`}`,
+          shown: net,
+        };
+        tx.set(bankRef(player), casino.bankAfter(bank, player, r.payout - (r.extraBet || 0), entry, {}, now));
+        Object.assign(update, { 'cmd.payout': r.payout, 'cmd.net': net });
+        tx.delete(secretRef);
+      } else tx.set(secretRef, r.secret);
+      tx.update(msgRef, update);
+      return { ok: true, serverNow: now };
+    });
+  }
+
+  // A new command.
+  if (!/^[\w-]{1,40}$/.test(conv) || conv === 'announcements')
+    return note('Not here.', 'Use #arcade for the casino, or any channel for the rest.');
+  const isCasino = casino.CASINO.includes(game);
+  if (!isCasino && !casino.ECONOMY.includes(game)) throw new HttpsError('invalid-argument', 'Unknown command.');
+  if (isCasino && conv !== 'arcade')
+    return { note: { title: '🎰 Take it to #arcade', body: 'Casino games only run in #arcade.', go: 'arcade' } };
+  const msgRef = db.collection(`channels/${conv}/messages`).doc();
+  const text = `/${game}${words.length ? ` ${words.join(' ')}` : ''}`.slice(0, 200);
+  const post = (tx, cmd, mentions = []) =>
+    tx.set(msgRef, {
+      text,
+      by: me,
+      byUid: uid,
+      at: now,
+      cmd: { ...cmd, name: game },
+      mentions,
+      taskIds: [],
+      replyTo,
+      reactions: {},
+      photo: null,
+    });
+
+  return db.runTransaction(async (tx) => {
+    const myBank = (await tx.get(bankRef(me))).data() || {};
+    const balance = balanceOf(me, myBank, data);
+
+    if (game === 'lottery') {
+      const lot = (await tx.get(lotteryRef)).data() || {};
+      const drawAt = lot.drawAt && lot.drawAt > now ? lot.drawAt : nextFriday(now);
+      const n = words[0] ? casino.parseBet(words[0], Math.floor(balance / casino.TICKET)) : 0;
+      if (words[0] && (!n || n < 1)) return note('How many tickets?', `Tickets are ${casino.TICKET} coins. Try: /lottery 3`);
+      const cost = (n || 0) * casino.TICKET;
+      if (cost > balance) return note(`That’s ${cost} coins. You have ${balance}.`);
+      const tickets = { ...(lot.tickets || {}) };
+      if (n) tickets[me] = (tickets[me] || 0) + n;
+      const pot = (lot.pot || 0) + cost;
+      tx.set(lotteryRef, { pot, tickets, drawAt, round: lot.round || 1, last: lot.last || null });
+      if (n)
+        tx.set(bankRef(me), casino.bankAfter(myBank, me, -cost, { icon: '🎟️', label: `Lottery: ${n} ticket${n > 1 ? 's' : ''}` }, {}, now));
+      post(tx, { bought: n || 0, mine: tickets[me] || 0, pot, drawAt, people: Object.keys(tickets).length, last: lot.last || null });
+      return { ok: true };
+    }
+
+    if (isCasino) {
+      const bet = casino.parseBet(words[0], balance);
+      if (!bet || bet < 1) return note(`/${game} needs a bet`, `Try: /${game} 20 (or all, half, 25%). You have ${balance} coins.`);
+      if (bet > balance) return note(`You only have ${balance} coins.`, 'Try /daily, /work, or /beg.');
+      const r = casino.startGame(game, bet, words.slice(1), Math.random, now);
+      if (r.error) return note(r.error);
+      const { status = 'done', ...game2 } = r.pub;
+      if (r.done) {
+        const net = r.payout - bet;
+        tx.set(
+          bankRef(me),
+          casino.bankAfter(
+            myBank,
+            me,
+            net,
+            { game, icon: ICON[game], label: `${LABEL[game]}: ${net >= 0 ? `won ${net}` : `lost ${-net}`}` },
+            {},
+            now,
+          ),
+        );
+        post(tx, { game: game2, status, bet, payout: r.payout, net });
+      } else {
+        // Take the bet now; the end of the game pays back what it won.
+        tx.set(bankRef(me), casino.bankAfter(myBank, me, -bet, null, {}, now));
+        tx.set(db.doc(`gameSecrets/${msgRef.id}`), r.secret);
+        post(tx, { game: game2, status, bet });
+      }
+      return { ok: true, serverNow: now };
+    }
+
+    // Economy
+    if (game === 'rob') {
+      const target = words.join(' ').replace(/^@/, '');
+      const people = (await db.collection('people').get()).docs.map((d) => data.rename(d.get('name') || '')).filter(Boolean);
+      const lower = target.toLowerCase();
+      const them =
+        people.find((n) => lower.includes(n.toLowerCase())) || people.find((n) => n.toLowerCase().split(' ')[0] === lower.split(' ')[0]);
+      if (!them) return note('Rob who?', 'Try: /rob @name');
+      if (them === me) return note('You can’t rob yourself.', 'You’d just be moving coins between pockets.');
+      const theirBank = (await tx.get(bankRef(them))).data() || {};
+      const r = casino.rob(myBank, balance, balanceOf(them, theirBank, data), now);
+      if (r.error) return note(r.error);
+      tx.set(
+        bankRef(me),
+        casino.bankAfter(
+          myBank,
+          me,
+          r.amount,
+          { icon: r.card.ok ? '🦹' : '🚓', label: r.card.ok ? `Robbed ${them}` : `Caught robbing ${them}` },
+          r.bank,
+          now,
+        ),
+      );
+      tx.set(
+        bankRef(them),
+        casino.bankAfter(
+          theirBank,
+          them,
+          r.theirs,
+          { icon: r.card.ok ? '😱' : '🚓', label: r.card.ok ? `Robbed by ${me}` : `${me} paid you a fine` },
+          {},
+          now,
+        ),
+      );
+      post(
+        tx,
+        {
+          ...r.card,
+          to: them,
+          line: r.card.ok ? `robbed you and got away with ${r.amount} coins` : `tried to rob you and paid you a ${r.amount} coin fine`,
+        },
+        [them],
+      );
+      return { ok: true };
+    }
+    const r =
+      game === 'daily'
+        ? casino.daily(myBank, nyDay(now), nyDay(now - 86400000))
+        : game === 'work'
+          ? casino.work(myBank, now)
+          : casino.beg(myBank, now);
+    if (r.error) return note(r.error);
+    const label = { daily: `Daily coins (streak ${r.card.streak})`, work: `Work: ${r.card.job}`, beg: 'Begging' }[game];
+    tx.set(
+      bankRef(me),
+      casino.bankAfter(myBank, me, r.amount, r.amount ? { icon: { daily: '📅', work: '🛠️', beg: '🥺' }[game], label } : null, r.bank, now),
+    );
+    post(tx, r.card);
+    return { ok: true };
+  });
+});
+
+// Fridays at 6 PM (New York): draw the lottery. One ticket wins the whole pot.
+export const drawLottery = onSchedule({ schedule: '0 18 * * 5', timeZone: TIME_ZONE }, async () => {
+  const now = Date.now();
+  await db.runTransaction(async (tx) => {
+    const lot = (await tx.get(lotteryRef)).data();
+    if (!lot || !lot.pot || !Object.keys(lot.tickets || {}).length) {
+      tx.set(lotteryRef, { pot: 0, tickets: {}, drawAt: nextFriday(now + 60000), round: (lot?.round || 0) + 1, last: lot?.last || null });
+      return;
+    }
+    const entries = Object.entries(lot.tickets);
+    const total = entries.reduce((t, [, n]) => t + n, 0);
+    let r = Math.floor(Math.random() * total);
+    const [winner, theirs] = entries.find(([, n]) => (r -= n) < 0) || entries[0];
+    const bank = (await tx.get(bankRef(winner))).data() || {};
+    tx.set(bankRef(winner), casino.bankAfter(bank, winner, lot.pot, { icon: '🎟️', label: `Won the lottery (${lot.pot} coins)` }, {}, now));
+    const last = { winner, pot: lot.pot, tickets: theirs, of: total, people: entries.length, at: now };
+    tx.set(lotteryRef, { pot: 0, tickets: {}, drawAt: nextFriday(now + 60000), round: (lot.round || 1) + 1, last });
+    tx.set(db.collection('channels/arcade/messages').doc(), {
+      text: `🎟️ ${winner} won the lottery: ${lot.pot} coins!`,
+      by: 'Trotbot',
+      byUid: 'trotbot',
+      bot: true,
+      at: now,
+      cmd: { name: 'lottery', draw: last, line: `won the lottery: ${lot.pot} coins` },
+      mentions: [winner],
+      taskIds: [],
+      replyTo: null,
+      reactions: {},
+      photo: null,
+    });
+  });
 });
