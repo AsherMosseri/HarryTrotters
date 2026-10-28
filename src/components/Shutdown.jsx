@@ -145,6 +145,12 @@ export function ShutdownScreen({ shutdown, store, actor }) {
   const to = firstName(REQUESTS_TO);
   return (
     <div className="gate shutdown-gate">
+      <button
+        className="btn small-btn shutdown-switch"
+        onClick={() => confirm('Switch user? You will need the team code again on this device.') && store.leave()}
+      >
+        Switch user
+      </button>
       <div className="gate-card shutdown-card" role="main">
         <div className="shutdown-icon" aria-hidden="true">
           🛑

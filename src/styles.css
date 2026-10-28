@@ -3320,7 +3320,7 @@ html.kb-open .toast { bottom: auto; top: calc(var(--vvt) + var(--vvh) - 64px); }
 .lablog-blockers { color: var(--danger); white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; }
 .lablog-next { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; }
 .shutdown-banner { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 6px 12px; padding: 6px 16px; font-size: 13px; font-weight: 700; background: color-mix(in srgb, var(--danger) 14%, var(--surface)); color: var(--text); border-bottom: 1px solid color-mix(in srgb, var(--danger) 30%, var(--border)); flex: none; }
-.shutdown-gate { min-height: 100dvh; padding-top: max(24px, env(safe-area-inset-top)); padding-bottom: max(24px, env(safe-area-inset-bottom)); }
+.shutdown-gate { position: relative; min-height: 100dvh; padding-top: calc(max(12px, env(safe-area-inset-top)) + 52px); padding-bottom: max(24px, env(safe-area-inset-bottom)); }
 .shutdown-card { gap: 12px; }
 .shutdown-icon { font-size: 44px; line-height: 1; }
 .shutdown-msg { font-size: 17px; white-space: pre-wrap; overflow-wrap: anywhere; }
@@ -3353,3 +3353,4 @@ html.kb-open .toast { bottom: auto; top: calc(var(--vvt) + var(--vvh) - 64px); }
 .sd-compose textarea { flex: 1; min-width: 0; font-weight: 400; }
 .sd-compose .btn { flex: none; min-height: 40px; }
 .sd-picker { width: auto; max-width: 46%; min-height: 34px; padding: 4px 8px; font-size: 14px; margin-right: 4px; }
+.shutdown-switch { position: absolute; top: max(12px, env(safe-area-inset-top)); right: max(16px, env(safe-area-inset-right)); z-index: 1; }
