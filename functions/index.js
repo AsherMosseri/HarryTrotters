@@ -262,6 +262,17 @@ async function previewFor(event) {
   }
   await event.data.after.ref.update({ preview });
 }
+// A reply from the shutdown screen goes to Asher.
+export const onShutdownReply = onDocumentCreated('shutdownReplies/{id}', async (event) => {
+  const r = event.data?.data();
+  if (!r?.text) return;
+  const rename = await renamer();
+  const by = rename(r.name || '');
+  await notify([
+    { to: REQUESTS_TO, type: 'shutdown', title: `${first(by)} replied to the shutdown`, body: clip(r.text), open: 'shutdown', by },
+  ]);
+});
+
 export const channelLinkPreview = onDocumentWritten('channels/{channelId}/messages/{messageId}', previewFor);
 export const dmLinkPreview = onDocumentWritten('dms/{dmId}/messages/{messageId}', previewFor);
 

@@ -22,6 +22,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Full history: the build id is the commit that last changed the version log (vite.config.js).
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 22

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { loadStore } from './data/store.js';
-import { TEAM_NAME, makeRenamer } from './config.js';
+import { REQUESTS_TO, TEAM_NAME, makeRenamer } from './config.js';
 import { InstallScreen, JoinScreen, LoadingScreen } from './components/Gate.jsx';
 import { installNeeded } from './data/push.js';
 import { isDemo } from './data/store.js';
@@ -8,6 +8,7 @@ import { isDemo } from './data/store.js';
 // Checked once: the Home Screen app is a separate launch, so this never changes mid-visit.
 const install = isDemo ? null : installNeeded();
 import Workspace from './components/Workspace.jsx';
+import { ShutdownScreen, useShutdown } from './components/Shutdown.jsx';
 
 const AUTH_ERRORS = {
   'auth/operation-not-allowed': 'Anonymous sign-in is turned off in Firebase (Authentication → Sign-in method → Anonymous).',
@@ -69,6 +70,8 @@ export default function App() {
   useEffect(() => {
     document.title = `${TEAM_NAME} Task Board`;
   }, []);
+  // Asher can shut the app down for everyone else.
+  const shutdown = useShutdown(store, !!actor);
 
   if (install) return <InstallScreen {...install} />;
   if (error) return <LoadingScreen error={error} />;
@@ -83,5 +86,6 @@ export default function App() {
         }}
       />
     );
-  return <Workspace store={store} actor={actor} rename={rename} renames={renames} />;
+  if (shutdown?.on && actor.name !== REQUESTS_TO) return <ShutdownScreen shutdown={shutdown} store={store} actor={actor} />;
+  return <Workspace store={store} actor={actor} rename={rename} renames={renames} shutdown={shutdown} />;
 }

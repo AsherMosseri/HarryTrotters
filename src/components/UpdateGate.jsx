@@ -48,13 +48,26 @@ export default function UpdateGate({ children }) {
     }
 
     let stopped = false;
+    // Newer code that isn't a new version (nothing in the version log): load
+    // it quietly once the app is in the background, with no update screen.
+    let quiet = null;
     const show = (data) => {
-      if (stopped || !data?.version || data.version === __BUILD_ID__) return;
+      if (stopped || !data?.version) return;
+      if (data.version === __BUILD_ID__) {
+        if (data.code && data.code !== __CODE_ID__) quiet = data.code;
+        return;
+      }
       setNewVersion(data.version);
       if (Array.isArray(data.changelog)) setInfo({ release: data.release, changelog: data.changelog });
     };
     // Offline or the local dev server: try again later.
-    const check = async () => document.visibilityState === 'visible' && show(await fetchLive());
+    const check = async () => {
+      if (document.visibilityState === 'hidden') {
+        if (quiet && !stopped) loadNewVersion(quiet);
+        return;
+      }
+      show(await fetchLive());
+    };
     const onFound = (e) => show(e.detail);
     check();
     const timer = setInterval(check, CHECK_EVERY);

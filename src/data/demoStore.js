@@ -1034,6 +1034,28 @@ export const demoStore = {
       off();
     };
   },
+  subscribeShutdown(cb) {
+    return listen(() => cb(state.shutdown || null));
+  },
+  async setShutdown(data, actor) {
+    state.shutdown = { ...data, by: actor.name, updatedAt: Date.now() };
+    commit();
+  },
+  async sendShutdownReply(text, round, actor) {
+    if (!state.shutdown?.on) throw new Error('The app is back on.');
+    state.shutdownReplies = [
+      { id: uid(), text, round, name: actor.name, byUid: actor.uid, at: Date.now() },
+      ...(state.shutdownReplies || []),
+    ];
+    commit();
+  },
+  subscribeShutdownReplies(cb) {
+    return listen(() => cb([...(state.shutdownReplies || [])]));
+  },
+  async deleteShutdownReply(id) {
+    state.shutdownReplies = (state.shutdownReplies || []).filter((r) => r.id !== id);
+    commit();
+  },
   // The demo's Friday draw (the drawLottery function on the server).
   drawLottery() {
     const lot = state.lottery;

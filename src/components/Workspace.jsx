@@ -61,6 +61,7 @@ import {
   useAdsEngine,
 } from './Ads.jsx';
 import CommandsPage from './CommandsPage.jsx';
+import { ShutdownPage } from './Shutdown.jsx';
 import { CoinsDialog, Coins } from './Coins.jsx';
 import { LabLogContext, LabLogDialog } from './LabLog.jsx';
 import { LotteryContext } from './chat/Casino.jsx';
@@ -275,7 +276,7 @@ function Contexts({ people, lab, lottery, children }) {
   );
 }
 
-export default function Workspace({ store, actor, rename, renames }) {
+export default function Workspace({ store, actor, rename, renames, shutdown }) {
   const [rawTasks, setRawTasks] = useState(null);
   const [people, setPeople] = useState([]);
   const [rawMilestones, setMilestones] = useState([]);
@@ -1125,6 +1126,7 @@ export default function Workspace({ store, actor, rename, renames }) {
       } else if (kind === 'view') setView(id);
       else if (kind === 'requests') setShowRequests(id || true);
       else if (kind === 'adorder') setTrackId(id);
+      else if (kind === 'shutdown') setShutdownPage(true);
       else if (kind === 'shift') {
         // "Still at the lab?": the End panel if the shift is still running.
         if (liveMyShift.current) setShiftPanel(true);
@@ -1243,6 +1245,11 @@ export default function Workspace({ store, actor, rename, renames }) {
   useEffect(() => store.subscribeAdSubmissions(setAdSubs), [store]);
   const [adsPage, setAdsPage] = useState(false);
   const [commandsPage, setCommandsPage] = useState(false);
+  // Asher's shutdown switch (Shutdown.jsx) and the replies people send him.
+  const [shutdownPage, setShutdownPage] = useState(false);
+  const [shutdownReplies, setShutdownReplies] = useState([]);
+  useEffect(() => (isOwner ? store.subscribeShutdownReplies(setShutdownReplies) : undefined), [store, isOwner]);
+  const shutdownReplyCount = shutdown?.on ? shutdownReplies.filter((r) => r.round === shutdown.at).length : 0;
   const [adStats, setAdStats] = useState({});
   useEffect(() => store.subscribeAdStats(setAdStats), [store]);
 
@@ -1499,6 +1506,7 @@ export default function Workspace({ store, actor, rename, renames }) {
                         <button onClick={() => (setMeMenu(false), setEditTabs(true))}>🗂 Edit tabs</button>
                         {isOwner && <button onClick={() => (setMeMenu(false), setAdsPage(true))}>📺 Ads</button>}
                         {isOwner && <button onClick={() => (setMeMenu(false), setCommandsPage(true))}>🤖 Commands</button>}
+                        {isOwner && <button onClick={() => (setMeMenu(false), setShutdownPage(true))}>🛑 Shut down app</button>}
                       </div>
                       <ThemeMenu {...themeMenuProps} inline onClose={() => {}} />
                       <UpdateCheck />
@@ -1513,6 +1521,14 @@ export default function Workspace({ store, actor, rename, renames }) {
                 </div>
               </div>
             </header>
+          )}
+          {isOwner && shutdown?.on && (
+            <div className="shutdown-banner" role="status">
+              <span>🛑 Shut down for everyone but you</span>
+              <button className="btn small-btn" onClick={() => setShutdownPage(true)}>
+                {shutdownReplyCount ? `Replies (${shutdownReplyCount})` : 'Manage'}
+              </button>
+            </div>
           )}
           <TakeoverStrip />
           <AdBanner position="top" />
@@ -2132,6 +2148,15 @@ export default function Workspace({ store, actor, rename, renames }) {
               onClose={ads.closeRemoving}
             />
           )}
+          {shutdownPage && isOwner && (
+            <ShutdownPage
+              shutdown={shutdown}
+              replies={shutdownReplies}
+              onSave={(data) => store.setShutdown(data, actor)}
+              onDelete={(id) => store.deleteShutdownReply(id)}
+              onClose={() => setShutdownPage(false)}
+            />
+          )}
           {commandsPage && (
             <CommandsPage
               cfg={settings.commands}
@@ -2227,6 +2252,7 @@ export default function Workspace({ store, actor, rename, renames }) {
                     <button onClick={() => (closeSheet(), setEditTabs(true))}>🗂 Edit tabs</button>
                     {isOwner && <button onClick={() => (closeSheet(), setAdsPage(true))}>📺 Ads</button>}
                     {isOwner && <button onClick={() => (closeSheet(), setCommandsPage(true))}>🤖 Commands</button>}
+                    {isOwner && <button onClick={() => (closeSheet(), setShutdownPage(true))}>🛑 Shut down app</button>}
                   </div>
                   <ThemeMenu {...themeMenuProps} inline onClose={() => {}} />
                   <UpdateCheck />

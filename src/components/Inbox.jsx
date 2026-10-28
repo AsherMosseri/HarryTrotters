@@ -11,6 +11,7 @@ const ICONS = {
   message: '💬',
   dm: '✉️',
   request: '💡',
+  shutdown: '🛑',
   shift: '⏱',
   checkin: '🧪',
 };

@@ -58,7 +58,27 @@ service cloud.firestore {
     // settings/names (renames) is readable before joining so the join screen shows current names.
     match /settings/{id} {
       allow read: if isMember() || (id == 'names' && signedIn());
-      allow write: if isManager();
+      allow write: if isManager() && id != 'shutdown';
+      // settings/shutdown shuts the app down for everyone else: Asher only.
+      allow write: if id == 'shutdown' && isOwner() && validShutdown(request.resource.data);
+    }
+    // Asher: the manager who joined as Asher Mosseri (that needs his manager code).
+    function isOwner() { return isManager() && myName().lower() == 'asher mosseri'; }
+    function validShutdown(d) {
+      return d.keys().hasOnly(['on', 'message', 'question', 'at', 'endedAt', 'by', 'updatedAt'])
+        && d.on is bool && d.message is string && d.message.size() <= 2000
+        && d.get('question', '') is string && d.get('question', '').size() <= 300;
+    }
+    // What people write back from the shutdown screen. Only Asher reads them,
+    // and they can only be sent while the app is shut down.
+    match /shutdownReplies/{id} {
+      allow read, delete: if isOwner();
+      allow create: if isMember()
+        && request.resource.data.keys().hasOnly(['text', 'round', 'name', 'byUid', 'at'])
+        && request.resource.data.byUid == request.auth.uid && isMe(request.resource.data.name)
+        && request.resource.data.text is string && request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 1000
+        && request.resource.data.round is int && request.resource.data.at is int
+        && get(/databases/$(database)/documents/settings/shutdown).data.get('on', false) == true;
     }
 
     // Pretend-ad view and tap counts (the fake earnings on the Ads page).

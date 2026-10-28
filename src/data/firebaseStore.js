@@ -839,6 +839,31 @@ export const firebaseStore = {
       () => cb(null),
     );
   },
+  // Asher's switch that shuts the app down for everyone else (settings/shutdown),
+  // and what people write back from the shutdown screen (shutdownReplies).
+  subscribeShutdown(cb) {
+    return onSnapshot(
+      doc(db, 'settings', 'shutdown'),
+      (snap) => cb(snap.data() || null),
+      () => {},
+    );
+  },
+  setShutdown(data, actor) {
+    return setDoc(doc(db, 'settings', 'shutdown'), { ...data, by: actor.name, updatedAt: Date.now() });
+  },
+  sendShutdownReply(text, round, actor) {
+    return setDoc(doc(collection(db, 'shutdownReplies')), { text, round, name: actor.name, byUid: actor.uid, at: Date.now() });
+  },
+  subscribeShutdownReplies(cb) {
+    return onSnapshot(
+      query(collection(db, 'shutdownReplies'), orderBy('at', 'desc'), limit(300)),
+      (snap) => cb(snap.docs.map(readDoc)),
+      () => cb([]),
+    );
+  },
+  deleteShutdownReply(id) {
+    return deleteDoc(doc(db, 'shutdownReplies', id));
+  },
   // /remind: the reminders function sends it to your 🔔 (and phone) when it's time.
   addReminder({ at, text, conv }, actor) {
     return setDoc(doc(collection(db, 'reminders')), { by: actor.name, at, text, conv: conv || '', created: Date.now() });

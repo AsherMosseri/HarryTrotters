@@ -3319,3 +3319,21 @@ html.kb-open .toast { bottom: auto; top: calc(var(--vvt) + var(--vvh) - 64px); }
 .lablog-entry-tasks .chip.done { border-color: var(--st-done); }
 .lablog-blockers { color: var(--danger); white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; }
 .lablog-next { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; }
+.shutdown-banner { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 6px 12px; padding: 6px 16px; font-size: 13px; font-weight: 700; background: color-mix(in srgb, var(--danger) 14%, var(--surface)); color: var(--text); border-bottom: 1px solid color-mix(in srgb, var(--danger) 30%, var(--border)); flex: none; }
+.shutdown-gate { min-height: 100dvh; padding-top: max(24px, env(safe-area-inset-top)); padding-bottom: max(24px, env(safe-area-inset-bottom)); }
+.shutdown-card { gap: 12px; }
+.shutdown-icon { font-size: 44px; line-height: 1; }
+.shutdown-msg { font-size: 17px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.shutdown-reply { display: flex; flex-direction: column; gap: 6px; width: 100%; text-align: left; font-weight: 700; font-size: 15px; white-space: pre-wrap; }
+.shutdown-reply textarea { font-weight: 400; min-height: 64px; }
+.shutdown-card .big-btn { width: 100%; }
+.shutdown-sent { width: 100%; text-align: left; display: flex; flex-direction: column; gap: 6px; }
+.shutdown-sent-item { padding: 8px 10px; border-radius: 10px; background: var(--accent-soft); white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; }
+.dialog.shutdown-dialog { width: min(560px, 100%); display: flex; flex-direction: column; gap: 12px; }
+.shutdown-status { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border-radius: 12px; background: var(--accent-soft); }
+.shutdown-status.on { background: color-mix(in srgb, var(--danger) 14%, var(--surface)); }
+.shutdown-actions { display: flex; flex-direction: column; gap: 8px; }
+.shutdown-replies h3 { margin: 4px 0 6px; font-size: 15px; }
+.shutdown-replies ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.shutdown-reply-item { display: flex; align-items: flex-start; gap: 10px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 12px; }
+.shutdown-reply-text { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; margin-top: 2px; }
