@@ -4,6 +4,17 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '2.63',
+    date: '2026-10-28',
+    title: 'Smoother chat on iPad',
+    items: [
+      'Animations in chat no longer start and freeze all over the place on iPad. With Calm chat on, decorations, name effects, message borders, and nameplates move only on the message you tap (or the conversation you have open).',
+      'Chat animations hold still while you scroll, so scrolling stays smooth.',
+      'The app can’t get stuck zoomed in anymore: double-tapping, pinching, or tapping a small text box no longer blows up the page.',
+      'Profile pictures with a decoration ring are centered again in poll votes and avatar stacks.',
+    ],
+  },
+  {
     version: '2.62',
     date: '2026-10-28',
     title: 'Command controls',

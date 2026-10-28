@@ -5,10 +5,11 @@ import { reloadOnceForNewVersion } from './data/store.js';
 import UpdateGate from './components/UpdateGate.jsx';
 import './styles.css';
 import { installEmojiKeyFix } from './emojiKeyFix.js';
-import { installKeyboardFit } from './keyboard.js';
+import { installKeyboardFit, installNoPageZoom } from './keyboard.js';
 
 installEmojiKeyFix();
 installKeyboardFit();
+installNoPageZoom();
 
 window.addEventListener('vite:preloadError', (e) => {
   if (reloadOnceForNewVersion()) e.preventDefault();

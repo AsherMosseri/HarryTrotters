@@ -145,7 +145,9 @@ function ThemeMenu({
         <input type="checkbox" checked={calm} onChange={(e) => setCalm(e.target.checked)} />
         <span>
           <b>Calm chat</b>
-          <span className="muted tiny">Animated pictures, names, and decorations in chat play when you hover or tap.</span>
+          <span className="muted tiny">
+            Animated pictures, names, decorations, borders, and nameplates in chat move only on the message you hover or tap.
+          </span>
         </span>
       </label>
     </div>

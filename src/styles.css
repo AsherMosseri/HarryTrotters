@@ -77,6 +77,9 @@
 }
 
 * { box-sizing: border-box; }
+/* No double-tap zoom anywhere (it blew the page up on iPad when you tapped
+   twice quickly, like voting in a poll). Pinch-zoom is stopped in keyboard.js. */
+* { touch-action: manipulation; }
 /* The page never scrolls. The header is a plain bar and only .app-scroll
    (everything under it) scrolls. Safari on iPad (as a Home Screen app)
    misplaces fixed/sticky elements when the document scrolls, and blurs a
@@ -229,7 +232,7 @@ a { color: var(--accent); }
   border: 2px solid var(--surface);
 }
 .avatar-stack { display: inline-flex; }
-.avatar-stack .avatar + .avatar { margin-left: -7px; }
+.avatar-stack > * + * { margin-left: -7px; }
 .avatar.more { background: var(--surface-2); color: var(--muted); font-size: 10px; margin-left: -7px; }
 
 .prio {
@@ -1042,7 +1045,8 @@ h3.md-h { font-size: 16.5px; }
 .poll-opt:disabled { cursor: default; }
 .poll-check { width: 16px; color: var(--accent); font-weight: 800; }
 .poll-voters { display: inline-flex; }
-.poll-voters .avatar { margin-left: -5px; border: 2px solid var(--surface); }
+.poll-voters > * { margin-left: -5px; }
+.poll-voters > .avatar, .poll-voters > .deco > .avatar { border: 2px solid var(--surface); }
 .dialog.poll-dialog { width: min(460px, calc(100vw - 32px)); }
 .link-card {
   position: relative; display: flex; gap: 10px; max-width: 480px; margin: 6px 0 2px; padding: 10px 12px;
@@ -2044,10 +2048,6 @@ body:has(.bottom-nav):has(.composer) .toast { bottom: calc(150px + env(safe-area
   90% { clip-path: inset(4% 0 70% 0); transform: translate(-2px, -1px); }
   93% { clip-path: inset(70% 0 2% 0); transform: translate(2px, 0); }
 }
-/* In chat, names animate when you hover or tap the message (like Discord). */
-.calm-chat :is(.msg, .member-row, .conv-row):not(:hover):not(.selected) .ne,
-.calm-chat :is(.msg, .member-row, .conv-row):not(:hover):not(.selected) .ne::before,
-.calm-chat :is(.msg, .member-row, .conv-row):not(:hover):not(.selected) .ne::after { animation-play-state: paused; }
 @media (prefers-reduced-motion: reduce) { .ne, .ne::before, .ne::after { animation: none !important; } }
 .ne-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; }
 .ne-choice { border: 2px solid var(--border); background: var(--surface); border-radius: 12px; padding: 8px 6px 6px; display: flex; flex-direction: column; align-items: center; gap: 2px; color: var(--text); }
@@ -2080,8 +2080,6 @@ body:has(.bottom-nav):has(.composer) .toast { bottom: calc(150px + env(safe-area
 @keyframes ad-march { to { stroke-dashoffset: -16; } }
 .adeco .ad-pulse { animation: ad-pulse 2.2s linear infinite; }
 @keyframes ad-pulse { to { stroke-dashoffset: -346; } }
-/* In chat, decorations animate when you hover or tap the message. */
-.calm-chat :is(.msg, .member-row, .conv-row):not(:hover):not(.selected) :is(.adeco, .adeco *) { animation-play-state: paused; }
 @media (prefers-reduced-motion: reduce) { .adeco, .adeco * { animation: none !important; } }
 /* Small avatars: a ring in the decoration's colors instead. */
 .deco-anim::before { inset: calc(var(--s) * -0.08); }
@@ -2215,9 +2213,50 @@ body:has(.bottom-nav):has(.composer) .toast { bottom: calc(150px + env(safe-area
 .gif-av { position: relative; overflow: hidden; display: inline-block; flex: none; border-radius: 50%; }
 .gif-av > canvas, .gif-av > img { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 50%; object-fit: cover; display: block; }
 .gif-av > canvas { visibility: hidden; }
-.calm-chat :is(.msg, .member-row, .conv-row):not(:hover):not(.selected) .gif-av > img { visibility: hidden; }
-.calm-chat :is(.msg, .member-row, .conv-row):not(:hover):not(.selected) .gif-av > canvas { visibility: visible; }
 @media (prefers-reduced-motion: reduce) { .gif-av > img { visibility: hidden; } .gif-av > canvas { visibility: visible; } }
+
+/* ---------- Calm chat ----------
+   In chat, people's decorations, name effects, message frames, nameplates,
+   and GIF pictures move only on the row you're on: with a mouse, the one you
+   hover; on a touch screen, the message you tapped or the conversation that's
+   open. (A finger's "hover" sticks to whatever it last touched, which started
+   and froze animations all over the channel as you scrolled.) */
+@media (hover: hover) {
+  .calm-chat :is(.msg, .member-row, .conv-row):not(:hover):not(.selected):not(.active) .ne,
+  .calm-chat :is(.msg, .member-row, .conv-row):not(:hover):not(.selected):not(.active) .ne::before,
+  .calm-chat :is(.msg, .member-row, .conv-row):not(:hover):not(.selected):not(.active) .ne::after,
+  .calm-chat :is(.msg, .member-row, .conv-row):not(:hover):not(.selected):not(.active) .adeco,
+  .calm-chat :is(.msg, .member-row, .conv-row):not(:hover):not(.selected):not(.active) .adeco *,
+  .calm-chat :is(.msg, .member-row, .conv-row):not(:hover):not(.selected):not(.active) .deco::before,
+  .calm-chat :is(.msg, .member-row, .conv-row):not(:hover):not(.selected):not(.active) .deco-ring,
+  .calm-chat :is(.msg, .member-row, .conv-row):not(:hover):not(.selected):not(.active) .deco-orbit,
+  .calm-chat :is(.msg, .member-row, .conv-row):not(:hover):not(.selected):not(.active) .deco-b,
+  .calm-chat :is(.msg, .member-row, .conv-row):not(:hover):not(.selected):not(.active) .custom-border,
+  .calm-chat :is(.msg, .member-row, .conv-row):not(:hover):not(.selected):not(.active) .nameplate,
+  .calm-chat :is(.msg, .member-row, .conv-row):not(:hover):not(.selected):not(.active) .nameplate::before,
+  .calm-chat :is(.msg, .member-row, .conv-row):not(:hover):not(.selected):not(.active) .nameplate::after { animation-play-state: paused; }
+  .calm-chat :is(.msg, .member-row, .conv-row):not(:hover):not(.selected):not(.active) .gif-av > img { visibility: hidden; }
+  .calm-chat :is(.msg, .member-row, .conv-row):not(:hover):not(.selected):not(.active) .gif-av > canvas { visibility: visible; }
+}
+@media (hover: none) {
+  .calm-chat :is(.msg, .member-row, .conv-row):not(.selected):not(.active) .ne,
+  .calm-chat :is(.msg, .member-row, .conv-row):not(.selected):not(.active) .ne::before,
+  .calm-chat :is(.msg, .member-row, .conv-row):not(.selected):not(.active) .ne::after,
+  .calm-chat :is(.msg, .member-row, .conv-row):not(.selected):not(.active) .adeco,
+  .calm-chat :is(.msg, .member-row, .conv-row):not(.selected):not(.active) .adeco *,
+  .calm-chat :is(.msg, .member-row, .conv-row):not(.selected):not(.active) .deco::before,
+  .calm-chat :is(.msg, .member-row, .conv-row):not(.selected):not(.active) .deco-ring,
+  .calm-chat :is(.msg, .member-row, .conv-row):not(.selected):not(.active) .deco-orbit,
+  .calm-chat :is(.msg, .member-row, .conv-row):not(.selected):not(.active) .deco-b,
+  .calm-chat :is(.msg, .member-row, .conv-row):not(.selected):not(.active) .custom-border,
+  .calm-chat :is(.msg, .member-row, .conv-row):not(.selected):not(.active) .nameplate,
+  .calm-chat :is(.msg, .member-row, .conv-row):not(.selected):not(.active) .nameplate::before,
+  .calm-chat :is(.msg, .member-row, .conv-row):not(.selected):not(.active) .nameplate::after { animation-play-state: paused; }
+  .calm-chat :is(.msg, .member-row, .conv-row):not(.selected):not(.active) .gif-av > img { visibility: hidden; }
+  .calm-chat :is(.msg, .member-row, .conv-row):not(.selected):not(.active) .gif-av > canvas { visibility: visible; }
+}
+/* Everything in the chat holds still while it scrolls (smoother on iPad). */
+.chat-scrolling *, .chat-scrolling *::before, .chat-scrolling *::after { animation-play-state: paused !important; }
 .calm-toggle { display: flex; gap: 10px; align-items: flex-start; margin-top: 4px; padding: 8px 10px; border-radius: 10px; background: var(--surface-2); cursor: pointer; }
 .calm-toggle input { margin-top: 3px; accent-color: var(--accent); }
 .calm-toggle > span { display: flex; flex-direction: column; font-size: 14px; }
@@ -2232,7 +2271,6 @@ body:has(.bottom-nav):has(.composer) .toast { bottom: calc(150px + env(safe-area
 @keyframes ne-glitter { to { background-position: 14px -14px, -18px 18px, 22px 22px, 0 0; } }
 .ne-pulse { animation: ne-pulse 1.4s ease-in-out infinite; }
 @keyframes ne-pulse { 50% { filter: drop-shadow(0 0 6px var(--nglow, currentColor)); transform: scale(1.04); } }
-.calm-chat :is(.msg, .member-row, .conv-row):not(:hover):not(.selected) .ne { animation-play-state: paused; }
 
 .ask-more { align-self: flex-start; margin-top: -2px; }
 .style-request { margin-top: 18px; padding: 12px; border-radius: 12px; background: var(--surface-2); display: flex; flex-direction: column; gap: 6px; }
@@ -3001,11 +3039,13 @@ html.kb-open .toast { bottom: auto; top: calc(var(--vvt) + var(--vvh) - 64px); }
 @keyframes cmd-squish { 50% { transform: scale(1.08, 0.88); } }
 .act-hug .cmd-stage > :first-child { animation: cmd-hug-l 1.2s ease-in-out 2; }
 .act-hug .cmd-target { animation: cmd-hug-r 1.2s ease-in-out 2; }
-.act-hug .cmd-prop { left: 44px; top: 0; animation: cmd-pop 1.2s ease-in-out 2; }
+/* Two people: room for their decorations, and the prop centered between them. */
+.act-hug .cmd-stage, .act-highfive .cmd-stage { gap: 16px; }
+.act-hug .cmd-prop { left: 41px; top: 0; animation: cmd-pop 1.2s ease-in-out 2; }
 @keyframes cmd-hug-l { 50% { transform: translateX(10px) rotate(8deg); } }
 @keyframes cmd-hug-r { 50% { transform: translateX(-10px) rotate(-8deg); } }
 @keyframes cmd-pop { 0%, 30% { transform: scale(0); } 50% { transform: scale(1.2); } 80%, 100% { transform: scale(0); } }
-.act-highfive .cmd-prop { left: 46px; top: 0; animation: cmd-pop 0.9s ease-in-out 3; }
+.act-highfive .cmd-prop { left: 41px; top: 0; animation: cmd-pop 0.9s ease-in-out 3; }
 .act-highfive .cmd-stage > :first-child { animation: cmd-hug-l 0.9s ease-in-out 3; }
 .act-highfive .cmd-target { animation: cmd-hug-r 0.9s ease-in-out 3; }
 .act-bonk .cmd-prop { left: 34px; top: -2px; transform-origin: 90% 90%; animation: cmd-bonk 0.7s ease-in 3; }

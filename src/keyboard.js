@@ -58,3 +58,14 @@ export function installKeyboardFit() {
   );
   update();
 }
+
+// The app never zooms as a whole page: an accidental pinch or double tap blew
+// it up on iPad and left it stuck that way. (maximum-scale=1 in index.html
+// also stops Safari zooming in on small text boxes.) The robot viewer and the
+// electrical diagram do their own pinch-zoom with pointer events, so they
+// still work.
+export function installNoPageZoom() {
+  const stop = (e) => e.preventDefault();
+  document.addEventListener('gesturestart', stop, { passive: false });
+  document.addEventListener('gesturechange', stop, { passive: false });
+}

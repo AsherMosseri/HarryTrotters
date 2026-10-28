@@ -234,10 +234,20 @@ export default function ChatView({
     };
   }, []);
 
+  // While you scroll (a finger or the wheel, and the glide after), animations
+  // in the chat hold still: smoother on iPad. Scrolls the app does itself
+  // (new messages) don't count.
+  const scrolling = useRef(null);
+  const holdStill = () => {
+    list.current?.classList.add('chat-scrolling');
+    clearTimeout(scrolling.current);
+    scrolling.current = setTimeout(() => list.current?.classList.remove('chat-scrolling'), 200);
+  };
   const onScroll = () => {
     const el = list.current;
     atBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
     if (atBottom.current) setNewBelow(false);
+    if (el.classList.contains('chat-scrolling')) holdStill();
   };
 
   const loadOlder = async () => {
@@ -474,7 +484,7 @@ export default function ChatView({
             )}
           </div>
         </header>
-        <div className="msg-list" ref={list} onScroll={onScroll}>
+        <div className="msg-list" ref={list} onScroll={onScroll} onTouchMove={holdStill} onWheel={holdStill}>
           {/* Pretend ads, every N messages (Asher's Ads page). */}
           {all.length >= PAGE && (
             <button className="btn ghost load-older" onClick={loadOlder} disabled={loadingOlder}>
