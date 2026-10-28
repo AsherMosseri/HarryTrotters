@@ -62,6 +62,8 @@ import {
 } from './Ads.jsx';
 import CommandsPage from './CommandsPage.jsx';
 import { CoinsDialog, Coins } from './Coins.jsx';
+import { LabLogContext, LabLogDialog } from './LabLog.jsx';
+import { dayOf, hoursOn, logId, missingLogDay } from '../labLog.js';
 import { OrderTracker, OrdersDialog, orderActive } from './AdOrders.jsx';
 import { setServerSkew } from '../serverTime.js';
 import { AdBlockWall, GameDialog, PrizeWheel, VideoAd } from './AdGames.jsx';
@@ -260,6 +262,15 @@ const TRASH_DAYS = 30;
 const CHAT_PAGE = 60;
 
 const EMPTY_FILTERS = { q: '', person: '', subteam: '', priority: '', statuses: [], hideDone: false };
+
+// What components deep in the app read: people (profiles, who's online) and the lab log.
+function Contexts({ people, lab, children }) {
+  return (
+    <PeopleContext.Provider value={people}>
+      <LabLogContext.Provider value={lab}>{children}</LabLogContext.Provider>
+    </PeopleContext.Provider>
+  );
+}
 
 export default function Workspace({ store, actor, rename, renames }) {
   const [rawTasks, setRawTasks] = useState(null);
@@ -1040,6 +1051,45 @@ export default function Workspace({ store, actor, rename, renames }) {
     () => (tasks || []).filter((t) => t.status !== 'done' && (t.assignees || []).includes(actor.name)),
     [tasks, actor.name],
   );
+  // The lab log (labLog.js): the last 30 days of logs, and the form (opened
+  // when you end a shift, to edit one, or for a shift that ended without one).
+  const [labLogs, setLabLogs] = useState(null);
+  useEffect(() => store.subscribeLabLogs(dayOf(Date.now() - 30 * 86400000), setLabLogs, loadFail('the lab log')), [store, loadFail]);
+  const [labLog, setLabLog] = useState(null); // { mode: 'end' | 'edit', day, person, shift? }
+  const namedShifts = useMemo(() => shifts.map((s) => (s.person ? { ...s, person: rename(s.person) } : s)), [shifts, rename]);
+  const owedDay = labLogs ? missingLogDay(actor.name, namedShifts, labLogs) : null;
+  const labCtx = useMemo(
+    () => ({
+      logs: labLogs || [],
+      shifts: namedShifts,
+      tasks: tasks || [],
+      me: actor.name,
+      isManager: !!actor.admin,
+      edit: (l) => setLabLog({ mode: 'edit', day: l.day, person: l.person }),
+    }),
+    [labLogs, namedShifts, tasks, actor.name, actor.admin],
+  );
+  const saveLabLog = async (form) => {
+    const st = labLog || { mode: 'missing', day: owedDay, person: actor.name };
+    const id = logId(st.day, st.person);
+    const prev = (labLogs || []).find((l) => l.id === id);
+    await store.saveLabLog(id, { day: st.day, person: st.person, uid: prev?.uid || actor.uid, at: prev?.at || Date.now(), ...form }, actor);
+    // Tasks marked finished in the log get marked done.
+    for (const tid of form.doneTaskIds) {
+      const t = (tasks || []).find((x) => x.id === tid);
+      if (t && t.status !== 'done') await api.update(t, { status: 'done' });
+    }
+    if (st.mode === 'end' && st.shift)
+      await api.updateShift(st.shift.id, {
+        note: st.shift.note || '',
+        subteam: st.shift.subteam || '',
+        taskIds: form.taskIds,
+        end: Date.now(),
+      });
+    setLabLog(null);
+    setToast({ text: st.mode === 'end' ? '🧪 Logged and shift ended. See you next time!' : '🧪 Saved to #lab-log.' });
+  };
+
   const startMyShift = useCallback(
     async (extra = {}) => {
       if (liveMyShift.current) return setShiftPanel(true);
@@ -1111,6 +1161,10 @@ export default function Workspace({ store, actor, rename, renames }) {
       myTasks={myOpenTasks}
       onStart={startMyShift}
       onUpdate={(patch) => myShift && api.updateShift(myShift.id, patch)}
+      // Ending a shift asks for the lab log first (it ends the shift when saved).
+      onEnd={(details) =>
+        myShift && setLabLog({ mode: 'end', day: dayOf(myShift.start), person: actor.name, shift: { ...myShift, ...details } })
+      }
       onCancel={() => {
         setShiftPanel(false);
         if (myShift) api.deleteShift(myShift.id);
@@ -1352,7 +1406,7 @@ export default function Workspace({ store, actor, rename, renames }) {
   ).length;
 
   return (
-    <PeopleContext.Provider value={peopleCtx}>
+    <Contexts people={peopleCtx} lab={labCtx}>
       <AdsProvider value={ads.value}>
         <div className={`app${view === 'chat' || view === 'robot' ? ' chat-mode' : ''}`} style={takeoverStyle(ads.value.takeover)}>
           {store.mode === 'demo' && (
@@ -1845,6 +1899,27 @@ export default function Workspace({ store, actor, rename, renames }) {
                 onAnswer={(text) => api.answerPoll('announcements', pendingPoll, text)}
               />
             )}
+            {(labLog || (owedDay && !pendingCheckin && !pendingPoll)) &&
+              (() => {
+                const st = labLog || { mode: 'missing', day: owedDay, person: actor.name };
+                const id = logId(st.day, st.person);
+                return (
+                  <LabLogDialog
+                    key={`${st.mode}-${id}`}
+                    day={st.day}
+                    person={st.person}
+                    log={(labLogs || []).find((l) => l.id === id)}
+                    shift={st.shift}
+                    tasks={tasks || []}
+                    hours={hoursOn(st.day, namedShifts)[st.person]}
+                    mode={st.mode}
+                    onSave={saveLabLog}
+                    // A missing log has to be written; ending a shift can wait ("Not yet").
+                    onCancel={st.mode === 'missing' ? null : () => setLabLog(null)}
+                    uploadPhoto={async (f) => store.uploadLabPhoto(await preparePhoto(f))}
+                  />
+                );
+              })()}
             {pendingCheckin && (
               <CheckinGate checkin={pendingCheckin} rename={rename} onAnswer={(a) => api.answerCheckin(pendingCheckin.id, a)} />
             )}
@@ -2164,6 +2239,6 @@ export default function Workspace({ store, actor, rename, renames }) {
           )}
         </div>
       </AdsProvider>
-    </PeopleContext.Provider>
+    </Contexts>
   );
 }

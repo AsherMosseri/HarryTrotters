@@ -4,6 +4,16 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '2.70',
+    date: '2026-10-28',
+    title: 'Lab log',
+    items: [
+      'When you end your shift, the app asks what you did: a note (type anything), the tasks you worked on (tick the ones you finished), photos, anything blocking you, and what to do next time. It’s required, and it fills in what you already wrote on your shift.',
+      'New #lab-log channel: Trotbot posts one card per lab day that fills in as each person logs, with hours at the lab and who still has to log. React and reply like any message. You can edit your own log; team management can edit anyone’s.',
+      'Forgot to clock out, or your shift ended another way? The app asks for that day’s log the next time you open it.',
+    ],
+  },
+  {
     version: '2.69',
     date: '2026-10-28',
     title: 'Written polls, drafts, and new lines',

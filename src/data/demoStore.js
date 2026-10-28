@@ -13,6 +13,7 @@ import { STARTER_CHECKLISTS, starterItems } from '../checklists.js';
 import { REQUESTS_TO } from '../config.js';
 import { deliver } from '../adOrders.js';
 import * as casino from '../../functions/shared/casino.js';
+import { dayOf } from '../labLog.js';
 import * as arcade from '../../functions/shared/arcade.js';
 import { blocked, serverGroup } from '../../functions/shared/commandRules.js';
 
@@ -273,6 +274,8 @@ function seed() {
     },
     { id: uid(), type: 'due', title: 'Due tomorrow', body: tasks[1].title, open: `task:${tasks[1].id}`, at: now - 1.5 * day, read: true },
   ];
+  const shifts = demoShifts(now);
+  const lab = demoLabLog(shifts, tasks);
   return {
     tasks,
     activity,
@@ -282,7 +285,8 @@ function seed() {
     parts,
     checklists,
     runs,
-    chat,
+    chat: { ...chat, 'lab-log': lab.posts },
+    labLogs: lab.logs,
     robot,
     inbox,
     dms,
@@ -290,7 +294,7 @@ function seed() {
     channels: [],
     emoji: [],
     stickers: [],
-    shifts: demoShifts(now),
+    shifts,
     shiftPlans: demoPlans(),
     requests: [
       {
@@ -318,6 +322,69 @@ function seed() {
 }
 
 // Sample shifts: a few past ones this week and last, and Cooper at the lab now.
+// Sample lab logs for the sample shifts that already ended, and #lab-log's
+// post for each of those days (the onLabLog function makes these for real).
+function demoLabLog(shifts, tasks) {
+  const NOTES = {
+    'Asher Mosseri': [
+      'Tuned the autonomous path for the left start. It hits the backdrop 4 out of 5 times now.',
+      'Planned the next two weeks with the leads and updated the milestones.',
+    ],
+    'Sebastian Tolbert': ['Mounted the shooter and re-tightened the drivetrain set screws.'],
+    'Jackson Lucks': ['Labeled every wire on the Control Hub and redid the battery connector.'],
+    'Cooper Mlezcko': ['Rebuilt the drivetrain: new bearings on the left side, and it drives straight again.'],
+    'Sophia Bermudez': ['Finished the intake roller CAD and exported the plates for cutting.'],
+    'Michael Meidan': ['Started the arm pivot in CAD.'],
+  };
+  const extra = {
+    'Asher Mosseri': { next: 'Try the right start, and record a video for the portfolio.' },
+    'Jackson Lucks': { blockers: 'Waiting on the new Anderson connectors to arrive.' },
+    'Cooper Mlezcko': { next: 'Check the motor temperatures after a full match run.' },
+  };
+  const logs = [];
+  const used = {};
+  for (const sh of shifts.filter((x) => x.end)) {
+    const day = dayOf(sh.start);
+    const id = `${day}_${personId(sh.person)}`;
+    if (logs.some((l) => l.id === id)) continue;
+    const i = (used[sh.person] = (used[sh.person] ?? -1) + 1);
+    const notes = NOTES[sh.person] || ['Helped out around the lab.'];
+    const mine = tasks.filter((t) => (t.assignees || []).includes(sh.person)).slice(0, 1);
+    logs.push({
+      id,
+      day,
+      person: sh.person,
+      uid: 'demo',
+      note: notes[i % notes.length],
+      taskIds: mine.map((t) => t.id),
+      doneTaskIds: [],
+      photos: [],
+      blockers: i === 0 ? extra[sh.person]?.blockers || '' : '',
+      next: i === 0 ? extra[sh.person]?.next || '' : '',
+      at: sh.end,
+    });
+  }
+  const days = [...new Set(logs.map((l) => l.day))].sort();
+  const posts = days.map((day) => {
+    const mine = logs.filter((l) => l.day === day);
+    const people = mine.map((l) => l.person);
+    return {
+      id: `labday-${day}`,
+      text: `🧪 Lab log: ${people.join(', ')}`,
+      by: 'Trotbot',
+      byUid: 'trotbot',
+      bot: true,
+      at: Math.min(...mine.map((l) => l.at)),
+      cmd: { name: 'labday', day, people },
+      mentions: [],
+      taskIds: [],
+      replyTo: null,
+      reactions: {},
+    };
+  });
+  return { logs, posts };
+}
+
 function demoShifts(now) {
   const h = 3600000;
   const day = (n, hour) => {
@@ -1334,6 +1401,46 @@ export const demoStore = {
     commit();
   },
 
+  // The lab log. The real app's onLabLog function makes #lab-log's day post;
+  // the demo does it here.
+  subscribeLabLogs(sinceDay, cb) {
+    return listen(() => cb((state.labLogs || []).filter((l) => l.day >= sinceDay)));
+  },
+  async saveLabLog(id, log, actor) {
+    const prev = (state.labLogs || []).find((l) => l.id === id) || {};
+    const merged = { ...prev, ...log, id, updatedAt: Date.now(), updatedBy: actor.name };
+    state.labLogs = [...(state.labLogs || []).filter((l) => l.id !== id), merged];
+    const msgId = `labday-${merged.day}`;
+    const list = (state.chat || {})['lab-log'] || [];
+    const people = [...new Set(state.labLogs.filter((l) => l.day === merged.day).map((l) => l.person))];
+    const day = list.find((m) => m.id === msgId);
+    const post = {
+      id: msgId,
+      text: `🧪 Lab log: ${people.join(', ')}`,
+      by: 'Trotbot',
+      byUid: 'trotbot',
+      bot: true,
+      at: day?.at || Date.now(),
+      cmd: { name: 'labday', day: merged.day, people },
+      mentions: [],
+      taskIds: [],
+      replyTo: null,
+      reactions: day?.reactions || {},
+    };
+    state.chat = { ...(state.chat || {}), 'lab-log': day ? list.map((m) => (m.id === msgId ? { ...m, ...post } : m)) : [...list, post] };
+    commit();
+  },
+  async uploadLabPhoto(prepared) {
+    const toUrl = (blob) =>
+      new Promise((res) => {
+        const r = new FileReader();
+        r.onload = () => res(r.result);
+        r.readAsDataURL(blob);
+      });
+    // Just the small one: the demo lives in this browser's storage, which is small.
+    const thumb = await toUrl(prepared.thumb);
+    return { url: thumb, thumbUrl: thumb, path: '', width: prepared.width, height: prepared.height };
+  },
   subscribeShifts(cb) {
     return listen(() => cb([...(state.shifts || [])]));
   },

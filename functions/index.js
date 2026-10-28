@@ -342,6 +342,37 @@ function zonedMs(date, time) {
 const clock = (ms) => new Date(ms).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: TIME_ZONE });
 const span = (ms) => `${Math.floor(ms / HOUR)}h ${String(Math.floor((ms % HOUR) / 60000)).padStart(2, '0')}m`;
 
+// The lab log (src/labLog.js): #lab-log has one Trotbot post per day, made
+// with the day's first log. It shows everyone's logs live; this keeps the
+// list of who logged (for the preview and notifications) up to date.
+export const onLabLog = onDocumentWritten('labLogs/{id}', async (event) => {
+  const log = event.data?.after?.data() || event.data?.before?.data();
+  const day = log?.day;
+  if (!day || !/^\d{4}-\d{2}-\d{2}$/.test(day)) return;
+  const logs = await db.collection('labLogs').where('day', '==', day).get();
+  const people = [...new Set(logs.docs.map((d) => d.get('person')).filter(Boolean))];
+  const ref = db.doc(`channels/lab-log/messages/labday-${day}`);
+  await db.runTransaction(async (tx) => {
+    const post = await tx.get(ref);
+    const text = `🧪 Lab log: ${people.join(', ')}`.slice(0, 400);
+    if (post.exists) tx.update(ref, { text, 'cmd.people': people });
+    else if (people.length)
+      tx.set(ref, {
+        text,
+        by: 'Trotbot',
+        byUid: 'trotbot',
+        bot: true,
+        at: Date.now(),
+        cmd: { name: 'labday', day, people },
+        mentions: [],
+        taskIds: [],
+        replyTo: null,
+        reactions: {},
+        photo: null,
+      });
+  });
+});
+
 export const shiftChecks = onSchedule({ schedule: 'every 15 minutes', timeZone: TIME_ZONE }, async () => {
   const now = Date.now();
   const rename = await renamer();
@@ -371,7 +402,7 @@ export const shiftChecks = onSchedule({ schedule: 'every 15 minutes', timeZone: 
         to,
         type: 'shift',
         title: 'Your shift was ended automatically',
-        body: `Ended at ${clock(end)} (${span(end - shift.start)}). Tap to fix it if that's wrong.`,
+        body: `Ended at ${clock(end)} (${span(end - shift.start)}). Tap to fix it if that's wrong. The app will ask what you did when you open it.`,
         open: 'view:shifts',
       });
     } else if (now - shift.start >= 4 * HOUR && !shift.reminded) {

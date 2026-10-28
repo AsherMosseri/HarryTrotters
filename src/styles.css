@@ -3284,3 +3284,33 @@ html.kb-open .toast { bottom: auto; top: calc(var(--vvt) + var(--vvh) - 64px); }
 .poll-answer-text { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; }
 /* Poll questions and options can have line breaks. */
 .poll-q, .poll-opt .grow, .pollgate-opt, .checkin-card h1 { white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* ---------- Lab log (LabLog.jsx) ---------- */
+.dialog.lablog-dialog { width: min(560px, calc(100vw - 32px)); max-height: calc(var(--vvh, 100dvh) - 40px); overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+.lablog-why { margin: -4px 0 0; }
+.lablog-field { display: flex; flex-direction: column; gap: 5px; font-weight: 700; font-size: 14px; }
+.lablog-field textarea { font-weight: 400; }
+.lablog-tasks { display: flex; flex-direction: column; gap: 6px; }
+.lablog-task { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.lablog-task .chip { text-align: left; white-space: normal; height: auto; min-height: 32px; padding: 4px 12px; }
+.lablog-done { font-weight: 600; font-size: 13px; display: inline-flex; align-items: center; gap: 4px; }
+.lablog-done input { width: 18px; height: 18px; accent-color: var(--st-done); }
+.lablog-photos { display: flex; gap: 8px; flex-wrap: wrap; }
+.lablog-photo { position: relative; width: 84px; height: 84px; border-radius: 10px; overflow: hidden; background: var(--surface-2); flex: none; }
+.lablog-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.lablog-photo-x { position: absolute; top: 3px; right: 3px; width: 24px; height: 24px; border-radius: 50%; border: 0; background: rgb(0 0 0 / 60%); color: #fff; font-size: 16px; line-height: 1; padding: 0; }
+.lablog-add-photo { width: 84px; height: 84px; border-radius: 10px; border: 2px dashed var(--border); background: none; color: var(--muted); font-weight: 700; }
+.lablog-notyet { align-self: center; }
+.lablog-hint { margin: -6px 0 0; text-align: center; }
+.cmd-card.cmd-card-labday { max-width: 640px; border-left-color: #10b981; }
+.lablog-day { display: flex; flex-direction: column; gap: 10px; }
+.lablog-day-head { display: flex; flex-direction: column; gap: 1px; }
+.lablog-entry { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border-radius: 10px; background: var(--surface); }
+.lablog-entry-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.lablog-hours { min-height: 24px; padding: 0 8px; font-size: 12px; }
+.lablog-note { white-space: pre-wrap; overflow-wrap: anywhere; }
+.lablog-entry-tasks { display: flex; flex-wrap: wrap; gap: 6px; }
+.lablog-entry-tasks .chip { min-height: 26px; font-size: 12.5px; padding: 0 9px; white-space: normal; height: auto; }
+.lablog-entry-tasks .chip.done { border-color: var(--st-done); }
+.lablog-blockers { color: var(--danger); white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; }
+.lablog-next { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; }

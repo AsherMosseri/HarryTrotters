@@ -68,7 +68,7 @@ function TaskPicks({ tasks, value, onChange }) {
 
 // The ⏱ in the top bar: one tap starts a shift; while running it shows the
 // time, and tapping opens this panel to fix the start, add notes, or end it.
-export function ShiftButton({ shift, open, setOpen, myTasks, onStart, onUpdate, onCancel, onOpenTab }) {
+export function ShiftButton({ shift, open, setOpen, myTasks, onStart, onUpdate, onEnd, onCancel, onOpenTab }) {
   const now = useNow(shift ? 15000 : 60000);
   const box = useRef(null);
   const [note, setNote] = useState('');
@@ -172,7 +172,9 @@ export function ShiftButton({ shift, open, setOpen, myTasks, onStart, onUpdate, 
           <button
             className="btn primary big-btn"
             onClick={() => {
-              onUpdate({ ...details, end: Date.now() });
+              // With the lab log, ending asks what you did first (onEnd).
+              if (onEnd) onEnd(details);
+              else onUpdate({ ...details, end: Date.now() });
               setOpen(false);
             }}
           >

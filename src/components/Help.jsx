@@ -152,6 +152,7 @@ const MANAGER_TIPS = [
   'Chat: post in #announcements (everyone gets a notification), use @everyone, delete any message, and remove reactions (🚫☺ on a message).',
   'Channels: ＋ next to Channels adds one; ⚙ on a channel renames it, sets its topic and subteam color, moves it up or down, or deletes it.',
   'Team emoji: open 😊 and tap ＋ under Team emoji to add your own (:name:), or remove them. Stickers: open 🎫 and tap ＋.',
+  'Lab log: ending your shift asks what you did (a note, the tasks you worked on, photos, blockers, and next time). It’s required, and it shows up in #lab-log, where Trotbot keeps one post per lab day with everyone’s logs and hours. Edit yours from that post. If a shift ends without a log (you forgot to clock out), the app asks the next time you open it.',
   'Shifts tab: 🧪 Lab check-in asks everyone who’s going to the lab (lunch / after school). Lunch is split by middle and high school lunch using each person’s grade, which you set on the Team tab (Edit). Repeat makes it ask by itself every weekday, or on the days you pick, at a set time. In #announcements, polls can be set so everyone has to answer.',
   'Shifts tab: Clock in… several people at once, End anyone’s shift, Plan a shift (once or weekly), set the season hours goal, add a missed shift, fix or delete any shift, and Export CSV.',
   'DMs: you can read every DM (under Team DMs) but can’t post in other people’s. You can change anyone’s profile picture and custom status from their profile (Edit profile → Status).',

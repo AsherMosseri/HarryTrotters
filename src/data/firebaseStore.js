@@ -73,6 +73,7 @@ const emojiCol = collection(db, 'emoji');
 const stickersCol = collection(db, 'stickers');
 const requestsCol = collection(db, 'requests');
 const shiftsCol = collection(db, 'shifts');
+const labLogsCol = collection(db, 'labLogs');
 const shiftPlansCol = collection(db, 'shiftPlans');
 const checkinsCol = collection(db, 'checkins');
 const isDm = (conv) => conv.startsWith('dm:');
@@ -941,6 +942,20 @@ export const firebaseStore = {
   },
 
   // Shifts: clock in/out (start and end in ms; end is null while running).
+  // The lab log (labLog.js): logs from sinceDay on.
+  subscribeLabLogs(sinceDay, cb, onError) {
+    return onSnapshot(query(labLogsCol, where('day', '>=', sinceDay)), (snap) => cb(snap.docs.map(readDoc)), onError);
+  },
+  // One log per person per day; the onLabLog function keeps #lab-log's post up to date.
+  saveLabLog(id, log, actor) {
+    return setDoc(doc(labLogsCol, id), { ...log, updatedAt: Date.now(), updatedBy: actor.name }, { merge: true });
+  },
+  // A photo for a lab log (already shrunk by preparePhoto), kept with #lab-log's photos.
+  async uploadLabPhoto(prepared) {
+    const up = await uploadPhoto(convFolder('lab-log'), prepared);
+    return { url: up.url, thumbUrl: up.thumbUrl, path: up.path || '', width: prepared.width, height: prepared.height };
+  },
+
   subscribeShifts(cb, onError) {
     return onSnapshot(shiftsCol, (snap) => cb(snap.docs.map(readDoc)), onError);
   },
