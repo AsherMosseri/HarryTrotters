@@ -58,9 +58,18 @@ function ringBackground({ style, colors = [] }) {
   }
 }
 
+// A sticker reaches at most this far from the picture's center (in picture
+// widths; the edge is 0.5), so it sticks out by no more than 15% of the
+// picture. Every screen leaves that much room, so stickers never cover the
+// names and text next to an avatar.
+const STICKER_REACH = 0.65;
+// How far out a sticker of this size can sit (an emoji is about 1.3 × its
+// size wide, so its half-width is about 0.65 × size).
+export const maxStickerDist = (size = 0.38) => Math.max(0, Math.min(0.75, STICKER_REACH - size * 0.65));
+
 function Badge({ b }) {
   const rad = ((b.angle ?? 45) * Math.PI) / 180;
-  const d = b.dist ?? 0.5;
+  const d = Math.min(b.dist ?? 0.5, maxStickerDist(b.size ?? 0.38));
   const at = { left: `${50 + Math.sin(rad) * d * 100}%`, top: `${50 - Math.cos(rad) * d * 100}%` };
   const vars = { '--r': `${b.rotate || 0}deg`, '--bs': b.size ?? 0.38, '--spd': `${b.speed || 3}s` };
   const dir = b.dir === 'ccw' ? ' ccw' : '';

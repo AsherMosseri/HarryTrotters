@@ -3270,4 +3270,4 @@ html.kb-open .toast { bottom: auto; top: calc(var(--vvt) + var(--vvh) - 64px); }
 .cmd-admin .ads-body { flex-shrink: 1; }
 /* Avatar decorations reach past the picture: keep them off the text beside it. */
 .cmd-whois > .avatar-btn, .cmd-whois > .deco, .cmd-whois > .avatar { margin: 8px 6px 8px 8px; }
-.cmd-ship-pair { gap: 18px; padding: 6px 8px; }
+.cmd-ship-pair { gap: 18px; padding: 8px 8px 10px; }

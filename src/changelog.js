@@ -4,6 +4,15 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '2.68',
+    date: '2026-10-28',
+    title: 'Decorations stay out of the way',
+    items: [
+      'Avatar decorations never cover names or text anywhere in the app now: chat, the members list, DMs, the Board, Team, Shifts, profiles, and command cards. Checked on every screen, on iPad and phone.',
+      'Custom decoration stickers can stick out a little past your picture, but not far enough to cover the text next to it. Big stickers sit closer in. The decoration editor shows exactly what everyone will see.',
+    ],
+  },
+  {
     version: '2.67',
     date: '2026-10-28',
     title: 'Clearer command cards',

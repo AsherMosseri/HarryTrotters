@@ -3,7 +3,7 @@ import { SWATCHES } from '../nitro.js';
 import { EmojiPicker, GifPicker } from './chat/Pickers.jsx';
 import { Avatar } from './common.jsx';
 import GradientColors from './GradientColors.jsx';
-import { BADGE_ANIMS, DEFAULT_DECO, RING_STYLES } from './decoRender.jsx';
+import { BADGE_ANIMS, DEFAULT_DECO, RING_STYLES, maxStickerDist } from './decoRender.jsx';
 import { shrinkParticle } from './People.jsx';
 
 const MAX_BADGES = 3;
@@ -98,7 +98,7 @@ export default function DecorationEditor({ name, value, onChange, upload }) {
     const dx = e.clientX - (r.left + r.width / 2);
     const dy = e.clientY - (r.top + r.height / 2);
     const angle = Math.round(((Math.atan2(dx, -dy) * 180) / Math.PI + 360) % 360);
-    const dist = Math.min(0.75, Math.round((Math.hypot(dx, dy) / r.width) * 100) / 100);
+    const dist = Math.min(maxStickerDist(b.size), Math.round((Math.hypot(dx, dy) / r.width) * 100) / 100);
     setBadge({ angle, dist });
   };
   const pickFile = async (f) => {
@@ -276,8 +276,8 @@ export default function DecorationEditor({ name, value, onChange, upload }) {
           <Slider
             label="In / out"
             min={0}
-            max={75}
-            value={Math.round(b.dist * 100)}
+            max={Math.round(maxStickerDist(b.size) * 100)}
+            value={Math.round(Math.min(b.dist, maxStickerDist(b.size)) * 100)}
             onChange={(v) => setBadge({ dist: v / 100 })}
             show={(v) => (v < 35 ? 'inside' : v > 58 ? 'outside' : 'on edge')}
           />
@@ -286,7 +286,8 @@ export default function DecorationEditor({ name, value, onChange, upload }) {
             min={15}
             max={80}
             value={Math.round(b.size * 100)}
-            onChange={(v) => setBadge({ size: v / 100 })}
+            // A bigger sticker can't sit as far out (see maxStickerDist).
+            onChange={(v) => setBadge({ size: v / 100, dist: Math.min(b.dist, maxStickerDist(v / 100)) })}
             show={(v) => `${v}%`}
           />
           <Slider
