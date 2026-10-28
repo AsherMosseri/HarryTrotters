@@ -4,7 +4,7 @@ import { preparePhoto } from '../../util.js';
 import { Avatar, CloseIcon, PlusIcon, StatusDot, usePeople } from '../common.jsx';
 import { prefixLines, wrapSelection } from './format.jsx';
 import { emojiList, loadEmoji, rememberEmoji, searchEmoji } from './emoji.js';
-import { EmojiPicker, GifPicker, PollDialog, StickerPicker } from './Pickers.jsx';
+import { EmojiPicker, GifPicker, PollDialog, StandupDialog, StickerPicker } from './Pickers.jsx';
 import { matchCommands, parseCommand, runCommand } from '../../commands.js';
 import { CommandOption } from './Commands.jsx';
 import { relTime } from '../../util.js';
@@ -259,9 +259,14 @@ export default function Composer({
   const runSlash = async (parsed) => {
     setSending(true);
     try {
+      const team = api.team();
       const result = await runCommand(parsed, {
         actor,
         roster,
+        ...team,
+        tasks,
+        subteam: team.subteamOf(conv),
+        createTask: api.create,
         ping: api.ping,
         whois: api.whois,
         countdown: api.countdown,
@@ -280,6 +285,10 @@ export default function Composer({
         reset();
       } else if (result.done) {
         reset();
+      } else if (result.standup) {
+        setText('');
+        setSuggest(null);
+        setPanel('standup');
       } else if (result.poll !== undefined) {
         setText('');
         setSuggest(null);
@@ -399,6 +408,17 @@ export default function Composer({
             setPanel(null);
             setPollQuestion('');
           }}
+        />
+      )}
+      {panel === 'standup' && (
+        <StandupDialog
+          onPost={(standup) =>
+            sendExtra({
+              text: '/standup',
+              cmd: { name: 'standup', ...standup, day: new Date().toLocaleDateString(undefined, { weekday: 'long' }) },
+            })
+          }
+          onClose={() => setPanel(null)}
         />
       )}
       {suggest && options.length > 0 && (

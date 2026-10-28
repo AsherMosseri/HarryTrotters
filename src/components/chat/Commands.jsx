@@ -1,6 +1,9 @@
 import { Avatar, DisplayName } from '../common.jsx';
 import { COMMANDS, GROUPS } from '../../commands.js';
 import { CASINO_CARDS, CasinoBody, ECONOMY_CARDS } from './Casino.jsx';
+import { ARCADE_CARDS, ArcadeBody } from './Arcade.jsx';
+import { priorityById } from '../../config.js';
+import { daysBetween, todayISO } from '../../teamCommands.js';
 
 // What slash commands look like in chat (commands.js does the work): the
 // Trotbot card on a command's message, and the notes only you can see.
@@ -23,6 +26,162 @@ const Name = ({ name, onPerson }) => (
 );
 
 const DIE = ['', '⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
+const TEAM_CARDS = ['task', 'overdue', 'shift', 'match', 'standup'];
+const dayText = (iso) => {
+  const d = daysBetween(todayISO(), iso);
+  if (d === 0) return 'today';
+  if (d === 1) return 'tomorrow';
+  if (d === -1) return 'yesterday';
+  return new Date(`${iso}T12:00`).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+};
+const time = (ms) => new Date(ms).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+const Record = ({ r }) => (
+  <div className="cmd-stats">
+    <span>
+      Season{' '}
+      <b>
+        {r.wins}–{r.losses}–{r.ties}
+      </b>
+    </span>
+    <span>
+      best <b>{r.best}</b>
+    </span>
+    <span>
+      avg <b>{r.avg}</b>
+    </span>
+    <span>
+      <b>{r.played}</b> match{r.played === 1 ? '' : 'es'}
+    </span>
+  </div>
+);
+
+function TeamBody({ c, by, onPerson }) {
+  switch (c.name) {
+    case 'task':
+      return (
+        <div>
+          <div className="muted tiny">📋 New task</div>
+          <div className="cmd-task-title">{c.title}</div>
+          <div className="cmd-task-meta">
+            {c.assignees.length ? (
+              c.assignees.map((n) => (
+                <span key={n} className="arc-who">
+                  <Avatar name={n} size={20} /> <Name name={n} onPerson={onPerson} />
+                </span>
+              ))
+            ) : (
+              <span className="muted">Nobody yet</span>
+            )}
+            {c.dueDate && <span>📅 due {dayText(c.dueDate)}</span>}
+            {c.priority && c.priority !== 'medium' && <span>⚑ {priorityById[c.priority]?.label}</span>}
+            {c.subteam && <span className="muted">{c.subteam}</span>}
+          </div>
+        </div>
+      );
+    case 'overdue':
+      return c.total ? (
+        <div>
+          <div className="cmd-big">
+            😬 {c.total} late task{c.total > 1 ? 's' : ''}
+          </div>
+          <ul className="cmd-late">
+            {c.list.map((t) => (
+              <li key={t.id}>
+                <span className="late">{t.late}d late</span>
+                <b>{t.title}</b>
+                <span className="muted small">{t.who.length ? t.who.map((n) => n.split(' ')[0]).join(', ') : 'nobody'}</span>
+              </li>
+            ))}
+          </ul>
+          {c.total > c.list.length && <div className="muted tiny">…and {c.total - c.list.length} more on the Board.</div>}
+        </div>
+      ) : (
+        <div className="cmd-big">🎉 Nothing is overdue. Who are you people?</div>
+      );
+    case 'shift':
+      if (c.who)
+        return c.people.length ? (
+          <div>
+            <div className="cmd-big">🟢 {c.people.length} at the lab</div>
+            <ul className="cmd-late">
+              {c.people.map((p) => (
+                <li key={p.name}>
+                  <Avatar name={p.name} size={22} /> <Name name={p.name} onPerson={onPerson} />
+                  <span className="muted small">since {time(p.since)}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : (
+          <div className="cmd-big">🌙 Nobody’s at the lab right now.</div>
+        );
+      return (
+        <div>
+          <div className="cmd-big">⏱ Clocked in</div>
+          <div>
+            <Name name={by} onPerson={onPerson} /> started a shift at {time(c.at)}.
+          </div>
+          {c.others?.length > 0 && <div className="muted small">Also here: {c.others.map((p) => p.name.split(' ')[0]).join(', ')}</div>}
+        </div>
+      );
+    case 'match': {
+      if (!c.total && c.total !== 0) return <Record r={c.record} />;
+      const parts = [
+        ['auto', 'Auto', c.auto],
+        ['teleop', 'TeleOp', c.teleop],
+        ['endgame', 'Endgame', c.endgame],
+      ];
+      return (
+        <div>
+          <div className="cmd-match-score">
+            <span className="cmd-big">
+              🏁 {c.matchNumber ? `Match ${c.matchNumber}` : 'Match'}: {c.total} pts
+            </span>
+            {c.result && <span className={`cmd-result ${c.result}`}>{{ win: 'W', loss: 'L', tie: 'T' }[c.result]}</span>}
+          </div>
+          <div className="cmd-match-bars" aria-hidden="true">
+            {parts.map(([k, , v]) => (
+              <span key={k} className={`sw-${k}`} style={{ width: `${c.total ? (v / c.total) * 100 : 0}%` }} />
+            ))}
+          </div>
+          <div className="cmd-stats">
+            {parts.map(([k, label, v]) => (
+              <span key={k}>
+                {label} <b>{v}</b>
+              </span>
+            ))}
+          </div>
+          <Record r={c.record} />
+          <div className="muted tiny">Saved to the Match Log.</div>
+        </div>
+      );
+    }
+    case 'standup':
+      return (
+        <div className="cmd-standup">
+          <div className="muted tiny">🗓️ {c.day} standup</div>
+          {c.yesterday && (
+            <div>
+              <span className="muted">✅ Done</span>
+              {c.yesterday}
+            </div>
+          )}
+          {c.today && (
+            <div>
+              <span className="muted">🎯 Today</span>
+              {c.today}
+            </div>
+          )}
+          <div>
+            <span className="muted">🚧 Blockers</span>
+            {c.blockers && !/^(none|nothing|no|n\/a|-)\.?$/i.test(c.blockers) ? <span className="blocked">{c.blockers}</span> : 'None 🎉'}
+          </div>
+        </div>
+      );
+    default:
+      return null;
+  }
+}
 
 function Body({ c, by, onPerson }) {
   switch (c.name) {
@@ -220,12 +379,24 @@ function Body({ c, by, onPerson }) {
 }
 
 export function CommandCard({ m, onPerson, me, onMove, onBuy }) {
-  const money = CASINO_CARDS.includes(m.cmd.name) || ECONOMY_CARDS.includes(m.cmd.name);
+  const n = m.cmd.name;
+  const kind = ARCADE_CARDS.includes(n)
+    ? 'arcade'
+    : CASINO_CARDS.includes(n) || ECONOMY_CARDS.includes(n)
+      ? 'money'
+      : TEAM_CARDS.includes(n)
+        ? 'team'
+        : '';
+  const PersonName = ({ name }) => <Name name={name} onPerson={onPerson} />;
   return (
-    <div className={`cmd-card cmd-card-${m.cmd.name}${money ? ' cmd-money' : ''}`}>
-      <Trotbot name={m.cmd.name} />
-      {money ? (
-        <CasinoBody m={m} me={me} onMove={onMove} onBuy={onBuy} Name={({ name }) => <Name name={name} onPerson={onPerson} />} />
+    <div className={`cmd-card cmd-card-${n}${kind ? ` cmd-${kind}` : ''}`}>
+      <Trotbot name={n} />
+      {kind === 'arcade' ? (
+        <ArcadeBody m={m} me={me} onMove={onMove} Name={PersonName} />
+      ) : kind === 'money' ? (
+        <CasinoBody m={m} me={me} onMove={onMove} onBuy={onBuy} Name={PersonName} />
+      ) : kind === 'team' ? (
+        <TeamBody c={m.cmd} by={m.by} onPerson={onPerson} />
       ) : (
         <Body c={m.cmd} by={m.by} onPerson={onPerson} />
       )}
@@ -233,8 +404,37 @@ export function CommandCard({ m, onPerson, me, onMove, onBuy }) {
   );
 }
 
+// /mytasks: your open tasks with a ✓ to finish each one.
+function MyTasks({ ids, tasks, onOpenTask, onTaskDone }) {
+  const today = todayISO();
+  const list = ids.map((id) => tasks.find((t) => t.id === id)).filter(Boolean);
+  return (
+    <div className="cmd-mytasks">
+      {list.map((t) => {
+        const done = t.status === 'done';
+        const late = !done && t.dueDate && t.dueDate < today;
+        return (
+          <div key={t.id} className={`cmd-mytask${done ? ' done' : ''}`}>
+            <button className="btn small" disabled={done} onClick={() => onTaskDone(t)} aria-label={`Mark “${t.title}” done`}>
+              {done ? '✅' : '✓ Done'}
+            </button>
+            <button className="task-chip" onClick={() => onOpenTask(t.id)}>
+              {t.title || 'Untitled'}
+            </button>
+            {late ? (
+              <span className="late">{daysBetween(t.dueDate, today)}d late</span>
+            ) : (
+              t.dueDate && !done && <span className="muted tiny">due {dayText(t.dueDate)}</span>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // A note only you can see (/help, confirmations, "who's that?").
-export function CommandNote({ note, onDismiss, onUse, onGo }) {
+export function CommandNote({ note, onDismiss, onUse, onGo, tasks = [], onOpenTask, onTaskDone }) {
   return (
     <div className="cmd-note" role="status">
       <div className="cmd-head">
@@ -249,6 +449,7 @@ export function CommandNote({ note, onDismiss, onUse, onGo }) {
         </button>
       </div>
       <b className="cmd-note-title">{note.title}</b>
+      {note.taskIds && <MyTasks ids={note.taskIds} tasks={tasks} onOpenTask={onOpenTask} onTaskDone={onTaskDone} />}
       {note.body && <div className="small">{note.body}</div>}
       {note.go && onGo && (
         <button className="btn primary cmd-go" onClick={() => onGo(note.go)}>
@@ -269,7 +470,6 @@ export function CommandNote({ note, onDismiss, onUse, onGo }) {
               ))}
             </section>
           ))}
-          <p className="muted tiny">More coming: multiplayer games and team commands.</p>
         </div>
       )}
     </div>

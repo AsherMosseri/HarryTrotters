@@ -4,6 +4,17 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '2.61',
+    date: '2026-10-28',
+    title: 'Games and team commands',
+    items: [
+      'Challenge anyone in #arcade: /rps, /tictactoe, /connect4, and /duel (wait for DRAW!, then tap first; tap early and you lose). Add a bet and the winner takes both. They get a notification to accept.',
+      'Nobody around? Challenge @Trotbot. It plays (and pays) for the house.',
+      'Games for everyone: /trivia (FTC questions, first right answer wins 8 coins), /hangman (the whole channel guesses robotics words), /typerace (no pasting!), and /heist (join the crew; more people, better odds).',
+      'Team commands work in any channel: /task makes a task (/task Fix the intake @Cooper friday !high), /mytasks lists yours with a Done button, /overdue shows what’s late, /shift clocks you in or out (/shift who shows who’s at the lab), /match 20 45 15 win #7 saves a match to the Match Log, and /standup posts yesterday / today / blockers.',
+    ],
+  },
+  {
     version: '2.60',
     date: '2026-10-28',
     title: 'Jackson coins casino',

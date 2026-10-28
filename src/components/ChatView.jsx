@@ -563,6 +563,9 @@ export default function ChatView({
               onDismiss={() => setNotes((all) => ({ ...all, [conv.key]: all[conv.key].filter((x) => x.id !== n.id) }))}
               onUse={(c) => setUseCmd({ ...c, at: Date.now() })}
               onGo={(id) => setCurrent(id)}
+              tasks={tasks}
+              onOpenTask={onOpenTask}
+              onTaskDone={(t) => api.update(t, { status: 'done' })}
             />
           ))}
         </div>

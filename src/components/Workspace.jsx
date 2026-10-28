@@ -762,8 +762,9 @@ export default function Workspace({ store, actor, rename, renames }) {
   const api = useMemo(
     () => ({
       create: async (data) => {
+        let id;
         try {
-          await store.createTask(data, actor);
+          id = await store.createTask(data, actor);
         } catch (e) {
           return fail(e);
         }
@@ -775,6 +776,7 @@ export default function Workspace({ store, actor, rename, renames }) {
             action: { label: 'Clear filters', run: () => setFilters(EMPTY_FILTERS) },
           });
         }
+        return id;
       },
       update: (task, patch) => store.updateTask(task.id, patch, actor, task).catch(fail),
       remove: async (task) => {
@@ -902,6 +904,8 @@ export default function Workspace({ store, actor, rename, renames }) {
       lottery: () => cmdData.current.lottery,
       gift: (to, amount, note) => store.addCoinTx({ type: 'gift', from: actor.name, to, amount, note: note || '', at: Date.now() }),
       whois: (name) => cmdData.current.whois(name),
+      // For the team commands (/task, /shift, /match…).
+      team: () => cmdData.current.team,
       countdown: () => cmdData.current.countdown(),
       addReminder: (r) => store.addReminder(r, actor),
       sendMessage: (conv, data, photoFiles) => {
@@ -1200,6 +1204,20 @@ export default function Workspace({ store, actor, rename, renames }) {
   cmdData.current = {
     roster,
     lottery,
+    team: {
+      tasks: tasks || [],
+      runs: () => runs,
+      createRun: (data) => api.createRun(data),
+      subteamOf: (conv) => convs.channels.find((c) => c.id === conv)?.subteam || '',
+      myShift: () => liveMyShift.current,
+      startShift: () => startMyShift(),
+      endShift: () => setShiftPanel(true),
+      onShift: () =>
+        shifts
+          .filter((x) => !x.end)
+          .map((x) => ({ name: rename(x.person || ''), since: x.start }))
+          .sort((a, b) => a.since - b.since),
+    },
     wallet: (name) => {
       const w = walletOf(name);
       return { balance: w.balance, earned: w.earned, casino: bank[name]?.net || 0, stats: bank[name]?.stats || {} };

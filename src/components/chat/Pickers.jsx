@@ -387,6 +387,56 @@ export function PollDialog({ onCreate, onClose, canRequire = false, initialQuest
   );
 }
 
+// /standup: three quick questions, posted as one card.
+export function StandupDialog({ onPost, onClose }) {
+  const [answers, setAnswers] = useState({ yesterday: '', today: '', blockers: '' });
+  useEscape(onClose);
+  const ok = answers.yesterday.trim() || answers.today.trim();
+  const fields = [
+    ['yesterday', '✅ What did you get done last time?', 'Wired the intake motors'],
+    ['today', '🎯 What are you working on today?', 'Tuning the arm PID'],
+    ['blockers', '🚧 Anything blocking you?', 'Nothing (or: waiting on the new servo)'],
+  ];
+  return (
+    <Overlay>
+      <div className="panel-backdrop center" onClick={onClose}>
+        <form
+          className="dialog poll-dialog standup-dialog"
+          onClick={(e) => e.stopPropagation()}
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (ok) onPost(Object.fromEntries(Object.entries(answers).map(([k, v]) => [k, v.trim().slice(0, 300)])));
+          }}
+        >
+          <div className="panel-head">
+            <h2>🗓️ Standup</h2>
+            <span className="spacer" />
+            <button type="button" className="icon-btn" onClick={onClose} aria-label="Close">
+              <CloseIcon />
+            </button>
+          </div>
+          {fields.map(([k, label, hint], i) => (
+            <label key={k} className="standup-field">
+              <span>{label}</span>
+              <textarea
+                className="input"
+                rows={2}
+                autoFocus={i === 0 && !isTouch}
+                value={answers[k]}
+                onChange={(e) => setAnswers({ ...answers, [k]: e.target.value })}
+                placeholder={hint}
+              />
+            </label>
+          ))}
+          <button className="btn primary big-btn" disabled={!ok}>
+            Post standup
+          </button>
+        </form>
+      </div>
+    </Overlay>
+  );
+}
+
 // Team stickers: tap one to send it. Team management adds and removes them.
 export function StickerPicker({ stickers, onPick, onClose, canManage, onManage }) {
   const [q, setQ] = useState('');

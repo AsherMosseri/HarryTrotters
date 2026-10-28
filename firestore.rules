@@ -254,11 +254,12 @@ service cloud.firestore {
         && (m.get('everyone', false) == false || isManager())
         && !serverCommand(m);
     }
-    // Casino and economy results only come from the server (the play
-    // function), so nobody can post a fake jackpot.
+    // Casino, economy, and arcade game cards only come from the server (the
+    // play function), so nobody can post a fake jackpot or a fake win.
     function serverCommand(m) {
       return 'cmd' in m && m.cmd is map && m.cmd.get('name', '') in
-        ['slots', 'dice', 'coinflip', 'roulette', 'blackjack', 'crash', 'mines', 'highlow', 'lottery', 'daily', 'work', 'beg', 'rob'];
+        ['slots', 'dice', 'coinflip', 'roulette', 'blackjack', 'crash', 'mines', 'highlow', 'lottery', 'daily', 'work', 'beg', 'rob',
+         'rps', 'tictactoe', 'connect4', 'duel', 'trivia', 'hangman', 'typerace', 'heist'];
     }
     // ...or change one afterwards (team management can still edit/delete).
     function keepsCmd() {

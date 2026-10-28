@@ -13,6 +13,7 @@ import { STARTER_CHECKLISTS, starterItems } from '../checklists.js';
 import { REQUESTS_TO } from '../config.js';
 import { deliver } from '../adOrders.js';
 import * as casino from '../../functions/shared/casino.js';
+import * as arcade from '../../functions/shared/arcade.js';
 
 const KEY = 'ftc32313-demo-v13';
 const listeners = new Set();
@@ -773,14 +774,37 @@ export const demoStore = {
       return m;
     };
     const done = (r) => (commit(), r);
+    // Several people's coins at once (multiplayer games).
+    const payOut = (money) => {
+      for (const x of money) setBank(x.name, casino.bankAfter(bank(x.name), x.name, x.delta, x.entry, x.extra || {}, now));
+    };
 
     if (action === 'move') {
       const list = (state.chat || {})[conv] || [];
       const m = list.find((x) => x.id === msgId);
       const secret = (state.gameSecrets || {})[msgId];
       if (!m?.cmd || !secret) return note('That game is gone.');
-      if (move !== 'peek' && m.by !== me) return note('That’s not your game.');
       const c = m.cmd;
+      if (arcade.MULTI.includes(c.name)) {
+        if (!arcade.isLive(c.status)) return { ok: true };
+        const r = arcade.move(c.name, {
+          pub: { ...c.game, status: c.status },
+          secret,
+          me,
+          move: String(move),
+          balance: balanceOf(me),
+          now,
+        });
+        if (r.error) return note(r.error);
+        if (!r.write) return { ok: true, serverNow: now };
+        payOut(r.money);
+        const { status, ...g } = r.pub;
+        if (arcade.isLive(status)) state.gameSecrets = { ...state.gameSecrets, [msgId]: r.secret };
+        else delete state.gameSecrets[msgId];
+        state.chat = { ...state.chat, [conv]: list.map((x) => (x.id === msgId ? { ...x, cmd: { ...c, game: g, status } } : x)) };
+        return done({ ok: true, serverNow: now });
+      }
+      if (move !== 'peek' && m.by !== me) return note('That’s not your game.');
       if (c.status !== 'playing') return { ok: true };
       if (move === 'double' && balanceOf(m.by) < c.bet) return note('Not enough coins to double.');
       const r = casino.moveGame(c.name, { ...c.game, status: c.status }, secret, String(move), c.bet, now);
@@ -806,6 +830,16 @@ export const demoStore = {
       return { note: { title: '🎰 Take it to #arcade', body: 'Casino games only run in #arcade.', go: 'arcade' } };
     const balance = balanceOf(me);
     const mine = bank(me);
+    if (arcade.MULTI.includes(game)) {
+      if (conv !== 'arcade') return { note: { title: '🕹️ Take it to #arcade', body: 'Games run in #arcade.', go: 'arcade' } };
+      const r = arcade.start(game, { me, words, roster, balance, bank: mine, now });
+      if (r.error) return note(r.error);
+      payOut(r.money);
+      const { status, ...g } = r.pub;
+      const m = post({ game: g, status, bet: g.bet || 0 }, r.mentions);
+      state.gameSecrets = { ...(state.gameSecrets || {}), [m.id]: r.secret };
+      return done({ ok: true, serverNow: now });
+    }
 
     if (game === 'lottery') {
       const lot = state.lottery || {};

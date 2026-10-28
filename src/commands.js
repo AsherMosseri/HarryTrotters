@@ -3,8 +3,10 @@
 // answers just you (a note under the chat that only you see).
 //
 // The randomness happens here, once, when you send it: the result is saved
-// on the message, so everyone sees the same roll. (Commands with coins on the
-// line roll on the server instead; those come in a later version.)
+// on the message, so everyone sees the same roll. Commands with coins on the
+// line (casino, economy, arcade games) roll on the server instead.
+
+import { overdueTasks, parseMatch, parseTask, seasonRecord, todayISO } from './teamCommands.js';
 
 export const GROUPS = [
   ['basics', '🧰 Basics'],
@@ -13,6 +15,8 @@ export const GROUPS = [
   ['actions', '🤗 Actions'],
   ['economy', '🪙 Jackson coins'],
   ['casino', '🎰 Casino (in #arcade)'],
+  ['arcade', '🕹️ Games (in #arcade)'],
+  ['team', '🛠️ Team'],
 ];
 
 // name, group, args (shown as a hint), what it does
@@ -66,6 +70,22 @@ export const COMMANDS = [
   { name: 'mines', group: 'casino', args: 'bet bombs', desc: 'Open tiles, dodge the bombs, cash out', server: true },
   { name: 'highlow', group: 'casino', args: 'bet', desc: 'Higher or lower? Keep the streak going', server: true },
   { name: 'lottery', group: 'casino', args: 'tickets', desc: `Tickets are 5 coins; Friday's draw takes the pot`, server: true },
+
+  { name: 'rps', group: 'arcade', args: '@person bet', desc: 'Rock paper scissors (anyone, or @Trotbot)', server: true },
+  { name: 'tictactoe', group: 'arcade', args: '@person bet', desc: 'Tic-tac-toe (anyone, or @Trotbot)', server: true },
+  { name: 'connect4', group: 'arcade', args: '@person bet', desc: 'Connect four (anyone, or @Trotbot)', server: true },
+  { name: 'duel', group: 'arcade', args: '@person bet', desc: 'Quick draw: first to tap after DRAW! wins', server: true },
+  { name: 'trivia', group: 'arcade', args: '', desc: 'FTC trivia: first right answer wins 8 coins', server: true },
+  { name: 'hangman', group: 'arcade', args: '', desc: 'Guess the robotics word together', server: true },
+  { name: 'typerace', group: 'arcade', args: '', desc: 'Race to type a sentence (no pasting)', server: true },
+  { name: 'heist', group: 'arcade', args: 'bet', desc: 'Plan a heist: more crew, better odds', server: true },
+
+  { name: 'task', group: 'team', args: 'title @person friday !high', desc: 'Make a task' },
+  { name: 'mytasks', group: 'team', args: '', desc: 'Your open tasks (check them off right here)' },
+  { name: 'overdue', group: 'team', args: '', desc: 'Every task that’s late' },
+  { name: 'shift', group: 'team', args: 'who', desc: 'Clock in or out (/shift who: who’s at the lab)' },
+  { name: 'match', group: 'team', args: 'auto teleop endgame win #7', desc: 'Log a match to the Match Log (or see the record)' },
+  { name: 'standup', group: 'team', args: '', desc: 'Yesterday / today / blockers' },
 ];
 export const commandByName = Object.fromEntries(COMMANDS.map((c) => [c.name, c]));
 
@@ -392,6 +412,7 @@ export function parseRemind(text, now = Date.now()) {
 //   { post: { text, cmd?, poll?, votes?, mentions? } }   a message everyone sees
 //   { note: { title, body?, lines? } }                  only you see it
 //   { poll: 'question' }                                 opens the poll maker
+//   { standup: true }                                    opens the standup form
 export async function runCommand({ cmd, args }, ctx) {
   const me = ctx.actor.name;
   const first = (n) => n.split(' ')[0];
@@ -429,6 +450,63 @@ export async function runCommand({ cmd, args }, ctx) {
     }
     case 'help':
       return { note: { title: 'Commands', help: true } };
+
+    case 'task': {
+      const t = parseTask(args, ctx.roster, me);
+      if (!t.title) return { note: { title: 'What’s the task?', body: 'Try: /task Fix the intake @Cooper friday !high' } };
+      const subteam = ctx.subteam || '';
+      const id = await ctx.createTask({ ...t, subteam });
+      if (!id) return { done: true };
+      return card(
+        { title: t.title, assignees: t.assignees, dueDate: t.dueDate, priority: t.priority, subteam },
+        { taskIds: [id], mentions: t.assignees.filter((n) => n !== me) },
+      );
+    }
+    case 'mytasks': {
+      const today = todayISO();
+      const mine = (ctx.tasks || [])
+        .filter((t) => t.status !== 'done' && (t.assignees || []).includes(me))
+        .sort((a, b) => (a.dueDate || '9999').localeCompare(b.dueDate || '9999'));
+      if (!mine.length) return { note: { title: '🎉 No open tasks', body: 'Nothing assigned to you right now. Try /task to make one.' } };
+      const late = mine.filter((t) => t.dueDate && t.dueDate < today).length;
+      return {
+        note: {
+          title: `📋 Your ${mine.length} open task${mine.length > 1 ? 's' : ''}${late ? ` (${late} late)` : ''}`,
+          taskIds: mine.slice(0, 15).map((t) => t.id),
+          body: mine.length > 15 ? `Showing 15 of ${mine.length}. The rest are on the Board.` : '',
+        },
+      };
+    }
+    case 'overdue': {
+      const list = overdueTasks(ctx.tasks);
+      return card({ total: list.length, list: list.slice(0, 10) });
+    }
+    case 'shift': {
+      if (/^who\b/i.test(args)) return card({ who: true, people: ctx.onShift() });
+      const mine = ctx.myShift();
+      if (mine) {
+        ctx.endShift();
+        return { note: { title: '⏱ Wrapping up your shift', body: 'Fill in what you worked on and tap End shift.' } };
+      }
+      await ctx.startShift();
+      return card({ in: true, at: Date.now(), others: ctx.onShift().filter((p) => p.name !== me) });
+    }
+    case 'match': {
+      if (!args) return card({ record: seasonRecord(ctx.runs()) });
+      const r = parseMatch(args);
+      if (!r)
+        return {
+          note: {
+            title: 'Log a match: auto, teleop, and endgame points',
+            body: 'Try: /match 20 45 15 win #7 · /match auto 12 teleop 40 endgame 10 loss · /match (the season record)',
+          },
+        };
+      const before = ctx.runs();
+      await ctx.createRun({ ...r, type: 'match', date: todayISO(), drivers: [] });
+      return card({ ...r, total: r.auto + r.teleop + r.endgame, record: seasonRecord([...before, { ...r, type: 'match' }]) });
+    }
+    case 'standup':
+      return { standup: true };
     case 'ping': {
       const ms = await ctx.ping();
       return card({ ms, status: pick(PING_STATUS) });

@@ -13,6 +13,7 @@ import { getMessaging } from 'firebase-admin/messaging';
 import { fetchPage, firstLink, readPreview } from './preview.js';
 import { coinSettings, wallet } from './shared/coins.js';
 import * as casino from './shared/casino.js';
+import * as arcade from './shared/arcade.js';
 
 // Functions run next to the database. The deploy workflow writes location.json
 // from the database's location; nam5 (the US multi-region) pairs with us-central1.
@@ -609,6 +610,15 @@ const LABEL = {
 };
 const note = (title, body = '') => ({ note: { title, body } });
 
+// Multiplayer games pay several people at once: read every bank first (a
+// transaction reads before it writes), then apply each change in order.
+async function payOut(tx, money, banks, now) {
+  const names = [...new Set(money.map((x) => x.name))];
+  for (const n of names) if (!banks[n]) banks[n] = (await tx.get(bankRef(n))).data() || {};
+  for (const x of money) banks[x.name] = casino.bankAfter(banks[x.name], x.name, x.delta, x.entry, x.extra || {}, now);
+  for (const n of names) tx.set(bankRef(n), banks[n]);
+}
+
 // The Friday lottery: one doc, drawn by drawLottery.
 const lotteryRef = db.doc('lottery/current');
 function nextFriday(now = Date.now()) {
@@ -640,6 +650,27 @@ export const play = onCall({ maxInstances: 5, invoker: 'public' }, async (req) =
       const [msg, secret] = await Promise.all([tx.get(msgRef), tx.get(secretRef)]);
       const c = msg.get('cmd');
       if (!msg.exists || !c || !secret.exists) return note('That game is gone.');
+      // Multiplayer: the game decides who may move (arcade.js).
+      if (arcade.MULTI.includes(c.name)) {
+        if (!arcade.isLive(c.status)) return { ok: true };
+        const myBank = (await tx.get(bankRef(me))).data() || {};
+        const r = arcade.move(c.name, {
+          pub: { ...c.game, status: c.status },
+          secret: secret.data(),
+          me,
+          move: String(move),
+          balance: balanceOf(me, myBank, data),
+          now,
+        });
+        if (r.error) return note(r.error);
+        if (!r.write) return { ok: true, serverNow: now };
+        await payOut(tx, r.money, { [me]: myBank }, now);
+        const { status, ...game } = r.pub;
+        if (arcade.isLive(status)) tx.set(secretRef, r.secret);
+        else tx.delete(secretRef);
+        tx.update(msgRef, { 'cmd.game': game, 'cmd.status': status });
+        return { ok: true, serverNow: now };
+      }
       const player = data.rename(msg.get('by'));
       if (move !== 'peek' && player !== me) return note('That’s not your game.');
       if (c.status !== 'playing') return { ok: true };
@@ -676,9 +707,12 @@ export const play = onCall({ maxInstances: 5, invoker: 'public' }, async (req) =
   if (!/^[\w-]{1,40}$/.test(conv) || conv === 'announcements')
     return note('Not here.', 'Use #arcade for the casino, or any channel for the rest.');
   const isCasino = casino.CASINO.includes(game);
-  if (!isCasino && !casino.ECONOMY.includes(game)) throw new HttpsError('invalid-argument', 'Unknown command.');
+  const isArcade = arcade.MULTI.includes(game);
+  if (!isCasino && !isArcade && !casino.ECONOMY.includes(game)) throw new HttpsError('invalid-argument', 'Unknown command.');
   if (isCasino && conv !== 'arcade')
     return { note: { title: '🎰 Take it to #arcade', body: 'Casino games only run in #arcade.', go: 'arcade' } };
+  if (isArcade && conv !== 'arcade') return { note: { title: '🕹️ Take it to #arcade', body: 'Games run in #arcade.', go: 'arcade' } };
+  const roster = isArcade ? (await db.collection('people').get()).docs.map((d) => data.rename(d.get('name') || '')).filter(Boolean) : [];
   const msgRef = db.collection(`channels/${conv}/messages`).doc();
   const text = `/${game}${words.length ? ` ${words.join(' ')}` : ''}`.slice(0, 200);
   const post = (tx, cmd, mentions = []) =>
@@ -714,6 +748,16 @@ export const play = onCall({ maxInstances: 5, invoker: 'public' }, async (req) =
         tx.set(bankRef(me), casino.bankAfter(myBank, me, -cost, { icon: '🎟️', label: `Lottery: ${n} ticket${n > 1 ? 's' : ''}` }, {}, now));
       post(tx, { bought: n || 0, mine: tickets[me] || 0, pot, drawAt, people: Object.keys(tickets).length, last: lot.last || null });
       return { ok: true };
+    }
+
+    if (isArcade) {
+      const r = arcade.start(game, { me, words, roster, balance, bank: myBank, now });
+      if (r.error) return note(r.error);
+      await payOut(tx, r.money, { [me]: myBank }, now);
+      tx.set(db.doc(`gameSecrets/${msgRef.id}`), r.secret);
+      const { status, ...g } = r.pub;
+      post(tx, { game: g, status, bet: g.bet || 0 }, r.mentions);
+      return { ok: true, serverNow: now };
     }
 
     if (isCasino) {
