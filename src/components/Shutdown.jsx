@@ -1,17 +1,19 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AutoTextarea, Avatar, CloseIcon, Overlay } from './common.jsx';
 import { REQUESTS_TO } from '../config.js';
 import { useEscape } from '../util.js';
 
 // Asher can shut the app down for everyone else (settings/shutdown). They see
-// a full screen with his message and a box to write back to him
-// (shutdownReplies); it opens again by itself when he turns it back on.
+// a full screen with his message and a plain-text chat with him
+// (shutdownReplies, one chat per person); it opens again by itself when he
+// turns it back on.
 
 const CACHE = 'shutdown-cache';
-const SENT = 'shutdown-sent';
 const firstName = (n) => (n || '').split(' ')[0];
 const when = (ms) =>
   new Date(ms).toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+const clock = (ms) => new Date(ms).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+const personOf = (r) => r.person || r.name;
 const read = (key) => {
   try {
     return JSON.parse(localStorage.getItem(key));
@@ -42,27 +44,52 @@ export function useShutdown(store, signedIn) {
   return shutdown;
 }
 
-// What everyone but Asher sees while the app is shut down.
-export function ShutdownScreen({ shutdown, store, actor }) {
+// One shutdown chat, oldest first: plain text only. `me`'s messages are on
+// the right.
+function Thread({ messages, me, onDelete }) {
+  const box = useRef(null);
+  useEffect(() => {
+    if (box.current) box.current.scrollTop = box.current.scrollHeight;
+  }, [messages.length]);
+  if (!messages.length) return null;
+  return (
+    <div className="sd-thread" ref={box} role="log" aria-label="Chat">
+      {messages.map((m) => {
+        const mine = m.name === me;
+        return (
+          <div key={m.id} className={`sd-msg${mine ? ' mine' : ''}`}>
+            {!mine && <Avatar name={m.name} size={26} />}
+            <div className="sd-bubble">
+              <div className="sd-text">{m.text}</div>
+              <div className="sd-meta">
+                {mine ? '' : `${firstName(m.name)} · `}
+                {clock(m.at)}
+                {onDelete && (
+                  <button className="link-btn" onClick={() => onDelete(m.id)} aria-label="Delete message">
+                    Delete
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// Plain text: Return sends, Shift+Return makes a new line.
+function ChatBox({ onSend, placeholder }) {
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  // What you sent during this shutdown, on this device.
-  const [sent, setSent] = useState(() => {
-    const s = read(SENT);
-    return s?.round === shutdown.at ? s.texts : [];
-  });
-  const to = firstName(REQUESTS_TO);
   const send = async () => {
     const t = text.trim().slice(0, 1000);
     if (!t || busy) return;
     setBusy(true);
     setError('');
     try {
-      await store.sendShutdownReply(t, shutdown.at, actor);
-      const next = [...sent, t];
-      setSent(next);
-      write(SENT, { round: shutdown.at, texts: next });
+      await onSend(t);
       setText('');
     } catch (e) {
       setError(e.message?.includes('permission') ? 'Couldn’t send it. The app may be back on: reload.' : e.message || 'Couldn’t send it.');
@@ -70,6 +97,52 @@ export function ShutdownScreen({ shutdown, store, actor }) {
       setBusy(false);
     }
   };
+  return (
+    <>
+      <div className="sd-compose">
+        <AutoTextarea
+          className="input"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              send();
+            }
+          }}
+          enterKeyHint="send"
+          placeholder={placeholder}
+          aria-label={placeholder}
+          maxLength={1000}
+          maxHeight={140}
+        />
+        <button className="btn primary" disabled={!text.trim() || busy} onClick={send}>
+          {busy ? '…' : 'Send'}
+        </button>
+      </div>
+      {error && <div className="casino-error">{error}</div>}
+    </>
+  );
+}
+
+// New messages in each chat: theirs since Asher last wrote in it.
+function unreadIn(messages, me) {
+  let n = 0;
+  for (const m of messages) n = m.name === me ? 0 : n + 1;
+  return n;
+}
+export function shutdownUnread(replies, me) {
+  const chats = {};
+  for (const r of [...replies].sort((a, b) => a.at - b.at)) (chats[personOf(r)] ||= []).push(r);
+  return Object.values(chats).reduce((t, msgs) => t + unreadIn(msgs, me), 0);
+}
+
+// What everyone but Asher sees while the app is shut down.
+export function ShutdownScreen({ shutdown, store, actor }) {
+  const [messages, setMessages] = useState([]);
+  useEffect(() => store.subscribeShutdownThread(actor.name, setMessages), [store, actor.name]);
+  const thread = messages.filter((m) => m.round === shutdown.at);
+  const to = firstName(REQUESTS_TO);
   return (
     <div className="gate shutdown-gate">
       <div className="gate-card shutdown-card" role="main">
@@ -82,49 +155,38 @@ export function ShutdownScreen({ shutdown, store, actor }) {
           — {firstName(shutdown.by) || to}
           {shutdown.at ? `, ${when(shutdown.at)}` : ''}
         </p>
-        <label className="shutdown-reply">
-          <span>{shutdown.question || `Anything to tell ${to}?`}</span>
-          <AutoTextarea
-            className="input"
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder="Type your answer…"
-            maxLength={1000}
+        <div className="shutdown-chat">
+          <b className="shutdown-question">{shutdown.question || `Anything to tell ${to}?`}</b>
+          <Thread messages={thread} me={actor.name} />
+          <ChatBox
+            placeholder={thread.length ? `Message ${to}…` : 'Type your answer…'}
+            onSend={(t) => store.sendShutdownReply(t, shutdown.at, actor)}
           />
-        </label>
-        <button className="btn primary big-btn" disabled={!text.trim() || busy} onClick={send}>
-          {busy ? 'Sending…' : `Send to ${to}`}
-        </button>
-        {error && <div className="casino-error">{error}</div>}
-        {sent.length > 0 && (
-          <div className="shutdown-sent">
-            <div className="muted small">✓ Sent to {to}:</div>
-            {sent.map((t, i) => (
-              <div key={i} className="shutdown-sent-item">
-                {t}
-              </div>
-            ))}
-          </div>
-        )}
+        </div>
         <p className="muted tiny">The app opens again by itself when it’s back on.</p>
       </div>
     </div>
   );
 }
 
-// Asher's page: shut the app down (or back on), change the message, and read replies.
-export function ShutdownPage({ shutdown, replies, onSave, onDelete, onClose }) {
+// Asher's page: shut the app down (or back on), change the message, and chat
+// with each person who wrote (switch between them at the top right).
+export function ShutdownPage({ shutdown, replies, me, onSave, onDelete, onReply, onClose }) {
   useEscape(onClose);
   const on = !!shutdown?.on;
   const [message, setMessage] = useState(shutdown?.message || 'Massive bug. The app is shut down while I fix it.');
   const [question, setQuestion] = useState(shutdown?.question ?? 'How long do you want this to be shut down?');
   const [asking, setAsking] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [earlierOpen, setEarlierOpen] = useState(false);
-  const round = shutdown?.at;
-  const current = round ? replies.filter((r) => r.round === round) : [];
-  const earlier = replies.filter((r) => r.round !== round);
+  // Everyone's chat, oldest message first; people with the newest message first.
+  const chats = {};
+  for (const r of [...replies].sort((a, b) => a.at - b.at)) (chats[personOf(r)] ||= []).push(r);
+  const people = Object.keys(chats).sort((a, b) => chats[b].at(-1).at - chats[a].at(-1).at);
+  const [picked, setPicked] = useState(null);
+  const person = people.includes(picked) ? picked : people[0];
+  const wrote = new Set(replies.filter((r) => r.round === shutdown?.at && r.name !== me).map(personOf)).size;
   const changed = on && (message.trim() !== shutdown.message || question.trim() !== (shutdown.question || ''));
   const save = async (data) => {
     setBusy(true);
@@ -132,6 +194,7 @@ export function ShutdownPage({ shutdown, replies, onSave, onDelete, onClose }) {
     try {
       await onSave(data);
       setAsking(false);
+      setEditing(false);
     } catch (e) {
       setError(e.message || 'Couldn’t save that.');
     } finally {
@@ -139,28 +202,27 @@ export function ShutdownPage({ shutdown, replies, onSave, onDelete, onClose }) {
     }
   };
   const fields = { message: message.trim(), question: question.trim() };
-  const list = (rs) =>
-    rs.map((r) => (
-      <li key={r.id} className="shutdown-reply-item">
-        <Avatar name={r.name} size={28} />
-        <div className="grow">
-          <div className="small">
-            <b>{r.name}</b> <span className="muted tiny">{when(r.at)}</span>
-          </div>
-          <div className="shutdown-reply-text">{r.text}</div>
-        </div>
-        <button className="icon-btn" aria-label={`Delete ${firstName(r.name)}’s reply`} onClick={() => onDelete(r.id)}>
-          <CloseIcon />
-        </button>
-      </li>
-    ));
+  const showFields = !on || editing;
   return (
     <Overlay>
       <div className="panel-backdrop center" onClick={onClose}>
         <div className="dialog shutdown-dialog" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Shut down app">
           <div className="panel-head">
-            <h2>🛑 Shut down app</h2>
+            <h2>🛑 Shutdown</h2>
             <span className="spacer" />
+            {people.length > 0 && (
+              <select className="input sd-picker" value={person} onChange={(e) => setPicked(e.target.value)} aria-label="Switch chat">
+                {people.map((p) => {
+                  const n = unreadIn(chats[p], me);
+                  return (
+                    <option key={p} value={p}>
+                      {p}
+                      {n ? ` (${n} new)` : ''}
+                    </option>
+                  );
+                })}
+              </select>
+            )}
             <button className="icon-btn" onClick={onClose} aria-label="Close">
               <CloseIcon />
             </button>
@@ -170,33 +232,37 @@ export function ShutdownPage({ shutdown, replies, onSave, onDelete, onClose }) {
               <>
                 <b>🛑 Shut down for everyone but you</b>
                 <span className="small">
-                  Since {when(shutdown.at)} · {current.length} {current.length === 1 ? 'reply' : 'replies'}
+                  Since {when(shutdown.at)} · {wrote} {wrote === 1 ? 'person' : 'people'} wrote
                 </span>
               </>
             ) : (
               <>
                 <b>✅ The app is on</b>
                 <span className="small muted">
-                  Shutting it down shows everyone but you a full screen with your message and a box to write back. Replies come to you here
-                  and in 🔔.
+                  Shutting it down shows everyone but you a full screen with your message and a chat with you. Their messages come to you
+                  here and in 🔔.
                 </span>
               </>
             )}
           </div>
-          <label className="lablog-field">
-            <span>What everyone sees</span>
-            <AutoTextarea className="input" value={message} onChange={(e) => setMessage(e.target.value)} maxLength={2000} />
-          </label>
-          <label className="lablog-field">
-            <span>Question for them (optional)</span>
-            <AutoTextarea
-              className="input"
-              value={question}
-              onChange={(e) => setQuestion(e.target.value)}
-              placeholder="Anything to tell me?"
-              maxLength={300}
-            />
-          </label>
+          {showFields && (
+            <>
+              <label className="lablog-field">
+                <span>What everyone sees</span>
+                <AutoTextarea className="input" value={message} onChange={(e) => setMessage(e.target.value)} maxLength={2000} />
+              </label>
+              <label className="lablog-field">
+                <span>Question for them (optional)</span>
+                <AutoTextarea
+                  className="input"
+                  value={question}
+                  onChange={(e) => setQuestion(e.target.value)}
+                  placeholder="Anything to tell me?"
+                  maxLength={300}
+                />
+              </label>
+            </>
+          )}
           {error && <div className="casino-error">{error}</div>}
           {on ? (
             <div className="shutdown-actions">
@@ -207,13 +273,24 @@ export function ShutdownPage({ shutdown, replies, onSave, onDelete, onClose }) {
               >
                 ✅ Turn the app back on
               </button>
-              <button
-                className="btn"
-                disabled={!changed || busy}
-                onClick={() => save({ on: true, ...fields, at: shutdown.at, endedAt: null })}
-              >
-                Update message
-              </button>
+              {editing ? (
+                <div className="row">
+                  <button
+                    className="btn grow"
+                    disabled={!changed || busy}
+                    onClick={() => save({ on: true, ...fields, at: shutdown.at, endedAt: null })}
+                  >
+                    Update message
+                  </button>
+                  <button className="btn" onClick={() => setEditing(false)}>
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <button className="link-btn small" onClick={() => setEditing(true)}>
+                  Edit message
+                </button>
+              )}
             </div>
           ) : asking ? (
             <div className="poll-confirm" role="group" aria-label="Shut down the app?">
@@ -234,19 +311,16 @@ export function ShutdownPage({ shutdown, replies, onSave, onDelete, onClose }) {
               🛑 Shut down app
             </button>
           )}
-          {(on || current.length > 0) && (
-            <div className="shutdown-replies">
-              <h3>{on ? 'Replies' : 'Replies from the last shutdown'}</h3>
-              {current.length ? <ul>{list(current)}</ul> : <p className="muted small">No replies yet.</p>}
+          {person ? (
+            <div className="shutdown-chat sd-owner">
+              <h3>
+                <Avatar name={person} size={24} /> {person}
+              </h3>
+              <Thread key={person} messages={chats[person]} me={me} onDelete={onDelete} />
+              <ChatBox key={`box-${person}`} placeholder={`Reply to ${firstName(person)}…`} onSend={(t) => onReply(person, t)} />
             </div>
-          )}
-          {earlier.length > 0 && (
-            <div className="shutdown-replies">
-              <button className="link-btn small" onClick={() => setEarlierOpen(!earlierOpen)}>
-                {earlierOpen ? 'Hide' : 'Show'} replies from earlier shutdowns ({earlier.length})
-              </button>
-              {earlierOpen && <ul>{list(earlier)}</ul>}
-            </div>
+          ) : (
+            on && <p className="muted small">No one has written yet.</p>
           )}
         </div>
       </div>

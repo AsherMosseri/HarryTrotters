@@ -3337,3 +3337,19 @@ html.kb-open .toast { bottom: auto; top: calc(var(--vvt) + var(--vvh) - 64px); }
 .shutdown-replies ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .shutdown-reply-item { display: flex; align-items: flex-start; gap: 10px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 12px; }
 .shutdown-reply-text { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; margin-top: 2px; }
+.shutdown-chat { width: 100%; display: flex; flex-direction: column; gap: 8px; text-align: left; }
+.shutdown-question { font-size: 15px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.sd-owner h3 { margin: 4px 0 0; font-size: 15px; display: flex; align-items: center; gap: 8px; }
+.sd-thread { display: flex; flex-direction: column; gap: 8px; max-height: min(320px, 45dvh); overflow-y: auto; overscroll-behavior: contain; padding: 4px 2px; }
+.sd-msg { display: flex; align-items: flex-end; gap: 6px; max-width: 85%; }
+.sd-msg.mine { align-self: flex-end; }
+.sd-bubble { padding: 7px 11px; border-radius: 16px 16px 16px 4px; background: var(--surface-2, var(--accent-soft)); border: 1px solid var(--border); min-width: 0; }
+.sd-msg.mine .sd-bubble { border-radius: 16px 16px 4px 16px; background: var(--accent); border-color: var(--accent); color: #fff; }
+.sd-text { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 15px; }
+.sd-meta { display: flex; gap: 8px; align-items: center; font-size: 11px; opacity: 0.7; margin-top: 2px; }
+.sd-msg.mine .sd-meta { justify-content: flex-end; }
+.sd-meta .link-btn { font-size: 11px; color: inherit; padding: 0; min-height: 0; text-decoration: underline; }
+.sd-compose { display: flex; gap: 8px; align-items: flex-end; }
+.sd-compose textarea { flex: 1; min-width: 0; font-weight: 400; }
+.sd-compose .btn { flex: none; min-height: 40px; }
+.sd-picker { width: auto; max-width: 46%; min-height: 34px; padding: 4px 8px; font-size: 14px; margin-right: 4px; }

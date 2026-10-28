@@ -69,16 +69,23 @@ service cloud.firestore {
         && d.on is bool && d.message is string && d.message.size() <= 2000
         && d.get('question', '') is string && d.get('question', '').size() <= 300;
     }
-    // What people write back from the shutdown screen. Only Asher reads them,
-    // and they can only be sent while the app is shut down.
+    // The shutdown chats: each teammate's back-and-forth with Asher
+    // (person = whose chat, name = who wrote it). Teammates read and write
+    // only their own, and only while the app is shut down; Asher reads all
+    // of them and can write in any.
     match /shutdownReplies/{id} {
-      allow read, delete: if isOwner();
-      allow create: if isMember()
-        && request.resource.data.keys().hasOnly(['text', 'round', 'name', 'byUid', 'at'])
-        && request.resource.data.byUid == request.auth.uid && isMe(request.resource.data.name)
-        && request.resource.data.text is string && request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 1000
-        && request.resource.data.round is int && request.resource.data.at is int
-        && get(/databases/$(database)/documents/settings/shutdown).data.get('on', false) == true;
+      function validReply(d) {
+        return d.keys().hasOnly(['text', 'round', 'person', 'name', 'byUid', 'at'])
+          && d.byUid == request.auth.uid && isMe(d.name)
+          && d.text is string && d.text.size() > 0 && d.text.size() <= 1000
+          && d.person is string && d.person.size() > 0 && d.person.size() <= 60
+          && d.round is int && d.at is int;
+      }
+      allow read: if isOwner() || (isMember() && isMe(resource.data.person));
+      allow delete: if isOwner();
+      allow create: if isMember() && validReply(request.resource.data)
+        && (isOwner() || (isMe(request.resource.data.person)
+          && get(/databases/$(database)/documents/settings/shutdown).data.get('on', false) == true));
     }
 
     // Pretend-ad view and tap counts (the fake earnings on the Ads page).

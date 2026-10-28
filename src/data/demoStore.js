@@ -1041,13 +1041,16 @@ export const demoStore = {
     state.shutdown = { ...data, by: actor.name, updatedAt: Date.now() };
     commit();
   },
-  async sendShutdownReply(text, round, actor) {
-    if (!state.shutdown?.on) throw new Error('The app is back on.');
+  async sendShutdownReply(text, round, actor, person = actor.name) {
+    if (!state.shutdown?.on && person === actor.name) throw new Error('The app is back on.');
     state.shutdownReplies = [
-      { id: uid(), text, round, name: actor.name, byUid: actor.uid, at: Date.now() },
+      { id: uid(), text, round, person, name: actor.name, byUid: actor.uid, at: Date.now() },
       ...(state.shutdownReplies || []),
     ];
     commit();
+  },
+  subscribeShutdownThread(person, cb) {
+    return listen(() => cb((state.shutdownReplies || []).filter((r) => (r.person || r.name) === person).sort((a, b) => a.at - b.at)));
   },
   subscribeShutdownReplies(cb) {
     return listen(() => cb([...(state.shutdownReplies || [])]));

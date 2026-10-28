@@ -851,8 +851,17 @@ export const firebaseStore = {
   setShutdown(data, actor) {
     return setDoc(doc(db, 'settings', 'shutdown'), { ...data, by: actor.name, updatedAt: Date.now() });
   },
-  sendShutdownReply(text, round, actor) {
-    return setDoc(doc(collection(db, 'shutdownReplies')), { text, round, name: actor.name, byUid: actor.uid, at: Date.now() });
+  // A message in someone's shutdown chat with Asher: person is whose chat it
+  // is (the teammate), name is who wrote it.
+  sendShutdownReply(text, round, actor, person = actor.name) {
+    return setDoc(doc(collection(db, 'shutdownReplies')), { text, round, person, name: actor.name, byUid: actor.uid, at: Date.now() });
+  },
+  subscribeShutdownThread(person, cb) {
+    return onSnapshot(
+      query(collection(db, 'shutdownReplies'), where('person', '==', person)),
+      (snap) => cb(snap.docs.map(readDoc).sort((a, b) => a.at - b.at)),
+      () => cb([]),
+    );
   },
   subscribeShutdownReplies(cb) {
     return onSnapshot(

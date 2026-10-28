@@ -262,15 +262,21 @@ async function previewFor(event) {
   }
   await event.data.after.ref.update({ preview });
 }
-// A reply from the shutdown screen goes to Asher.
+// The shutdown chats: a teammate's message goes to Asher, and Asher's reply
+// goes to that teammate (it opens to the shutdown screen, where the chat is).
 export const onShutdownReply = onDocumentCreated('shutdownReplies/{id}', async (event) => {
   const r = event.data?.data();
   if (!r?.text) return;
   const rename = await renamer();
   const by = rename(r.name || '');
-  await notify([
-    { to: REQUESTS_TO, type: 'shutdown', title: `${first(by)} replied to the shutdown`, body: clip(r.text), open: 'shutdown', by },
-  ]);
+  const person = rename(r.person || r.name || '');
+  const owner = rename(REQUESTS_TO);
+  if (by === owner) {
+    if (person && person !== owner)
+      await notify([{ to: person, type: 'shutdown', title: `${first(by)} replied`, body: clip(r.text), open: 'shutdown', by }]);
+    return;
+  }
+  await notify([{ to: owner, type: 'shutdown', title: `${first(by)} replied to the shutdown`, body: clip(r.text), open: 'shutdown', by }]);
 });
 
 export const channelLinkPreview = onDocumentWritten('channels/{channelId}/messages/{messageId}', previewFor);

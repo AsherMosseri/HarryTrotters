@@ -61,7 +61,7 @@ import {
   useAdsEngine,
 } from './Ads.jsx';
 import CommandsPage from './CommandsPage.jsx';
-import { ShutdownPage } from './Shutdown.jsx';
+import { ShutdownPage, shutdownUnread } from './Shutdown.jsx';
 import { CoinsDialog, Coins } from './Coins.jsx';
 import { LabLogContext, LabLogDialog } from './LabLog.jsx';
 import { LotteryContext } from './chat/Casino.jsx';
@@ -1249,7 +1249,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown }) {
   const [shutdownPage, setShutdownPage] = useState(false);
   const [shutdownReplies, setShutdownReplies] = useState([]);
   useEffect(() => (isOwner ? store.subscribeShutdownReplies(setShutdownReplies) : undefined), [store, isOwner]);
-  const shutdownReplyCount = shutdown?.on ? shutdownReplies.filter((r) => r.round === shutdown.at).length : 0;
+  const shutdownNew = shutdown?.on ? shutdownUnread(shutdownReplies, actor.name) : 0;
   const [adStats, setAdStats] = useState({});
   useEffect(() => store.subscribeAdStats(setAdStats), [store]);
 
@@ -1526,7 +1526,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown }) {
             <div className="shutdown-banner" role="status">
               <span>🛑 Shut down for everyone but you</span>
               <button className="btn small-btn" onClick={() => setShutdownPage(true)}>
-                {shutdownReplyCount ? `Replies (${shutdownReplyCount})` : 'Manage'}
+                {shutdownNew ? `Chats (${shutdownNew} new)` : 'Manage'}
               </button>
             </div>
           )}
@@ -2152,8 +2152,10 @@ export default function Workspace({ store, actor, rename, renames, shutdown }) {
             <ShutdownPage
               shutdown={shutdown}
               replies={shutdownReplies}
+              me={actor.name}
               onSave={(data) => store.setShutdown(data, actor)}
               onDelete={(id) => store.deleteShutdownReply(id)}
+              onReply={(person, text) => store.sendShutdownReply(text, shutdown?.at || 0, actor, person)}
               onClose={() => setShutdownPage(false)}
             />
           )}
