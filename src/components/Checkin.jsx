@@ -56,7 +56,7 @@ function AnswerForm({ checkin, initial, submitLabel, onDone }) {
 }
 
 // Today's check-in, unanswered: blocks the app until it's answered.
-export function CheckinGate({ checkin, rename, onAnswer }) {
+export function CheckinGate({ checkin, rename, onAnswer, onSkip }) {
   const [busy, setBusy] = useState(false);
   return (
     <Overlay>
@@ -77,9 +77,20 @@ export function CheckinGate({ checkin, rename, onAnswer }) {
             }}
           />
           <p className="muted tiny">Plans changed? Change your answer anytime in the Shifts tab.</p>
+          {onSkip && <PreviewSkip onSkip={onSkip} />}
         </div>
       </div>
     </Overlay>
+  );
+}
+
+// Asher previewing (Controls → View as): required screens can be skipped,
+// since nothing can be answered in a look-only preview.
+export function PreviewSkip({ onSkip }) {
+  return (
+    <button className="link-btn small preview-skip" onClick={onSkip}>
+      Skip (preview)
+    </button>
   );
 }
 
@@ -319,7 +330,7 @@ export function CheckinDialog({ schedule, onDone, onSchedule, onClose }) {
 
 // A required poll from #announcements, not voted on yet: blocks the app,
 // like a lab check-in, until it's answered (or the poll is ended).
-export function PollGate({ msg, rename, onVote, onAnswer }) {
+export function PollGate({ msg, rename, onVote, onAnswer, onSkip }) {
   const [picked, setPicked] = useState([]);
   const [answer, setAnswer] = useState('');
   const written = msg.poll.kind === 'text';
@@ -371,6 +382,7 @@ export function PollGate({ msg, rename, onVote, onAnswer }) {
             {busy ? 'Saving…' : written ? 'Send answer' : 'Vote'}
           </button>
           <p className="muted tiny">You can change your {written ? 'answer' : 'vote'} anytime in #announcements.</p>
+          {onSkip && <PreviewSkip onSkip={onSkip} />}
         </div>
       </div>
     </Overlay>

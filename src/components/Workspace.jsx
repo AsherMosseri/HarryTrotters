@@ -713,8 +713,14 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
   }, [themeKey]);
   const gradeOf = useCallback((name) => peopleInfo.get(name)?.grade || 9, [peopleInfo]);
   const today = todayISO();
+  // Previewing: required screens you skipped (polls, check-ins, a missing lab log).
+  const [previewSkipped, setPreviewSkipped] = useState([]);
+  const skipInPreview = actor.preview ? (key) => () => setPreviewSkipped((list) => [...list, key]) : null;
   const pendingCheckin =
-    controls.isOn('checkins') && checkins.find((c) => c.date === today && (c.slots || []).length && !answerOf(c, actor.name, rename));
+    controls.isOn('checkins') &&
+    checkins.find(
+      (c) => c.date === today && (c.slots || []).length && !answerOf(c, actor.name, rename) && !previewSkipped.includes(`checkin:${c.id}`),
+    );
   const upcomingCheckins = checkins
     .filter((c) => c.date >= today)
     .sort((a, b) => a.date.localeCompare(b.date) || (a.at || 0) - (b.at || 0));
@@ -800,9 +806,10 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
         !m.poll.closed &&
         !m.deleted &&
         rename(m.by || '') !== actor.name &&
-        !Object.values(m.votes || {}).some((v) => v?.[me]),
+        !Object.values(m.votes || {}).some((v) => v?.[me]) &&
+        !previewSkipped.includes(`poll:${m.id}`),
     );
-  }, [chat, actor.name, rename, controls]);
+  }, [chat, actor.name, rename, controls, previewSkipped]);
 
   // Mark the open channel read while it's on screen.
   useEffect(() => {
@@ -1118,7 +1125,8 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
   const [labLog, setLabLog] = useState(null); // { mode: 'end' | 'edit', day, person, shift? }
   const namedShifts = useMemo(() => shifts.map((s) => (s.person ? { ...s, person: rename(s.person) } : s)), [shifts, rename]);
   // Lab log (Controls): required, optional (ending a shift can skip it), or off.
-  const owedDay = labLogs && controls.labLog === 'required' ? missingLogDay(actor.name, namedShifts, labLogs) : null;
+  const owedLog = labLogs && controls.labLog === 'required' ? missingLogDay(actor.name, namedShifts, labLogs) : null;
+  const owedDay = owedLog && !previewSkipped.includes(`lablog:${owedLog}`) ? owedLog : null;
   const labCtx = useMemo(
     () => ({
       logs: labLogs || [],
@@ -1998,6 +2006,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
               <PollGate
                 msg={pendingPoll}
                 rename={rename}
+                onSkip={skipInPreview?.(`poll:${pendingPoll.id}`)}
                 onVote={async (ids) => {
                   for (const id of ids) await api.vote('announcements', pendingPoll, id, true);
                 }}
@@ -2019,8 +2028,8 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
                     hours={hoursOn(st.day, namedShifts)[st.person]}
                     mode={st.mode}
                     onSave={saveLabLog}
-                    // A missing log has to be written; ending a shift can wait ("Not yet").
-                    onCancel={st.mode === 'missing' ? null : () => setLabLog(null)}
+                    // A missing log has to be written (unless Asher is previewing); ending a shift can wait ("Not yet").
+                    onCancel={st.mode === 'missing' ? skipInPreview?.(`lablog:${st.day}`) || null : () => setLabLog(null)}
                     // Optional lab log: end the shift without one.
                     onSkip={
                       st.mode === 'end' && st.shift && controls.labLog === 'optional'
@@ -2041,7 +2050,12 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
                 );
               })()}
             {pendingCheckin && (
-              <CheckinGate checkin={pendingCheckin} rename={rename} onAnswer={(a) => api.answerCheckin(pendingCheckin.id, a)} />
+              <CheckinGate
+                checkin={pendingCheckin}
+                rename={rename}
+                onAnswer={(a) => api.answerCheckin(pendingCheckin.id, a)}
+                onSkip={skipInPreview?.(`checkin:${pendingCheckin.id}`)}
+              />
             )}
             {toast && (
               <Overlay>

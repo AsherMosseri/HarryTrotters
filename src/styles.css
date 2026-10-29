@@ -3366,3 +3366,5 @@ html.kb-open .toast { bottom: auto; top: calc(var(--vvt) + var(--vvh) - 64px); }
 .update-plain { padding: 28px; }
 .update-plain .big-btn { width: 100%; }
 .sd-people { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; font-weight: 400; }
+.preview-strip-space { flex: none; visibility: hidden; }
+.preview-strip.on-top { position: fixed; top: 0; left: 0; right: 0; z-index: 2147483000; }

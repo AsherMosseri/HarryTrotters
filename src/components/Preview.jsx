@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 // Asher's preview (Controls → View as): the app as someone else sees it,
 // look only. The store keeps reading; anything that would change something
@@ -42,12 +43,20 @@ export function PreviewBar({ as, onExit }) {
       clearTimeout(t);
     };
   }, []);
-  return (
-    <div className="preview-strip" role="status">
+  const strip = (shown) => (
+    <div className={`preview-strip${shown ? ' on-top' : ''}`} role={shown ? 'status' : undefined} aria-hidden={shown ? undefined : true}>
       <span>{nudge ? 'Preview is look only: nothing was changed' : `👁 Viewing as ${as || 'a teammate'}`}</span>
-      <button className="btn small-btn" onClick={onExit}>
+      <button className="btn small-btn" onClick={onExit} tabIndex={shown ? undefined : -1}>
         Exit
       </button>
     </div>
+  );
+  // The strip floats above everything, pop-ups included, so Exit always
+  // works; an invisible copy holds its place at the top of the page.
+  return (
+    <>
+      <div className="preview-strip-space">{strip(false)}</div>
+      {createPortal(strip(true), document.body)}
+    </>
   );
 }
