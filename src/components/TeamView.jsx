@@ -26,7 +26,7 @@ const EMPTY_ROLE = { title: '', subteams: [], responsibilities: [] };
 // person.isNew = adding someone to the team (asks for their name).
 // Managers' names are tied to their manager codes in the security rules, so
 // they can't be renamed here.
-function PersonDialog({ person, taken, onClose, onSave, onRemove }) {
+function PersonDialog({ person, taken, onClose, onSave, onRemove, onPerson }) {
   useEscape(onClose);
   const [name, setName] = useState(person.name || '');
   const canRename = !person.isNew && !isManagerName(person.name);
@@ -63,8 +63,14 @@ function PersonDialog({ person, taken, onClose, onSave, onRemove }) {
           }}
         >
           <div className="panel-head">
-            {person.isNew ? <h2>Add a person</h2> : <Avatar name={person.name} size={30} />}
-            {!person.isNew && <h2>{person.name}</h2>}
+            {person.isNew ? (
+              <h2>Add a person</h2>
+            ) : (
+              <button type="button" className="pd-who" onClick={() => onPerson?.(person.name)} title="Open their profile">
+                <Avatar name={person.name} size={30} />
+                <h2>{person.name}</h2>
+              </button>
+            )}
             <span className="spacer" />
             <button type="button" className="icon-btn" onClick={onClose} aria-label="Close">
               <CloseIcon />
@@ -159,7 +165,7 @@ function PersonDialog({ person, taken, onClose, onSave, onRemove }) {
   );
 }
 
-function MemberChip({ p, onEdit }) {
+function MemberChip({ p, onEdit, onPerson }) {
   const inner = (
     <>
       <Avatar name={p.name} size={26} />
@@ -169,17 +175,15 @@ function MemberChip({ p, onEdit }) {
       </span>
     </>
   );
-  // Only the manager can open the editor.
-  return onEdit ? (
-    <button className="org-member" onClick={() => onEdit(p)}>
+  // The manager opens the editor; everyone else, the person's profile.
+  return (
+    <button className="org-member" onClick={() => (onEdit ? onEdit(p) : onPerson?.(p.name))}>
       {inner}
     </button>
-  ) : (
-    <div className="org-member">{inner}</div>
   );
 }
 
-export default function TeamView({ roster, roles, tasks, api, isManager, rename }) {
+export default function TeamView({ roster, roles, tasks, api, isManager, rename, onPerson }) {
   const [editing, setEditing] = useState(null);
   const today = todayISO();
 
@@ -214,7 +218,7 @@ export default function TeamView({ roster, roles, tasks, api, isManager, rename 
         <h3>{name}</h3>
         <div className="org-members">
           {members.map((p) => (
-            <MemberChip key={p.name} p={p} onEdit={onEdit} />
+            <MemberChip key={p.name} p={p} onEdit={onEdit} onPerson={onPerson} />
           ))}
           {!members.length && <span className="muted small">No one yet</span>}
         </div>
@@ -247,7 +251,7 @@ export default function TeamView({ roster, roles, tasks, api, isManager, rename 
               <h3>{g.name}</h3>
               <div className="org-members">
                 {g.members.map((p) => (
-                  <MemberChip key={p.name} p={p} onEdit={onEdit} />
+                  <MemberChip key={p.name} p={p} onEdit={onEdit} onPerson={onPerson} />
                 ))}
                 {!g.members.length && <span className="muted small">No one yet</span>}
               </div>
@@ -259,7 +263,7 @@ export default function TeamView({ roster, roles, tasks, api, isManager, rename 
             <h3>No subteam yet</h3>
             <div className="org-members">
               {unassigned.map((p) => (
-                <MemberChip key={p.name} p={p} onEdit={onEdit} />
+                <MemberChip key={p.name} p={p} onEdit={onEdit} onPerson={onPerson} />
               ))}
             </div>
           </div>
@@ -279,9 +283,13 @@ export default function TeamView({ roster, roles, tasks, api, isManager, rename 
       <ul className="roster-list">
         {people.map((p) => (
           <li key={p.name} className="roster-row">
-            <Avatar name={p.name} size={34} />
+            <button className="roster-pic" onClick={() => onPerson?.(p.name)} aria-label={`${p.name}'s profile`}>
+              <Avatar name={p.name} size={34} />
+            </button>
             <div className="roster-who">
-              <b>{p.name}</b>
+              <button className="roster-name" onClick={() => onPerson?.(p.name)}>
+                {p.name}
+              </button>
               <span>
                 {p.title || 'Team member'} · {gradeLabel(p.grade)}
               </span>
@@ -312,6 +320,10 @@ export default function TeamView({ roster, roles, tasks, api, isManager, rename 
           person={editing}
           taken={roster}
           onClose={() => setEditing(null)}
+          onPerson={(n) => {
+            setEditing(null);
+            onPerson?.(n);
+          }}
           onRemove={
             editing.isNew || isManagerName(editing.name)
               ? null

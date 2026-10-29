@@ -2040,7 +2040,15 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
                 ) : view === 'runs' ? (
                   <RunsView runs={runs} roster={roster} api={api} />
                 ) : view === 'team' ? (
-                  <TeamView roster={roster} roles={roles} tasks={tasks} api={api} isManager={actor.admin} rename={rename} />
+                  <TeamView
+                    roster={roster}
+                    roles={roles}
+                    tasks={tasks}
+                    api={api}
+                    isManager={actor.admin}
+                    rename={rename}
+                    onPerson={openPerson}
+                  />
                 ) : (
                   <main className="content">
                     {view === 'table' ? (
