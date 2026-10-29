@@ -75,7 +75,7 @@ import { dayOf, hoursOn, logId, missingLogDay } from '../labLog.js';
 import { OrderTracker, OrdersDialog, orderActive } from './AdOrders.jsx';
 import { setServerSkew } from '../serverTime.js';
 import { AdBlockWall, GameDialog, PrizeWheel, VideoAd } from './AdGames.jsx';
-import { coinSettings, wallet } from '../coins.js';
+import { coinSettings, coinsByName, wallet } from '../coins.js';
 
 // Versions were renumbered once (2.0 became 1.9, 2.1 became 2.0, and so
 // on). Move this device's "last seen" version along so What's new doesn't
@@ -1365,9 +1365,19 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
   useEffect(() => store.subscribeBank(setBank), [store]);
   const [lottery, setLottery] = useState(null);
   useEffect(() => store.subscribeLottery(setLottery), [store]);
+  // Under everyone's current name (shifts, the ledger, and banks keep the
+  // name they were saved with), and counted up to this minute, so time on a
+  // running shift keeps adding up.
+  const coinMinute = Math.floor(now / 60000) * 60000;
   const coinData = useMemo(
-    () => ({ tasks: tasks || [], shifts, adStats, ledger, bank, cfg: coinCfg }),
-    [tasks, shifts, adStats, ledger, bank, coinCfg],
+    () => ({
+      tasks: tasks || [],
+      ...coinsByName({ shifts, ledger, bank: Object.values(bank) }, rename),
+      adStats,
+      cfg: coinCfg,
+      now: coinMinute,
+    }),
+    [tasks, shifts, adStats, ledger, bank, coinCfg, rename, coinMinute],
   );
   const walletOf = useCallback((name) => wallet(name, { ...coinData, owner: name === REQUESTS_TO }), [coinData]);
   const myWallet = useMemo(() => walletOf(actor.name), [walletOf, actor.name]);
@@ -1391,7 +1401,8 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
     },
     wallet: (name) => {
       const w = walletOf(name);
-      return { balance: w.balance, earned: w.earned, casino: bank[name]?.net || 0, stats: bank[name]?.stats || {} };
+      const b = coinData.bank[name];
+      return { balance: w.balance, earned: w.earned, casino: b?.net || 0, stats: b?.stats || {} };
     },
     richest: () =>
       roster

@@ -11,7 +11,7 @@ import { initializeApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getMessaging } from 'firebase-admin/messaging';
 import { fetchPage, firstLink, readPreview } from './preview.js';
-import { coinSettings, wallet } from './shared/coins.js';
+import { coinSettings, coinsByName, wallet } from './shared/coins.js';
 import * as casino from './shared/casino.js';
 import * as arcade from './shared/arcade.js';
 import { blocked, serverGroup } from './shared/commandRules.js';
@@ -45,11 +45,14 @@ const personId = (name) =>
 async function renamer() {
   const snap = await db.doc('settings/names').get();
   const all = { ...RENAMED, ...(snap.get('renames') || {}) };
-  return (name) => {
+  const rename = (name) => {
     let n = name;
     for (let i = 0; i < 10 && all[n] && all[n] !== n; i++) n = all[n];
     return n;
   };
+  // Every name someone has gone by (their current one first).
+  rename.aliases = (name) => [name, ...Object.keys(all).filter((k) => k !== name && rename(k) === name)];
+  return rename;
 }
 
 // Same as REQUESTS_TO in src/config.js: who feature requests go to.
@@ -603,16 +606,16 @@ export const reminders = onSchedule({ schedule: 'every 1 minutes', timeZone: TIM
 // app adds it to what they earned (functions/shared/coins.js). The rules
 // and odds are in functions/shared/casino.js (demo mode runs the same file).
 
-// Tasks, shifts, and the ledger change slowly; keep them for 20 seconds so a
-// run of bets doesn't reread the whole database every time.
+// Tasks, shifts, and ad numbers change slowly (and only ever add coins); keep
+// them for 20 seconds so a run of bets doesn't reread the whole database every
+// time. Spending and gifts are read fresh for each balance (balanceOf).
 let coinCache = { at: 0, data: null };
 async function coinData() {
   if (coinCache.data && Date.now() - coinCache.at < 20000) return coinCache.data;
   const rename = await renamer();
-  const [tasks, shifts, coins, adStats, team] = await Promise.all([
+  const [tasks, shifts, adStats, team] = await Promise.all([
     db.collection('tasks').get(),
     db.collection('shifts').get(),
-    db.collection('coins').get(),
     db.collection('adStats').get(),
     db.doc('settings/team').get(),
   ]);
@@ -624,16 +627,29 @@ async function coinData() {
   const data = {
     rename,
     tasks: taskList,
-    shifts: shifts.docs.map((d) => d.data()),
-    ledger: coins.docs.map((d) => d.data()),
+    shifts: coinsByName({ shifts: shifts.docs.map((d) => d.data()) }, rename).shifts,
     adStats: Object.fromEntries(adStats.docs.map((d) => [d.id, d.data()])),
     cfg: coinSettings(team.get('coins')),
   };
   coinCache = { at: Date.now(), data };
   return data;
 }
-const balanceOf = (name, bank, data) => wallet(name, { ...data, owner: name === REQUESTS_TO, bank: { [name]: bank } }).balance;
 const bankRef = (name) => db.doc(`bank/${personId(name)}`);
+// What someone has right now, the same sum the app shows. Their ledger entries
+// (spending, gifts, prizes, bonuses) and any bank doc under an old name are
+// read fresh, so a gift or a purchase from a second ago counts.
+async function balanceOf(name, bank, data) {
+  const aliases = data.rename.aliases(name).slice(0, 30);
+  const [found, old] = await Promise.all([
+    Promise.all(['person', 'from', 'to'].map((f) => db.collection('coins').where(f, 'in', aliases).get())),
+    aliases.length > 1 ? db.getAll(...aliases.slice(1).map(bankRef)) : [],
+  ]);
+  const ledger = new Map();
+  for (const q of found) for (const d of q.docs) ledger.set(d.id, d.data());
+  const banks = [{ ...bank, name }, ...old.filter((d) => d.exists).map((d) => d.data())];
+  const mine = coinsByName({ ledger: [...ledger.values()], bank: banks }, data.rename);
+  return wallet(name, { ...data, ...mine, owner: name === REQUESTS_TO }).balance;
+}
 const nyDay = (ms) => new Date(ms).toLocaleDateString('en-CA', { timeZone: TIME_ZONE });
 
 const ICON = {
@@ -718,7 +734,7 @@ export const play = onCall({ maxInstances: 5, invoker: 'public' }, async (req) =
           secret: secret.data(),
           me,
           move: String(move),
-          balance: balanceOf(me, myBank, data),
+          balance: await balanceOf(me, myBank, data),
           now,
         });
         if (r.error) return note(r.error);
@@ -735,7 +751,7 @@ export const play = onCall({ maxInstances: 5, invoker: 'public' }, async (req) =
       if (c.status !== 'playing') return { ok: true };
       const bank = (await tx.get(bankRef(player))).data() || {};
       // Doubling down puts in the bet again, so it has to be there.
-      if (move === 'double' && balanceOf(player, bank, data) < c.bet) return note('Not enough coins to double.');
+      if (move === 'double' && (await balanceOf(player, bank, data)) < c.bet) return note('Not enough coins to double.');
       const r = casino.moveGame(c.name, { ...c.game, status: c.status }, secret.data(), String(move), c.bet, now);
       if (r.error) return note(r.error);
       // Still flying: nothing to write.
@@ -796,7 +812,7 @@ export const play = onCall({ maxInstances: 5, invoker: 'public' }, async (req) =
 
   return db.runTransaction(async (tx) => {
     const myBank = (await tx.get(bankRef(me))).data() || {};
-    const balance = balanceOf(me, myBank, data);
+    const balance = await balanceOf(me, myBank, data);
 
     if (game === 'lottery') {
       const lot = (await tx.get(lotteryRef)).data() || {};
@@ -874,7 +890,7 @@ export const play = onCall({ maxInstances: 5, invoker: 'public' }, async (req) =
       if (!them) return note('Rob who?', 'Try: /rob @name');
       if (them === me) return note('You can’t rob yourself.', 'You’d just be moving coins between pockets.');
       const theirBank = (await tx.get(bankRef(them))).data() || {};
-      const r = casino.rob(myBank, balance, balanceOf(them, theirBank, data), now);
+      const r = casino.rob(myBank, balance, await balanceOf(them, theirBank, data), now);
       if (r.error) return note(r.error);
       tx.set(
         bankRef(me),
