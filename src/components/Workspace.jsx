@@ -246,7 +246,7 @@ const VIEWS = [
   ['runs', 'Match Log'],
   ['robot', 'Robot'],
   ['resources', 'Resources'],
-  ['team', 'Team'],
+  ['team', 'Roster'],
 ];
 
 function matchesFilters(t, filters, me, view) {
@@ -1522,6 +1522,8 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
     setView('chat');
   };
   const [chatAsk, setChatAsk] = useState(null);
+  // The sidebar can fold to a strip of icons (remembered on this device).
+  const [sidebarRail, setSidebarRail] = useLocalStorage('sidebar-rail', false);
   const clearChatAsk = useCallback(() => setChatAsk(null), []);
   const frame = (inner) =>
     phone ? (
@@ -1559,6 +1561,8 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
           }
           me={meChip}
           onLogo={() => controls.isOn('catParty') && setCat(true)}
+          rail={sidebarRail}
+          onToggleRail={() => setSidebarRail(!sidebarRail)}
         />
         <div className="shell-main">{inner}</div>
       </div>

@@ -75,15 +75,15 @@ export default function ControlsPage({
           </div>
           <div className="ctl-quick">
             <button className={`btn${shutdown?.on ? ' danger' : ''}`} onClick={onShutdown}>
-              🛑 Shutdown{shutdown?.on ? ': ON' : ''}
+              Shutdown{shutdown?.on ? ': ON' : ''}
             </button>
             <button className="btn" onClick={onCommands}>
-              🤖 Commands{commandsOff ? ` (${commandsOff} off)` : ''}
+              Commands{commandsOff ? ` (${commandsOff} off)` : ''}
             </button>
           </div>
           <div className="ctl-preview">
             <button className="btn" onClick={() => onPreview({ as: null })}>
-              👁 View as teammate
+              View as teammate
             </button>
             <select className="input" value={as} onChange={(e) => setAs(e.target.value)} aria-label="Person to view as">
               <option value="">View as…</option>

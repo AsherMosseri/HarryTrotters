@@ -125,7 +125,7 @@ export default function ProfilePage({
                 )}
                 {(me || actor.admin) && (
                   <button className="btn" onClick={onEdit}>
-                    ✏️ Edit profile
+                    Edit profile
                   </button>
                 )}
               </div>

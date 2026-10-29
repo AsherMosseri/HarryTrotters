@@ -10,14 +10,14 @@ import { overdueTasks, parseMatch, parseTask, seasonRecord, todayISO } from './t
 import { blocked, isOff } from '../functions/shared/commandRules.js';
 
 export const GROUPS = [
-  ['basics', '🧰 Basics'],
-  ['text', '✍️ Text fun'],
-  ['random', '🎲 Random'],
-  ['actions', '🤗 Actions'],
-  ['economy', '🪙 Jackson coins'],
-  ['casino', '🎰 Casino (in #arcade)'],
-  ['arcade', '🕹️ Games (in #arcade)'],
-  ['team', '🛠️ Team'],
+  ['basics', 'Basics'],
+  ['text', 'Text fun'],
+  ['random', 'Random'],
+  ['actions', 'Actions'],
+  ['economy', 'Jackson coins'],
+  ['casino', 'Casino (in #arcade)'],
+  ['arcade', 'Games (in #arcade)'],
+  ['team', 'Team'],
 ];
 
 // name, group, args (shown as a hint), what it does

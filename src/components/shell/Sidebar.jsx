@@ -58,11 +58,52 @@ export default function Sidebar({
   topRight,
   me,
   onLogo,
+  rail, // folded to a narrow strip of icons (more room for the page)
+  onToggleRail,
 }) {
   const show = (id) => on.includes(id);
   const chatOn = show('chat');
   const dms = convs.dms.slice(0, 8);
   const [teamDmsOpen, setTeamDmsOpen] = useState(false);
+  if (rail) {
+    const chatCount = Object.values(unread).reduce((n, u) => n + (u.muted ? u.mentions : u.count), 0);
+    const pages = GROUPS.flatMap(([, ids]) => ids).filter(show);
+    return (
+      <aside className="sidebar rail">
+        <div className="sb-top">
+          <button className="sb-fold" onClick={onToggleRail} aria-label="Show the sidebar" title="Show the sidebar">
+            <Icon name="sidebar" size={20} />
+          </button>
+        </div>
+        <div className="sb-rail-tools">{topRight}</div>
+        <nav className="sb-scroll" aria-label="Pages">
+          {pages.map((id) => (
+            <button
+              key={id}
+              className={`sb-rail-btn${page === id ? ' active' : ''}`}
+              onClick={() => setPage(id)}
+              aria-label={LABELS[id]}
+              title={LABELS[id]}
+            >
+              <Icon name={id} size={20} />
+            </button>
+          ))}
+          {chatOn && currentConv && (
+            <button
+              className={`sb-rail-btn${page === 'chat' ? ' active' : ''}`}
+              onClick={() => onOpenConv(currentConv.key)}
+              aria-label="Chat"
+              title="Chat"
+            >
+              <Icon name="chat" size={20} />
+              {chatCount > 0 && <span className="sb-rail-badge">{chatCount > 99 ? '99+' : chatCount}</span>}
+            </button>
+          )}
+        </nav>
+        <div className="sb-foot">{me}</div>
+      </aside>
+    );
+  }
   return (
     <aside className="sidebar">
       <div className="sb-top">
@@ -76,6 +117,9 @@ export default function Sidebar({
           </span>
         </button>
         <span className="sb-top-tools">{topRight}</span>
+        <button className="sb-fold" onClick={onToggleRail} aria-label="Fold the sidebar" title="Fold the sidebar">
+          <Icon name="sidebar" size={18} />
+        </button>
       </div>
       <nav className="sb-scroll" aria-label="Pages">
         {GROUPS.map(([title, ids]) => {

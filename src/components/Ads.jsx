@@ -1234,7 +1234,7 @@ export function AdsSettings({
       <div className="panel-backdrop center" onClick={onClose}>
         <div className="dialog ads-settings" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Ads">
           <div className="panel-head">
-            <h2>📺 Ads</h2>
+            <h2>Ads</h2>
             <span className="spacer" />
             <button className="icon-btn" onClick={onClose} aria-label="Close">
               <CloseIcon />
@@ -1348,10 +1348,10 @@ export function AdsSettings({
                 <h4>Try it</h4>
                 <div className="row gap wrap">
                   <button className="btn" onClick={() => onPreview(preview ? 0 : 10)}>
-                    {preview ? '⏹ Stop previewing' : '👀 Preview ads as me for 10 min'}
+                    {preview ? 'Stop previewing' : 'Preview ads as me for 10 min'}
                   </button>
                   <button className="btn" onClick={() => onShowFull()}>
-                    📺 Show a full-screen ad now
+                    Show a full-screen ad now
                   </button>
                 </div>
                 <p className="muted small">Preview uses the saved settings, so save first to see changes.</p>
