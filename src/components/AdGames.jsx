@@ -224,9 +224,11 @@ export function GameDialog({ ad, capLeft, onPrize, onClose }) {
   useEscape(onClose);
   const [round, setRound] = useState(0);
   const [result, setResult] = useState(null);
+  // What the server actually paid (it keeps the daily cap too).
   const finish = async (score, label) => {
-    const won = Math.min(tier(score), Math.max(0, capLeft));
-    if (won > 0) await onPrize(won, `${label} in ${ad.brand}`);
+    const want = Math.min(tier(score), Math.max(0, capLeft));
+    const paid = want > 0 ? await onPrize(want, `${label} in ${ad.brand}`) : null;
+    const won = paid?.amount || 0;
     setResult({ score, label, won, capped: tier(score) > won });
   };
   const again = () => {
@@ -312,9 +314,11 @@ export function PrizeWheel({ onWin, onClose }) {
     setSpinning(true);
     setTurn(360 * 6 + (360 - (i * SEG + SEG / 2)));
     setTimeout(async () => {
-      await onWin(WHEEL[i]);
-      setWon(WHEEL[i]);
+      // Paid by the server; if it says no (already spun today), the note shows and the wheel closes.
+      const paid = await onWin(WHEEL[i]);
       setSpinning(false);
+      if (paid) setWon(WHEEL[i]);
+      else onClose();
     }, 4700);
   };
   const gradient = `conic-gradient(${WHEEL.map((s, i) => `${s.color} ${i * SEG}deg ${(i + 1) * SEG}deg`).join(', ')})`;
@@ -446,6 +450,7 @@ export function VideoAd({ ad, n, total, skip, onCta, onNext }) {
 
 export function AdBlockWall({ balance, onPay, onWatch, onClose }) {
   const [tries, setTries] = useState(0);
+  const [paying, setPaying] = useState(false);
   return (
     <Overlay>
       <div className="panel-backdrop center ad-block-back">
@@ -462,9 +467,19 @@ export function AdBlockWall({ balance, onPay, onWatch, onClose }) {
             I turned it off
           </button>
           <div className="row gap">
-            <button className="btn grow" disabled={balance < 1} onClick={onPay}>
-              Pay 1 Jackson coin
-            </button>
+            {onPay && (
+              <button
+                className="btn grow"
+                disabled={paying || balance < 1}
+                onClick={async () => {
+                  setPaying(true);
+                  await onPay();
+                  setPaying(false);
+                }}
+              >
+                Pay 1 Jackson coin
+              </button>
+            )}
             <button className="btn grow" onClick={onWatch}>
               Watch an ad
             </button>

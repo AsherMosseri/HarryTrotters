@@ -11,7 +11,7 @@ import { initializeApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getMessaging } from 'firebase-admin/messaging';
 import { fetchPage, firstLink, readPreview } from './preview.js';
-import { coinSettings, coinsByName, wallet } from './shared/coins.js';
+import { coinSettings, coinsByName, giftEntry, prizeEntry, wallet } from './shared/coins.js';
 import * as casino from './shared/casino.js';
 import * as arcade from './shared/arcade.js';
 import { blocked, serverGroup } from './shared/commandRules.js';
@@ -623,13 +623,18 @@ async function coinData() {
   const taskList = tasks.docs
     .map((d) => d.data())
     .filter((t) => !t.deletedAt)
-    .map((t) => (t.assignees ? { ...t, assignees: [...new Set(t.assignees.map(rename))] } : t));
+    .map((t) => ({
+      ...t,
+      ...(t.assignees && { assignees: [...new Set(t.assignees.map(rename))] }),
+      ...(t.createdBy && { createdBy: rename(t.createdBy) }),
+    }));
   const data = {
     rename,
     tasks: taskList,
     shifts: coinsByName({ shifts: shifts.docs.map((d) => d.data()) }, rename).shifts,
     adStats: Object.fromEntries(adStats.docs.map((d) => [d.id, d.data()])),
     cfg: coinSettings(team.get('coins')),
+    gameCap: team.get('ads')?.games?.cap ?? 10,
   };
   coinCache = { at: Date.now(), data };
   return data;
@@ -639,6 +644,9 @@ const bankRef = (name) => db.doc(`bank/${personId(name)}`);
 // (spending, gifts, prizes, bonuses) and any bank doc under an old name are
 // read fresh, so a gift or a purchase from a second ago counts.
 async function balanceOf(name, bank, data) {
+  return (await freshCoins(name, bank, data)).balance;
+}
+async function freshCoins(name, bank, data) {
   const aliases = data.rename.aliases(name).slice(0, 30);
   const [found, old] = await Promise.all([
     Promise.all(['person', 'from', 'to'].map((f) => db.collection('coins').where(f, 'in', aliases).get())),
@@ -648,7 +656,7 @@ async function balanceOf(name, bank, data) {
   for (const q of found) for (const d of q.docs) ledger.set(d.id, d.data());
   const banks = [{ ...bank, name }, ...old.filter((d) => d.exists).map((d) => d.data())];
   const mine = coinsByName({ ledger: [...ledger.values()], bank: banks }, data.rename);
-  return wallet(name, { ...data, ...mine, owner: name === REQUESTS_TO }).balance;
+  return { balance: wallet(name, { ...data, ...mine, owner: name === REQUESTS_TO }).balance, ledger: mine.ledger };
 }
 const nyDay = (ms) => new Date(ms).toLocaleDateString('en-CA', { timeZone: TIME_ZONE });
 
@@ -715,6 +723,31 @@ export const play = onCall({ maxInstances: 5, invoker: 'public' }, async (req) =
   const { action, game, conv = '', args = [], msgId, move, replyTo = null } = req.data || {};
   const now = Date.now();
   const words = (Array.isArray(args) ? args : []).map(String).slice(0, 6);
+
+  // A gift to a teammate, or a prize from an ad game or the prize wheel. The
+  // bank doc is read and touched so two at once (or one during a bet) take
+  // turns, and the second one sees the first.
+  if (action === 'gift' || action === 'prize') {
+    if (me !== REQUESTS_TO) {
+      const controls = (await db.doc('settings/controls').get()).data() || {};
+      if ((controls.off || []).includes('coins')) return note('🪙 Jackson coins are off right now.');
+    }
+    const roster =
+      action === 'gift' ? (await db.collection('people').get()).docs.map((d) => data.rename(d.get('name') || '')).filter(Boolean) : [];
+    const body = req.data || {};
+    return db.runTransaction(async (tx) => {
+      const myBank = (await tx.get(bankRef(me))).data() || {};
+      const mine = await freshCoins(me, myBank, data);
+      const entry =
+        action === 'gift'
+          ? giftEntry(me, { ...body, to: data.rename(String(body.to || '')) }, { roster, balance: mine.balance, now })
+          : prizeEntry(me, body, { ledger: mine.ledger, gameCap: data.gameCap, now });
+      if (entry.error) return note(entry.error, entry.body);
+      tx.set(db.collection('coins').doc(), entry);
+      tx.set(bankRef(me), { ...myBank, name: me, touched: now });
+      return { ok: true, entry };
+    });
+  }
 
   // A move in a running game (or a peek at a crash).
   if (action === 'move') {

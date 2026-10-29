@@ -473,11 +473,13 @@ export const firebaseStore = {
     return batch.commit();
   },
   // Jackson coins ledger: spending, gifts, and Asher's bonuses.
+  // On an error, keep what was there (an empty ledger would hand back every
+  // coin spent and every prize claimed today).
   subscribeCoins(cb) {
     return onSnapshot(
       collection(db, 'coins'),
       (snap) => cb(snap.docs.map(readDoc)),
-      () => cb([]),
+      (e) => console.warn('coins', e),
     );
   },
   addCoinTx(tx) {
@@ -832,7 +834,7 @@ export const firebaseStore = {
     return onSnapshot(
       collection(db, 'bank'),
       (snap) => cb(Object.fromEntries(snap.docs.map((d) => [d.data().name, d.data()]))),
-      () => cb({}),
+      (e) => console.warn('bank', e),
     );
   },
   subscribeLottery(cb) {

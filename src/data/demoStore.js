@@ -16,6 +16,7 @@ import * as casino from '../../functions/shared/casino.js';
 import { dayOf } from '../labLog.js';
 import * as arcade from '../../functions/shared/arcade.js';
 import { blocked, serverGroup } from '../../functions/shared/commandRules.js';
+import { giftEntry, prizeEntry } from '../../functions/shared/coins.js';
 
 const KEY = 'ftc32313-demo-v13';
 const listeners = new Set();
@@ -852,6 +853,17 @@ export const demoStore = {
     const payOut = (money) => {
       for (const x of money) setBank(x.name, casino.bankAfter(bank(x.name), x.name, x.delta, x.entry, x.extra || {}, now));
     };
+
+    // Gifts and ad prizes, checked the way the server checks them.
+    if (action === 'gift' || action === 'prize') {
+      const entry =
+        action === 'gift'
+          ? giftEntry(me, req, { roster, balance: balanceOf(me), now })
+          : prizeEntry(me, req, { ledger: state.coins || [], gameCap: state.settings?.ads?.games?.cap ?? 10, now });
+      if (entry.error) return note(entry.error, entry.body);
+      await demoStore.addCoinTx(entry);
+      return { ok: true, entry };
+    }
 
     if (action === 'move') {
       const list = (state.chat || {})[conv] || [];

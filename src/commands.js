@@ -444,14 +444,23 @@ export async function runCommand({ cmd, args }, ctx) {
     case 'leaderboard':
       return card({ top: ctx.richest() });
     case 'give': {
-      const to = findPerson(args, ctx.roster);
-      const amount = +(/(\d+)\s*$/.exec(args)?.[1] || /\b(\d+)\b/.exec(args)?.[1] || 0);
+      // The amount is the last word, a whole number ("/give @Cooper 20").
+      const last = args.trim().split(/\s+/).pop() || '';
+      const amount = /^\d+$/.test(last) ? +last : 0;
+      const who = args.trim().slice(0, -last.length).trim();
+      const to = who && findPerson(who, ctx.roster);
       if (!to || !amount) return { note: { title: 'Give who how much?', body: 'Try: /give @Cooper 20' } };
+      // A first name or start of a name that fits more than one person: ask.
+      const word = who.toLowerCase().replace(/^@/, '');
+      const fits = ctx.roster.filter((n) => n.toLowerCase() === word || n.toLowerCase().startsWith(word));
+      if (!who.toLowerCase().includes(`@${to.toLowerCase()}`) && to.toLowerCase() !== word && fits.length > 1)
+        return { note: { title: `Which one?`, body: `${fits.join(', ')}. Use their full name, like /give @${fits[0]} ${amount}` } };
       if (to === me) return { note: { title: 'That’s you.', body: 'Your coins are already yours.' } };
       const have = ctx.wallet(me).balance;
       if (amount > have) return { note: { title: `You only have ${have} coins.` } };
       if (amount > 5000) return { note: { title: 'That’s a lot.', body: 'Up to 5000 at a time.' } };
-      await ctx.gift(to, amount);
+      const r = await ctx.gift(to, amount);
+      if (!r?.ok) return { note: r?.note || { title: 'That didn’t go through.' } };
       return card({ to, amount, line: `sent you ${amount} Jackson coins` }, { mentions: [to] });
     }
     case 'help':
