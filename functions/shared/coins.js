@@ -22,11 +22,35 @@ export function coinSettings(raw) {
   return { ...COIN_DEFAULTS, ...(raw || {}), prices: { ...COIN_DEFAULTS.prices, ...(raw?.prices || {}) } };
 }
 
-const dayKey = (ms) => {
-  const d = new Date(ms);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-};
-const startMs = (cfg) => new Date(`${cfg.start}T00:00:00`).getTime();
+// Days are the team's days (New York), on every phone and on the server, so
+// the daily hour cap and the start date land the same everywhere.
+export const TEAM_TZ = 'America/New_York';
+const dayFmt = new Intl.DateTimeFormat('en-CA', { timeZone: TEAM_TZ, year: 'numeric', month: '2-digit', day: '2-digit' });
+const clockFmt = new Intl.DateTimeFormat('en-US', {
+  timeZone: TEAM_TZ,
+  hourCycle: 'h23',
+  year: 'numeric',
+  month: 'numeric',
+  day: 'numeric',
+  hour: 'numeric',
+  minute: 'numeric',
+});
+export const teamDay = (ms) => dayFmt.format(ms);
+// Midnight at the start of a team day ('2026-08-28'), in ms.
+export function teamMidnight(day) {
+  const [y, m, d] = day.split('-').map(Number);
+  const want = Date.UTC(y, m - 1, d);
+  let t = want;
+  for (let i = 0; i < 2; i++) {
+    const p = Object.fromEntries(clockFmt.formatToParts(t).map((x) => [x.type, x.value]));
+    t -= Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour % 24, +p.minute) - want;
+  }
+  return t;
+}
+const startMs = (cfg) => teamMidnight(cfg.start);
+// A time as ms: the server reads Firestore Timestamps (task times are set by
+// the server clock), the app reads numbers.
+const toMs = (v) => (v && typeof v.toMillis === 'function' ? v.toMillis() : typeof v === 'number' ? v : 0);
 
 // Everything someone has earned, newest first: [{ at, amount, icon, label, kind }].
 export function earnedItems(name, { tasks = [], shifts = [], adStats, owner = false, cfg, now = Date.now() }) {
@@ -34,7 +58,7 @@ export function earnedItems(name, { tasks = [], shifts = [], adStats, owner = fa
   const items = [];
   for (const t of tasks) {
     if (t.status !== 'done' || !(t.assignees || []).includes(name) || t.createdBy === name) continue;
-    const at = t.completedAt || t.updatedAt || t.createdAt || 0;
+    const at = toMs(t.completedAt) || toMs(t.updatedAt) || toMs(t.createdAt);
     if (at < from) continue;
     items.push({ kind: 'task', at, amount: cfg.perTask, icon: '✅', label: t.title || 'A task' });
   }
@@ -44,7 +68,7 @@ export function earnedItems(name, { tasks = [], shifts = [], adStats, owner = fa
     if (s.person !== name || !s.start || s.start < from) continue;
     const end = s.end || now;
     if (end <= s.start) continue;
-    const key = dayKey(s.start);
+    const key = teamDay(s.start);
     const d = days.get(key) || { minutes: 0, at: s.start };
     d.minutes += (end - s.start) / 60000;
     d.at = Math.max(d.at, end);
@@ -139,7 +163,75 @@ export function adFreeUntil(name, ledger = []) {
 }
 
 // Prizes this person has won today (games and the wheel have daily limits).
-export function prizesToday(name, ledger = [], what) {
-  const midnight = new Date().setHours(0, 0, 0, 0);
+export function prizesToday(name, ledger = [], what, now = Date.now()) {
+  const midnight = teamMidnight(teamDay(now));
   return ledger.filter((x) => x.type === 'prize' && x.person === name && x.at >= midnight && (!what || x.what === what));
+}
+
+// Everything under people's current names, so coins follow a rename: shifts
+// and ledger entries keep the name they were saved with, and the server keeps
+// writing to the bank doc of the current name (an old one stays as it was and
+// is added in). bank: the bank docs, as a list.
+export function coinsByName({ shifts = [], ledger = [], bank = [] }, rename = (n) => n) {
+  const same = (n) => (n ? rename(n) : n);
+  const banks = {};
+  for (const b of bank) {
+    if (!b?.name) continue;
+    const name = same(b.name);
+    const prev = banks[name];
+    banks[name] = !prev
+      ? { ...b, name }
+      : {
+          ...(b.name === name ? b : prev),
+          name,
+          net: (prev.net || 0) + (b.net || 0),
+          recent: [...(prev.recent || []), ...(b.recent || [])].sort((x, y) => y.at - x.at).slice(0, 15),
+          since: Math.min(prev.since || b.since || 0, b.since || prev.since || 0) || undefined,
+        };
+  }
+  return {
+    shifts: shifts.map((s) => (s.person && same(s.person) !== s.person ? { ...s, person: same(s.person) } : s)),
+    ledger: ledger.map((x) =>
+      ['person', 'from', 'to'].some((k) => x[k] && same(x[k]) !== x[k])
+        ? { ...x, ...(x.person && { person: same(x.person) }), ...(x.from && { from: same(x.from) }), ...(x.to && { to: same(x.to) }) }
+        : x,
+    ),
+    bank: banks,
+  };
+}
+
+// Gifts and ad prizes are paid by the server (the play function), which
+// checks them against the real balance and today's limits; demo mode runs the
+// same checks. Each returns the ledger entry to add, or { error }.
+export const GIFT_MAX = 5000;
+// The prize wheel's coin slices (AdGames.jsx draws the wheel).
+export const WHEEL_COINS = [0, 1, 2, 3, 5, 10];
+export const GAME_PRIZE_MAX = 20;
+const text = (v, n) => String(v || '').slice(0, n);
+
+export function giftEntry(from, { to, amount, note }, { roster, balance, now = Date.now() }) {
+  const n = Number(amount);
+  if (!roster.includes(to)) return { error: 'Who’s that?' };
+  if (to === from) return { error: 'That’s you.', body: 'Your coins are already yours.' };
+  if (!Number.isInteger(n) || n < 1) return { error: 'Send at least 1 coin.' };
+  if (n > GIFT_MAX) return { error: 'That’s a lot.', body: `Up to ${GIFT_MAX} at a time.` };
+  if (n > balance) return { error: `You only have ${balance} coins.` };
+  return { type: 'gift', from, to, amount: n, note: text(note, 140).trim(), at: now };
+}
+
+export function prizeEntry(name, { what, amount, hour, label }, { ledger, gameCap, now = Date.now() }) {
+  if (what === 'wheel') {
+    if (prizesToday(name, ledger, 'wheel', now).length) return { error: 'You already spun the wheel today.' };
+    if (hour) return { type: 'prize', person: name, what, amount: 0, label: 'Prize wheel: 1 hour with no ads', until: now + 3600000, at: now };
+    const n = Number(amount);
+    if (!WHEEL_COINS.includes(n)) return { error: 'That isn’t on the wheel.' };
+    return { type: 'prize', person: name, what, amount: n, label: n ? `Prize wheel: +${n}` : 'Prize wheel: nothing', at: now };
+  }
+  if (what === 'game') {
+    const left = Math.max(0, gameCap - prizesToday(name, ledger, 'game', now).reduce((t, x) => t + x.amount, 0));
+    const n = Math.min(left, GAME_PRIZE_MAX, Math.max(0, Math.floor(Number(amount)) || 0));
+    if (!n) return { error: left ? 'No prize this time.' : 'That’s all the game prizes for today.' };
+    return { type: 'prize', person: name, what, amount: n, label: text(label, 80) || 'Ad game prize', at: now };
+  }
+  return { error: 'Unknown prize.' };
 }

@@ -11,7 +11,7 @@ import { initializeApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getMessaging } from 'firebase-admin/messaging';
 import { fetchPage, firstLink, readPreview } from './preview.js';
-import { coinSettings, wallet } from './shared/coins.js';
+import { coinSettings, coinsByName, giftEntry, prizeEntry, wallet } from './shared/coins.js';
 import * as casino from './shared/casino.js';
 import * as arcade from './shared/arcade.js';
 import { blocked, serverGroup } from './shared/commandRules.js';
@@ -45,11 +45,14 @@ const personId = (name) =>
 async function renamer() {
   const snap = await db.doc('settings/names').get();
   const all = { ...RENAMED, ...(snap.get('renames') || {}) };
-  return (name) => {
+  const rename = (name) => {
     let n = name;
     for (let i = 0; i < 10 && all[n] && all[n] !== n; i++) n = all[n];
     return n;
   };
+  // Every name someone has gone by (their current one first).
+  rename.aliases = (name) => [name, ...Object.keys(all).filter((k) => k !== name && rename(k) === name)];
+  return rename;
 }
 
 // Same as REQUESTS_TO in src/config.js: who feature requests go to.
@@ -603,16 +606,16 @@ export const reminders = onSchedule({ schedule: 'every 1 minutes', timeZone: TIM
 // app adds it to what they earned (functions/shared/coins.js). The rules
 // and odds are in functions/shared/casino.js (demo mode runs the same file).
 
-// Tasks, shifts, and the ledger change slowly; keep them for 20 seconds so a
-// run of bets doesn't reread the whole database every time.
+// Tasks, shifts, and ad numbers change slowly (and only ever add coins); keep
+// them for 20 seconds so a run of bets doesn't reread the whole database every
+// time. Spending and gifts are read fresh for each balance (balanceOf).
 let coinCache = { at: 0, data: null };
 async function coinData() {
   if (coinCache.data && Date.now() - coinCache.at < 20000) return coinCache.data;
   const rename = await renamer();
-  const [tasks, shifts, coins, adStats, team] = await Promise.all([
+  const [tasks, shifts, adStats, team] = await Promise.all([
     db.collection('tasks').get(),
     db.collection('shifts').get(),
-    db.collection('coins').get(),
     db.collection('adStats').get(),
     db.doc('settings/team').get(),
   ]);
@@ -620,20 +623,41 @@ async function coinData() {
   const taskList = tasks.docs
     .map((d) => d.data())
     .filter((t) => !t.deletedAt)
-    .map((t) => (t.assignees ? { ...t, assignees: [...new Set(t.assignees.map(rename))] } : t));
+    .map((t) => ({
+      ...t,
+      ...(t.assignees && { assignees: [...new Set(t.assignees.map(rename))] }),
+      ...(t.createdBy && { createdBy: rename(t.createdBy) }),
+    }));
   const data = {
     rename,
     tasks: taskList,
-    shifts: shifts.docs.map((d) => d.data()),
-    ledger: coins.docs.map((d) => d.data()),
+    shifts: coinsByName({ shifts: shifts.docs.map((d) => d.data()) }, rename).shifts,
     adStats: Object.fromEntries(adStats.docs.map((d) => [d.id, d.data()])),
     cfg: coinSettings(team.get('coins')),
+    gameCap: team.get('ads')?.games?.cap ?? 10,
   };
   coinCache = { at: Date.now(), data };
   return data;
 }
-const balanceOf = (name, bank, data) => wallet(name, { ...data, owner: name === REQUESTS_TO, bank: { [name]: bank } }).balance;
 const bankRef = (name) => db.doc(`bank/${personId(name)}`);
+// What someone has right now, the same sum the app shows. Their ledger entries
+// (spending, gifts, prizes, bonuses) and any bank doc under an old name are
+// read fresh, so a gift or a purchase from a second ago counts.
+async function balanceOf(name, bank, data) {
+  return (await freshCoins(name, bank, data)).balance;
+}
+async function freshCoins(name, bank, data) {
+  const aliases = data.rename.aliases(name).slice(0, 30);
+  const [found, old] = await Promise.all([
+    Promise.all(['person', 'from', 'to'].map((f) => db.collection('coins').where(f, 'in', aliases).get())),
+    aliases.length > 1 ? db.getAll(...aliases.slice(1).map(bankRef)) : [],
+  ]);
+  const ledger = new Map();
+  for (const q of found) for (const d of q.docs) ledger.set(d.id, d.data());
+  const banks = [{ ...bank, name }, ...old.filter((d) => d.exists).map((d) => d.data())];
+  const mine = coinsByName({ ledger: [...ledger.values()], bank: banks }, data.rename);
+  return { balance: wallet(name, { ...data, ...mine, owner: name === REQUESTS_TO }).balance, ledger: mine.ledger };
+}
 const nyDay = (ms) => new Date(ms).toLocaleDateString('en-CA', { timeZone: TIME_ZONE });
 
 const ICON = {
@@ -671,10 +695,11 @@ async function workContext(me, data) {
 
 // Multiplayer games pay several people at once: read every bank first (a
 // transaction reads before it writes), then apply each change in order.
+// Winnings from the free games (x.free) stop at arcade.FREE_DAILY a day.
 async function payOut(tx, money, banks, now) {
   const names = [...new Set(money.map((x) => x.name))];
   for (const n of names) if (!banks[n]) banks[n] = (await tx.get(bankRef(n))).data() || {};
-  for (const x of money) banks[x.name] = casino.bankAfter(banks[x.name], x.name, x.delta, x.entry, x.extra || {}, now);
+  for (const x of money) banks[x.name] = casino.bankAfter(banks[x.name], x.name, ...arcade.paid(x, banks[x.name], nyDay(now)), now);
   for (const n of names) tx.set(bankRef(n), banks[n]);
 }
 
@@ -689,6 +714,74 @@ function nextFriday(now = Date.now()) {
   return now + 7 * 86400000;
 }
 
+// Where a live game's card is, kept with its secret so settleGames can find it.
+const secretWith = (secret, conv, now) => ({ ...secret, where: { conv, at: now } });
+
+// A move in a running game: a player's, or the house settling a game nobody
+// finished (house: true, from settleGames).
+async function runMove({ conv, msgId, me, move, data, now, house = false }) {
+  const msgRef = db.doc(`channels/${conv}/messages/${msgId}`);
+  const secretRef = db.doc(`gameSecrets/${msgId}`);
+  return db.runTransaction(async (tx) => {
+    const [msg, secret] = await Promise.all([tx.get(msgRef), tx.get(secretRef)]);
+    const c = msg.get('cmd');
+    if (!msg.exists || !c || !secret.exists) {
+      if (house && secret.exists) tx.delete(secretRef);
+      return note('That game is gone.');
+    }
+    // Multiplayer: the game decides who may move (arcade.js).
+    if (arcade.MULTI.includes(c.name)) {
+      if (!arcade.isLive(c.status)) return { ok: true };
+      const myBank = house ? null : (await tx.get(bankRef(me))).data() || {};
+      const r = arcade.move(c.name, {
+        pub: { ...c.game, status: c.status },
+        secret: secret.data(),
+        me,
+        move,
+        balance: house ? 0 : await balanceOf(me, myBank, data),
+        now,
+      });
+      if (r.error) return note(r.error);
+      if (!r.write) return { ok: true, serverNow: now };
+      await payOut(tx, r.money, house ? {} : { [me]: myBank }, now);
+      const { status, ...game } = r.pub;
+      if (arcade.isLive(status)) tx.set(secretRef, secretWith(r.secret, conv, now));
+      else tx.delete(secretRef);
+      tx.update(msgRef, { 'cmd.game': game, 'cmd.status': status });
+      return { ok: true, serverNow: now };
+    }
+    const player = data.rename(msg.get('by'));
+    if (!house && move !== 'peek' && player !== me) return note('That’s not your game.');
+    if (c.status !== 'playing') return { ok: true };
+    const bank = (await tx.get(bankRef(player))).data() || {};
+    // Doubling down puts in the bet again, so it has to be there.
+    if (move === 'double' && (await balanceOf(player, bank, data)) < c.bet) return note('Not enough coins to double.');
+    const r = casino.moveGame(c.name, { ...c.game, status: c.status }, secret.data(), move, c.bet, now);
+    if (r.error) return note(r.error);
+    // Still flying: nothing to write.
+    if (move === 'peek' && !r.done) return { ok: true, serverNow: now };
+    const bet = c.bet + (r.extraBet || 0);
+    const { status, ...game } = r.pub;
+    const update = { 'cmd.game': game, 'cmd.status': status, 'cmd.bet': bet };
+    if (r.done) {
+      // The bet was taken when the game started (and again when doubling):
+      // pay back what it won; the history shows the overall result.
+      const net = r.payout - bet;
+      const entry = {
+        game: c.name,
+        icon: ICON[c.name],
+        label: `${LABEL[c.name]}: ${net > 0 ? `won ${net}` : net < 0 ? `lost ${-net}` : 'bet back'}`,
+        shown: net,
+      };
+      tx.set(bankRef(player), casino.bankAfter(bank, player, r.payout - (r.extraBet || 0), entry, {}, now));
+      Object.assign(update, { 'cmd.payout': r.payout, 'cmd.net': net });
+      tx.delete(secretRef);
+    } else tx.set(secretRef, secretWith(r.secret, conv, now));
+    tx.update(msgRef, update);
+    return { ok: true, serverNow: now };
+  });
+}
+
 export const play = onCall({ maxInstances: 5, invoker: 'public' }, async (req) => {
   const uid = req.auth?.uid;
   if (!uid) throw new HttpsError('unauthenticated', 'Sign in first.');
@@ -700,66 +793,35 @@ export const play = onCall({ maxInstances: 5, invoker: 'public' }, async (req) =
   const now = Date.now();
   const words = (Array.isArray(args) ? args : []).map(String).slice(0, 6);
 
+  // A gift to a teammate, or a prize from an ad game or the prize wheel. The
+  // bank doc is read and touched so two at once (or one during a bet) take
+  // turns, and the second one sees the first.
+  if (action === 'gift' || action === 'prize') {
+    if (me !== REQUESTS_TO) {
+      const controls = (await db.doc('settings/controls').get()).data() || {};
+      if ((controls.off || []).includes('coins')) return note('🪙 Jackson coins are off right now.');
+    }
+    const roster =
+      action === 'gift' ? (await db.collection('people').get()).docs.map((d) => data.rename(d.get('name') || '')).filter(Boolean) : [];
+    const body = req.data || {};
+    return db.runTransaction(async (tx) => {
+      const myBank = (await tx.get(bankRef(me))).data() || {};
+      const mine = await freshCoins(me, myBank, data);
+      const entry =
+        action === 'gift'
+          ? giftEntry(me, { ...body, to: data.rename(String(body.to || '')) }, { roster, balance: mine.balance, now })
+          : prizeEntry(me, body, { ledger: mine.ledger, gameCap: data.gameCap, now });
+      if (entry.error) return note(entry.error, entry.body);
+      tx.set(db.collection('coins').doc(), entry);
+      tx.set(bankRef(me), { ...myBank, name: me, touched: now });
+      return { ok: true, entry };
+    });
+  }
+
   // A move in a running game (or a peek at a crash).
   if (action === 'move') {
     if (!/^[\w-]{1,40}$/.test(conv) || !/^[\w-]{1,40}$/.test(msgId || '')) throw new HttpsError('invalid-argument', 'Which game?');
-    const msgRef = db.doc(`channels/${conv}/messages/${msgId}`);
-    const secretRef = db.doc(`gameSecrets/${msgId}`);
-    return db.runTransaction(async (tx) => {
-      const [msg, secret] = await Promise.all([tx.get(msgRef), tx.get(secretRef)]);
-      const c = msg.get('cmd');
-      if (!msg.exists || !c || !secret.exists) return note('That game is gone.');
-      // Multiplayer: the game decides who may move (arcade.js).
-      if (arcade.MULTI.includes(c.name)) {
-        if (!arcade.isLive(c.status)) return { ok: true };
-        const myBank = (await tx.get(bankRef(me))).data() || {};
-        const r = arcade.move(c.name, {
-          pub: { ...c.game, status: c.status },
-          secret: secret.data(),
-          me,
-          move: String(move),
-          balance: balanceOf(me, myBank, data),
-          now,
-        });
-        if (r.error) return note(r.error);
-        if (!r.write) return { ok: true, serverNow: now };
-        await payOut(tx, r.money, { [me]: myBank }, now);
-        const { status, ...game } = r.pub;
-        if (arcade.isLive(status)) tx.set(secretRef, r.secret);
-        else tx.delete(secretRef);
-        tx.update(msgRef, { 'cmd.game': game, 'cmd.status': status });
-        return { ok: true, serverNow: now };
-      }
-      const player = data.rename(msg.get('by'));
-      if (move !== 'peek' && player !== me) return note('That’s not your game.');
-      if (c.status !== 'playing') return { ok: true };
-      const bank = (await tx.get(bankRef(player))).data() || {};
-      // Doubling down puts in the bet again, so it has to be there.
-      if (move === 'double' && balanceOf(player, bank, data) < c.bet) return note('Not enough coins to double.');
-      const r = casino.moveGame(c.name, { ...c.game, status: c.status }, secret.data(), String(move), c.bet, now);
-      if (r.error) return note(r.error);
-      // Still flying: nothing to write.
-      if (move === 'peek' && !r.done) return { ok: true, serverNow: now };
-      const bet = c.bet + (r.extraBet || 0);
-      const { status, ...game } = r.pub;
-      const update = { 'cmd.game': game, 'cmd.status': status, 'cmd.bet': bet };
-      if (r.done) {
-        // The bet was taken when the game started (and again when doubling):
-        // pay back what it won; the history shows the overall result.
-        const net = r.payout - bet;
-        const entry = {
-          game: c.name,
-          icon: ICON[c.name],
-          label: `${LABEL[c.name]}: ${net >= 0 ? `won ${net}` : `lost ${-net}`}`,
-          shown: net,
-        };
-        tx.set(bankRef(player), casino.bankAfter(bank, player, r.payout - (r.extraBet || 0), entry, {}, now));
-        Object.assign(update, { 'cmd.payout': r.payout, 'cmd.net': net });
-        tx.delete(secretRef);
-      } else tx.set(secretRef, r.secret);
-      tx.update(msgRef, update);
-      return { ok: true, serverNow: now };
-    });
+    return runMove({ conv, msgId, me, move: String(move), data, now });
   }
 
   // A new command.
@@ -796,7 +858,7 @@ export const play = onCall({ maxInstances: 5, invoker: 'public' }, async (req) =
 
   return db.runTransaction(async (tx) => {
     const myBank = (await tx.get(bankRef(me))).data() || {};
-    const balance = balanceOf(me, myBank, data);
+    const balance = await balanceOf(me, myBank, data);
 
     if (game === 'lottery') {
       const lot = (await tx.get(lotteryRef)).data() || {};
@@ -828,7 +890,7 @@ export const play = onCall({ maxInstances: 5, invoker: 'public' }, async (req) =
       const r = arcade.start(game, { me, words, roster, balance, bank: myBank, now });
       if (r.error) return note(r.error);
       await payOut(tx, r.money, { [me]: myBank }, now);
-      tx.set(db.doc(`gameSecrets/${msgRef.id}`), r.secret);
+      tx.set(db.doc(`gameSecrets/${msgRef.id}`), secretWith(r.secret, conv, now));
       const { status, ...g } = r.pub;
       post(tx, { game: g, status, bet: g.bet || 0 }, r.mentions);
       return { ok: true, serverNow: now };
@@ -858,7 +920,7 @@ export const play = onCall({ maxInstances: 5, invoker: 'public' }, async (req) =
       } else {
         // Take the bet now; the end of the game pays back what it won.
         tx.set(bankRef(me), casino.bankAfter(myBank, me, -bet, null, {}, now));
-        tx.set(db.doc(`gameSecrets/${msgRef.id}`), r.secret);
+        tx.set(db.doc(`gameSecrets/${msgRef.id}`), secretWith(r.secret, conv, now));
         post(tx, { game: game2, status, bet });
       }
       return { ok: true, serverNow: now };
@@ -874,7 +936,7 @@ export const play = onCall({ maxInstances: 5, invoker: 'public' }, async (req) =
       if (!them) return note('Rob who?', 'Try: /rob @name');
       if (them === me) return note('You can’t rob yourself.', 'You’d just be moving coins between pockets.');
       const theirBank = (await tx.get(bankRef(them))).data() || {};
-      const r = casino.rob(myBank, balance, balanceOf(them, theirBank, data), now);
+      const r = casino.rob(myBank, balance, await balanceOf(them, theirBank, data), now);
       if (r.error) return note(r.error);
       tx.set(
         bankRef(me),
@@ -924,6 +986,32 @@ export const play = onCall({ maxInstances: 5, invoker: 'public' }, async (req) =
     post(tx, r.card);
     return { ok: true };
   });
+});
+
+// Every 10 minutes: finish games nobody finished, so no one's bet stays stuck
+// on a card nobody has open. Multiplayer games settle by their own timers
+// (an expired challenge, a type race that ended, a board game left alone);
+// casino games left alone for casino.ABANDONED are played out for the player.
+export const settleGames = onSchedule({ schedule: 'every 10 minutes', timeZone: TIME_ZONE }, async () => {
+  const now = Date.now();
+  const live = await db.collection('gameSecrets').get();
+  if (live.empty) return;
+  const data = await coinData();
+  for (const d of live.docs) {
+    const where = d.get('where');
+    if (!where?.conv) continue; // games from before this was kept
+    const msg = await db.doc(`channels/${where.conv}/messages/${d.id}`).get();
+    const c = msg.get('cmd');
+    let move = 'peek';
+    if (c && !arcade.MULTI.includes(c.name)) {
+      if (now - (where.at || 0) < casino.ABANDONED) continue;
+      move = casino.abandonMove(c.name, c.game || {});
+      if (!move) continue;
+    }
+    await runMove({ conv: where.conv, msgId: d.id, me: '', move, data, now, house: true }).catch((e) =>
+      logger.warn('settle', d.id, e.message),
+    );
+  }
 });
 
 // Fridays at 6 PM (New York): draw the lottery. One ticket wins the whole pot.

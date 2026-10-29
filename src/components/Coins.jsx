@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
-import { leaderboard, wallet as walletOf } from '../coins.js';
+import { GIFT_MAX, leaderboard, teamDay, teamMidnight, wallet as walletOf } from '../coins.js';
 import { REQUESTS_TO } from '../config.js';
-import { mondayOf, parseDay, todayISO } from '../milestones.js';
+import { mondayOf } from '../milestones.js';
 import { relTime, useEscape } from '../util.js';
 import { Avatar, CloseIcon, Overlay } from './common.jsx';
 
@@ -31,7 +31,10 @@ export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onClose 
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
   const [sent, setSent] = useState(null);
-  const monday = parseDay(mondayOf(todayISO())).getTime();
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState('');
+  // The team's Monday (New York), the same week everywhere.
+  const monday = teamMidnight(mondayOf(teamDay(Date.now())));
   const board = useMemo(
     () =>
       kind === 'coins'
@@ -42,7 +45,7 @@ export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onClose 
     [kind, roster, data, range, monday],
   );
   const n = Math.floor(Number(amount));
-  const canSend = to && n > 0 && n <= wallet.balance;
+  const canSend = to && n > 0 && n <= wallet.balance && n <= GIFT_MAX && !sending;
   const others = roster.filter((x) => x !== actor.name);
   return (
     <Overlay>
@@ -163,14 +166,24 @@ export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onClose 
                   />
                   <span />
                   <div className="row gap">
-                    {n > wallet.balance && <span className="danger small">You only have {wallet.balance}.</span>}
+                    {n > wallet.balance ? (
+                      <span className="danger small">You only have {wallet.balance}.</span>
+                    ) : n > GIFT_MAX ? (
+                      <span className="danger small">Up to {GIFT_MAX} at a time.</span>
+                    ) : (
+                      sendError && <span className="danger small">{sendError}</span>
+                    )}
                     <span className="spacer" />
                     <button
                       className="btn primary"
                       disabled={!canSend}
                       onClick={async () => {
-                        await onGift({ to, amount: n, note: note.trim() });
-                        setSent({ to, amount: n });
+                        setSending(true);
+                        setSendError('');
+                        const r = await onGift({ to, amount: n, note: note.trim() });
+                        setSending(false);
+                        if (r?.ok) setSent({ to, amount: n });
+                        else setSendError(r?.note ? [r.note.title, r.note.body].filter(Boolean).join(' ') : 'That didn’t go through.');
                       }}
                     >
                       Send
@@ -243,7 +256,8 @@ export function CoinsAdmin({ cfg, setCfg, roster, balances, onGrant, ledger, onU
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
   const num = (v) => Math.max(0, Math.floor(Number(v) || 0));
-  const setPrice = (k, v) => setCfg({ ...cfg, prices: { ...cfg.prices, [k]: num(v) } });
+  // At least 1 (the ledger won't take a free purchase).
+  const setPrice = (k, v) => setCfg({ ...cfg, prices: { ...cfg.prices, [k]: Math.max(1, num(v)) } });
   const grants = ledger.filter((x) => x.type === 'grant').sort((a, b) => b.at - a.at);
   const n = Math.trunc(Number(amount));
   const field = (label, value, onChange, hint) => (

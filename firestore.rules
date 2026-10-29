@@ -119,8 +119,10 @@ service cloud.firestore {
       allow delete: if isManager();
     }
 
-    // Jackson coins ledger: spending, gifts, and Asher's bonuses. What people
-    // earn is worked out from tasks and shifts, so it isn't stored here.
+    // Jackson coins ledger: spending, gifts, prizes, and Asher's bonuses. What
+    // people earn is worked out from tasks and shifts, so it isn't stored here.
+    // Gifts and prizes come from the play function, which checks the balance
+    // and today's limits; phones only add their own spending and Asher's bonuses.
     match /coins/{id} {
       function amount(d) { return d.amount is int && d.amount > 0 && d.amount <= 5000; }
       function shortStr(v, n) { return v is string && v.size() <= n; }
@@ -129,25 +131,14 @@ service cloud.firestore {
           && shortStr(d.get('what', ''), 20) && shortStr(d.get('label', ''), 80)
           && (!('until' in d) || (d.until is int && d.until <= request.time.toMillis() + 8 * 86400000));
       }
-      function validGift(d) {
-        return d.keys().hasOnly(['type', 'from', 'to', 'amount', 'note', 'at']) && isMe(d.from) && d.to is string
-          && d.to.size() > 0 && d.to != d.from && amount(d) && shortStr(d.get('note', ''), 140);
-      }
-      // Prizes from ad games and the wheel: small, and only for yourself.
-      function validPrize(d) {
-        return d.keys().hasOnly(['type', 'person', 'amount', 'what', 'label', 'until', 'at']) && isMe(d.person)
-          && d.amount is int && d.amount >= 0 && d.amount <= 20 && d.what in ['game', 'wheel'] && shortStr(d.get('label', ''), 80)
-          && (!('until' in d) || (d.until is int && d.until <= request.time.toMillis() + 8 * 86400000));
-      }
       function validGrant(d) {
         return d.keys().hasOnly(['type', 'to', 'amount', 'note', 'by', 'at']) && requestsOwner() && d.to is string
           && d.amount is int && d.amount != 0 && d.amount >= -100000 && d.amount <= 100000 && shortStr(d.get('note', ''), 140);
       }
       allow read: if isMember();
-      allow create: if isMember() && !featureOff('coins') && request.resource.data.at is int && (
+      allow create: if isMember() && !featureOff('coins') && request.resource.data.at is int
+        && request.resource.data.at > nowMs() - 120000 && request.resource.data.at < nowMs() + 120000 && (
         (request.resource.data.type == 'spend' && validSpend(request.resource.data))
-        || (request.resource.data.type == 'gift' && validGift(request.resource.data))
-        || (request.resource.data.type == 'prize' && validPrize(request.resource.data))
         || (request.resource.data.type == 'grant' && validGrant(request.resource.data)));
       allow update: if false;
       allow delete: if requestsOwner();

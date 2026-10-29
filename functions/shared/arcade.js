@@ -37,8 +37,26 @@ export const TIMES = {
   afterFirst: 15000, // a type race ends this long after someone finishes
   duelIdle: 30000, // nobody shot: bets back
   cooldown: MINUTE, // between starting trivia / hangman / type races
+  abandoned: 30 * MINUTE, // a board game nobody touches ends: whoever's turn it was loses
 };
 export const TRIVIA_PRIZE = 8;
+// Trivia, hangman, and type races are free to play; what they pay is capped
+// per person per day (the team's day), so they can't be farmed.
+export const FREE_DAILY = 100;
+export function capFree(bank, delta, day) {
+  const so = bank.free?.day === day ? bank.free.total || 0 : 0;
+  const paid = Math.max(0, Math.min(delta, FREE_DAILY - so));
+  return { paid, free: { day, total: so + paid } };
+}
+// casino.bankAfter's [delta, entry, extra] for one payment in a game's money
+// list, with free-game winnings capped (day: the team's day, YYYY-MM-DD).
+export function paid(x, bank, day) {
+  if (!x.free) return [x.delta, x.entry, x.extra || {}];
+  const { paid: n, free } = capFree(bank, x.delta, day);
+  const note = n < x.delta ? `+${n}, daily limit reached` : `+${n}`;
+  const entry = x.entry && { ...x.entry, label: `${x.entry.label} (${note})`, shown: n };
+  return [n, entry, { ...(x.extra || {}), free }];
+}
 
 const rint = (rng, a, b) => a + Math.floor(rng() * (b - a + 1));
 const pickOf = (rng, list) => list[Math.floor(rng() * list.length)];
@@ -508,7 +526,12 @@ export function move(game, { pub, secret = {}, me, move: mv, balance = 0, now = 
       return { ...r, money: [...take(me, p.bet), ...r.money] };
     }
     if (game === 'rps') {
-      if (m === 'peek') return nothing;
+      // Nobody picks for a while: whoever picked wins; if nobody did, bets back.
+      if (m === 'peek') {
+        if (now - p.lastAt < TIMES.turn) return nothing;
+        const picked = (p.picked || []).filter((n) => n === p.a || n === p.b);
+        return end(picked.length === 1 ? picked[0] : '', picked.length === 1 ? 'timeout' : 'nopick');
+      }
       if (!player) return { error: 'You’re not in this one.' };
       if (!RPS[m]) return { error: 'Rock, paper, or scissors?' };
       return rpsPick(p, s, me, m, now);
@@ -530,7 +553,8 @@ export function move(game, { pub, secret = {}, me, move: mv, balance = 0, now = 
     const ttt = game === 'tictactoe';
     const markOf = (n) => (ttt ? (n === p.a ? 'X' : 'O') : n === p.a ? 'R' : 'Y');
     const other = me === p.a ? p.b : p.a;
-    if (m === 'peek') return nothing;
+    // Left for good: whoever's turn it was loses (the other player could have claimed it).
+    if (m === 'peek') return now - p.lastAt >= TIMES.abandoned ? end(p.turn === p.a ? p.b : p.a, 'timeout') : nothing;
     if (!player) return { error: 'You’re not playing this one.' };
     if (m === 'resign') return end(other, 'resigned');
     if (m === 'claim') {
@@ -615,7 +639,7 @@ export function move(game, { pub, secret = {}, me, move: mv, balance = 0, now = 
     const reveal = (winner) => {
       Object.assign(p, { status: 'done', answer: s.answer, winner: winner || '' });
       return out(
-        winner ? [{ name: winner, delta: p.prize, entry: { icon: ICON.trivia, label: `Trivia: right answer (+${p.prize})` } }] : [],
+        winner ? [{ name: winner, delta: p.prize, free: true, entry: { icon: ICON.trivia, label: 'Trivia: right answer' } }] : [],
       );
     };
     if (m === 'peek') return now >= p.endsAt ? reveal('') : nothing;
@@ -636,10 +660,10 @@ export function move(game, { pub, secret = {}, me, move: mv, balance = 0, now = 
       if (won) {
         for (const [name, n] of Object.entries(found)) {
           const amount = 2 * n + (name === solver ? 5 : 0);
-          money.push({ name, delta: amount, entry: { icon: ICON.hangman, label: `Hangman: ${word} (+${amount})` } });
+          money.push({ name, delta: amount, free: true, entry: { icon: ICON.hangman, label: `Hangman: ${word}` } });
         }
         if (solver && !found[solver])
-          money.push({ name: solver, delta: 5, entry: { icon: ICON.hangman, label: `Hangman: solved ${word} (+5)` } });
+          money.push({ name: solver, delta: 5, free: true, entry: { icon: ICON.hangman, label: `Hangman: solved ${word}` } });
       }
       Object.assign(p, { status: 'done', won, word, solver: solver || '' });
       return out(money);
@@ -685,7 +709,8 @@ export function move(game, { pub, secret = {}, me, move: mv, balance = 0, now = 
               {
                 name: results[0].name,
                 delta: prize,
-                entry: { icon: ICON.typerace, label: `Type race: 1st of ${results.length} (+${prize})` },
+                free: true,
+                entry: { icon: ICON.typerace, label: `Type race: 1st of ${results.length}` },
               },
             ]
           : [],

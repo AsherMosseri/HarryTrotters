@@ -72,7 +72,7 @@ import { dayOf, hoursOn, logId, missingLogDay } from '../labLog.js';
 import { OrderTracker, OrdersDialog, orderActive } from './AdOrders.jsx';
 import { setServerSkew } from '../serverTime.js';
 import { AdBlockWall, GameDialog, PrizeWheel, VideoAd } from './AdGames.jsx';
-import { coinSettings, wallet } from '../coins.js';
+import { coinSettings, coinsByName, wallet } from '../coins.js';
 
 // Versions were renumbered once (2.0 became 1.9, 2.1 became 2.0, and so
 // on). Move this device's "last seen" version along so What's new doesn't
@@ -532,7 +532,11 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
   const allTasks = useMemo(
     () =>
       rawTasks &&
-      rawTasks.map((t) => (t.assignees?.some((n) => rename(n) !== n) ? { ...t, assignees: [...new Set(t.assignees.map(rename))] } : t)),
+      rawTasks.map((t) =>
+        t.assignees?.some((n) => rename(n) !== n) || (t.createdBy && rename(t.createdBy) !== t.createdBy)
+          ? { ...t, assignees: [...new Set((t.assignees || []).map(rename))], ...(t.createdBy && { createdBy: rename(t.createdBy) }) }
+          : t,
+      ),
     [rawTasks, rename],
   );
   const tasks = useMemo(() => allTasks && allTasks.filter((t) => !t.deletedAt), [allTasks]);
@@ -935,7 +939,12 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
       submitAd: (data) => store.submitAd(data, actor).catch(fail),
       placeAdOrder: (plan) => store.addAdOrder(plan, actor),
       deleteAdOrder: (id) => store.deleteAdOrder(id).catch(fail),
-      addCoins: (tx) => store.addCoinTx(tx).catch(fail),
+      // true once it's saved (the rules can refuse it: coins off, a bad price).
+      addCoins: (tx) =>
+        store.addCoinTx(tx).then(
+          () => true,
+          (e) => (fail(e), false),
+        ),
       undoCoins: (tx) => store.deleteCoinTx(tx.id).catch(fail),
       withdrawAd: (sub) => store.updateAdSubmission(sub.id, { status: 'withdrawn' }).catch(fail),
       reviewAd: (sub, patch) => store.updateAdSubmission(sub.id, patch).catch(fail),
@@ -985,7 +994,8 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
       wallet: (name) => cmdData.current.wallet(name),
       richest: () => cmdData.current.richest(),
       lottery: () => cmdData.current.lottery,
-      gift: (to, amount, note) => store.addCoinTx({ type: 'gift', from: actor.name, to, amount, note: note || '', at: Date.now() }),
+      // Gifts and ad prizes go through the play function, which checks the balance and today's limits.
+      gift: (to, amount, note) => api.play({ action: 'gift', to, amount, note: note || '' }),
       whois: (name) => cmdData.current.whois(name),
       // For the team commands (/task, /shift, /match…).
       team: () => cmdData.current.team,
@@ -1337,9 +1347,19 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
   useEffect(() => store.subscribeBank(setBank), [store]);
   const [lottery, setLottery] = useState(null);
   useEffect(() => store.subscribeLottery(setLottery), [store]);
+  // Under everyone's current name (shifts, the ledger, and banks keep the
+  // name they were saved with), and counted up to this minute, so time on a
+  // running shift keeps adding up.
+  const coinMinute = Math.floor(now / 60000) * 60000;
   const coinData = useMemo(
-    () => ({ tasks: tasks || [], shifts, adStats, ledger, bank, cfg: coinCfg }),
-    [tasks, shifts, adStats, ledger, bank, coinCfg],
+    () => ({
+      tasks: tasks || [],
+      ...coinsByName({ shifts, ledger, bank: Object.values(bank) }, rename),
+      adStats,
+      cfg: coinCfg,
+      now: coinMinute,
+    }),
+    [tasks, shifts, adStats, ledger, bank, coinCfg, rename, coinMinute],
   );
   const walletOf = useCallback((name) => wallet(name, { ...coinData, owner: name === REQUESTS_TO }), [coinData]);
   const myWallet = useMemo(() => walletOf(actor.name), [walletOf, actor.name]);
@@ -1363,7 +1383,8 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
     },
     wallet: (name) => {
       const w = walletOf(name);
-      return { balance: w.balance, earned: w.earned, casino: bank[name]?.net || 0, stats: bank[name]?.stats || {} };
+      const b = coinData.bank[name];
+      return { balance: w.balance, earned: w.earned, casino: b?.net || 0, stats: b?.stats || {} };
     },
     richest: () =>
       roster
@@ -1412,9 +1433,14 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
     () => ({
       balance: myWallet.balance,
       cfg: coinCfg,
-      // Never more than you have (the ledger can't check this itself).
-      spend: (tx) => (tx.amount > myWallet.balance ? Promise.resolve() : api.addCoins({ type: 'spend', person: actor.name, ...tx })),
-      prize: (tx) => api.addCoins({ type: 'prize', person: actor.name, ...tx }),
+      // Never more than you have (the ledger can't check this itself). True once it's paid.
+      spend: (tx) => (tx.amount > myWallet.balance ? Promise.resolve(false) : api.addCoins({ type: 'spend', person: actor.name, ...tx })),
+      // The prize as paid (the server may pay less, or nothing), or null.
+      prize: (tx) =>
+        api.play({ action: 'prize', ...tx }).then((r) => {
+          if (r?.note) setToast({ text: r.note.title });
+          return r?.entry || null;
+        }),
     }),
     [myWallet.balance, coinCfg, api, actor.name],
   );
@@ -1452,7 +1478,19 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
     () => (controls.isOn('ads') ? settings : { ...settings, ads: { ...(settings.ads || {}), paused: true } }),
     [settings, controls],
   );
-  const ads = useAdsEngine({ settings: adSettings, actor, view, shifts, submissions: adSubs, ledger, coins, viewer, competitionDate, api });
+  const ads = useAdsEngine({
+    settings: adSettings,
+    actor,
+    view,
+    shifts,
+    submissions: adSubs,
+    ledger: coinData.ledger,
+    // Coins switched off (Controls): no prizes, skips, or paying to remove ads.
+    coins: controls.isOn('coins') ? coins : null,
+    viewer,
+    competitionDate,
+    api,
+  });
   botHook.current = ads.onChatSent;
   const inboxButton = (
     <Inbox
@@ -2195,7 +2233,12 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
           {ads.game && <GameDialog ad={ads.game} capLeft={ads.gameCapLeft} onPrize={ads.winGame} onClose={ads.closeGame} />}
           {ads.wheel && <PrizeWheel onWin={ads.winWheel} onClose={ads.closeWheel} />}
           {ads.blockWall && (
-            <AdBlockWall balance={myWallet.balance} onPay={ads.payBlock} onWatch={ads.watchBlock} onClose={ads.closeBlock} />
+            <AdBlockWall
+              balance={myWallet.balance}
+              onPay={controls.isOn('coins') ? ads.payBlock : null}
+              onWatch={ads.watchBlock}
+              onClose={ads.closeBlock}
+            />
           )}
           {coinsOpen && (
             <CoinsDialog
@@ -2204,7 +2247,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
               roster={roster}
               data={coinData}
               cfg={coinCfg}
-              onGift={(g) => (g.amount <= myWallet.balance ? api.addCoins({ type: 'gift', from: actor.name, ...g }) : Promise.resolve())}
+              onGift={(g) => api.play({ action: 'gift', ...g })}
               onClose={() => setCoinsOpen(false)}
             />
           )}

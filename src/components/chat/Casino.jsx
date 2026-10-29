@@ -240,7 +240,7 @@ function Mines({ c, mine, act }) {
       {playing && mine && !g.open.length && <div className="muted small">Tap a tile. Avoid the bombs.</div>}
       {!playing && (
         <>
-          <b>{c.status === 'boom' ? '💥 Boom.' : `Cashed out at ${g.multiplier}×`}</b>
+          <b>{c.status === 'boom' ? '💥 Boom.' : c.status === 'refunded' ? 'Left alone: bet back.' : `Cashed out at ${g.multiplier}×`}</b>
           <Outcome c={c} />
         </>
       )}
@@ -280,7 +280,15 @@ function HighLow({ c, mine, act }) {
         </div>
       ) : (
         <>
-          {!playing && <b>{c.status === 'lost' ? `Wrong: it was ${HL_NAMES[g.card]}.` : `Cashed out at ${g.multiplier}×`}</b>}
+          {!playing && (
+            <b>
+              {c.status === 'lost'
+                ? `Wrong: it was ${HL_NAMES[g.card]}.`
+                : c.status === 'refunded'
+                  ? 'Left alone: bet back.'
+                  : `Cashed out at ${g.multiplier}×`}
+            </b>
+          )}
           <Outcome c={c} />
         </>
       )}

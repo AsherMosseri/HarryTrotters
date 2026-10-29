@@ -105,6 +105,7 @@ function Result({ g, Name }) {
     cancelled: 'Cancelled.',
     expired: 'Nobody accepted in time.',
     nobody: 'Nobody shot. Bets back.',
+    nopick: 'Nobody picked in time. Bets back.',
   }[g.how];
   if (text) return <div className="muted small arc-result">{text}</div>;
   if (!g.winner) return <div className="arc-result push">🤝 Tie{g.bet ? ': bets back' : ''}</div>;
@@ -121,6 +122,8 @@ function Rps({ g, me, act, Name, now }) {
   const player = me === g.a || me === g.b;
   const picked = (g.picked || []).includes(me);
   const canPick = isLive(g.status) && player && !picked;
+  // Picks close TIMES.turn after the last one (the server settles it then).
+  const closesAt = g.status === 'playing' ? (g.lastAt || 0) + TIMES.turn : 0;
   return (
     <div className="arc-rps">
       <Versus g={g} Name={Name} />
@@ -150,7 +153,7 @@ function Rps({ g, me, act, Name, now }) {
           ))}
         </div>
       )}
-      {picked && isLive(g.status) && <div className="muted small">You picked. Waiting…</div>}
+      {picked && isLive(g.status) && <div className="muted small">You picked. Waiting… (picks close in {clock(closesAt - now)})</div>}
       {g.status === 'open' && <Invite g={g} me={me} act={act} game="rps" now={now} />}
       <Result g={g} Name={Name} />
     </div>
@@ -597,7 +600,13 @@ export function ArcadeBody({ m, me, Name, onMove }) {
   const at = {
     open: c.name === 'typerace' ? g.startAt : c.name === 'heist' ? g.endsAt : g.expiresAt,
     playing:
-      c.name === 'typerace' || c.name === 'trivia' ? g.endsAt : c.name === 'duel' && g.b !== BOT ? (g.drawAt || 0) + TIMES.duelIdle : 0,
+      c.name === 'typerace' || c.name === 'trivia'
+        ? g.endsAt
+        : c.name === 'duel' && g.b !== BOT
+          ? (g.drawAt || 0) + TIMES.duelIdle
+          : c.name === 'rps'
+            ? (g.lastAt || 0) + TIMES.turn
+            : 0,
   }[c.status];
   usePeekAt(at, live, act);
   const props = { g, me, act, Name, now };

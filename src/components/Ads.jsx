@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { ADS } from '../ads.js';
 import { STATUSES } from '../config.js';
 import { todayISO } from '../milestones.js';
-import { adFreeUntil, prizesToday } from '../coins.js';
+import { adFreeUntil, prizesToday, teamDay, teamMidnight } from '../coins.js';
 import { GAME_ADS } from './AdGames.jsx';
 import { PACKS, packOn } from '../adPacks.js';
 import { TARGETS, targetedAds } from '../adTargets.js';
@@ -315,7 +315,7 @@ export function useAdsEngine({ settings, actor, view, shifts, submissions, ledge
   const wheelShown = useRef(false);
   const spunToday = prizesToday(actor.name, ledger, 'wheel').length > 0;
   useEffect(() => {
-    if (!on || !cfg.wheel.on || spunToday || wheelShown.current) return;
+    if (!on || !cfg.wheel.on || !coins || spunToday || wheelShown.current) return;
     // Wait until nothing else is open, so it never interrupts.
     let t;
     const tryShow = () => {
@@ -327,16 +327,13 @@ export function useAdsEngine({ settings, actor, view, shifts, submissions, ledge
     };
     t = setTimeout(tryShow, 3000);
     return () => clearTimeout(t);
-  }, [on, cfg.wheel.on, spunToday]);
-  const winWheel = (seg) => {
-    if (prizesToday(actor.name, ledger, 'wheel').length) return Promise.resolve();
-    if (seg.hour) return coins.prize({ what: 'wheel', amount: 0, label: 'Prize wheel: 1 hour with no ads', until: Date.now() + 3600000 });
-    return coins.prize({ what: 'wheel', amount: seg.coins, label: seg.coins ? `Prize wheel: +${seg.coins}` : 'Prize wheel: nothing' });
-  };
+  }, [on, cfg.wheel.on, coins, spunToday]);
+  // The server checks it's the first spin today and pays it.
+  const winWheel = (seg) => (coins ? coins.prize({ what: 'wheel', amount: seg.coins, hour: !!seg.hour }) : Promise.resolve(null));
 
   // Playable ads: small prizes, up to cfg.games.cap a day.
   const [game, setGame] = useState(null);
-  const gameCapLeft = Math.max(0, cfg.games.cap - prizesToday(actor.name, ledger, 'game').reduce((t, x) => t + x.amount, 0));
+  const gameCapLeft = coins ? Math.max(0, cfg.games.cap - prizesToday(actor.name, ledger, 'game').reduce((t, x) => t + x.amount, 0)) : 0;
 
   // Takeover day: one sponsor for the whole day ("random" picks a new one each day).
   const everyAd = useMemo(
@@ -456,16 +453,19 @@ export function useAdsEngine({ settings, actor, view, shifts, submissions, ledge
   );
   // Remove ads, paid for in Jackson coins. The purchase is in the ledger, so
   // it works on every device the person uses.
-  const buyRemoval = (choice) => {
-    const until = choice === 'today' ? new Date().setHours(23, 59, 59, 999) : Date.now() + (choice === 'week' ? 7 * 24 : 1) * 3600000;
+  // True once it's paid; the coupon is used up only then.
+  const buyRemoval = async (choice) => {
+    if (!coins) return false;
+    const until = choice === 'today' ? teamMidnight(teamDay(Date.now() + 86400000)) - 1 : Date.now() + (choice === 'week' ? 7 * 24 : 1) * 3600000;
     const price = couponPrice(coins.cfg.prices[choice], bestCoupon);
-    if (bestCoupon) saveCoupons(coupons.filter((c) => c.id !== bestCoupon.id));
-    return coins.spend({
+    const paid = await coins.spend({
       what: `remove-${choice}`,
       amount: price,
       label: `Removed ads ${HOW_LONG[choice]}${bestCoupon ? ` (${bestCoupon.pct}% coupon)` : ''}`,
       until,
     });
+    if (paid && bestCoupon) saveCoupons(coupons.filter((c) => c.id !== bestCoupon.id));
+    return paid;
   };
   const setPreview = (mins) => {
     const until = mins ? Date.now() + mins * 60000 : 0;
@@ -483,15 +483,14 @@ export function useAdsEngine({ settings, actor, view, shifts, submissions, ledge
     game,
     closeGame: () => setGame(null),
     gameCapLeft,
-    winGame: (amount, label) => coins.prize({ what: 'game', amount, label }),
+    winGame: (amount, label) => (coins ? coins.prize({ what: 'game', amount, label }) : Promise.resolve(null)),
     wheel,
     closeWheel: () => setWheel(false),
     winWheel,
     blockWall,
     closeBlock: () => setBlockWall(false),
     payBlock: async () => {
-      await coins.spend({ what: 'adblock', amount: 1, label: 'Got past the ad blocker wall' });
-      setBlockWall(false);
+      if (coins && (await coins.spend({ what: 'adblock', amount: 1, label: 'Got past the ad blocker wall' }))) setBlockWall(false);
     },
     watchBlock: () => {
       setBlockWall(false);
@@ -675,8 +674,8 @@ function AdClose({ onClose, label = 'Close ad' }) {
 }
 
 function RemoveLink() {
-  const { cfg, remove } = useAds();
-  if (!cfg.remove.on) return null;
+  const { cfg, remove, coins } = useAds();
+  if (!cfg.remove.on || !coins) return null;
   return (
     <button
       className="ad-remove"
@@ -886,6 +885,7 @@ export function FullScreenAd({ ad, onClose }) {
   const { cfg, cta, level, track, coins } = useAds();
   const skip = cfg.full.skip;
   const skipPrice = coins?.cfg.prices.skip ?? 0;
+  const [paying, setPaying] = useState(false);
   const [left, setLeft] = useState(skip);
   useEffect(() => {
     track(ad, 'view');
@@ -922,9 +922,11 @@ export function FullScreenAd({ ad, onClose }) {
           {left > 0 && coins && coins.balance >= skipPrice && (
             <button
               className="ad-skip ad-skip-pay"
+              disabled={paying}
               onClick={async () => {
-                await coins.spend({ what: 'skip', amount: skipPrice, label: `Skipped a ${ad.brand} ad` });
-                onClose();
+                setPaying(true);
+                if (await coins.spend({ what: 'skip', amount: skipPrice, label: `Skipped a ${ad.brand} ad` })) onClose();
+                else setPaying(false);
               }}
             >
               ⏭ Skip now for <Coin size={13} /> {skipPrice}
@@ -1101,8 +1103,8 @@ export function RemoveAdsDialog({ prices, balance, coupon, onBuy, onClose }) {
                     onClick={async () => {
                       setBusy(true);
                       setPaid(couponPrice(prices[k], coupon));
-                      await onBuy(k);
-                      setDone(k);
+                      if (await onBuy(k)) setDone(k);
+                      else setBusy(false);
                     }}
                   >
                     <span>{HOW_LONG[k][4].toUpperCase() + HOW_LONG[k].slice(5)}</span>
