@@ -510,3 +510,4 @@ button.sb-head-row { width: 100%; border: 0; background: none; color: var(--mute
 .sidebar.rail .sb-rail-tools .shift-pill { padding: 4px 5px; font-size: 11px; }
 .shift-pill-label { display: none; }
 .sb-shift-row .shift-pill-label { display: inline; flex: 1; text-align: left; font-weight: 600; }
+.sb-row .deco, .sb-row .avatar-wrap { flex: none; }

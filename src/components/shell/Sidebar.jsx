@@ -193,7 +193,7 @@ export default function Sidebar({
                   return (
                     <Row
                       key={c.key}
-                      icon={others.length === 1 ? <Avatar name={others[0]} size={20} showOnline /> : <Icon name="team" />}
+                      icon={others.length === 1 ? <Avatar name={others[0]} size={24} showOnline /> : <Icon name="team" />}
                       label={c.short}
                       active={page === 'chat' && currentConv?.key === c.key}
                       count={u?.count || 0}

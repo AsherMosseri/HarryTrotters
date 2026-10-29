@@ -64,16 +64,16 @@ export function Avatar({ name, size = 26, photo, showOnline = false, decoration,
       </CustomDecoration>
     );
   } else if (decorationById[deco]?.anim) {
-    // Animated decorations; tiny avatars get just a matching ring.
+    // Animated decorations; tiny avatars (under 24px) get just a matching ring.
     pic = (
       <span className={`deco deco-anim deco-${deco}`} style={{ width: size, height: size, '--s': `${size}px` }}>
-        {size >= 28 && <DecorationBehind id={deco} />}
+        {size >= 24 && <DecorationBehind id={deco} />}
         {pic}
-        {size >= 28 && <AnimatedDecoration id={deco} />}
+        {size >= 24 && <AnimatedDecoration id={deco} />}
       </span>
     );
   } else if (deco && deco !== 'custom' && decorationById[deco]) {
-    const badge = size >= 28 && decorationById[deco].badge;
+    const badge = size >= 24 && decorationById[deco].badge;
     pic = (
       <span className={`deco deco-${deco}`} style={{ width: size, height: size, '--s': `${size}px` }}>
         {pic}
