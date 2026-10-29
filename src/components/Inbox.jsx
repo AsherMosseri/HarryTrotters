@@ -75,6 +75,12 @@ function PushRow({ status, busy, onEnable, onDisable }) {
           </span>
         </div>
       );
+    case 'next':
+      return (
+        <div className="push-row">
+          <span>Notifications come to the team’s app, not this test copy.</span>
+        </div>
+      );
     case 'demo':
       return (
         <div className="push-row">

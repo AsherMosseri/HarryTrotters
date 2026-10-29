@@ -4,6 +4,7 @@ import { REQUESTS_TO, TEAM_NAME, isManagerName, makeRenamer } from './config.js'
 import { InstallScreen, JoinScreen, LoadingScreen } from './components/Gate.jsx';
 import { installNeeded } from './data/push.js';
 import { isDemo } from './data/store.js';
+import { NEXT } from './next.js';
 
 // Checked once: the Home Screen app is a separate launch, so this never changes mid-visit.
 const install = isDemo ? null : installNeeded();
@@ -69,7 +70,7 @@ export default function App() {
   );
 
   useEffect(() => {
-    document.title = `${TEAM_NAME} Task Board`;
+    document.title = `${TEAM_NAME} Task Board${NEXT ? ' (Next)' : ''}`;
   }, []);
   // Asher can shut the app down for everyone else.
   const shutdown = useShutdown(store, !!actor);
@@ -97,6 +98,11 @@ export default function App() {
         }}
       />
     );
+  // The redesign's test copy (next.js) is Asher's only.
+  if (NEXT && !isDemo && !owner) {
+    location.replace('../');
+    return <LoadingScreen />;
+  }
   const exitPreview = () => setPreview(null);
   // Shut down for everyone but Asher, or only for the people he picked.
   const shutFor = (name) => shutdown?.on && (!shutdown.people?.length || shutdown.people.includes(name));

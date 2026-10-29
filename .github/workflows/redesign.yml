@@ -1,0 +1,18 @@
+name: Deploy the redesign test copy
+
+# The site is published from main (deploy.yml), which also builds the
+# redesign branch into …/next/. A push to redesign just starts that deploy.
+on:
+  push:
+    branches: [redesign]
+
+permissions:
+  actions: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - run: gh workflow run deploy.yml --ref main --repo "$GITHUB_REPOSITORY"
+        env:
+          GH_TOKEN: ${{ github.token }}

@@ -40,6 +40,7 @@ import {
   itemId,
   personId,
 } from './diff.js';
+import { NEXT } from '../next.js';
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -217,6 +218,7 @@ export const firebaseStore = {
   // Phone notifications on this device: 'on', 'off', 'blocked', 'home-screen'
   // (iPhone/iPad: only works from the Home Screen app), or 'unsupported'.
   pushStatus() {
+    if (NEXT) return 'next';
     const support = pushSupport();
     if (support !== 'ok') return support;
     if (Notification.permission === 'denied') return 'blocked';
@@ -224,6 +226,7 @@ export const firebaseStore = {
   },
   // Call straight from a tap: Safari only shows the permission prompt then.
   async enablePush(actor) {
+    if (NEXT) return 'next';
     const permission = await Notification.requestPermission();
     if (permission !== 'granted') return this.pushStatus();
     const token = await pushToken();

@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { execSync } from 'node:child_process';
+import { copyFileSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { CHANGELOG } from './src/changelog.js';
 
 // Each build has two ids, baked into the app and published in version.json
@@ -43,9 +44,30 @@ const versionFile = {
   },
 };
 
+// The redesign's test copy (src/next.js) gets its own name and orange icons,
+// so it sits on the Home Screen as a second app.
+const NEXT = process.env.VITE_NEXT === '1';
+let outDir = 'dist';
+const nextLook = {
+  name: 'next-look',
+  apply: 'build',
+  configResolved: (config) => (outDir = config.build.outDir),
+  transformIndexHtml: (html) =>
+    NEXT ? html.replace('content="32313 Tasks"', 'content="32313 Next"').replace('Task Board</title>', 'Task Board (Next)</title>') : html,
+  closeBundle() {
+    if (!NEXT) return;
+    for (const f of readdirSync('next-icons')) copyFileSync(`next-icons/${f}`, `${outDir}/${f}`);
+    const manifest = JSON.parse(readFileSync(`${outDir}/manifest.webmanifest`, 'utf8'));
+    writeFileSync(
+      `${outDir}/manifest.webmanifest`,
+      JSON.stringify({ ...manifest, name: 'FTC 32313 Next', short_name: '32313 Next', theme_color: '#ea7a3c' }, null, 2),
+    );
+  },
+};
+
 // Relative base so the build works at any GitHub Pages path.
 export default defineConfig({
-  plugins: [react(), versionFile],
+  plugins: [react(), versionFile, nextLook],
   base: './',
   define: { __BUILD_ID__: JSON.stringify(BUILD_ID), __CODE_ID__: JSON.stringify(CODE_ID) },
   build: { chunkSizeWarningLimit: 900 },
