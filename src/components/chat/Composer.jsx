@@ -380,7 +380,7 @@ export default function Composer({
       {(replyTo || editing) && (
         <div className="composer-context">
           {editing ? (
-            <span>✏️ Editing your message</span>
+            <span>Editing your message</span>
           ) : (
             <span>
               ↩ Replying to <b>{replyTo.by.split(' ')[0]}</b>: {replyTo.text?.slice(0, 80) || 'a photo'}
@@ -427,7 +427,7 @@ export default function Composer({
       )}
       {upload && (
         <div className="upload-bar">
-          📎 Uploading {upload.name}… {Math.round(upload.progress * 100)}%
+          Uploading {upload.name}… {Math.round(upload.progress * 100)}%
           <span className="upload-track">
             <span style={{ width: `${upload.progress * 100}%` }} />
           </span>
@@ -468,7 +468,7 @@ export default function Composer({
                 )}
                 {o.type === 'everyone' && (
                   <>
-                    <span className="suggest-icon">📢</span> @everyone <span className="muted small">notifies the whole team</span>
+                    <span className="suggest-icon">@</span> @everyone <span className="muted small">notifies the whole team</span>
                   </>
                 )}
                 {o.type === 'role' && (
@@ -542,7 +542,7 @@ export default function Composer({
                     <Icon name="camera" /> Photo
                   </button>
                 )}
-                {feat('gifs') && <button onClick={() => setPanel('gif')}>🎞 GIF</button>}
+                {feat('gifs') && <button onClick={() => setPanel('gif')}>GIF</button>}
                 {feat('polls') && (
                   <button onClick={() => setPanel('poll')}>
                     <Icon name="poll" /> Poll

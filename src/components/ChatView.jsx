@@ -54,7 +54,9 @@ function ConvButton({ conv, active, unread, onClick, onSettings, actor }) {
           others.length === 1 ? (
             <Avatar name={others[0]} size={24} showOnline />
           ) : (
-            <span className="group-dm-icon">👥</span>
+            <span className="group-dm-icon">
+              <Icon name="team" size={18} />
+            </span>
           )
         ) : (
           <ChannelIcon conv={conv} />
@@ -62,14 +64,14 @@ function ConvButton({ conv, active, unread, onClick, onSettings, actor }) {
         <span className="grow conv-name">{conv.kind === 'dm' ? conv.short : conv.name}</span>
         {unread?.muted && (
           <span className="muted tiny" title="Muted">
-            🔕
+            <Icon name="bellOff" size={14} />
           </span>
         )}
         {unread?.count > 0 && !unread.muted && <span className={`unread${unread.mentions ? ' mention' : ''}`}>{unread.count}</span>}
       </button>
       {onSettings && (
         <button className="conv-gear" onClick={onSettings} title={`#${conv.name} settings`} aria-label={`#${conv.name} settings`}>
-          ⚙
+          <Icon name="more" size={16} />
         </button>
       )}
     </div>
@@ -424,7 +426,7 @@ export default function ChatView({
                 {conv.people.length === 2 ? (
                   <Avatar name={conv.people.find((n) => n !== actor.name) || conv.people[0]} size={24} showOnline />
                 ) : (
-                  '👥'
+                  <Icon name="team" size={20} />
                 )}{' '}
                 {conv.label}
               </h2>
@@ -438,7 +440,7 @@ export default function ChatView({
               {conv.kind === 'dm'
                 ? conv.mine
                   ? 'Direct message'
-                  : '👁 Viewing as team management (only the people in it can post)'
+                  : 'Viewing as team management (only the people in it can post)'
                 : conv.topic ||
                   (conv.announce ? 'Only team management posts here' : conv.subteam ? `${conv.subteam} subteam` : 'The whole team')}
             </span>
@@ -614,8 +616,8 @@ export default function ChatView({
         {!canPost ? (
           <div className="composer read-only">
             {conv.kind === 'dm'
-              ? '👁 You can read this DM because you’re on team management.'
-              : '📣 Only team management can post announcements. You can still react.'}
+              ? 'You can read this DM because you’re on team management.'
+              : 'Only team management can post announcements. You can still react.'}
           </div>
         ) : (
           <Composer

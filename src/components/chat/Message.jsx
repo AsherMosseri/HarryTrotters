@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Icon } from '../shell/icons.jsx';
 import { personId } from '../../data/diff.js';
 import { CommandCard, Trotbot } from './Commands.jsx';
 import { AutoTextarea, Avatar, DisplayName, StatusDot, usePeople } from '../common.jsx';
@@ -424,16 +425,15 @@ export default function Message({
             )}{' '}
             <span className="muted tiny">{timeOf(m.at)}</span>
             {m.pinned && feat('pins') && (
-              <span className="muted tiny" title={`Pinned by ${m.pinnedBy}`}>
-                {' '}
-                📌
+              <span className="msg-pinned" title={`Pinned by ${m.pinnedBy}`}>
+                <Icon name="pin" size={13} /> Pinned
               </span>
             )}
           </div>
         )}
         {m.replyTo && feat('replies') && (
           <button className="msg-reply-quote" onClick={() => onJump(m.replyTo.id)}>
-            ↩ <b>{m.replyTo.by?.split(' ')[0]}</b> {m.replyTo.text || 'a photo'}
+            <Icon name="reply" size={14} /> <b>{m.replyTo.by?.split(' ')[0]}</b> {m.replyTo.text || 'a photo'}
           </button>
         )}
         {m.deleted ? (
@@ -569,7 +569,7 @@ export default function Message({
                 </button>
               ))}
               <button onClick={() => setPicker((p) => !p)} aria-label="More reactions" title="More reactions">
-                ☺+
+                <Icon name="smilePlus" size={18} />
               </button>
               <button
                 onClick={() => setPicker((p) => (p === 'super' ? false : 'super'))}
@@ -581,33 +581,43 @@ export default function Message({
             </>
           )}
           {canPost && feat('replies') && (
-            <button onClick={() => onReply(m)} title="Reply">
-              ↩
+            <button onClick={() => onReply(m)} title="Reply" aria-label="Reply">
+              <Icon name="reply" size={18} />
             </button>
           )}
           {feat('pins') && (
-            <button onClick={() => api.pin(conv, m.id, !m.pinned)} title={m.pinned ? 'Unpin' : 'Pin to this channel'}>
-              {m.pinned ? '📍' : '📌'}
+            <button
+              className={m.pinned ? 'on' : ''}
+              onClick={() => api.pin(conv, m.id, !m.pinned)}
+              title={m.pinned ? 'Unpin' : 'Pin to this channel'}
+              aria-label={m.pinned ? 'Unpin' : 'Pin'}
+            >
+              <Icon name="pin" size={18} />
             </button>
           )}
           {feat('makeTask') && (
             <button onClick={() => onMakeTask(m)} title="Make a task from this message">
-              ＋Task
+              <Icon name="tasks" size={18} /> Task
             </button>
           )}
           {mine && feat('editing') && !m.poll && !m.cmd && (
-            <button onClick={() => onEdit(m)} title="Edit">
-              ✏️
+            <button onClick={() => onEdit(m)} title="Edit" aria-label="Edit">
+              <Icon name="edit" size={18} />
             </button>
           )}
           {isManager && reactions.length > 0 && (
-            <button onClick={() => setRemoving(true)} title="Remove reactions">
-              🚫☺
+            <button onClick={() => setRemoving(true)} title="Remove reactions" aria-label="Remove reactions">
+              <Icon name="smileOff" size={18} />
             </button>
           )}
           {(mine || isManager) && (
-            <button className="danger-text" onClick={() => confirm('Delete this message?') && api.deleteMessage(conv, m)} title="Delete">
-              🗑
+            <button
+              className="danger-text"
+              onClick={() => confirm('Delete this message?') && api.deleteMessage(conv, m)}
+              title="Delete"
+              aria-label="Delete"
+            >
+              <Icon name="trash" size={18} />
             </button>
           )}
           {picker && feat('reactions') && (

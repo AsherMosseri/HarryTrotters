@@ -420,3 +420,24 @@ button.sb-head-row { width: 100%; border: 0; background: none; color: var(--mute
 .phone-shell .ms-header h1 { display: none; }
 .phone-shell .ms-header:not(:has(p)) > div:first-child { display: none; }
 .phone-shell .chat-mobile-bar .btn { gap: 4px; }
+
+/* ---------- chat messages ---------- */
+.msg:hover, .msg.selected { background: color-mix(in srgb, var(--text) 3.5%, var(--surface)); }
+.msg.mentions-me { background: color-mix(in srgb, var(--accent) 7%, var(--surface)); box-shadow: inset 2px 0 0 var(--accent); }
+.msg-head .name-btn { font-weight: 650; }
+.msg-pinned { display: inline-flex; align-items: center; gap: 3px; margin-left: 6px; font-size: 12px; color: var(--muted); }
+.msg-reply-quote { display: flex; align-items: center; gap: 5px; border-left: 0; background: none; border-radius: 0; padding: 0; margin: 0 0 2px; }
+.msg-reply-quote .icon { flex: none; }
+.reaction { border: 0; background: var(--surface-2); padding: 2px 8px; }
+.reaction.mine { background: color-mix(in srgb, var(--accent) 14%, var(--surface)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent); }
+.task-chip { border-color: var(--hairline); background: var(--surface); border-radius: 7px; font-weight: 500; }
+.msg-actions { border-color: var(--hairline); border-radius: 9px; box-shadow: 0 2px 10px rgb(0 0 0 / 8%); }
+.msg-actions > button { display: inline-flex; align-items: center; justify-content: center; gap: 4px; color: var(--muted); }
+.msg-actions > button:hover { color: var(--text); }
+.msg-actions > button.on { color: var(--accent); }
+.msg-actions > button.danger-text { color: var(--muted); }
+.msg-actions > button.danger-text:hover { color: var(--danger); }
+.chat-side-head h3 { font-size: 16px; font-weight: 700; }
+.composer .input, .composer textarea { border-radius: 10px; }
+.link-card { border-left-width: 1px; border-left-color: var(--border); border-radius: 10px; background: var(--surface); }
+.link-card-title { text-decoration: none; }

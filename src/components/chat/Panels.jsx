@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Icon } from '../shell/icons.jsx';
 import { SUBTEAMS, SUBTEAM_COLORS } from '../../config.js';
 import { activeStatus } from '../../people.js';
 import { Avatar, CloseIcon, DisplayName, Nameplate, Overlay, usePeople } from '../common.jsx';
@@ -48,9 +49,9 @@ export function MembersPanel({ names, onPerson, onClose }) {
   };
   return (
     <PanelShell title="Members" onClose={onClose}>
-      <h4>Online — {online.length}</h4>
+      <h4>Online · {online.length}</h4>
       {online.map(row)}
-      <h4>Offline — {offline.length}</h4>
+      <h4>Offline · {offline.length}</h4>
       {offline.map(row)}
     </PanelShell>
   );
@@ -61,9 +62,9 @@ export function PinsPanel({ conv, api, ctx, onJump, onClose, canUnpin }) {
   useEffect(() => api.subscribePins(conv.key, (list) => setPins(list.filter((m) => !m.deleted))), [api, conv.key]);
   const sorted = (pins || []).sort((a, b) => (b.pinnedAt || 0) - (a.pinnedAt || 0));
   return (
-    <PanelShell title={`📌 Pinned in ${conv.label}`} onClose={onClose}>
+    <PanelShell title={`Pinned in ${conv.label}`} onClose={onClose}>
       {pins === null && <p className="muted small">Loading…</p>}
-      {pins?.length === 0 && <p className="muted small">Nothing pinned yet. Tap a message, then 📌 to pin it here.</p>}
+      {pins?.length === 0 && <p className="muted small">Nothing pinned yet. Tap a message, then the pin button to pin it here.</p>}
       {sorted.map((m) => (
         <div key={m.id} className="side-msg">
           <div className="row gap-sm">
@@ -72,7 +73,7 @@ export function PinsPanel({ conv, api, ctx, onJump, onClose, canUnpin }) {
             <span className="muted tiny">{dateOf(m.at)}</span>
           </div>
           <div className="side-msg-text">
-            {m.poll ? `📊 ${m.poll.question}` : renderRich(m.text, ctx) || (m.photo ? '📷 Photo' : m.gif ? 'GIF' : '')}
+            {m.poll ? `Poll: ${m.poll.question}` : renderRich(m.text, ctx) || (m.photo ? 'Photo' : m.gif ? 'GIF' : '')}
           </div>
           <div className="row gap-sm">
             <button className="link-btn small" onClick={() => onJump(m.id)}>
@@ -137,7 +138,7 @@ export function SearchPanel({ convs, current, api, roster, onOpen, onClose }) {
   };
 
   return (
-    <PanelShell title="🔍 Search messages" onClose={onClose}>
+    <PanelShell title="Search messages" onClose={onClose}>
       <input className="input" autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search for words" />
       <div className="row gap-sm search-filters">
         <select className="input" value={from} onChange={(e) => setFrom(e.target.value)} aria-label="From">
@@ -164,7 +165,7 @@ export function SearchPanel({ convs, current, api, roster, onOpen, onClose }) {
               {m.conv.label} · {dateOf(m.at)} {timeOf(m.at)}
             </span>
           </div>
-          <div className="small">{m.poll ? `📊 ${m.poll.question}` : snippet(m.text)}</div>
+          <div className="small">{m.poll ? `Poll: ${m.poll.question}` : snippet(m.text)}</div>
         </button>
       ))}
       {data && <p className="muted tiny">Searches the newest 300 messages in each channel and DM.</p>}
@@ -352,7 +353,7 @@ export function ChannelIcon({ conv }) {
   if (conv.kind === 'dm') return null;
   return (
     <span className="hash" style={{ color: SUBTEAM_COLORS[conv.subteam] || 'var(--accent)' }}>
-      {conv.announce ? '📣' : '#'}
+      {conv.announce ? <Icon name="announce" size={20} /> : '#'}
     </span>
   );
 }
