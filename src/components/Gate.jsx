@@ -15,21 +15,32 @@ function Shell({ children }) {
   );
 }
 
+// The splash while the app starts (index.html shows the same one before the
+// code loads), or what went wrong.
 export function LoadingScreen({ error }) {
   return (
-    <Shell>
-      {error ? (
-        <>
-          <h1>Something went wrong</h1>
-          <p className="muted">{error}</p>
-          <button className="btn" onClick={() => location.reload()}>
-            Reload
-          </button>
-        </>
-      ) : (
-        <p className="muted">Loading…</p>
-      )}
-    </Shell>
+    <div className="gate splash" role={error ? 'alert' : 'status'} aria-label={error ? undefined : 'Loading'}>
+      <div className="splash-mark">
+        <span className="splash-ht" aria-hidden="true">
+          HT
+        </span>
+        <h1>{TEAM_NICKNAME}</h1>
+        <p>{TEAM_NAME}</p>
+        {error ? (
+          <div className="splash-error">
+            <b>Something went wrong</b>
+            <span>{error}</span>
+            <button className="btn primary" onClick={() => location.reload()}>
+              Reload
+            </button>
+          </div>
+        ) : (
+          <div className="splash-bar" aria-hidden="true">
+            <span />
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 

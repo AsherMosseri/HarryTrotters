@@ -41,7 +41,16 @@
          reload, and it keeps the first color it reads. It's the header's
          color, so it looks like part of the header and status bar. -->
     <div class="status-bar-band" aria-hidden="true"></div>
-    <div id="root"></div>
+    <div id="root">
+      <div class="gate splash" role="status" aria-label="Loading">
+        <div class="splash-mark">
+          <span class="splash-ht" aria-hidden="true">HT</span>
+          <h1>Harry Trotters</h1>
+          <p>FTC 32313</p>
+          <div class="splash-bar" aria-hidden="true"><span></span></div>
+        </div>
+      </div>
+    </div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
