@@ -339,6 +339,8 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
   }, []);
   // Tasks is one page with two layouts (board or table).
   const [tasksMode, setTasksMode] = useLocalStorage('tasks-mode', 'board');
+  // The #parts chat beside the Parts list can be hidden (remembered on this device).
+  const [partsChatOpen, setPartsChatOpen] = useLocalStorage('parts-chat-open', true);
   // Phones get a slim top bar, a bottom tab bar, and sheets instead of the header's buttons.
   const phone = useMedia('(max-width: 760px)');
   const showRobot = ROBOT_TAB_PEOPLE.includes(actor.name);
@@ -1847,11 +1849,30 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
                     onAddTask={(m) => setNewTask({ status: 'todo', milestoneId: m.id, subteam: m.subteam || '' })}
                   />
                 ) : view === 'parts' ? (
-                  <div className={`parts-layout${partsConv ? '' : ' no-chat'}`}>
-                    <PartsView parts={parts} tasks={tasks} api={api} onOpenTask={setOpenId} />
-                    {partsConv && (
+                  <div className={`parts-layout${partsConv && partsChatOpen ? '' : ' no-chat'}`}>
+                    <PartsView
+                      parts={parts}
+                      tasks={tasks}
+                      api={api}
+                      onOpenTask={setOpenId}
+                      chatToggle={
+                        partsConv &&
+                        !partsChatOpen && (
+                          <button className="btn" onClick={() => setPartsChatOpen(true)}>
+                            Show #{partsConv.name}
+                            {unread[partsConv.key]?.count > 0 && (
+                              <span className={`chat-toggle-count${unread[partsConv.key].mentions ? ' strong' : ''}`}>
+                                {unread[partsConv.key].count}
+                              </span>
+                            )}
+                          </button>
+                        )
+                      }
+                    />
+                    {partsConv && partsChatOpen && (
                       <ChatView
                         embedded
+                        onCollapse={() => setPartsChatOpen(false)}
                         convs={convs}
                         current={partsConv}
                         setCurrent={(key) => {

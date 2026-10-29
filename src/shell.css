@@ -359,3 +359,7 @@ button.sb-head-row { width: 100%; border: 0; background: none; color: var(--mute
 .rules { background: none; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); border-radius: 0; padding: 12px 0; }
 .version-chip { border: 0; border-radius: 8px; }
 .help-sections summary { font-weight: 600; }
+
+/* Parts: the #parts chat beside the list can be hidden. */
+.chat-toggle-count { min-width: 20px; padding: 0 6px; border-radius: 999px; background: var(--muted); color: var(--surface); font-size: 12px; font-weight: 700; text-align: center; }
+.chat-toggle-count.strong { background: var(--danger); color: #fff; }

@@ -100,6 +100,7 @@ export default function ChatView({
   // side panels, and a button to open it in the Chat tab.
   embedded = false,
   onOpenFull,
+  onCollapse,
   // The app's sidebar lists the channels (iPads and computers), and asks for
   // the new-message and channel dialogs through `ask`.
   noList = false,
@@ -446,6 +447,11 @@ export default function ChatView({
             {embedded && (
               <button className="btn small-btn" onClick={onOpenFull} title="Search, pins, and members are in the Chat tab">
                 Open in Chat ↗
+              </button>
+            )}
+            {embedded && onCollapse && (
+              <button className="btn small-btn" onClick={onCollapse} title="Hide the chat (the list gets the whole page)">
+                Hide
               </button>
             )}
             {!embedded && (

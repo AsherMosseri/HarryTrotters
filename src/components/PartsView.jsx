@@ -210,7 +210,7 @@ function PartDialog({ part, tasks, onClose, onSave, onDelete }) {
   );
 }
 
-export default function PartsView({ parts, tasks, api, onOpenTask }) {
+export default function PartsView({ parts, tasks, api, onOpenTask, chatToggle }) {
   const [filter, setFilter] = useState('');
   const [q, setQ] = useState('');
   const [editing, setEditing] = useState(null);
@@ -245,6 +245,7 @@ export default function PartsView({ parts, tasks, api, onOpenTask }) {
           </p>
         </div>
         <span className="spacer" />
+        {chatToggle}
         <button className="btn primary" onClick={() => setEditing({})}>
           <PlusIcon /> Add part
         </button>
