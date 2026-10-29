@@ -542,3 +542,10 @@ button.sb-head-row { width: 100%; border: 0; background: none; color: var(--mute
 .splash-error span { color: var(--muted); }
 .splash-error .btn { margin-top: 6px; min-width: 140px; justify-content: center; }
 @media (max-width: 760px) { .splash-mark h1 { font-size: 36px; } .splash-ht { font-size: 52px; } }
+
+/* Chat header: picture or icon, name, and topic on one centered line. */
+.chat-title { align-items: center; gap: 12px; }
+.chat-title h2 { gap: 10px; line-height: 1.2; }
+.chat-title h2 .hash { display: inline-flex; align-items: center; justify-content: center; width: 24px; line-height: 1; }
+.chat-title h2 .avatar-wrap, .chat-title h2 .deco, .chat-title h2 > .avatar, .chat-title h2 > .icon { flex: none; }
+.chat-topic { font-size: 14px; line-height: 1.2; padding-top: 2px; }
