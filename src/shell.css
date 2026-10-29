@@ -494,3 +494,19 @@ button.sb-head-row { width: 100%; border: 0; background: none; color: var(--mute
 .dialog.appearance .theme-menu { display: flex; flex-direction: column; gap: 12px; }
 .sidebar:not(.rail) .sb-foot { display: flex; align-items: center; gap: 2px; }
 .sidebar:not(.rail) .sb-foot .me-wrap { flex: 1; min-width: 0; }
+
+/* Sidebar top: the team name gets the room; while you're on a shift, the
+   timer is its own row under it. Pop-ups open toward the page, never off
+   the left edge. */
+.sb-top { flex-wrap: wrap; }
+.sb-team { flex: 1 1 auto; }
+.sb-shift-row { flex: 1 0 100%; padding: 4px 2px 2px; }
+.sb-shift-row .shift-wrap { display: block; }
+.sb-shift-row .shift-pill { width: 100%; justify-content: flex-start; padding: 7px 12px; font-size: 14px; border-radius: 9px; }
+.sidebar .shift-pop { left: 0; right: auto; }
+.sidebar .inbox-pop { left: auto; right: auto; }
+.sidebar .sb-top-tools .inbox-pop { left: -120px; }
+.sidebar.rail .shift-pop, .sidebar.rail .inbox-pop { left: 0; top: 0; transform: translateX(50px); }
+.sidebar.rail .sb-rail-tools .shift-pill { padding: 4px 5px; font-size: 11px; }
+.shift-pill-label { display: none; }
+.sb-shift-row .shift-pill-label { display: inline; flex: 1; text-align: left; font-weight: 600; }

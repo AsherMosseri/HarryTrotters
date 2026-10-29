@@ -1567,10 +1567,11 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
           dmsOn={controls.isOn('dms')}
           topRight={
             <>
-              {shiftButton}
+              {!myShift && shiftButton}
               {inboxButton}
             </>
           }
+          shiftRow={myShift && shiftButton}
           me={meChip}
           onLogo={() => controls.isOn('catParty') && setCat(true)}
           rail={sidebarRail}

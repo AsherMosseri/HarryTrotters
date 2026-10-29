@@ -114,6 +114,7 @@ export function ShiftButton({ shift, open, setOpen, myTasks, onStart, onUpdate, 
         title="Your shift"
       >
         <span className="shift-live" aria-hidden="true" />
+        <span className="shift-pill-label">On shift</span>
         {timer(now - shift.start)}
       </button>
       {open && (

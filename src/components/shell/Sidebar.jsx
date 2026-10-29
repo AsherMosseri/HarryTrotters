@@ -56,6 +56,7 @@ export default function Sidebar({
   actor,
   dmsOn,
   topRight,
+  shiftRow, // while you're on a shift: the timer, on its own row under the team name
   me,
   onLogo,
   rail, // folded to a narrow strip of icons (more room for the page)
@@ -75,7 +76,10 @@ export default function Sidebar({
             <Icon name="sidebar" size={20} />
           </button>
         </div>
-        <div className="sb-rail-tools">{topRight}</div>
+        <div className="sb-rail-tools">
+          {shiftRow}
+          {topRight}
+        </div>
         <nav className="sb-scroll" aria-label="Pages">
           {pages.map((id) => (
             <button
@@ -117,6 +121,7 @@ export default function Sidebar({
           </span>
         </button>
         <span className="sb-top-tools">{topRight}</span>
+        {shiftRow && <div className="sb-shift-row">{shiftRow}</div>}
       </div>
       <nav className="sb-scroll" aria-label="Pages">
         {GROUPS.map(([title, ids]) => {
