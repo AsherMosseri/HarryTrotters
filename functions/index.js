@@ -695,10 +695,11 @@ async function workContext(me, data) {
 
 // Multiplayer games pay several people at once: read every bank first (a
 // transaction reads before it writes), then apply each change in order.
+// Winnings from the free games (x.free) stop at arcade.FREE_DAILY a day.
 async function payOut(tx, money, banks, now) {
   const names = [...new Set(money.map((x) => x.name))];
   for (const n of names) if (!banks[n]) banks[n] = (await tx.get(bankRef(n))).data() || {};
-  for (const x of money) banks[x.name] = casino.bankAfter(banks[x.name], x.name, x.delta, x.entry, x.extra || {}, now);
+  for (const x of money) banks[x.name] = casino.bankAfter(banks[x.name], x.name, ...arcade.paid(x, banks[x.name], nyDay(now)), now);
   for (const n of names) tx.set(bankRef(n), banks[n]);
 }
 
@@ -711,6 +712,74 @@ function nextFriday(now = Date.now()) {
     if (new Date(`${day}T12:00:00Z`).getUTCDay() === 5 && at > now) return at;
   }
   return now + 7 * 86400000;
+}
+
+// Where a live game's card is, kept with its secret so settleGames can find it.
+const secretWith = (secret, conv, now) => ({ ...secret, where: { conv, at: now } });
+
+// A move in a running game: a player's, or the house settling a game nobody
+// finished (house: true, from settleGames).
+async function runMove({ conv, msgId, me, move, data, now, house = false }) {
+  const msgRef = db.doc(`channels/${conv}/messages/${msgId}`);
+  const secretRef = db.doc(`gameSecrets/${msgId}`);
+  return db.runTransaction(async (tx) => {
+    const [msg, secret] = await Promise.all([tx.get(msgRef), tx.get(secretRef)]);
+    const c = msg.get('cmd');
+    if (!msg.exists || !c || !secret.exists) {
+      if (house && secret.exists) tx.delete(secretRef);
+      return note('That game is gone.');
+    }
+    // Multiplayer: the game decides who may move (arcade.js).
+    if (arcade.MULTI.includes(c.name)) {
+      if (!arcade.isLive(c.status)) return { ok: true };
+      const myBank = house ? null : (await tx.get(bankRef(me))).data() || {};
+      const r = arcade.move(c.name, {
+        pub: { ...c.game, status: c.status },
+        secret: secret.data(),
+        me,
+        move,
+        balance: house ? 0 : await balanceOf(me, myBank, data),
+        now,
+      });
+      if (r.error) return note(r.error);
+      if (!r.write) return { ok: true, serverNow: now };
+      await payOut(tx, r.money, house ? {} : { [me]: myBank }, now);
+      const { status, ...game } = r.pub;
+      if (arcade.isLive(status)) tx.set(secretRef, secretWith(r.secret, conv, now));
+      else tx.delete(secretRef);
+      tx.update(msgRef, { 'cmd.game': game, 'cmd.status': status });
+      return { ok: true, serverNow: now };
+    }
+    const player = data.rename(msg.get('by'));
+    if (!house && move !== 'peek' && player !== me) return note('That’s not your game.');
+    if (c.status !== 'playing') return { ok: true };
+    const bank = (await tx.get(bankRef(player))).data() || {};
+    // Doubling down puts in the bet again, so it has to be there.
+    if (move === 'double' && (await balanceOf(player, bank, data)) < c.bet) return note('Not enough coins to double.');
+    const r = casino.moveGame(c.name, { ...c.game, status: c.status }, secret.data(), move, c.bet, now);
+    if (r.error) return note(r.error);
+    // Still flying: nothing to write.
+    if (move === 'peek' && !r.done) return { ok: true, serverNow: now };
+    const bet = c.bet + (r.extraBet || 0);
+    const { status, ...game } = r.pub;
+    const update = { 'cmd.game': game, 'cmd.status': status, 'cmd.bet': bet };
+    if (r.done) {
+      // The bet was taken when the game started (and again when doubling):
+      // pay back what it won; the history shows the overall result.
+      const net = r.payout - bet;
+      const entry = {
+        game: c.name,
+        icon: ICON[c.name],
+        label: `${LABEL[c.name]}: ${net > 0 ? `won ${net}` : net < 0 ? `lost ${-net}` : 'bet back'}`,
+        shown: net,
+      };
+      tx.set(bankRef(player), casino.bankAfter(bank, player, r.payout - (r.extraBet || 0), entry, {}, now));
+      Object.assign(update, { 'cmd.payout': r.payout, 'cmd.net': net });
+      tx.delete(secretRef);
+    } else tx.set(secretRef, secretWith(r.secret, conv, now));
+    tx.update(msgRef, update);
+    return { ok: true, serverNow: now };
+  });
 }
 
 export const play = onCall({ maxInstances: 5, invoker: 'public' }, async (req) => {
@@ -752,63 +821,7 @@ export const play = onCall({ maxInstances: 5, invoker: 'public' }, async (req) =
   // A move in a running game (or a peek at a crash).
   if (action === 'move') {
     if (!/^[\w-]{1,40}$/.test(conv) || !/^[\w-]{1,40}$/.test(msgId || '')) throw new HttpsError('invalid-argument', 'Which game?');
-    const msgRef = db.doc(`channels/${conv}/messages/${msgId}`);
-    const secretRef = db.doc(`gameSecrets/${msgId}`);
-    return db.runTransaction(async (tx) => {
-      const [msg, secret] = await Promise.all([tx.get(msgRef), tx.get(secretRef)]);
-      const c = msg.get('cmd');
-      if (!msg.exists || !c || !secret.exists) return note('That game is gone.');
-      // Multiplayer: the game decides who may move (arcade.js).
-      if (arcade.MULTI.includes(c.name)) {
-        if (!arcade.isLive(c.status)) return { ok: true };
-        const myBank = (await tx.get(bankRef(me))).data() || {};
-        const r = arcade.move(c.name, {
-          pub: { ...c.game, status: c.status },
-          secret: secret.data(),
-          me,
-          move: String(move),
-          balance: await balanceOf(me, myBank, data),
-          now,
-        });
-        if (r.error) return note(r.error);
-        if (!r.write) return { ok: true, serverNow: now };
-        await payOut(tx, r.money, { [me]: myBank }, now);
-        const { status, ...game } = r.pub;
-        if (arcade.isLive(status)) tx.set(secretRef, r.secret);
-        else tx.delete(secretRef);
-        tx.update(msgRef, { 'cmd.game': game, 'cmd.status': status });
-        return { ok: true, serverNow: now };
-      }
-      const player = data.rename(msg.get('by'));
-      if (move !== 'peek' && player !== me) return note('That’s not your game.');
-      if (c.status !== 'playing') return { ok: true };
-      const bank = (await tx.get(bankRef(player))).data() || {};
-      // Doubling down puts in the bet again, so it has to be there.
-      if (move === 'double' && (await balanceOf(player, bank, data)) < c.bet) return note('Not enough coins to double.');
-      const r = casino.moveGame(c.name, { ...c.game, status: c.status }, secret.data(), String(move), c.bet, now);
-      if (r.error) return note(r.error);
-      // Still flying: nothing to write.
-      if (move === 'peek' && !r.done) return { ok: true, serverNow: now };
-      const bet = c.bet + (r.extraBet || 0);
-      const { status, ...game } = r.pub;
-      const update = { 'cmd.game': game, 'cmd.status': status, 'cmd.bet': bet };
-      if (r.done) {
-        // The bet was taken when the game started (and again when doubling):
-        // pay back what it won; the history shows the overall result.
-        const net = r.payout - bet;
-        const entry = {
-          game: c.name,
-          icon: ICON[c.name],
-          label: `${LABEL[c.name]}: ${net >= 0 ? `won ${net}` : `lost ${-net}`}`,
-          shown: net,
-        };
-        tx.set(bankRef(player), casino.bankAfter(bank, player, r.payout - (r.extraBet || 0), entry, {}, now));
-        Object.assign(update, { 'cmd.payout': r.payout, 'cmd.net': net });
-        tx.delete(secretRef);
-      } else tx.set(secretRef, r.secret);
-      tx.update(msgRef, update);
-      return { ok: true, serverNow: now };
-    });
+    return runMove({ conv, msgId, me, move: String(move), data, now });
   }
 
   // A new command.
@@ -877,7 +890,7 @@ export const play = onCall({ maxInstances: 5, invoker: 'public' }, async (req) =
       const r = arcade.start(game, { me, words, roster, balance, bank: myBank, now });
       if (r.error) return note(r.error);
       await payOut(tx, r.money, { [me]: myBank }, now);
-      tx.set(db.doc(`gameSecrets/${msgRef.id}`), r.secret);
+      tx.set(db.doc(`gameSecrets/${msgRef.id}`), secretWith(r.secret, conv, now));
       const { status, ...g } = r.pub;
       post(tx, { game: g, status, bet: g.bet || 0 }, r.mentions);
       return { ok: true, serverNow: now };
@@ -907,7 +920,7 @@ export const play = onCall({ maxInstances: 5, invoker: 'public' }, async (req) =
       } else {
         // Take the bet now; the end of the game pays back what it won.
         tx.set(bankRef(me), casino.bankAfter(myBank, me, -bet, null, {}, now));
-        tx.set(db.doc(`gameSecrets/${msgRef.id}`), r.secret);
+        tx.set(db.doc(`gameSecrets/${msgRef.id}`), secretWith(r.secret, conv, now));
         post(tx, { game: game2, status, bet });
       }
       return { ok: true, serverNow: now };
@@ -973,6 +986,32 @@ export const play = onCall({ maxInstances: 5, invoker: 'public' }, async (req) =
     post(tx, r.card);
     return { ok: true };
   });
+});
+
+// Every 10 minutes: finish games nobody finished, so no one's bet stays stuck
+// on a card nobody has open. Multiplayer games settle by their own timers
+// (an expired challenge, a type race that ended, a board game left alone);
+// casino games left alone for casino.ABANDONED are played out for the player.
+export const settleGames = onSchedule({ schedule: 'every 10 minutes', timeZone: TIME_ZONE }, async () => {
+  const now = Date.now();
+  const live = await db.collection('gameSecrets').get();
+  if (live.empty) return;
+  const data = await coinData();
+  for (const d of live.docs) {
+    const where = d.get('where');
+    if (!where?.conv) continue; // games from before this was kept
+    const msg = await db.doc(`channels/${where.conv}/messages/${d.id}`).get();
+    const c = msg.get('cmd');
+    let move = 'peek';
+    if (c && !arcade.MULTI.includes(c.name)) {
+      if (now - (where.at || 0) < casino.ABANDONED) continue;
+      move = casino.abandonMove(c.name, c.game || {});
+      if (!move) continue;
+    }
+    await runMove({ conv: where.conv, msgId: d.id, me: '', move, data, now, house: true }).catch((e) =>
+      logger.warn('settle', d.id, e.message),
+    );
+  }
 });
 
 // Fridays at 6 PM (New York): draw the lottery. One ticket wins the whole pot.

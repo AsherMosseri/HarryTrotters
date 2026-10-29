@@ -219,6 +219,18 @@ function finishBlackjack(pub, secret, bet) {
   return { pub: { ...pub, dealer, status }, secret: { deck, dealer }, done: true, payout };
 }
 
+// A game left alone this long is finished for the player (the server's
+// settleGames): blackjack stands, mines and high-low cash out what they've
+// won (or give the bet back if nothing was played), crash has crashed.
+export const ABANDONED = 30 * MINUTE;
+export function abandonMove(game, pub) {
+  if (game === 'blackjack') return 'stand';
+  if (game === 'crash') return 'peek';
+  if (game === 'mines') return pub.open?.length ? 'cashout' : 'refund';
+  if (game === 'highlow') return pub.history?.length ? 'cashout' : 'refund';
+  return null;
+}
+
 // ---------- moves ----------
 // Returns { error } or { pub, secret, done, payout, extraBet }.
 export function moveGame(game, pub, secret, move, bet, now = Date.now(), rng = Math.random) {
@@ -247,6 +259,7 @@ export function moveGame(game, pub, secret, move, bet, now = Date.now(), rng = M
       return { pub: { ...pub, status: 'cashed', at: m, point: secret.point }, secret, done: true, payout: Math.floor(bet * m) };
     }
     case 'mines': {
+      if (move === 'refund' && !pub.open.length) return { pub: { ...pub, status: 'refunded', spots: secret.spots }, secret, done: true, payout: bet };
       if (move === 'cashout') {
         if (!pub.open.length) return { error: 'Open at least one tile first.' };
         return {
@@ -272,6 +285,7 @@ export function moveGame(game, pub, secret, move, bet, now = Date.now(), rng = M
       return { pub: { ...pub, open, multiplier }, secret, done: false, payout: 0 };
     }
     case 'highlow': {
+      if (move === 'refund' && !pub.history.length) return { pub: { ...pub, status: 'refunded' }, secret, done: true, payout: bet };
       if (move === 'cashout') {
         if (!pub.history.length) return { error: 'Make at least one guess first.' };
         return { pub: { ...pub, status: 'cashed' }, secret, done: true, payout: Math.floor(bet * pub.multiplier) };

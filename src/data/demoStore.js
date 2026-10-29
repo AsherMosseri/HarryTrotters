@@ -16,7 +16,7 @@ import * as casino from '../../functions/shared/casino.js';
 import { dayOf } from '../labLog.js';
 import * as arcade from '../../functions/shared/arcade.js';
 import { blocked, serverGroup } from '../../functions/shared/commandRules.js';
-import { giftEntry, prizeEntry } from '../../functions/shared/coins.js';
+import { giftEntry, prizeEntry, teamDay } from '../../functions/shared/coins.js';
 
 const KEY = 'ftc32313-demo-v13';
 const listeners = new Set();
@@ -851,7 +851,7 @@ export const demoStore = {
     const done = (r) => (commit(), r);
     // Several people's coins at once (multiplayer games).
     const payOut = (money) => {
-      for (const x of money) setBank(x.name, casino.bankAfter(bank(x.name), x.name, x.delta, x.entry, x.extra || {}, now));
+      for (const x of money) setBank(x.name, casino.bankAfter(bank(x.name), x.name, ...arcade.paid(x, bank(x.name), teamDay(now)), now));
     };
 
     // Gifts and ad prizes, checked the way the server checks them.
@@ -1008,13 +1008,9 @@ export const demoStore = {
       );
       return done({ ok: true });
     }
-    const day = (ms) => {
-      const d = new Date(ms);
-      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    };
     const r =
       game === 'daily'
-        ? casino.daily(mine, day(now), day(now - 86400000))
+        ? casino.daily(mine, teamDay(now), teamDay(now - 86400000))
         : game === 'work'
           ? casino.work(mine, now, Math.random, {
               onShift: (state.shifts || []).some((x) => !x.end && x.person === me),
