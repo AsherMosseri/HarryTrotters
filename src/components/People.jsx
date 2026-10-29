@@ -20,7 +20,7 @@ import { DEFAULT_BORDER, borderProps } from '../borders.js';
 import BorderEditor from './BorderEditor.jsx';
 import { EmojiPicker, GifPicker } from './chat/Pickers.jsx';
 import { activeStatus } from '../people.js';
-import { useControls } from '../controls.js';
+import { profileView, useControls } from '../controls.js';
 import { Avatar, CloseIcon, Nameplate, Overlay, usePeople } from './common.jsx';
 import DecorationEditor from './DecorationEditor.jsx';
 import { DEFAULT_DECO } from './decoRender.jsx';
@@ -677,35 +677,39 @@ export function ProfileEditor({ name, actor, api, tasks = [], onClose }) {
                         />
                       </>
                     )}
-                    <h3 className="field-label">Banner</h3>
-                    <div className="row gap">
-                      <button className="btn" onClick={() => bannerInput.current?.click()} disabled={!!busy}>
-                        {busy === 'banner' ? 'Saving…' : profile.banner ? 'Change banner' : 'Add a banner image'}
-                      </button>
-                      {profile.banner && (
-                        <button
-                          className="link-btn danger-text"
-                          onClick={() => run('banner', () => api.removeBanner(name, profile.banner.path))}
-                        >
-                          Remove
-                        </button>
-                      )}
-                    </div>
-                    <input
-                      ref={bannerInput}
-                      type="file"
-                      accept="image/*"
-                      hidden
-                      onChange={(e) => {
-                        const f = e.target.files[0];
-                        e.target.value = '';
-                        if (f) run('banner', async () => api.uploadBanner(name, await prepareBanner(f), profile.banner?.path));
-                      }}
-                    />
-                    {!profile.banner && (
+                    {isOn('banners') && (
                       <>
-                        <p className="muted tiny">Or a banner color:</p>
-                        <ColorRow value={look.bannerColor} onChange={(c) => set({ bannerColor: c })} />
+                        <h3 className="field-label">Banner</h3>
+                        <div className="row gap">
+                          <button className="btn" onClick={() => bannerInput.current?.click()} disabled={!!busy}>
+                            {busy === 'banner' ? 'Saving…' : profile.banner ? 'Change banner' : 'Add a banner image'}
+                          </button>
+                          {profile.banner && (
+                            <button
+                              className="link-btn danger-text"
+                              onClick={() => run('banner', () => api.removeBanner(name, profile.banner.path))}
+                            >
+                              Remove
+                            </button>
+                          )}
+                        </div>
+                        <input
+                          ref={bannerInput}
+                          type="file"
+                          accept="image/*"
+                          hidden
+                          onChange={(e) => {
+                            const f = e.target.files[0];
+                            e.target.value = '';
+                            if (f) run('banner', async () => api.uploadBanner(name, await prepareBanner(f), profile.banner?.path));
+                          }}
+                        />
+                        {!profile.banner && (
+                          <>
+                            <p className="muted tiny">Or a banner color:</p>
+                            <ColorRow value={look.bannerColor} onChange={(c) => set({ bannerColor: c })} />
+                          </>
+                        )}
                       </>
                     )}
                     <h3 className="field-label">Pronouns</h3>
@@ -885,78 +889,90 @@ export function ProfileEditor({ name, actor, api, tasks = [], onClose }) {
                         <More k="decoration" />
                       </>
                     )}
-                    <h3 className="field-label">Profile effect</h3>
-                    <div className="fx-tiles">
-                      {EFFECTS.map((f) => (
-                        <button
-                          key={f.id}
-                          className={`fx-tile${look.effect === f.id ? ' on' : ''}`}
-                          aria-pressed={look.effect === f.id}
-                          onClick={() => set({ effect: f.id })}
-                        >
-                          <span className="fx-tile-pic" aria-hidden="true">
-                            {FX[f.id] ? (
-                              <FxCanvas id={f.id} fps={30} density={2.2} intro={false} />
-                            ) : (
-                              <span className="fx-tile-icon">{f.icon || '∅'}</span>
-                            )}
-                          </span>
-                          <span className="fx-tile-label">{f.label}</span>
-                        </button>
-                      ))}
-                    </div>
-                    {look.effect === 'custom' && (
-                      <CustomEffect
-                        value={look.effectCustom}
-                        onChange={(c) => set({ effectCustom: c })}
-                        upload={(file, oldPath) => api.uploadEffectImage(name, file, oldPath)}
-                      />
+                    {isOn('profileEffects') && (
+                      <>
+                        <h3 className="field-label">Profile effect</h3>
+                        <div className="fx-tiles">
+                          {EFFECTS.map((f) => (
+                            <button
+                              key={f.id}
+                              className={`fx-tile${look.effect === f.id ? ' on' : ''}`}
+                              aria-pressed={look.effect === f.id}
+                              onClick={() => set({ effect: f.id })}
+                            >
+                              <span className="fx-tile-pic" aria-hidden="true">
+                                {FX[f.id] ? (
+                                  <FxCanvas id={f.id} fps={30} density={2.2} intro={false} />
+                                ) : (
+                                  <span className="fx-tile-icon">{f.icon || '∅'}</span>
+                                )}
+                              </span>
+                              <span className="fx-tile-label">{f.label}</span>
+                            </button>
+                          ))}
+                        </div>
+                        {look.effect === 'custom' && (
+                          <CustomEffect
+                            value={look.effectCustom}
+                            onChange={(c) => set({ effectCustom: c })}
+                            upload={(file, oldPath) => api.uploadEffectImage(name, file, oldPath)}
+                          />
+                        )}
+                        <More k="effect" />
+                      </>
                     )}
-                    <More k="effect" />
-                    <h3 className="field-label">Profile colors</h3>
-                    <div className="row gap">
-                      <label className="row gap-sm small">
-                        Top{' '}
-                        <input
-                          type="color"
-                          value={look.theme?.a || '#6366f1'}
-                          onChange={(e) => set({ theme: { ...look.theme, a: e.target.value, b: look.theme?.b || '#ec4899' } })}
-                        />
-                      </label>
-                      {look.theme?.m ? (
-                        <label className="row gap-sm small">
-                          Middle{' '}
-                          <input type="color" value={look.theme.m} onChange={(e) => set({ theme: { ...look.theme, m: e.target.value } })} />
-                          <button
-                            className="icon-btn small"
-                            aria-label="Remove middle color"
-                            onClick={() => set({ theme: { a: look.theme.a, b: look.theme.b } })}
-                          >
-                            <CloseIcon />
-                          </button>
-                        </label>
-                      ) : (
-                        <button
-                          className="link-btn small"
-                          onClick={() => set({ theme: { a: look.theme?.a || '#6366f1', b: look.theme?.b || '#ec4899', m: '#f59e0b' } })}
-                        >
-                          ＋ Middle color
-                        </button>
-                      )}
-                      <label className="row gap-sm small">
-                        Bottom{' '}
-                        <input
-                          type="color"
-                          value={look.theme?.b || '#ec4899'}
-                          onChange={(e) => set({ theme: { ...look.theme, a: look.theme?.a || '#6366f1', b: e.target.value } })}
-                        />
-                      </label>
-                      {look.theme && (
-                        <button className="link-btn small" onClick={() => set({ theme: null })}>
-                          Reset
-                        </button>
-                      )}
-                    </div>
+                    {isOn('profileColors') && (
+                      <>
+                        <h3 className="field-label">Profile colors</h3>
+                        <div className="row gap">
+                          <label className="row gap-sm small">
+                            Top{' '}
+                            <input
+                              type="color"
+                              value={look.theme?.a || '#6366f1'}
+                              onChange={(e) => set({ theme: { ...look.theme, a: e.target.value, b: look.theme?.b || '#ec4899' } })}
+                            />
+                          </label>
+                          {look.theme?.m ? (
+                            <label className="row gap-sm small">
+                              Middle{' '}
+                              <input
+                                type="color"
+                                value={look.theme.m}
+                                onChange={(e) => set({ theme: { ...look.theme, m: e.target.value } })}
+                              />
+                              <button
+                                className="icon-btn small"
+                                aria-label="Remove middle color"
+                                onClick={() => set({ theme: { a: look.theme.a, b: look.theme.b } })}
+                              >
+                                <CloseIcon />
+                              </button>
+                            </label>
+                          ) : (
+                            <button
+                              className="link-btn small"
+                              onClick={() => set({ theme: { a: look.theme?.a || '#6366f1', b: look.theme?.b || '#ec4899', m: '#f59e0b' } })}
+                            >
+                              ＋ Middle color
+                            </button>
+                          )}
+                          <label className="row gap-sm small">
+                            Bottom{' '}
+                            <input
+                              type="color"
+                              value={look.theme?.b || '#ec4899'}
+                              onChange={(e) => set({ theme: { ...look.theme, a: look.theme?.a || '#6366f1', b: e.target.value } })}
+                            />
+                          </label>
+                          {look.theme && (
+                            <button className="link-btn small" onClick={() => set({ theme: null })}>
+                              Reset
+                            </button>
+                          )}
+                        </div>
+                      </>
+                    )}
                     {isOn('borders') && (
                       <>
                         <h3 className="field-label">Borders</h3>
@@ -1093,10 +1109,15 @@ export function ProfileEditor({ name, actor, api, tasks = [], onClose }) {
               <div className="editor-preview">
                 <h3 className="field-label">Preview</h3>
                 <div
-                  className={`profile-card preview-card ${borderProps(look.cardBorder).className}`}
-                  style={borderProps(look.cardBorder).style}
+                  className={`profile-card preview-card ${borderProps(isOn('borders') && look.cardBorder).className}`}
+                  style={borderProps(isOn('borders') && look.cardBorder).style}
                 >
-                  <CardBody name={name} actor={actor} tasks={tasks} look={{ ...look, status: text || emoji ? { emoji, text } : null }} />
+                  <CardBody
+                    name={name}
+                    actor={actor}
+                    tasks={tasks}
+                    look={profileView({ ...look, status: text || emoji ? { emoji, text } : null }, isOn)}
+                  />
                 </div>
               </div>
             </div>

@@ -40,7 +40,10 @@ export const FEATURE_GROUPS = [
       ['nameEffects', 'Name effects', 'Animated and colored names'],
       ['nameplates', 'Nameplates', 'Backgrounds behind names'],
       ['fonts', 'Name fonts', 'Custom fonts for names'],
-      ['borders', 'Message borders', 'Borders around people’s messages'],
+      ['borders', 'Borders', 'Borders around people’s messages and profile cards'],
+      ['banners', 'Profile banners', 'Banner pictures and colors on profiles'],
+      ['profileEffects', 'Profile effects', 'Animations that play over profiles'],
+      ['profileColors', 'Profile colors', 'Custom colors on profile cards'],
       ['coins', '🪙 Jackson coins', 'Coins, the casino, games, and coin commands'],
       ['ads', '📺 Ads', 'Every ad in the app'],
       ['themes', '🎨 Themes', 'Color themes (everyone gets the standard look)'],
@@ -115,7 +118,19 @@ export function profileView(p, isOn) {
     delete out.decorationCustom;
   }
   if (!isOn('nameplates')) delete out.nameplate;
-  if (!isOn('borders')) delete out.msgBorder;
+  if (!isOn('borders')) {
+    delete out.msgBorder;
+    delete out.cardBorder;
+  }
+  if (!isOn('banners')) {
+    delete out.banner;
+    delete out.bannerColor;
+  }
+  if (!isOn('profileEffects')) {
+    delete out.effect;
+    delete out.effectCustom;
+  }
+  if (!isOn('profileColors')) delete out.theme;
   if (out.nameStyle && (!isOn('nameEffects') || !isOn('fonts'))) {
     const ns = { ...out.nameStyle };
     if (!isOn('nameEffects')) {
