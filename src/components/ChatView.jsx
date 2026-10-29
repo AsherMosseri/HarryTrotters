@@ -410,7 +410,7 @@ export default function ChatView({
           </select>
           {feat('dms') && (
             <button className="btn" onClick={() => setDialog({ type: 'dm' })} aria-label="New direct message">
-              ✉️ New
+              <Icon name="plus" size={16} /> New
             </button>
           )}
         </div>

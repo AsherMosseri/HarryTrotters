@@ -17,7 +17,7 @@ import { PALETTES } from '../nitro.js';
 import { daysBetween, mondayOf, parseDay, todayISO } from '../milestones.js';
 import { newTaskDefaults, personId } from '../data/diff.js';
 import { preparePhoto, useLocalStorage, useMedia } from '../util.js';
-import { Avatar, Overlay, PeopleContext, PlusIcon } from './common.jsx';
+import { Avatar, Overlay, PeopleContext } from './common.jsx';
 import { ProfileCard, ProfileEditor } from './People.jsx';
 import ProfilePage from './ProfilePage.jsx';
 import TabsEditor from './TabsEditor.jsx';
@@ -228,17 +228,8 @@ function Countdown({ date }) {
   const left = daysBetween(todayISO(), date);
   if (left < 0) return null;
   return (
-    <span className="countdown" title={`${COMPETITION.name}: ${date}`}>
-      🏁{' '}
-      {left === 0 ? (
-        'Competition day!'
-      ) : (
-        <>
-          <b>{left}</b>
-          <span className="countdown-long"> day{left === 1 ? '' : 's'} to go</span>
-          <span className="countdown-short">d</span>
-        </>
-      )}
+    <span className="me-countdown" title={`${COMPETITION.name}: ${date}`}>
+      {left === 0 ? `${COMPETITION.name} day` : `${left} day${left === 1 ? '' : 's'} until ${COMPETITION.name.toLowerCase()}`}
     </span>
   );
 }
@@ -367,8 +358,9 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [exempt, settings.hiddenTabs]);
   const tabOrder = profileDocs.find((d) => d.id === personId(actor.name))?.tabOrder;
-  // No saved order: phones start with Board, Chat, Shifts, Parts on the tab bar.
-  const order = tabOrder || (phone ? ['board', 'chat', 'shifts', 'parts'] : []);
+  // Phones: Today is always the first tab; then your order (Edit tabs), or
+  // Board, Chat, Shifts, Parts when you haven't set one.
+  const order = phone ? [...new Set(['today', ...(tabOrder || ['board', 'chat', 'shifts', 'parts'])])] : tabOrder || [];
   const rank = (id) => (order.includes(id) ? order.indexOf(id) : order.length + allViews.findIndex(([v]) => v === id));
   const shownViews = allViews.filter(([id]) => controls.tabOn(id));
   const byRank = (list) => [...list].sort((a, b) => rank(a[0]) - rank(b[0]));
@@ -1533,7 +1525,9 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
   const clearChatAsk = useCallback(() => setChatAsk(null), []);
   const frame = (inner) =>
     phone ? (
-      inner
+      <div className="shell phone-shell">
+        <div className="shell-main">{inner}</div>
+      </div>
     ) : (
       <div className="shell">
         <Sidebar
@@ -1683,11 +1677,21 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
             <>
               {phone ? (
                 <header className="topbar phone-top">
-                  <button className="brand" onClick={() => controls.isOn('catParty') && setCat(true)} aria-label="Team logo">
-                    <span className="logo-mark">✓</span>
-                  </button>
-                  <h1 className="phone-title">{views.find(([id]) => id === view)?.[1] || 'Board'}</h1>
+                  <h1 className="phone-title" onClick={() => controls.isOn('catParty') && view === 'today' && setCat(true)}>
+                    {taskView
+                      ? 'Tasks'
+                      : view === 'team'
+                        ? 'Roster'
+                        : view === 'runs'
+                          ? 'Match log'
+                          : views.find(([id]) => id === view)?.[1] || 'Today'}
+                  </h1>
                   <span className="spacer" />
+                  {taskView && (
+                    <button className="icon-btn" onClick={() => setNewTask({ status: 'todo' })} aria-label="New task" title="New task">
+                      <Icon name="plus" size={22} />
+                    </button>
+                  )}
                   {shiftButton}
                   {inboxButton}
                   <button className="avatar-btn me-btn" onClick={() => setPhoneSheet('me')} aria-label="You: profile, theme, ideas, help">
@@ -2459,11 +2463,6 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
           )}
           {phone && (
             <>
-              {taskView && (
-                <button className="fab" onClick={() => setNewTask({ status: 'todo' })} aria-label="New task">
-                  <PlusIcon size={26} />
-                </button>
-              )}
               <BottomNav
                 views={views}
                 view={view}
@@ -2496,17 +2495,17 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
                     </div>
                   </div>
                   <div className="me-list">
-                    <button onClick={() => (closeSheet(), setProfileFor(actor.name))}>👤 My profile</button>
-                    <button onClick={() => (closeSheet(), setEditProfileFor(actor.name))}>✏️ Edit profile</button>
+                    <button onClick={() => (closeSheet(), setProfileFor(actor.name))}>My profile</button>
+                    <button onClick={() => (closeSheet(), setEditProfileFor(actor.name))}>Edit profile</button>
                     {controls.isOn('requests') && (
                       <button onClick={() => (closeSheet(), setShowRequests(true))}>
-                        💡 Request a feature {newRequests > 0 && <span className="me-badge">{newRequests}</span>}
+                        Request a feature {newRequests > 0 && <span className="me-badge">{newRequests}</span>}
                       </button>
                     )}
-                    <button onClick={() => (closeSheet(), setShowHelp(true))}>❓ Help</button>
+                    <button onClick={() => (closeSheet(), setShowHelp(true))}>Help</button>
                     {controls.isOn('coins') && (
                       <button onClick={() => (closeSheet(), setCoinsOpen(true))}>
-                        🪙 Jackson coins{' '}
+                        Jackson coins{' '}
                         <span className="me-coins">
                           <Coins n={myWallet.balance} />
                         </span>
@@ -2514,12 +2513,12 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
                     )}
                     {adOrders.length > 0 && (
                       <button onClick={() => (closeSheet(), setOrdersOpen(true))}>
-                        📦 Orders & bookings {activeOrders > 0 && <span className="me-badge">{activeOrders}</span>}
+                        Orders & bookings {activeOrders > 0 && <span className="me-badge">{activeOrders}</span>}
                       </button>
                     )}
-                    <button onClick={() => (closeSheet(), setEditTabs(true))}>🗂 Edit tabs</button>
-                    {isOwner && <button onClick={() => (closeSheet(), setAdsPage(true))}>📺 Ads</button>}
-                    {isOwner && <button onClick={() => (closeSheet(), setControlsPage(true))}>🎛 Controls</button>}
+                    <button onClick={() => (closeSheet(), setEditTabs(true))}>Edit tabs</button>
+                    {isOwner && <button onClick={() => (closeSheet(), setAdsPage(true))}>Ads</button>}
+                    {isOwner && <button onClick={() => (closeSheet(), setControlsPage(true))}>Controls</button>}
                   </div>
                   <ThemeMenu {...themeMenuProps} inline onClose={() => {}} />
                   <UpdateCheck />

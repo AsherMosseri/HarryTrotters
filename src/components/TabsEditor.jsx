@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef, useState } from 'react';
 import { useEscape } from '../util.js';
 import { CloseIcon, Overlay } from './common.jsx';
 import { TAB_ICONS } from './PhoneChrome.jsx';
+import { Icon } from './shell/icons.jsx';
 
 // Edit tabs: everyone puts the tabs in their own order (saved to their
 // profile, so it follows them to every device). The owner (Asher) can also
@@ -108,7 +109,7 @@ export default function TabsEditor({ all, order, hidden, canHide, onSave, onClos
                   ⠿
                 </span>
                 <span className="tabs-icon" aria-hidden="true">
-                  {TAB_ICONS[id]}
+                  <Icon name={TAB_ICONS[id]} size={18} />
                 </span>
                 <span className="grow">
                   {label[id]}

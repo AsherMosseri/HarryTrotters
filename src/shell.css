@@ -363,3 +363,60 @@ button.sb-head-row { width: 100%; border: 0; background: none; color: var(--mute
 /* Parts: the #parts chat beside the list can be hidden. */
 .chat-toggle-count { min-width: 20px; padding: 0 6px; border-radius: 999px; background: var(--muted); color: var(--surface); font-size: 12px; font-weight: 700; text-align: center; }
 .chat-toggle-count.strong { background: var(--danger); color: #fff; }
+
+/* ---------- phones (≤ 760px): the same pages, a big title, a tab bar ---------- */
+.phone-shell .shell-main { background: var(--surface); }
+.phone-shell .content { padding: 4px 16px 24px; }
+.phone-shell .content.today { padding: 8px 16px 32px; }
+.phone-shell .toolbar { padding: 4px 16px 6px; }
+.phone-shell .status-strip { padding: 4px 16px 0; }
+.phone-shell .announce-banner { margin-left: 16px; margin-right: 16px; }
+.phone-shell .ms-header { margin-top: 4px; }
+.phone-shell .ms-header h1 { font-size: 26px; }
+.phone-shell .stat-tiles { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+.phone-shell .stat { padding: 0 14px; flex: none; }
+.phone-shell .stat b { font-size: 24px; }
+.phone-shell .today-head h1 { font-size: 28px; }
+.phone-shell .today-head { margin-bottom: 22px; }
+.phone-shell .countdown-sec .big-num { font-size: 48px; }
+.phone-shell .content.chat { padding: 0; }
+.phone-shell .chat-main { border: 0; border-radius: 0; box-shadow: none; }
+.phone-shell .chat-head { padding: 10px 16px; }
+.phone-shell .chat-mobile-bar { padding: 6px 12px 0; gap: 8px; }
+.phone-shell .channel-select { border: 0; background: var(--surface-2); font-weight: 600; }
+/* Header: the page's name, big, with the shift, bell, and you on the right. */
+.phone-top { background: var(--surface); border-bottom: 0; padding: max(10px, env(safe-area-inset-top)) 10px 2px 16px; }
+.phone-title { font-size: 28px; font-weight: 760; letter-spacing: -0.024em; margin: 0; }
+.phone-top .icon-btn { color: var(--text); }
+/* Tab bar: line icons; the current tab in the accent color, no pill. */
+.bottom-nav { border-top-color: var(--hairline); background: color-mix(in srgb, var(--surface) 94%, transparent); padding: 2px 4px max(4px, env(safe-area-inset-bottom)); }
+.bottom-nav button { font-size: 11px; font-weight: 600; padding: 7px 0 3px; border-radius: 0; gap: 2px; }
+.bottom-nav button.on { background: transparent; color: var(--accent); }
+.bn-icon { display: grid; place-items: center; }
+.bn-badge { top: -4px; right: -12px; }
+/* More: a plain list. */
+.more-list { display: flex; flex-direction: column; }
+.more-row {
+  display: flex; align-items: center; gap: 14px; border: 0; border-bottom: 1px solid var(--hairline); background: none; padding: 14px 2px;
+  font-size: 17px; color: var(--text); text-align: left;
+}
+.more-row .icon { color: var(--muted); }
+.more-row.on { color: var(--accent); font-weight: 600; }
+.more-row.on .icon { color: var(--accent); }
+.more-chev { color: var(--border) !important; }
+/* Sheets */
+.sheet { border-radius: 14px 14px 0 0; }
+.sheet-head h2 { font-size: 20px; font-weight: 700; }
+.me-list button { font-weight: 500; }
+/* Board: the statuses as a row of words; the picked one underlined. */
+.phone-status-chips { gap: 18px; padding-bottom: 10px; border-bottom: 1px solid var(--hairline); margin-bottom: 12px; }
+.phone-status { border: 0; background: none; padding: 6px 0; border-radius: 0; font-weight: 500; font-size: 15px; }
+.phone-status .dot { display: none; }
+.phone-status strong { color: var(--muted); font-weight: 500; }
+.phone-status.on { background: none; color: var(--text); font-weight: 650; box-shadow: inset 0 -2px 0 var(--c); }
+.phone-cards { padding-bottom: 24px; }
+.me-countdown { font-size: 14px; color: var(--muted); }
+/* The header already names the page: pages' own title rows keep only their details and buttons. */
+.phone-shell .ms-header h1 { display: none; }
+.phone-shell .ms-header:not(:has(p)) > div:first-child { display: none; }
+.phone-shell .chat-mobile-bar .btn { gap: 4px; }

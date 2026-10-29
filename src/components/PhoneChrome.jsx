@@ -1,21 +1,26 @@
 import { useEffect, useRef } from 'react';
 import { CloseIcon, Overlay } from './common.jsx';
+import { Icon } from './shell/icons.jsx';
 
 // Phone layout pieces: the bottom tab bar, and sheets that slide up from the bottom.
 export const PHONE_MAIN_COUNT = 4;
 export const TAB_ICONS = {
-  board: '📋',
-  table: '📑',
-  chat: '💬',
-  shifts: '⏱',
-  milestones: '🏁',
-  parts: '🔩',
-  checklists: '✅',
-  runs: '🏎',
-  robot: '🤖',
-  resources: '📚',
-  team: '👥',
+  today: 'today',
+  board: 'tasks',
+  table: 'table',
+  chat: 'chat',
+  shifts: 'shifts',
+  milestones: 'milestones',
+  parts: 'parts',
+  checklists: 'checklists',
+  runs: 'runs',
+  robot: 'robot',
+  resources: 'resources',
+  team: 'team',
 };
+// The tab bar's names where the page has a plainer one.
+const TAB_LABELS = { board: 'Tasks', team: 'Roster', runs: 'Match log' };
+const tabLabel = (id, label) => TAB_LABELS[id] || label;
 
 export function Sheet({ title, onClose, children, className = '' }) {
   const ref = useRef(null);
@@ -128,18 +133,18 @@ export function BottomNav({ views, view, setView, badges = {}, onMore, moreOn })
       {main.map(([id, label]) => (
         <button key={id} className={view === id ? 'on' : ''} aria-current={view === id ? 'page' : undefined} onClick={() => setView(id)}>
           <span className="bn-icon" aria-hidden="true">
-            {TAB_ICONS[id]}
+            <Icon name={TAB_ICONS[id]} size={24} />
             {badges[id] ? <span className="bn-badge">{badges[id] > 99 ? '99+' : badges[id]}</span> : null}
           </span>
-          <span className="bn-label">{label}</span>
+          <span className="bn-label">{tabLabel(id, label)}</span>
         </button>
       ))}
       {main.length < views.length && (
         <button className={inMore || moreOn ? 'on' : ''} onClick={onMore}>
           <span className="bn-icon" aria-hidden="true">
-            ☰
+            <Icon name="more" size={24} />
           </span>
-          <span className="bn-label">{inMore ? views.find(([id]) => id === view)?.[1] || 'More' : 'More'}</span>
+          <span className="bn-label">More</span>
         </button>
       )}
     </nav>
@@ -149,18 +154,19 @@ export function BottomNav({ views, view, setView, badges = {}, onMore, moreOn })
 export function MoreSheet({ views, view, setView, onClose }) {
   return (
     <Sheet title="More" onClose={onClose}>
-      <div className="more-grid">
+      <div className="more-list">
         {views.slice(PHONE_MAIN_COUNT).map(([id, label]) => (
           <button
             key={id}
-            className={`more-tile${view === id ? ' on' : ''}`}
+            className={`more-row${view === id ? ' on' : ''}`}
             onClick={() => {
               setView(id);
               onClose();
             }}
           >
-            <span aria-hidden="true">{TAB_ICONS[id]}</span>
-            {label}
+            <Icon name={TAB_ICONS[id]} size={22} />
+            <span className="grow">{tabLabel(id, label)}</span>
+            <Icon name="chevron" size={16} className="more-chev" />
           </button>
         ))}
       </div>
