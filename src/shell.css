@@ -514,3 +514,8 @@ button.sb-head-row { width: 100%; border: 0; background: none; color: var(--mute
 /* The board fits the screen; a long column scrolls inside itself. */
 .shell .column-body { overscroll-behavior: contain; }
 .phone-shell .column { max-height: none; }
+
+/* Profile card: room on the left for a decoration ring that grows outward
+   (up to 22% of the picture) and for the card's own border. */
+.pc-avatar { left: 32px; }
+.pp-avatar { left: 46px; }
