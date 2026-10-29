@@ -82,7 +82,6 @@ export default function ChecklistsView({ checklists, api, isManager }) {
       <div className="ms-header">
         <div>
           <h1>Competition checklists</h1>
-          <p className="muted">Everyone sees the same boxes. Tick things off as you go.</p>
         </div>
         <span className="spacer" />
         <button className="btn primary" onClick={() => api.createChecklist({ title: 'New checklist', items: {} })}>

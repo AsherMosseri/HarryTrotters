@@ -533,7 +533,6 @@ export default function ShiftsView({
       <div className="ms-header">
         <div>
           <h1>Shifts</h1>
-          <p className="muted">Who’s at the lab, who’s coming, and everyone’s hours.</p>
         </div>
         <span className="spacer" />
         {isManager && (
@@ -555,7 +554,7 @@ export default function ShiftsView({
       {checkinSchedule?.on && (
         <div className="checkin-schedule">
           <span>
-            🔁 Lab check-in is asked <b>{scheduleText(checkinSchedule)}</b>
+            Lab check-in is asked <b>{scheduleText(checkinSchedule)}</b>
           </span>
           {isManager && (
             <>
@@ -590,10 +589,6 @@ export default function ShiftsView({
       ))}
 
       <div className="stat-tiles">
-        <div className="stat">
-          <span>At the lab now</span>
-          <b>{running.length}</b>
-        </div>
         <div className="stat">
           <span>Your hours this week</span>
           <b>{(myWeek / HOUR).toFixed(1)}</b>
@@ -788,7 +783,7 @@ export default function ShiftsView({
               )
             }
           >
-            ⬇ Export CSV
+            Export CSV
           </button>
         </div>
         <ol className="shift-board">

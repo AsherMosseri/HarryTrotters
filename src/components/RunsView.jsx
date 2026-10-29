@@ -359,7 +359,6 @@ export default function RunsView({ runs, roster, api }) {
       <div className="ms-header">
         <div>
           <h1>Practice &amp; match log</h1>
-          <p className="muted">Log every practice run and match to see if the robot is getting better.</p>
         </div>
         <span className="spacer" />
         <button className="btn primary" onClick={() => setEditing({})}>

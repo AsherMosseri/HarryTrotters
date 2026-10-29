@@ -1571,7 +1571,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
   const pageTitle = taskView ? 'Tasks' : view === 'team' ? 'Roster' : views.find(([id]) => id === view)?.[1];
   // Pages with their own title (.ms-header) keep it; it's styled as the page title.
   const pageHead =
-    phone || !['board', 'table', 'team'].includes(view) ? null : (
+    phone || !['board', 'table', 'team', 'robot'].includes(view) ? null : (
       <header className="page-head">
         <h1>{pageTitle}</h1>
         {taskView && (

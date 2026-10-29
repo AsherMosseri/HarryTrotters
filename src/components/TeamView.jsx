@@ -23,14 +23,6 @@ const LEAD_GROUP = 'Team Management';
 const STAFF_GROUP = 'Secretary';
 const EMPTY_ROLE = { title: '', subteams: [], responsibilities: [] };
 
-function SubteamPill({ name }) {
-  return (
-    <span className="sub-pill" style={{ '--c': SUBTEAM_COLORS[name] || 'var(--accent)' }}>
-      {name}
-    </span>
-  );
-}
-
 // person.isNew = adding someone to the team (asks for their name).
 // Managers' names are tied to their manager codes in the security rules, so
 // they can't be renamed here.
@@ -275,7 +267,7 @@ export default function TeamView({ roster, roles, tasks, api, isManager, rename 
       </section>
 
       <div className="row gap team-heading-row">
-        <h2 className="team-heading grow">Responsibilities</h2>
+        <h2 className="team-heading grow">People</h2>
         {isManager ? (
           <button className="btn primary" onClick={() => setEditing({ isNew: true, title: '', subteams: [], responsibilities: [] })}>
             <PlusIcon /> Add person
@@ -284,46 +276,36 @@ export default function TeamView({ roster, roles, tasks, api, isManager, rename 
           <span className="muted small">Only team management can change roles.</span>
         )}
       </div>
-      <section className="people-grid">
+      <ul className="roster-list">
         {people.map((p) => (
-          <article key={p.name} className="person-card">
-            <header>
-              <Avatar name={p.name} size={40} />
-              <div className="grow">
-                <h3>{p.name}</h3>
-                <div className="muted small">
-                  {p.title || 'Team member'} · {gradeLabel(p.grade)}
-                </div>
-              </div>
-              {isManager && (
-                <button className="link-btn" onClick={() => setEditing(p)}>
-                  Edit
-                </button>
-              )}
-            </header>
-            <div className="sub-pills">
-              {p.subteams.map((s) => (
-                <SubteamPill key={s} name={s} />
+          <li key={p.name} className="roster-row">
+            <Avatar name={p.name} size={34} />
+            <div className="roster-who">
+              <b>{p.name}</b>
+              <span>
+                {p.title || 'Team member'} · {gradeLabel(p.grade)}
+              </span>
+            </div>
+            <div className="roster-teams">
+              {p.subteams.map((sub) => (
+                <span key={sub} style={{ '--c': SUBTEAM_COLORS[sub] || 'var(--muted)' }}>
+                  {sub}
+                </span>
               ))}
             </div>
-            {p.responsibilities.length ? (
-              <ul className="resp">
-                {p.responsibilities.map((r, i) => (
-                  <li key={i}>{r}</li>
-                ))}
-              </ul>
-            ) : (
-              <p className="muted small">No responsibilities listed yet.</p>
+            <div className="roster-resp">{p.responsibilities.join(', ') || <span className="muted">Nothing listed</span>}</div>
+            <div className="roster-tasks">
+              {p.open} open
+              {p.overdue > 0 && <span className="overdue-count"> · {p.overdue} overdue</span>}
+            </div>
+            {isManager && (
+              <button className="link-btn" onClick={() => setEditing(p)}>
+                Edit
+              </button>
             )}
-            <footer className="small">
-              <span className="muted">
-                {p.open} open task{p.open === 1 ? '' : 's'}
-              </span>
-              {p.overdue > 0 && <span className="overdue-count">{p.overdue} overdue</span>}
-            </footer>
-          </article>
+          </li>
         ))}
-      </section>
+      </ul>
 
       {editing && (
         <PersonDialog

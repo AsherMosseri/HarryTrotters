@@ -99,7 +99,6 @@ export default function ResourcesView({ resources, diagram, actor, isManager, ca
       <div className="ms-header">
         <div>
           <h1>Resources</h1>
-          <p className="muted">The team’s CAD, code, and wiring, plus good FTC links.</p>
         </div>
       </div>
 
@@ -109,7 +108,7 @@ export default function ResourcesView({ resources, diagram, actor, isManager, ca
             <DiagramPreview diagram={diagram} />
           </button>
           <div className="res-diagram-side">
-            <h2>⚡ Electrical diagram</h2>
+            <h2>Electrical diagram</h2>
             <p className="muted small">
               Every motor, servo, and sensor and the hub port it plugs into.{' '}
               {canEditDiagram
@@ -123,7 +122,7 @@ export default function ResourcesView({ resources, diagram, actor, isManager, ca
               </p>
             )}
             <button className="btn primary" onClick={() => setOpenDiagram(true)}>
-              {canEditDiagram ? '✏️ Open and edit' : 'Open'}
+              {canEditDiagram ? 'Open and edit' : 'Open'}
             </button>
           </div>
         </section>

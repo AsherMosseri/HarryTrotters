@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { Icon } from './shell/icons.jsx';
 import { RobotScene } from '../robot/scene.js';
 import { loadModel, diffModels } from '../robot/model.js';
 import { relTime, useEscape } from '../util.js';
@@ -171,7 +172,7 @@ function PinDialog({ draft, partName, tasks, parts, onClose, onSave }) {
           }}
         >
           <div className="panel-head">
-            <h2>📍 Pin on {partName}</h2>
+            <h2>Pin on {partName}</h2>
             <span className="spacer" />
             <button type="button" className="icon-btn" onClick={onClose} aria-label="Close">
               <CloseIcon />
@@ -281,7 +282,7 @@ function PartsTree({ model, hidden, selected, onToggle, onSelect, expanded, setE
                 onToggle(n.key);
               }}
             >
-              {hidden.has(n.key) ? '🙈' : '👁'}
+              <Icon name={hidden.has(n.key) ? 'eyeOff' : 'eye'} size={16} />
             </button>
           </li>
         ))}
@@ -523,10 +524,10 @@ export default function RobotView({ robot, tasks, parts, actor, isManager, api, 
         </button>
         <div className="segmented mode-switch">
           {[
-            ['view', '👁 View'],
-            ['pin', '📍 Pins'],
-            ['sandbox', '✋ Sandbox'],
-            ['compare', '⇄ Compare'],
+            ['view', 'View'],
+            ['pin', 'Pins'],
+            ['sandbox', 'Sandbox'],
+            ['compare', 'Compare'],
           ].map(([id, label]) => (
             <button
               key={id}
@@ -615,7 +616,7 @@ export default function RobotView({ robot, tasks, parts, actor, isManager, api, 
           {side === 'pins' && (
             <div className="pin-list">
               <p className="muted small">
-                {mode === 'pin' ? 'Tap anywhere on the robot to drop a pin.' : 'Switch to 📍 Pins mode to add a pin.'}{' '}
+                {mode === 'pin' ? 'Tap anywhere on the robot to drop a pin.' : 'Switch to Pins to add a pin.'}{' '}
                 <label className="inline-check">
                   <input type="checkbox" checked={showResolved} onChange={(e) => setShowResolved(e.target.checked)} /> Show resolved
                 </label>

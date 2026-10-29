@@ -517,17 +517,7 @@ export default function ChatView({
           )}
           {!all.length && (
             <div className="empty conv-empty">
-              {conv.kind === 'dm' ? (
-                <p>This is the start of your messages with {conv.label}. Say hi! 👋</p>
-              ) : (
-                <>
-                  <div className="conv-empty-icon">
-                    <ChannelIcon conv={conv} />
-                  </div>
-                  <h3>Welcome to #{conv.name}!</h3>
-                  <p className="muted">This is the start of the channel.</p>
-                </>
-              )}
+              {conv.kind === 'dm' ? <p>No messages with {conv.label} yet.</p> : <p>Nothing in #{conv.name} yet.</p>}
             </div>
           )}
           {shownMessages.map((m, i) => {

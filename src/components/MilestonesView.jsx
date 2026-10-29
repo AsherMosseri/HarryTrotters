@@ -374,12 +374,12 @@ export default function MilestonesView({ milestones, competitionDate, isManager,
     <main className="content milestones">
       <div className="ms-header">
         <div>
-          <h1>Road to {shortDate(competitionDate)}</h1>
+          <h1>Milestones</h1>
           <p className="muted">
             {left > 0
               ? `${left} day${left === 1 ? '' : 's'} until the competition`
               : left === 0
-                ? 'Competition day! Good luck!'
+                ? 'Competition day'
                 : 'Competition is over'}
             {' · '}
             {parseDay(competitionDate).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
