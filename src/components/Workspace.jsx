@@ -331,6 +331,17 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
   // older settings.hiddenTabs); each person orders their own (profile.tabOrder).
   const allViews = showRobot ? VIEWS : VIEWS.filter(([id]) => id !== 'robot');
   const hiddenTabs = [...new Set([...(controlsDoc.tabsOff || []), ...(settings.hiddenTabs || [])])];
+  // Tabs Asher hid before Controls (settings.hiddenTabs) move into Controls,
+  // so Controls and Edit tabs show and change the same list.
+  useEffect(() => {
+    if (!exempt || !settings.hiddenTabs?.length) return;
+    const tabsOff = [...new Set([...(controlsDoc.tabsOff || []), ...settings.hiddenTabs])];
+    store
+      .saveControls({ tabsOff }, actor)
+      .then(() => store.saveSettings({ hiddenTabs: [] }, actor))
+      .catch((e) => console.warn('move hidden tabs', e));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [exempt, settings.hiddenTabs]);
   const tabOrder = profileDocs.find((d) => d.id === personId(actor.name))?.tabOrder;
   // No saved order: phones start with Board, Chat, Shifts, Parts on the tab bar.
   const order = tabOrder || (phone ? ['board', 'chat', 'shifts', 'parts'] : []);
@@ -2235,7 +2246,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
           )}
           {controlsPage && isOwner && (
             <ControlsPage
-              doc={controlsDoc}
+              doc={{ ...controlsDoc, tabsOff: hiddenTabs }}
               views={showRobot ? VIEWS : VIEWS.filter(([id]) => id !== 'robot')}
               channels={convs.channels}
               people={roster.filter((n) => n !== actor.name)}
