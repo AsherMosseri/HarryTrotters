@@ -334,7 +334,7 @@ export function PollDialog({ onCreate, onClose, canRequire = false, initialQuest
           }}
         >
           <div className="panel-head">
-            <h2>📊 New poll</h2>
+            <h2>New poll</h2>
             <span className="spacer" />
             <button type="button" className="icon-btn" onClick={onClose} aria-label="Close">
               <CloseIcon />
@@ -342,8 +342,8 @@ export function PollDialog({ onCreate, onClose, canRequire = false, initialQuest
           </div>
           <div className="segmented poll-kind" role="radiogroup" aria-label="Kind of poll">
             {[
-              ['choices', '☑️ Choices'],
-              ['text', '✍️ Written answer'],
+              ['choices', 'Choices'],
+              ['text', 'Written answer'],
             ].map(([id, label]) => (
               <button
                 key={id}
@@ -422,9 +422,9 @@ export function StandupDialog({ onPost, onClose }) {
   useEscape(onClose);
   const ok = answers.yesterday.trim() || answers.today.trim();
   const fields = [
-    ['yesterday', '✅ What did you get done last time?', 'Wired the intake motors'],
-    ['today', '🎯 What are you working on today?', 'Tuning the arm PID'],
-    ['blockers', '🚧 Anything blocking you?', 'Nothing (or: waiting on the new servo)'],
+    ['yesterday', 'What did you get done last time?', 'Wired the intake motors'],
+    ['today', 'What are you working on today?', 'Tuning the arm PID'],
+    ['blockers', 'Anything blocking you?', 'Nothing (or: waiting on the new servo)'],
   ];
   return (
     <Overlay>
@@ -438,7 +438,7 @@ export function StandupDialog({ onPost, onClose }) {
           }}
         >
           <div className="panel-head">
-            <h2>🗓️ Standup</h2>
+            <h2>Standup</h2>
             <span className="spacer" />
             <button type="button" className="icon-btn" onClick={onClose} aria-label="Close">
               <CloseIcon />

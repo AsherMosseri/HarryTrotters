@@ -441,3 +441,19 @@ button.sb-head-row { width: 100%; border: 0; background: none; color: var(--mute
 .composer .input, .composer textarea { border-radius: 10px; }
 .link-card { border-left-width: 1px; border-left-color: var(--border); border-radius: 10px; background: var(--surface); }
 .link-card-title { text-decoration: none; }
+
+/* ---------- full-screen moments (sign in, update, check-in, polls, shutdown) ---------- */
+.gate { background: var(--bg); }
+.gate-card {
+  text-align: left; align-items: stretch; gap: 12px; padding: 30px 28px 28px;
+  border-color: var(--hairline); border-radius: 16px; box-shadow: 0 10px 40px rgb(16 24 40 / 10%);
+}
+.gate > .gate-card { background: none; border: 0; box-shadow: none; padding: 24px 4px; }
+.gate-card h1 { margin: 0; font-size: 28px; font-weight: 760; letter-spacing: -0.022em; line-height: 1.15; }
+.gate-card > .btn, .gate-card .big-btn { align-self: stretch; justify-content: center; }
+.gate-card .link-btn { align-self: flex-start; padding-left: 0; }
+.gate-eyebrow { margin: 0; font-size: 14px; font-weight: 600; color: var(--accent); }
+.join-names { justify-content: flex-start; }
+.dialog.welcome h2 { font-size: 26px; letter-spacing: -0.02em; }
+.shutdown-card .shutdown-msg { font-size: 18px; }
+.file-icon { display: grid; place-items: center; min-width: 40px; height: 40px; padding: 0 4px; border-radius: 8px; background: var(--surface-2); color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: 0.02em; }

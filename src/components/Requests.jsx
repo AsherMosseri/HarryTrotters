@@ -86,11 +86,9 @@ function RequestItem({ r, actor, api, focused, onMakeTask }) {
         <DisplayName name={r.by} className="request-by" />
         <span className="muted tiny">{relTime(r.at)}</span>
         <span className="spacer" />
-        <span className={`request-status s-${r.status}`}>
-          {st.icon} {st.label}
-        </span>
+        <span className={`request-status s-${r.status}`}>{st.label}</span>
       </div>
-      {r.kind && <span className="request-kind">🎨 Profile style</span>}
+      {r.kind && <span className="request-kind">Profile style</span>}
       <p className="request-text">{r.text}</p>
       {r.reply && !replying && (
         <p className="request-reply">
@@ -152,7 +150,7 @@ function RequestItem({ r, actor, api, focused, onMakeTask }) {
             >
               {REQUEST_STATUSES.map((s) => (
                 <option key={s.id} value={s.id}>
-                  {s.icon} {s.label}
+                  {s.label}
                 </option>
               ))}
             </select>
@@ -196,7 +194,7 @@ export function RequestsDialog({ requests, actor, api, focusId, onMakeTask, onCl
       <div className="panel-backdrop center" onClick={onClose}>
         <div className="dialog requests" onClick={(e) => e.stopPropagation()} role="dialog" aria-labelledby="requests-title">
           <div className="panel-head">
-            <h2 id="requests-title">💡 Feature requests</h2>
+            <h2 id="requests-title">Feature requests</h2>
             <span className="spacer" />
             <button className="icon-btn" onClick={onClose} aria-label="Close">
               <CloseIcon />

@@ -112,7 +112,7 @@ export default function UpdateGate({ children }) {
         <Overlay>
           <div className="update-gate" role="alertdialog" aria-labelledby="update-title">
             <div className="gate-card update-quiet">
-              <div className="logo-mark big">✦</div>
+              <p className="gate-eyebrow">Update</p>
               <h1 id="update-title">Laying the groundwork for 3.0</h1>
               <p className="muted">
                 Behind the scenes, we’ve been refining, polishing, and fine-tuning every corner of the app to pave the way for something
@@ -140,7 +140,7 @@ export default function UpdateGate({ children }) {
         <Overlay>
           <div className="update-gate" role="alertdialog" aria-labelledby="update-title">
             <div className="gate-card">
-              <div className="logo-mark big">↻</div>
+              <p className="gate-eyebrow">Update</p>
               <h1 id="update-title">{info?.release ? `Version ${info.release} is ready` : 'New version available'}</h1>
               {info?.changelog?.[0] && (
                 <div className="update-whats-new">

@@ -1,12 +1,14 @@
 import { useState } from 'react';
-import { TEAM_NAME, ROSTER, isManagerName } from '../config.js';
+import { TEAM_NAME, TEAM_NICKNAME, ROSTER, isManagerName } from '../config.js';
 import { Avatar } from './common.jsx';
 
 function Shell({ children }) {
   return (
     <div className="gate">
       <div className="gate-card">
-        <div className="logo-mark big">✓</div>
+        <p className="gate-eyebrow">
+          {TEAM_NICKNAME} · {TEAM_NAME}
+        </p>
         {children}
       </div>
     </div>
@@ -121,7 +123,7 @@ export function InstallScreen({ device, browser }) {
             }
           }}
         >
-          {copied ? 'Copied ✓' : 'Copy link'}
+          {copied ? 'Copied' : 'Copy link'}
         </button>
       )}
       <p className="muted small">Needs iOS 16.4 or later for notifications (Settings → General → About → iOS Version).</p>

@@ -61,7 +61,7 @@ export default function ControlsPage({
       <div className="panel-backdrop center" onClick={onClose}>
         <div className="dialog ads-settings controls-page" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Controls">
           <div className="panel-head">
-            <h2>🎛 Controls</h2>
+            <h2>Controls</h2>
             <span className="spacer" />
             <button className="icon-btn" onClick={onClose} aria-label="Close">
               <CloseIcon />
@@ -120,7 +120,7 @@ export default function ControlsPage({
                 {FEATURE_GROUPS.map(([g, label, items]) => group('off', label, items))}
                 <section className="cmd-admin-group">
                   <div className="cmd-admin-head">
-                    <h4>🧪 Lab log</h4>
+                    <h4>Lab log</h4>
                   </div>
                   <div className="cmd-admin-row">
                     <span className="muted small grow">
@@ -160,7 +160,7 @@ export default function ControlsPage({
                   'Channels',
                   channels.map((c) => [c.id, `#${c.name}`]),
                 )}
-                {group('off', 'Direct messages', [['dms', '✉️ All DMs', 'Sending and reading DMs']])}
+                {group('off', 'Direct messages', [['dms', 'All DMs', 'Sending and reading DMs']])}
               </>
             )}
           </div>

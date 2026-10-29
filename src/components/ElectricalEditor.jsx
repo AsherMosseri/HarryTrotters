@@ -630,7 +630,7 @@ export default function ElectricalEditor({ remote, canEdit, actor, onSave, onClo
     <Overlay>
       <div className="dg-screen" role="dialog" aria-label="Electrical diagram">
         <div className="dg-bar">
-          <h2>⚡ Electrical diagram</h2>
+          <h2>Electrical diagram</h2>
           {canEdit ? (
             <div className="dg-tools">
               <button className="btn primary" onClick={() => setAdding((a) => !a)} aria-expanded={adding}>
@@ -861,7 +861,7 @@ export default function ElectricalEditor({ remote, canEdit, actor, onSave, onClo
                   <br />↔ {endText(selWire.to)}
                 </p>
                 <p className="muted small">{KINDS[wireInfo.kind]?.label}</p>
-                {wireInfo.mismatch && <p className="form-error">⚠ The two ends are different kinds of ports. Check this one.</p>}
+                {wireInfo.mismatch && <p className="form-error">The two ends are different kinds of ports. Check this one.</p>}
                 {canEdit && (
                   <>
                     <span className="field-label">Color</span>
@@ -903,7 +903,7 @@ export default function ElectricalEditor({ remote, canEdit, actor, onSave, onClo
                   ) : (
                     <>
                       <li>Tap a part to see what it’s plugged into.</li>
-                      <li>🔌 Port list shows every port in one table.</li>
+                      <li>Port list shows every port in one table.</li>
                       <li>Drag (or scroll) to move around; pinch to zoom.</li>
                     </>
                   )}

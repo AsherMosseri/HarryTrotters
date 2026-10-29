@@ -63,7 +63,7 @@ function TeamBody({ c, by, onPerson }) {
     case 'task':
       return (
         <div>
-          <div className="muted tiny">📋 New task</div>
+          <div className="muted tiny">New task</div>
           <div className="cmd-task-title">{c.title}</div>
           <div className="cmd-task-meta">
             {c.assignees.length ? (
@@ -75,8 +75,8 @@ function TeamBody({ c, by, onPerson }) {
             ) : (
               <span className="muted">Nobody yet</span>
             )}
-            {c.dueDate && <span>📅 due {dayText(c.dueDate)}</span>}
-            {c.priority && c.priority !== 'medium' && <span>⚑ {priorityById[c.priority]?.label}</span>}
+            {c.dueDate && <span>Due {dayText(c.dueDate)}</span>}
+            {c.priority && c.priority !== 'medium' && <span>{priorityById[c.priority]?.label}</span>}
             {c.subteam && <span className="muted">{c.subteam}</span>}
           </div>
         </div>
@@ -99,13 +99,13 @@ function TeamBody({ c, by, onPerson }) {
           {c.total > c.list.length && <div className="muted tiny">…and {c.total - c.list.length} more on the Board.</div>}
         </div>
       ) : (
-        <div className="cmd-big">🎉 Nothing is overdue. Who are you people?</div>
+        <div className="cmd-big">Nothing is overdue. Who are you people?</div>
       );
     case 'shift':
       if (c.who)
         return c.people.length ? (
           <div>
-            <div className="cmd-big">🟢 {c.people.length} at the lab</div>
+            <div className="cmd-big">{c.people.length} at the lab</div>
             <ul className="cmd-late">
               {c.people.map((p) => (
                 <li key={p.name}>
@@ -116,7 +116,7 @@ function TeamBody({ c, by, onPerson }) {
             </ul>
           </div>
         ) : (
-          <div className="cmd-big">🌙 Nobody’s at the lab right now.</div>
+          <div className="cmd-big">Nobody’s at the lab right now.</div>
         );
       return (
         <div>
@@ -162,21 +162,21 @@ function TeamBody({ c, by, onPerson }) {
     case 'standup':
       return (
         <div className="cmd-standup">
-          <div className="muted tiny">🗓️ {c.day} standup</div>
+          <div className="muted tiny">{c.day} standup</div>
           {c.yesterday && (
             <div>
-              <span className="muted">✅ Done</span>
+              <span className="muted">Done</span>
               {c.yesterday}
             </div>
           )}
           {c.today && (
             <div>
-              <span className="muted">🎯 Today</span>
+              <span className="muted">Today</span>
               {c.today}
             </div>
           )}
           <div>
-            <span className="muted">🚧 Blockers</span>
+            <span className="muted">Blockers</span>
             {c.blockers && !/^(none|nothing|no|n\/a|-)\.?$/i.test(c.blockers) ? <span className="blocked">{c.blockers}</span> : 'None 🎉'}
           </div>
         </div>
@@ -224,7 +224,7 @@ function Body({ c, by, onPerson }) {
                 <b>{c.coins ?? 0}</b> 🪙
               </span>
             </div>
-            {c.onShift && <div className="small cmd-onshift">🟢 At the lab right now</div>}
+            {c.onShift && <div className="small cmd-onshift">At the lab right now</div>}
           </div>
         </div>
       );
@@ -453,7 +453,7 @@ export function CommandNote({ note, onDismiss, onUse, onGo, tasks = [], onOpenTa
         </span>
         <b>Trotbot</b>
         <span className="cmd-tag">BOT</span>
-        <span className="muted tiny">👁 Only you can see this ·</span>
+        <span className="muted tiny">Only you can see this ·</span>
         <button className="link-btn tiny" onClick={onDismiss}>
           Dismiss
         </button>

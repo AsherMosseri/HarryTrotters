@@ -155,13 +155,10 @@ export function ShutdownScreen({ shutdown, store, actor }) {
         Switch user
       </button>
       <div className="gate-card shutdown-card" role="main">
-        <div className="shutdown-icon" aria-hidden="true">
-          🛑
-        </div>
         <h1>The app is shut down</h1>
         {shutdown.message && <p className="shutdown-msg">{shutdown.message}</p>}
         <p className="muted small">
-          — {firstName(shutdown.by) || to}
+          From {firstName(shutdown.by) || to}
           {shutdown.at ? `, ${when(shutdown.at)}` : ''}
         </p>
         <div className="shutdown-chat">
@@ -228,7 +225,7 @@ export function ShutdownPage({ shutdown, replies, me, roster = [], onSave, onDel
       <div className="panel-backdrop center" onClick={onClose}>
         <div className="dialog shutdown-dialog" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Shut down app">
           <div className="panel-head">
-            <h2>🛑 Shutdown</h2>
+            <h2>Shutdown</h2>
             <span className="spacer" />
             {people.length > 0 && (
               <select className="input sd-picker" value={person} onChange={(e) => setPicked(e.target.value)} aria-label="Switch chat">
@@ -250,17 +247,17 @@ export function ShutdownPage({ shutdown, replies, me, roster = [], onSave, onDel
           <div className={`shutdown-status${on ? ' on' : ''}`}>
             {on ? (
               <>
-                <b>🛑 Shut down for {forWho(shutdown.people || [])}</b>
+                <b>Shut down for {forWho(shutdown.people || [])}</b>
                 <span className="small">
                   Since {when(shutdown.at)} · {wrote} {wrote === 1 ? 'person' : 'people'} wrote
                 </span>
               </>
             ) : (
               <>
-                <b>✅ The app is on</b>
+                <b>The app is on</b>
                 <span className="small muted">
                   Shutting it down shows a full screen with your message and a chat with you, for everyone but you or only the people you
-                  pick. Their messages come to you here and in 🔔.
+                  pick. Their messages come to you here and in your notifications.
                 </span>
               </>
             )}
@@ -328,7 +325,7 @@ export function ShutdownPage({ shutdown, replies, me, roster = [], onSave, onDel
                 disabled={busy}
                 onClick={() => save({ on: false, ...fields, at: shutdown.at, endedAt: Date.now() })}
               >
-                ✅ Turn the app back on
+                Turn the app back on
               </button>
               {editing ? (
                 <div className="row">
@@ -365,7 +362,7 @@ export function ShutdownPage({ shutdown, replies, me, roster = [], onSave, onDel
             </div>
           ) : (
             <button className="btn danger big-btn" disabled={!ready} onClick={() => setAsking(true)}>
-              🛑 Shut down app
+              Shut down app
             </button>
           )}
           {person ? (

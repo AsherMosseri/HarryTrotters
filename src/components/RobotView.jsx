@@ -651,13 +651,13 @@ export default function RobotView({ robot, tasks, parts, actor, isManager, api, 
                           <StatusDot status={taskById[p.taskId].status} /> {taskById[p.taskId].title}
                         </button>
                       )}
-                      {partById[p.partId] && <span className="tag">🔩 {partById[p.partId].name}</span>}
+                      {partById[p.partId] && <span className="tag">{partById[p.partId].name}</span>}
                     </div>
                   )}
                   {openPin === p.id && (
                     <div className="row gap wrap pin-actions" onClick={(e) => e.stopPropagation()}>
                       <button className="btn small-btn" onClick={() => api.updateRobotPin(p.id, { resolved: !p.resolved })}>
-                        {p.resolved ? 'Reopen' : '✓ Resolve'}
+                        {p.resolved ? 'Reopen' : 'Resolve'}
                       </button>
                       {!p.taskId && (
                         <button

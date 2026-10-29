@@ -91,7 +91,7 @@ function TextPoll({ m, actor, onAnswer, onEnd, onReopen, canEnd }) {
   };
   return (
     <div className="poll poll-text" onClick={(e) => e.stopPropagation()}>
-      <div className="poll-q">✍️ {m.poll.question}</div>
+      <div className="poll-q">{m.poll.question}</div>
       <div className="muted tiny">
         {closed ? 'Poll ended' : 'Write your answer'} · {answers.length} {answers.length === 1 ? 'answer' : 'answers'}
         {m.poll.required && !closed && <span className="poll-required"> · Everyone has to answer</span>}
@@ -201,7 +201,7 @@ function ChoicePoll({ m, actor, onVote, onEnd, onReopen, canEnd }) {
   const closed = !!m.poll.closed;
   return (
     <div className="poll" onClick={(e) => e.stopPropagation()}>
-      <div className="poll-q">📊 {m.poll.question}</div>
+      <div className="poll-q">{m.poll.question}</div>
       <div className="muted tiny">
         {closed ? 'Poll ended' : m.poll.multi ? 'Pick one or more' : 'Pick one'} · {voters.size} {voters.size === 1 ? 'vote' : 'votes'}
         {m.poll.required && !closed && <span className="poll-required"> · Everyone has to answer</span>}
@@ -235,27 +235,6 @@ function ChoicePoll({ m, actor, onVote, onEnd, onReopen, canEnd }) {
 }
 
 const fmtSize = (n) => (n > 1e6 ? `${(n / 1e6).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1e3))} KB`);
-const FILE_ICONS = {
-  pdf: '📕',
-  stl: '🧊',
-  step: '🧊',
-  stp: '🧊',
-  f3d: '🧊',
-  glb: '🧊',
-  zip: '🗜',
-  java: '☕',
-  kt: '💻',
-  py: '🐍',
-  txt: '📄',
-  doc: '📘',
-  docx: '📘',
-  xls: '📗',
-  xlsx: '📗',
-  csv: '📗',
-  ppt: '📙',
-  pptx: '📙',
-};
-
 // A file in a message: videos and audio play inline, pictures show, anything
 // else is a download card.
 function Attachment({ f }) {
@@ -272,7 +251,7 @@ function Attachment({ f }) {
   const ext = (f.name.split('.').pop() || '').toLowerCase();
   return (
     <a className="file-card" href={f.url} target="_blank" rel="noreferrer" download={f.name} onClick={(e) => e.stopPropagation()}>
-      <span className="file-icon">{FILE_ICONS[ext] || '📎'}</span>
+      <span className="file-icon">{(ext || 'file').slice(0, 4).toUpperCase()}</span>
       <span className="grow">
         <b className="file-name">{f.name}</b>
         <span className="muted tiny">{fmtSize(f.size)}</span>

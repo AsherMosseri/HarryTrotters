@@ -188,7 +188,7 @@ export function WelcomeCard({ name, showRobot, pushStatus, onEnablePush, onClose
     <Overlay>
       <div className="panel-backdrop center" onClick={onClose}>
         <div className="dialog welcome" onClick={(e) => e.stopPropagation()} role="dialog" aria-labelledby="welcome-title">
-          <h2 id="welcome-title">Welcome, {name.split(' ')[0]}! 👋</h2>
+          <h2 id="welcome-title">Welcome, {name.split(' ')[0]}</h2>
           <p className="muted">Here’s how the {TEAM_NAME} task board works.</p>
           <TipList />
           <Rules />
@@ -204,7 +204,7 @@ export function WelcomeCard({ name, showRobot, pushStatus, onEnablePush, onClose
                   onClose();
                 }}
               >
-                {busy ? 'Turning on…' : '🔔 Turn on notifications'}
+                {busy ? 'Turning on…' : 'Turn on notifications'}
               </button>
               <button className="link-btn" onClick={onClose}>
                 Not now
@@ -234,7 +234,7 @@ export function UpdateCheck() {
         {state === 'checking' ? 'Checking…' : '↻ Check for updates'}
       </button>
       <span className="muted small" role="status">
-        {state?.status === 'latest' && `✓ You’re on the newest version (${state.release || VERSION}).`}
+        {state?.status === 'latest' && `You’re on the newest version (${state.release || VERSION}).`}
         {state?.status === 'new' && `Version ${state.release} is ready.`}
         {state?.status === 'offline' && 'Couldn’t check. Are you online?'}
       </span>

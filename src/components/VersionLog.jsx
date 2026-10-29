@@ -104,7 +104,7 @@ export function WhatsNew({ versions, onClose, onFullLog, onRequest }) {
           ))}
           {onRequest && (
             <div className="whats-new-idea">
-              <h3>💡 What should we add next?</h3>
+              <h3>What should we add next?</h3>
               <RequestBox onSend={onRequest} />
             </div>
           )}

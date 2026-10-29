@@ -72,7 +72,7 @@ export function LabLogDialog({ day, person, log, shift, tasks, hours, mode, onSa
       <div className="panel-backdrop center">
         <div className="dialog lablog-dialog" role="dialog" aria-label="Lab log">
           <div className="panel-head">
-            <h2>🧪 {title}</h2>
+            <h2>{title}</h2>
             <span className="spacer" />
             {onCancel && mode !== 'end' && (
               <button className="icon-btn" onClick={onCancel} aria-label="Close">
@@ -92,7 +92,7 @@ export function LabLogDialog({ day, person, log, shift, tasks, hours, mode, onSa
             </p>
           )}
           <label className="lablog-field">
-            <span>✍️ What you did</span>
+            <span>What you did</span>
             <AutoTextarea
               className="input"
               value={note}
@@ -104,7 +104,7 @@ export function LabLogDialog({ day, person, log, shift, tasks, hours, mode, onSa
           </label>
           {list.length > 0 && (
             <div className="lablog-field">
-              <span>📋 Tasks you worked on</span>
+              <span>Tasks you worked on</span>
               <div className="lablog-tasks">
                 {list.map((t) => {
                   const on = taskIds.includes(t.id);
@@ -131,7 +131,7 @@ export function LabLogDialog({ day, person, log, shift, tasks, hours, mode, onSa
             </div>
           )}
           <div className="lablog-field">
-            <span>📷 Photos</span>
+            <span>Photos</span>
             <div className="lablog-photos">
               {photos.map((p, i) => (
                 <span key={p.url} className="lablog-photo">
@@ -165,7 +165,7 @@ export function LabLogDialog({ day, person, log, shift, tasks, hours, mode, onSa
             </div>
           </div>
           <label className="lablog-field">
-            <span>🚧 Anything blocking you? (optional)</span>
+            <span>Anything blocking you? (optional)</span>
             <AutoTextarea
               className="input"
               value={blockers}
@@ -175,7 +175,7 @@ export function LabLogDialog({ day, person, log, shift, tasks, hours, mode, onSa
             />
           </label>
           <label className="lablog-field">
-            <span>🎯 Next time (optional)</span>
+            <span>Next time (optional)</span>
             <AutoTextarea
               className="input"
               value={next}
@@ -221,7 +221,7 @@ export function LabDay({ c, onPerson }) {
   return (
     <div className="lablog-day">
       <div className="lablog-day-head">
-        <b className="cmd-big">🧪 {dayLabel(c.day)}</b>
+        <b className="cmd-big">{dayLabel(c.day)}</b>
         <span className="muted small">
           {logs.length} {logs.length === 1 ? 'log' : 'logs'}
           {total ? ` · ${total} h at the lab` : ''}
@@ -247,7 +247,8 @@ export function LabDay({ c, onPerson }) {
             <div className="lablog-entry-tasks">
               {l.taskIds.map((id) => (
                 <span key={id} className={`chip${(l.doneTaskIds || []).includes(id) ? ' done' : ''}`}>
-                  {(l.doneTaskIds || []).includes(id) ? '✅' : '🔧'} {taskTitle(id)}
+                  {taskTitle(id)}
+                  {(l.doneTaskIds || []).includes(id) ? ' (done)' : ''}
                 </span>
               ))}
             </div>
@@ -263,17 +264,17 @@ export function LabDay({ c, onPerson }) {
           )}
           {l.blockers && (
             <div className="lablog-blockers">
-              <b>🚧 Blocked:</b> {l.blockers}
+              <b>Blocked:</b> {l.blockers}
             </div>
           )}
           {l.next && (
             <div className="lablog-next">
-              <b>🎯 Next time:</b> {l.next}
+              <b>Next time:</b> {l.next}
             </div>
           )}
         </div>
       ))}
-      {atLab.length > 0 && <div className="muted small">🟢 At the lab now: {atLab.map((n) => n.split(' ')[0]).join(', ')}</div>}
+      {atLab.length > 0 && <div className="muted small">At the lab now: {atLab.map((n) => n.split(' ')[0]).join(', ')}</div>}
       {stillToLog.length > 0 && <div className="muted small">Still to log: {stillToLog.map((n) => n.split(' ')[0]).join(', ')}</div>}
     </div>
   );

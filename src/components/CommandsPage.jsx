@@ -82,7 +82,7 @@ export default function CommandsPage({ cfg = {}, channels, bank, lottery, onSave
       <div className="panel-backdrop center" onClick={onClose}>
         <div className="dialog ads-settings cmd-admin" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Commands">
           <div className="panel-head">
-            <h2>🤖 Commands</h2>
+            <h2>Commands</h2>
             <span className="spacer" />
             <button className="icon-btn" onClick={onClose} aria-label="Close">
               <CloseIcon />

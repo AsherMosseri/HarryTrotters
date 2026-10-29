@@ -1173,7 +1173,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
         end: Date.now(),
       });
     setLabLog(null);
-    setToast({ text: st.mode === 'end' ? '🧪 Logged and shift ended. See you next time!' : '🧪 Saved to #lab-log.' });
+    setToast({ text: st.mode === 'end' ? 'Logged. Your shift is over.' : 'Saved to #lab-log.' });
   };
 
   const startMyShift = useCallback(
@@ -1181,7 +1181,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
       if (liveMyShift.current) return setShiftPanel(true);
       await api.startShifts([actor.name], Date.now(), extra);
       setToast({
-        text: '⏱ Shift started',
+        text: 'Shift started',
         action: { label: 'Undo', run: () => liveMyShift.current && api.deleteShift(liveMyShift.current.id) },
       });
     },
@@ -1722,7 +1722,9 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
                 {pageHead}
                 {taskView && announcement && (
                   <div className="announce-banner" role="status">
-                    <span className="announce-icon">📣</span>
+                    <span className="announce-icon">
+                      <Icon name="announce" size={20} />
+                    </span>
                     <div className="grow">
                       <b>{announcement.by.split(' ')[0]}:</b> {announcement.text || (announcement.gif ? 'sent a GIF' : 'shared a photo')}
                     </div>
@@ -2171,7 +2173,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
                                   end: Date.now(),
                                 });
                                 setLabLog(null);
-                                setToast({ text: '⏱ Shift ended. See you next time!' });
+                                setToast({ text: 'Shift ended.' });
                               }
                             : null
                         }

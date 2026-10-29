@@ -5,8 +5,8 @@ import { firstName } from '../util.js';
 import { AutoTextarea, Avatar, CloseIcon, Overlay } from './common.jsx';
 
 export const SLOTS = [
-  { id: 'lunch', label: 'Lunch', icon: '🥪' },
-  { id: 'after', label: 'After school', icon: '🏫' },
+  { id: 'lunch', label: 'Lunch', icon: '' },
+  { id: 'after', label: 'After school', icon: '' },
 ];
 const slotById = Object.fromEntries(SLOTS.map((s) => [s.id, s]));
 const dayLabel = (iso) =>
@@ -27,9 +27,7 @@ function AnswerForm({ checkin, initial, submitLabel, onDone }) {
     <div className="checkin-form">
       {(checkin.slots || []).map((s) => (
         <div key={s} className="checkin-slot">
-          <span className="checkin-slot-label">
-            {slotById[s]?.icon} {slotById[s]?.label || s}
-          </span>
+          <span className="checkin-slot-label">{slotById[s]?.label || s}</span>
           <div className="checkin-yn">
             <button
               className={`checkin-yes${a[s] === true ? ' on' : ''}`}
@@ -62,7 +60,7 @@ export function CheckinGate({ checkin, rename, onAnswer, onSkip }) {
     <Overlay>
       <div className="checkin-gate" role="alertdialog" aria-labelledby="checkin-title">
         <div className="gate-card checkin-card">
-          <div className="logo-mark big">🧪</div>
+          <p className="gate-eyebrow">Lab check-in</p>
           <h1 id="checkin-title">{checkin.question || 'Are you going to the lab today?'}</h1>
           <p className="muted">
             Lab check-in from {firstName(rename(checkin.by || ''))} · {dayLabel(checkin.date)}. Answer to keep going.
@@ -120,7 +118,7 @@ export function CheckinCard({ checkin, roster, gradeOf, me, isManager, rename, o
     <section className="chart-card checkin-results">
       <div className="shift-sec-head">
         <h2>
-          🧪 {checkin.question || 'Lab check-in'} <span className="muted small">· {dayLabel(checkin.date)}</span>
+          {checkin.question || 'Lab check-in'} <span className="muted small">· {dayLabel(checkin.date)}</span>
         </h2>
         <span className="spacer" />
         {mine && !changing && (
@@ -154,18 +152,18 @@ export function CheckinCard({ checkin, roster, gradeOf, me, isManager, rename, o
         {(checkin.slots || []).includes('lunch') && (
           <>
             <div>
-              <h3>🥪 Middle school lunch</h3>
+              <h3>Middle school lunch</h3>
               <Names names={yes('lunch').filter((n) => lunchOf(gradeOf(n)) === 'Middle school lunch')} />
             </div>
             <div>
-              <h3>🥪 High school lunch</h3>
+              <h3>High school lunch</h3>
               <Names names={yes('lunch').filter((n) => lunchOf(gradeOf(n)) === 'High school lunch')} />
             </div>
           </>
         )}
         {(checkin.slots || []).includes('after') && (
           <div>
-            <h3>🏫 After school</h3>
+            <h3>After school</h3>
             <Names names={yes('after')} />
           </div>
         )}
@@ -218,7 +216,7 @@ export function CheckinDialog({ schedule, onDone, onSchedule, onClose }) {
       <div className="panel-backdrop center" onClick={onClose}>
         <div className="dialog shift-dialog" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Lab check-in">
           <div className="panel-head">
-            <h2>🧪 Lab check-in</h2>
+            <h2>Lab check-in</h2>
             <span className="spacer" />
             <button className="icon-btn" onClick={onClose} aria-label="Close">
               <CloseIcon />
@@ -292,7 +290,7 @@ export function CheckinDialog({ schedule, onDone, onSchedule, onClose }) {
                   aria-pressed={slots.includes(s.id)}
                   onClick={() => toggle(s.id)}
                 >
-                  {s.icon} {s.label}
+                  {s.label}
                 </button>
               ))}
             </div>
@@ -341,7 +339,7 @@ export function PollGate({ msg, rename, onVote, onAnswer, onSkip }) {
     <Overlay>
       <div className="checkin-gate" role="alertdialog" aria-labelledby="pollgate-title">
         <div className="gate-card checkin-card">
-          <div className="logo-mark big">📊</div>
+          <p className="gate-eyebrow">Poll</p>
           <h1 id="pollgate-title">{poll.question}</h1>
           <p className="muted">
             Poll from {firstName(rename(msg.by || ''))} in #announcements.{' '}

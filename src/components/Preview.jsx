@@ -45,7 +45,7 @@ export function PreviewBar({ as, onExit }) {
   }, []);
   const strip = (shown) => (
     <div className={`preview-strip${shown ? ' on-top' : ''}`} role={shown ? 'status' : undefined} aria-hidden={shown ? undefined : true}>
-      <span>{nudge ? 'Preview is look only: nothing was changed' : `👁 Viewing as ${as || 'a teammate'}`}</span>
+      <span>{nudge ? 'Preview is look only: nothing was changed' : `Viewing as ${as || 'a teammate'}`}</span>
       <button className="btn small-btn" onClick={onExit} tabIndex={shown ? undefined : -1}>
         Exit
       </button>
