@@ -117,7 +117,7 @@ button.sb-head-row { width: 100%; border: 0; background: none; color: var(--mute
 
 /* ---------- tasks ---------- */
 .shell .board { gap: 18px; }
-.shell .column { background: transparent; border: 0; border-top: 0; max-height: none; }
+.shell .column { background: transparent; border: 0; border-top: 0; max-height: calc(var(--vvh, 100dvh) - 190px); }
 .shell .column.over { box-shadow: none; background: color-mix(in srgb, var(--c) 7%, transparent); border-radius: 10px; }
 .shell .column-head { padding: 4px 2px 10px; gap: 8px; }
 .shell .column-head .dot { width: 8px; height: 8px; }
@@ -511,3 +511,6 @@ button.sb-head-row { width: 100%; border: 0; background: none; color: var(--mute
 .shift-pill-label { display: none; }
 .sb-shift-row .shift-pill-label { display: inline; flex: 1; text-align: left; font-weight: 600; }
 .sb-row .deco, .sb-row .avatar-wrap { flex: none; }
+/* The board fits the screen; a long column scrolls inside itself. */
+.shell .column-body { overscroll-behavior: contain; }
+.phone-shell .column { max-height: none; }
