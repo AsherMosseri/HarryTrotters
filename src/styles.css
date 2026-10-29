@@ -3365,3 +3365,4 @@ html.kb-open .toast { bottom: auto; top: calc(var(--vvt) + var(--vvh) - 64px); }
 .app.previewing .topbar { padding-top: 10px; }
 .update-plain { padding: 28px; }
 .update-plain .big-btn { width: 100%; }
+.sd-people { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; font-weight: 400; }

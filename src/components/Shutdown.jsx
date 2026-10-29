@@ -180,11 +180,14 @@ export function ShutdownScreen({ shutdown, store, actor }) {
 
 // Asher's page: shut the app down (or back on), change the message, and chat
 // with each person who wrote (switch between them at the top right).
-export function ShutdownPage({ shutdown, replies, me, onSave, onDelete, onReply, onClose }) {
+export function ShutdownPage({ shutdown, replies, me, roster = [], onSave, onDelete, onReply, onClose }) {
   useEscape(onClose);
   const on = !!shutdown?.on;
   const [message, setMessage] = useState(shutdown?.message || 'Massive bug. The app is shut down while I fix it.');
   const [question, setQuestion] = useState(shutdown?.question ?? 'How long do you want this to be shut down?');
+  // Who it's for: everyone but you, or only the people you pick.
+  const [targets, setTargets] = useState(shutdown?.people || []);
+  const [pickPeople, setPickPeople] = useState(!!shutdown?.people?.length);
   const [asking, setAsking] = useState(false);
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -196,7 +199,14 @@ export function ShutdownPage({ shutdown, replies, me, onSave, onDelete, onReply,
   const [picked, setPicked] = useState(null);
   const person = people.includes(picked) ? picked : people[0];
   const wrote = new Set(replies.filter((r) => r.round === shutdown?.at && r.name !== me).map(personOf)).size;
-  const changed = on && (message.trim() !== shutdown.message || question.trim() !== (shutdown.question || ''));
+  const forList = pickPeople ? targets : [];
+  const changed =
+    on &&
+    (message.trim() !== shutdown.message ||
+      question.trim() !== (shutdown.question || '') ||
+      forList.join() !== (shutdown.people || []).join());
+  const forWho = (list) =>
+    list.length ? (list.length <= 3 ? list.map(firstName).join(', ') : `${list.length} people`) : 'everyone but you';
   const save = async (data) => {
     setBusy(true);
     setError('');
@@ -210,7 +220,8 @@ export function ShutdownPage({ shutdown, replies, me, onSave, onDelete, onReply,
       setBusy(false);
     }
   };
-  const fields = { message: message.trim(), question: question.trim() };
+  const fields = { message: message.trim(), question: question.trim(), people: forList };
+  const ready = !!fields.message && (!pickPeople || targets.length > 0);
   const showFields = !on || editing;
   return (
     <Overlay>
@@ -239,7 +250,7 @@ export function ShutdownPage({ shutdown, replies, me, onSave, onDelete, onReply,
           <div className={`shutdown-status${on ? ' on' : ''}`}>
             {on ? (
               <>
-                <b>🛑 Shut down for everyone but you</b>
+                <b>🛑 Shut down for {forWho(shutdown.people || [])}</b>
                 <span className="small">
                   Since {when(shutdown.at)} · {wrote} {wrote === 1 ? 'person' : 'people'} wrote
                 </span>
@@ -248,8 +259,8 @@ export function ShutdownPage({ shutdown, replies, me, onSave, onDelete, onReply,
               <>
                 <b>✅ The app is on</b>
                 <span className="small muted">
-                  Shutting it down shows everyone but you a full screen with your message and a chat with you. Their messages come to you
-                  here and in 🔔.
+                  Shutting it down shows a full screen with your message and a chat with you, for everyone but you or only the people you
+                  pick. Their messages come to you here and in 🔔.
                 </span>
               </>
             )}
@@ -270,6 +281,43 @@ export function ShutdownPage({ shutdown, replies, me, onSave, onDelete, onReply,
                   maxLength={300}
                 />
               </label>
+              <div className="lablog-field">
+                <span>Who</span>
+                <div className="segmented sd-who" role="radiogroup" aria-label="Who it’s shut down for">
+                  {[
+                    [false, 'Everyone'],
+                    [true, 'Pick people'],
+                  ].map(([v, text]) => (
+                    <button
+                      key={text}
+                      role="radio"
+                      aria-checked={pickPeople === v}
+                      className={`plain-seg${pickPeople === v ? ' on' : ''}`}
+                      onClick={() => setPickPeople(v)}
+                    >
+                      {text}
+                    </button>
+                  ))}
+                </div>
+                {pickPeople && (
+                  <div className="ads-people sd-people">
+                    {roster.map((n) => {
+                      const chosen = targets.includes(n);
+                      return (
+                        <button
+                          key={n}
+                          className={`chip${chosen ? ' on' : ''}`}
+                          aria-pressed={chosen}
+                          onClick={() => setTargets(chosen ? targets.filter((x) => x !== n) : [...targets, n])}
+                        >
+                          {chosen ? '✓ ' : ''}
+                          {n}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </>
           )}
           {error && <div className="casino-error">{error}</div>}
@@ -286,10 +334,10 @@ export function ShutdownPage({ shutdown, replies, me, onSave, onDelete, onReply,
                 <div className="row">
                   <button
                     className="btn grow"
-                    disabled={!changed || busy}
+                    disabled={!changed || !ready || busy}
                     onClick={() => save({ on: true, ...fields, at: shutdown.at, endedAt: null })}
                   >
-                    Update message
+                    Update
                   </button>
                   <button className="btn" onClick={() => setEditing(false)}>
                     Cancel
@@ -297,16 +345,16 @@ export function ShutdownPage({ shutdown, replies, me, onSave, onDelete, onReply,
                 </div>
               ) : (
                 <button className="link-btn small" onClick={() => setEditing(true)}>
-                  Edit message
+                  Edit message or who
                 </button>
               )}
             </div>
           ) : asking ? (
             <div className="poll-confirm" role="group" aria-label="Shut down the app?">
-              <span className="small">Shut down the app for everyone else right now?</span>
+              <span className="small">Shut down the app for {forWho(forList)} right now?</span>
               <button
                 className="btn small-btn danger"
-                disabled={busy || !fields.message}
+                disabled={busy || !ready}
                 onClick={() => save({ on: true, ...fields, at: Date.now(), endedAt: null })}
               >
                 Shut it down
@@ -316,7 +364,7 @@ export function ShutdownPage({ shutdown, replies, me, onSave, onDelete, onReply,
               </button>
             </div>
           ) : (
-            <button className="btn danger big-btn" disabled={!fields.message} onClick={() => setAsking(true)}>
+            <button className="btn danger big-btn" disabled={!ready} onClick={() => setAsking(true)}>
               🛑 Shut down app
             </button>
           )}

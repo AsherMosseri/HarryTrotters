@@ -98,7 +98,9 @@ export default function App() {
       />
     );
   const exitPreview = () => setPreview(null);
-  if (shutdown?.on && !(owner && !preview))
+  // Shut down for everyone but Asher, or only for the people he picked.
+  const shutFor = (name) => shutdown?.on && (!shutdown.people?.length || shutdown.people.includes(name));
+  if (actor && shutFor(viewer.name) && !(owner && !preview))
     return (
       <>
         {preview && owner && <PreviewBar as={preview.as} onExit={exitPreview} />}

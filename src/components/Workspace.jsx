@@ -1599,7 +1599,14 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
           )}
           {isOwner && shutdown?.on && (
             <div className="shutdown-banner" role="status">
-              <span>🛑 Shut down for everyone but you</span>
+              <span>
+                🛑 Shut down for{' '}
+                {shutdown.people?.length
+                  ? shutdown.people.length <= 3
+                    ? shutdown.people.map((n) => n.split(' ')[0]).join(', ')
+                    : `${shutdown.people.length} people`
+                  : 'everyone but you'}
+              </span>
               <button className="btn small-btn" onClick={() => setShutdownPage(true)}>
                 {shutdownNew ? `Chats (${shutdownNew} new)` : 'Manage'}
               </button>
@@ -2265,6 +2272,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
               shutdown={shutdown}
               replies={shutdownReplies}
               me={actor.name}
+              roster={roster.filter((n) => n !== actor.name)}
               onSave={(data) => store.setShutdown(data, actor)}
               onDelete={(id) => store.deleteShutdownReply(id)}
               onReply={(person, text) => store.sendShutdownReply(text, shutdown?.at || 0, actor, person)}

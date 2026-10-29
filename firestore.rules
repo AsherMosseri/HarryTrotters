@@ -77,11 +77,14 @@ service cloud.firestore {
     function labLogOff() { return !isOwner() && exists(controlsPath()) && get(controlsPath()).data.get('labLog', 'required') == 'off'; }
     // Asher: the manager who joined as Asher Mosseri (that needs his manager code).
     function isOwner() { return isManager() && myName().lower() == 'asher mosseri'; }
+    // people: who it's shut down for (names); empty means everyone but Asher.
     function validShutdown(d) {
-      return d.keys().hasOnly(['on', 'message', 'question', 'at', 'endedAt', 'by', 'updatedAt'])
+      return d.keys().hasOnly(['on', 'message', 'question', 'people', 'at', 'endedAt', 'by', 'updatedAt'])
         && d.on is bool && d.message is string && d.message.size() <= 2000
-        && d.get('question', '') is string && d.get('question', '').size() <= 300;
+        && d.get('question', '') is string && d.get('question', '').size() <= 300
+        && d.get('people', []) is list && d.get('people', []).size() <= 100;
     }
+    function shutdownFor(sd) { return sd.get('on', false) == true && (sd.get('people', []).size() == 0 || inPeople(sd.get('people', []))); }
     // The shutdown chats: each teammate's back-and-forth with Asher
     // (person = whose chat, name = who wrote it). Teammates read and write
     // only their own, and only while the app is shut down; Asher reads all
@@ -98,7 +101,7 @@ service cloud.firestore {
       allow delete: if isOwner();
       allow create: if isMember() && validReply(request.resource.data)
         && (isOwner() || (isMe(request.resource.data.person)
-          && get(/databases/$(database)/documents/settings/shutdown).data.get('on', false) == true));
+          && shutdownFor(get(/databases/$(database)/documents/settings/shutdown).data)));
     }
 
     // Pretend-ad view and tap counts (the fake earnings on the Ads page).

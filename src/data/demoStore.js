@@ -1049,7 +1049,9 @@ export const demoStore = {
     commit();
   },
   async sendShutdownReply(text, round, actor, person = actor.name) {
-    if (!state.shutdown?.on && person === actor.name) throw new Error('The app is back on.');
+    const sd = state.shutdown;
+    const forMe = sd?.on && (!sd.people?.length || sd.people.includes(actor.name));
+    if (!forMe && person === actor.name) throw new Error('The app is back on.');
     state.shutdownReplies = [
       { id: uid(), text, round, person, name: actor.name, byUid: actor.uid, at: Date.now() },
       ...(state.shutdownReplies || []),
