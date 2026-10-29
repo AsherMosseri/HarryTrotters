@@ -12,8 +12,9 @@ import {
   useSensors,
 } from '@dnd-kit/core';
 import { STATUSES, priorityById } from '../config.js';
-import { AvatarStack, DueChip, PriorityBadge, CommentIcon, PlusIcon } from './common.jsx';
-import { useLocalStorage } from '../util.js';
+import { AvatarStack, PlusIcon } from './common.jsx';
+import { Icon } from './shell/icons.jsx';
+import { dueInfo, useLocalStorage } from '../util.js';
 import { SponsoredCard, boardAdCount, useAds } from './Ads.jsx';
 
 // Drop into whichever column is under the finger/cursor; fall back to overlap.
@@ -30,33 +31,45 @@ function byPriorityThenDue(a, b) {
   );
 }
 
+// A card: the title first, then one quiet line of details (priority only
+// when it's urgent or high), then who and when.
 function CardBody({ task }) {
+  const due = dueInfo(task.dueDate, task.status);
+  const prio = task.priority === 'urgent' || task.priority === 'high' ? priorityById[task.priority] : null;
+  const meta = [task.subteam, task.milestoneTitle].filter(Boolean);
+  const list = task.checklist || [];
   return (
     <>
       {task.photos?.length > 0 && (
         <img className="card-cover" src={task.photos[0].thumbUrl || task.photos[0].url} alt="" loading="lazy" draggable="false" />
       )}
-      <div className="card-top">
-        <PriorityBadge value={task.priority} />
-        {task.subteam && <span className="tag">{task.subteam}</span>}
-      </div>
       <div className="card-title">{task.title || <span className="muted">Untitled</span>}</div>
-      {task.milestoneTitle && <div className="card-ms">◆ {task.milestoneTitle}</div>}
-      {task.status === 'blocked' && task.blockedReason && <div className="blocked-note">⛔ {task.blockedReason}</div>}
+      {(prio || meta.length > 0) && (
+        <div className="card-meta">
+          {prio && <span className={`card-prio p-${task.priority}`}>{prio.label}</span>}
+          {prio && meta.length > 0 && ' · '}
+          {meta.join(' · ')}
+        </div>
+      )}
+      {task.status === 'blocked' && task.blockedReason && <div className="blocked-note">Waiting: {task.blockedReason}</div>}
       <div className="card-foot">
         <AvatarStack names={task.assignees} size={22} />
         <span className="spacer" />
-        {task.checklist?.length > 0 && (
-          <span className={`meta-count${task.checklist.every((i) => i.done) ? ' all-done' : ''}`} title="Checklist">
-            ☑ {task.checklist.filter((i) => i.done).length}/{task.checklist.length}
+        {list.length > 0 && (
+          <span className={`card-count${list.every((i) => i.done) ? ' all-done' : ''}`} title="Checklist">
+            <Icon name="checklists" size={14} /> {list.filter((i) => i.done).length}/{list.length}
           </span>
         )}
         {task.commentCount > 0 && (
-          <span className="meta-count">
-            <CommentIcon /> {task.commentCount}
+          <span className="card-count" title="Comments">
+            <Icon name="chat" size={14} /> {task.commentCount}
           </span>
         )}
-        <DueChip dueDate={task.dueDate} status={task.status} />
+        {due && (
+          <span className={`card-due ${due.tone}`} title={due.title}>
+            {due.label}
+          </span>
+        )}
       </div>
     </>
   );

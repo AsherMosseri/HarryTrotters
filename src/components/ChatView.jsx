@@ -9,6 +9,7 @@ import { CommandNote } from './chat/Commands.jsx';
 import { mentionPattern } from './chat/format.jsx';
 import { EmojiManager, StickerManager } from './chat/Pickers.jsx';
 import { ChannelDialog, ChannelIcon, MembersPanel, NewDmDialog, NotifyMenu, PinsPanel, SearchPanel, slugChannel } from './chat/Panels.jsx';
+import { Icon } from './shell/icons.jsx';
 import { BotReplies, ChatAd, chatAdSpots, useAds } from './Ads.jsx';
 
 const GROUP_MINUTES = 5;
@@ -99,6 +100,11 @@ export default function ChatView({
   // side panels, and a button to open it in the Chat tab.
   embedded = false,
   onOpenFull,
+  // The app's sidebar lists the channels (iPads and computers), and asks for
+  // the new-message and channel dialogs through `ask`.
+  noList = false,
+  ask,
+  onAsked,
 }) {
   // Asher's Controls: what's switched off isn't shown here at all.
   const feat = useControls().isOn;
@@ -118,6 +124,11 @@ export default function ChatView({
     !embedded && typeof matchMedia === 'function' && matchMedia('(min-width: 1200px)').matches ? 'members' : null,
   );
   const [dialog, setDialog] = useState(null); // { type: 'channel', channel? } | { type: 'dm' } | { type: 'emoji' }
+  useEffect(() => {
+    if (!ask) return;
+    setDialog({ type: ask.type, ...(ask.channel ? { channel: ask.channel } : {}) });
+    onAsked?.();
+  }, [ask, onAsked]);
   const [notifyOpen, setNotifyOpen] = useState(false);
   const [showTeamDms, setShowTeamDms] = useState(false);
   const [flash, setFlash] = useState(null);
@@ -363,9 +374,9 @@ export default function ChatView({
   );
 
   return (
-    <main className={`content chat${side ? ' with-side' : ''}${embedded ? ' embedded' : ''}`}>
-      {!embedded && <aside className="channel-list">{sideList}</aside>}
-      {!embedded && (
+    <main className={`content chat${side ? ' with-side' : ''}${embedded ? ' embedded' : ''}${noList ? ' no-list' : ''}`}>
+      {!embedded && !noList && <aside className="channel-list">{sideList}</aside>}
+      {!embedded && !noList && (
         <div className="chat-mobile-bar">
           <select className="input channel-select" value={conv.key} onChange={(e) => setCurrent(e.target.value)} aria-label="Channel or DM">
             <optgroup label="Channels">
@@ -446,7 +457,7 @@ export default function ChatView({
                     title="Search"
                     aria-label="Search messages"
                   >
-                    🔍
+                    <Icon name="search" />
                   </button>
                 )}
                 {feat('pins') && (
@@ -456,7 +467,7 @@ export default function ChatView({
                     title="Pinned messages"
                     aria-label="Pinned messages"
                   >
-                    📌
+                    <Icon name="pin" />
                   </button>
                 )}
               </>
@@ -469,7 +480,7 @@ export default function ChatView({
                   title="Notification settings"
                   aria-label="Notification settings"
                 >
-                  {level.value === 'none' ? '🔕' : level.value === 'all' ? '🔔' : '🔔'}
+                  <Icon name={level.value === 'none' ? 'bellOff' : 'bell'} />
                   {level.value === 'all' && <span className="notify-all-dot" />}
                 </button>
                 {notifyOpen && (
@@ -492,7 +503,7 @@ export default function ChatView({
                 title="Members"
                 aria-label="Members"
               >
-                👥
+                <Icon name="team" />
               </button>
             )}
           </div>

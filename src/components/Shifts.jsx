@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { Icon } from './shell/icons.jsx';
 import { SUBTEAMS } from '../config.js';
 import { addDays, mondayOf, parseDay, toISO, todayISO } from '../milestones.js';
 import { firstName } from '../util.js';
@@ -98,7 +99,7 @@ export function ShiftButton({ shift, open, setOpen, myTasks, onStart, onUpdate, 
   if (!shift)
     return (
       <button className="icon-btn shift-btn" title="Start a shift now" aria-label="Start a shift now" onClick={() => onStart()}>
-        ⏱
+        <Icon name="shifts" size={20} />
       </button>
     );
   const details = { note: note.trim(), subteam, taskIds };
@@ -112,7 +113,8 @@ export function ShiftButton({ shift, open, setOpen, myTasks, onStart, onUpdate, 
         aria-label={`On shift for ${timer(now - shift.start)}`}
         title="Your shift"
       >
-        <span className="shift-live" aria-hidden="true" />⏱ {timer(now - shift.start)}
+        <span className="shift-live" aria-hidden="true" />
+        {timer(now - shift.start)}
       </button>
       {open && (
         <div className="shift-pop" role="dialog" aria-label="Your shift">
@@ -536,16 +538,16 @@ export default function ShiftsView({
         <span className="spacer" />
         {isManager && (
           <button className="btn" onClick={() => setDialog('checkin')}>
-            🧪 Lab check-in
+            Lab check-in
           </button>
         )}
         {mine ? (
           <button className="btn primary" onClick={onOpenMine}>
-            ⏱ End my shift
+            End my shift
           </button>
         ) : (
           <button className="btn primary" onClick={() => onStartMine()}>
-            ⏱ Start shift now
+            Start shift now
           </button>
         )}
       </div>

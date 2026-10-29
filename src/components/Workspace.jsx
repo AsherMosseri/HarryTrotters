@@ -34,6 +34,9 @@ import CatParty from './CatParty.jsx';
 import TrashDialog from './TrashDialog.jsx';
 import RunsView from './RunsView.jsx';
 import ChatView from './ChatView.jsx';
+import Sidebar from './shell/Sidebar.jsx';
+import Today from './shell/Today.jsx';
+import { Icon } from './shell/icons.jsx';
 // The 3D viewer pulls in three.js, so it loads only when the Robot tab opens.
 const RobotView = lazy(() => import('./RobotView.jsx'));
 import { HelpDialog, UpdateCheck, WelcomeCard } from './Help.jsx';
@@ -241,6 +244,7 @@ function Countdown({ date }) {
 }
 
 const VIEWS = [
+  ['today', 'Today'],
   ['board', 'Board'],
   ['table', 'Table'],
   ['chat', 'Chat'],
@@ -316,7 +320,25 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
   const whatsNew =
     welcomed && seenVersion && seenVersion !== VERSION ? versionsSince(seenVersion) : welcomed && !seenVersion ? versionsSince(null) : null;
   const [showHelp, setShowHelp] = useState(false);
-  const [savedView, setView] = useLocalStorage('view', 'board');
+  // The page on screen. Each launch starts on Today; a quiet reload (an update)
+  // keeps the page you were on.
+  const [savedView, setSavedView] = useState(() => {
+    try {
+      return sessionStorage.getItem('view') || 'today';
+    } catch {
+      return 'today';
+    }
+  });
+  const setView = useCallback((v) => {
+    setSavedView(v);
+    try {
+      sessionStorage.setItem('view', v);
+    } catch {
+      /* private mode */
+    }
+  }, []);
+  // Tasks is one page with two layouts (board or table).
+  const [tasksMode, setTasksMode] = useLocalStorage('tasks-mode', 'board');
   // Phones get a slim top bar, a bottom tab bar, and sheets instead of the header's buttons.
   const phone = useMedia('(max-width: 760px)');
   const showRobot = ROBOT_TAB_PEOPLE.includes(actor.name);
@@ -1492,6 +1514,155 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
     Boolean,
   ).length;
 
+  // iPads and computers: the sidebar, with the page beside it (phones keep
+  // the header and bottom tab bar).
+  const sidebarOn = [...new Set(views.map(([id]) => (id === 'board' || id === 'table' ? 'tasks' : id)))];
+  const page = taskView ? 'tasks' : view;
+  const openPage = (id) => {
+    if (id !== 'tasks') return setView(id);
+    const on = views.map(([v]) => v);
+    setView(on.includes(tasksMode) ? tasksMode : on.includes('board') ? 'board' : 'table');
+  };
+  const openConv = (key) => {
+    setChatChannel(key);
+    setView('chat');
+  };
+  const [chatAsk, setChatAsk] = useState(null);
+  const clearChatAsk = useCallback(() => setChatAsk(null), []);
+  const frame = (inner) =>
+    phone ? (
+      inner
+    ) : (
+      <div className="shell">
+        <Sidebar
+          on={sidebarOn}
+          page={page}
+          setPage={openPage}
+          convs={convs}
+          currentConv={currentConv}
+          unread={unread}
+          onOpenConv={openConv}
+          onNewDm={() => {
+            setView('chat');
+            setChatAsk({ type: 'dm', n: Date.now() });
+          }}
+          onChatAsk={(ask) => {
+            if (ask.channel) setChatChannel(ask.channel.key);
+            setView('chat');
+            setChatAsk({ ...ask, n: Date.now() });
+          }}
+          isManager={actor.admin}
+          myOpen={myOpenTasks.length}
+          actor={actor}
+          dmsOn={controls.isOn('dms')}
+          topRight={
+            <>
+              {shiftButton}
+              {inboxButton}
+            </>
+          }
+          me={meChip}
+          onLogo={() => controls.isOn('catParty') && setCat(true)}
+        />
+        <div className="shell-main">{inner}</div>
+      </div>
+    );
+  const tasksBoth = views.some(([id]) => id === 'board') && views.some(([id]) => id === 'table');
+  const pageTitle = taskView ? 'Tasks' : view === 'team' ? 'Roster' : views.find(([id]) => id === view)?.[1];
+  // Pages with their own title (.ms-header) keep it; it's styled as the page title.
+  const pageHead =
+    phone || !['board', 'table', 'team'].includes(view) ? null : (
+      <header className="page-head">
+        <h1>{pageTitle}</h1>
+        {taskView && (
+          <p className="page-sub">
+            {tasks ? `${tasks.filter((t) => t.status !== 'done').length} open` : ''}
+            {myOpenTasks.length ? ` · ${myOpenTasks.length} yours` : ''}
+          </p>
+        )}
+        <span className="spacer" />
+        {taskView && tasksBoth && (
+          <div className="seg" role="tablist" aria-label="Layout">
+            {[
+              ['board', 'Board'],
+              ['table', 'Table'],
+            ].map(([id, label]) => (
+              <button
+                key={id}
+                role="tab"
+                aria-selected={view === id}
+                className={view === id ? 'on' : ''}
+                onClick={() => {
+                  setTasksMode(id);
+                  setView(id);
+                }}
+              >
+                <Icon name={id} size={16} />
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+        {taskView && (
+          <button className="btn primary" onClick={() => setNewTask({ status: 'todo' })}>
+            <Icon name="plus" size={16} /> New task
+          </button>
+        )}
+      </header>
+    );
+  const meChip = (
+    <div className="user-chip me-wrap">
+      <button
+        className={`me-chip${meMenu ? ' on' : ''}`}
+        onClick={() => setMeMenu(!meMenu)}
+        aria-label={newRequests ? `You: ${newRequests} new feature requests` : 'You: profile, ideas, help, theme'}
+        aria-expanded={meMenu}
+      >
+        <Avatar name={actor.name} size={28} />
+        <span className="user-name">{actor.name}</span>
+        <Icon name="more" size={18} className="me-more" />
+        {newRequests > 0 && <span className="bell-badge">{newRequests > 9 ? '9+' : newRequests}</span>}
+      </button>
+      {meMenu && (
+        <MeMenu onClose={() => setMeMenu(false)}>
+          <div className="me-list">
+            <button onClick={() => (setMeMenu(false), setProfileFor(actor.name))}>My profile</button>
+            <button onClick={() => (setMeMenu(false), setEditProfileFor(actor.name))}>Edit profile</button>
+            {controls.isOn('requests') && (
+              <button onClick={() => (setMeMenu(false), setShowRequests(true))}>
+                Request a feature {newRequests > 0 && <span className="me-badge">{newRequests}</span>}
+              </button>
+            )}
+            <button onClick={() => (setMeMenu(false), setShowHelp(true))}>Help</button>
+            {controls.isOn('coins') && (
+              <button onClick={() => (setMeMenu(false), setCoinsOpen(true))}>
+                Jackson coins{' '}
+                <span className="me-coins">
+                  <Coins n={myWallet.balance} />
+                </span>
+              </button>
+            )}
+            {adOrders.length > 0 && (
+              <button onClick={() => (setMeMenu(false), setOrdersOpen(true))}>
+                Orders & bookings {activeOrders > 0 && <span className="me-badge">{activeOrders}</span>}
+              </button>
+            )}
+            <button onClick={() => (setMeMenu(false), setEditTabs(true))}>Edit tabs</button>
+            {isOwner && <button onClick={() => (setMeMenu(false), setAdsPage(true))}>Ads</button>}
+            {isOwner && <button onClick={() => (setMeMenu(false), setControlsPage(true))}>Controls</button>}
+          </div>
+          <ThemeMenu {...themeMenuProps} inline onClose={() => {}} />
+          <UpdateCheck />
+          <button
+            className="btn me-switch"
+            onClick={() => confirm('Switch user? You will need the team code again on this device.') && store.leave()}
+          >
+            Switch user
+          </button>
+        </MeMenu>
+      )}
+    </div>
+  );
   return (
     <Contexts people={peopleCtx} lab={labCtx} lottery={lottery} controls={controls}>
       <AdsProvider value={ads.value}>
@@ -1506,261 +1677,231 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
             </div>
           )}
           <AppBackdrop theme={activeTheme} />
-          {phone ? (
-            <header className="topbar phone-top">
-              <button className="brand" onClick={() => controls.isOn('catParty') && setCat(true)} aria-label="Team logo">
-                <span className="logo-mark">✓</span>
-              </button>
-              <h1 className="phone-title">{views.find(([id]) => id === view)?.[1] || 'Board'}</h1>
-              <span className="spacer" />
-              {shiftButton}
-              {inboxButton}
-              <button className="avatar-btn me-btn" onClick={() => setPhoneSheet('me')} aria-label="You: profile, theme, ideas, help">
-                <Avatar name={actor.name} size={34} />
-                {newRequests > 0 && <span className="bell-badge">{newRequests > 9 ? '9+' : newRequests}</span>}
-              </button>
-            </header>
-          ) : (
-            <header className="topbar">
-              <button className="brand" onClick={() => controls.isOn('catParty') && setCat(true)}>
-                <span className="logo-mark">✓</span>
-                <span className="brand-text">
-                  {TEAM_NAME} <span className="muted">Tasks</span>
-                </span>
-              </button>
-              <nav className="tabs" role="tablist" ref={tabsRef}>
-                {views.map(([id, label]) => (
-                  <button
-                    key={id}
-                    role="tab"
-                    aria-selected={view === id}
-                    className={view === id ? 'active' : ''}
-                    onClick={() => setView(id)}
-                  >
-                    {label}
-                    {id === 'chat' && unreadTotal > 0 && (
-                      <span className={`tab-badge${unreadMentions ? ' mention' : ''}`} aria-label={`${unreadTotal} unread`}>
-                        {unreadTotal > 99 ? '99+' : unreadTotal}
-                      </span>
-                    )}
+          {frame(
+            <>
+              {phone ? (
+                <header className="topbar phone-top">
+                  <button className="brand" onClick={() => controls.isOn('catParty') && setCat(true)} aria-label="Team logo">
+                    <span className="logo-mark">✓</span>
                   </button>
-                ))}
-              </nav>
-              <div className="topbar-right">
-                <Countdown date={competitionDate} />
-                {shiftButton}
-                {inboxButton}
-                <div className="user-chip me-wrap">
-                  <button
-                    className={`me-chip${meMenu ? ' on' : ''}`}
-                    onClick={() => setMeMenu(!meMenu)}
-                    aria-label={newRequests ? `You: ${newRequests} new feature requests` : 'You: profile, ideas, help, theme'}
-                    aria-expanded={meMenu}
-                  >
-                    <Avatar name={actor.name} size={30} />
-                    <span className="user-name">{actor.name.split(' ')[0]}</span>
-                    <span className="me-caret" aria-hidden="true">
-                      ▾
-                    </span>
+                  <h1 className="phone-title">{views.find(([id]) => id === view)?.[1] || 'Board'}</h1>
+                  <span className="spacer" />
+                  {shiftButton}
+                  {inboxButton}
+                  <button className="avatar-btn me-btn" onClick={() => setPhoneSheet('me')} aria-label="You: profile, theme, ideas, help">
+                    <Avatar name={actor.name} size={34} />
                     {newRequests > 0 && <span className="bell-badge">{newRequests > 9 ? '9+' : newRequests}</span>}
                   </button>
-                  {meMenu && (
-                    <MeMenu onClose={() => setMeMenu(false)}>
-                      <div className="me-list">
-                        <button onClick={() => (setMeMenu(false), setProfileFor(actor.name))}>👤 My profile</button>
-                        <button onClick={() => (setMeMenu(false), setEditProfileFor(actor.name))}>✏️ Edit profile</button>
-                        {controls.isOn('requests') && (
-                          <button onClick={() => (setMeMenu(false), setShowRequests(true))}>
-                            💡 Request a feature {newRequests > 0 && <span className="me-badge">{newRequests}</span>}
-                          </button>
-                        )}
-                        <button onClick={() => (setMeMenu(false), setShowHelp(true))}>❓ Help</button>
-                        {controls.isOn('coins') && (
-                          <button onClick={() => (setMeMenu(false), setCoinsOpen(true))}>
-                            🪙 Jackson coins{' '}
-                            <span className="me-coins">
-                              <Coins n={myWallet.balance} />
-                            </span>
-                          </button>
-                        )}
-                        {adOrders.length > 0 && (
-                          <button onClick={() => (setMeMenu(false), setOrdersOpen(true))}>
-                            📦 Orders & bookings {activeOrders > 0 && <span className="me-badge">{activeOrders}</span>}
-                          </button>
-                        )}
-                        <button onClick={() => (setMeMenu(false), setEditTabs(true))}>🗂 Edit tabs</button>
-                        {isOwner && <button onClick={() => (setMeMenu(false), setAdsPage(true))}>📺 Ads</button>}
-                        {isOwner && <button onClick={() => (setMeMenu(false), setControlsPage(true))}>🎛 Controls</button>}
-                      </div>
-                      <ThemeMenu {...themeMenuProps} inline onClose={() => {}} />
-                      <UpdateCheck />
-                      <button
-                        className="btn me-switch"
-                        onClick={() => confirm('Switch user? You will need the team code again on this device.') && store.leave()}
-                      >
-                        Switch user
-                      </button>
-                    </MeMenu>
-                  )}
-                </div>
-              </div>
-            </header>
-          )}
-          {isOwner && shutdown?.on && (
-            <div className="shutdown-banner" role="status">
-              <span>
-                🛑 Shut down for{' '}
-                {shutdown.people?.length
-                  ? shutdown.people.length <= 3
-                    ? shutdown.people.map((n) => n.split(' ')[0]).join(', ')
-                    : `${shutdown.people.length} people`
-                  : 'everyone but you'}
-              </span>
-              <button className="btn small-btn" onClick={() => setShutdownPage(true)}>
-                {shutdownNew ? `Chats (${shutdownNew} new)` : 'Manage'}
-              </button>
-            </div>
-          )}
-          <TakeoverStrip />
-          <AdBanner position="top" />
-          {/* Only this area scrolls; the header stays put above it. */}
-          <div className="app-scroll">
-            {taskView && announcement && (
-              <div className="announce-banner" role="status">
-                <span className="announce-icon">📣</span>
-                <div className="grow">
-                  <b>{announcement.by.split(' ')[0]}:</b> {announcement.text || (announcement.gif ? 'sent a GIF' : 'shared a photo')}
-                </div>
-                <button
-                  className="btn small-btn"
-                  onClick={() => {
-                    setChatChannel('announcements');
-                    setView('chat');
-                  }}
-                >
-                  Open
-                </button>
-                <button
-                  className="icon-btn small"
-                  aria-label="Dismiss"
-                  onClick={() => setChatRead({ ...chatRead, announcements: announcement.at })}
-                >
-                  ✕
-                </button>
-              </div>
-            )}
-
-            {taskView && (
-              <div className={`toolbar${phone ? ' phone' : ''}`}>
-                <input
-                  className="search"
-                  type="search"
-                  placeholder="Search tasks…"
-                  value={filters.q}
-                  onChange={(e) => setF({ q: e.target.value })}
-                />
-                <div className="filters">
-                  <button
-                    className={`chip${filters.person === '__me' ? ' on' : ''}`}
-                    onClick={() => setF({ person: filters.person === '__me' ? '' : '__me' })}
-                  >
-                    My tasks
+                </header>
+              ) : null}
+              {isOwner && shutdown?.on && (
+                <div className="shutdown-banner" role="status">
+                  <span>
+                    🛑 Shut down for{' '}
+                    {shutdown.people?.length
+                      ? shutdown.people.length <= 3
+                        ? shutdown.people.map((n) => n.split(' ')[0]).join(', ')
+                        : `${shutdown.people.length} people`
+                      : 'everyone but you'}
+                  </span>
+                  <button className="btn small-btn" onClick={() => setShutdownPage(true)}>
+                    {shutdownNew ? `Chats (${shutdownNew} new)` : 'Manage'}
                   </button>
-                  {phone ? (
-                    <button className={`chip${filterCount ? ' on' : ''}`} onClick={() => setPhoneSheet('filters')}>
-                      Filters{filterCount ? ` · ${filterCount}` : ''}
-                    </button>
-                  ) : (
-                    <span className="filters-wrap">
-                      <button
-                        className={`chip${filterCount || filtersOpen ? ' on' : ''}`}
-                        onClick={() => setFiltersOpen(!filtersOpen)}
-                        aria-expanded={filtersOpen}
-                      >
-                        ⚙︎ Filters{filterCount ? ` · ${filterCount}` : ''}
-                        {trash.length > 0 && !filterCount ? <span className="filters-dot" aria-hidden="true" /> : null}
-                      </button>
-                      {filtersOpen && (
-                        <Popover wrap=".filters-wrap" className="filters-pop" onClose={() => setFiltersOpen(false)}>
-                          {filterControls}
-                        </Popover>
-                      )}
-                    </span>
-                  )}
                 </div>
-                {!phone && (
-                  <>
-                    <span className="spacer" />
-                    <button className="btn primary" onClick={() => setNewTask({ status: 'todo' })}>
-                      <PlusIcon /> New task
-                    </button>
-                  </>
-                )}
-              </div>
-            )}
-
-            {view === 'table' && (
-              <div className="status-strip">
-                {STATUSES.map((s) => {
-                  const on = filters.statuses.includes(s.id);
-                  return (
+              )}
+              <TakeoverStrip />
+              <AdBanner position="top" />
+              {/* Only this area scrolls; the header stays put above it. */}
+              <div className="app-scroll">
+                {pageHead}
+                {taskView && announcement && (
+                  <div className="announce-banner" role="status">
+                    <span className="announce-icon">📣</span>
+                    <div className="grow">
+                      <b>{announcement.by.split(' ')[0]}:</b> {announcement.text || (announcement.gif ? 'sent a GIF' : 'shared a photo')}
+                    </div>
                     <button
-                      key={s.id}
-                      className={`status-count${on ? ' on' : ''}`}
-                      style={{ '--c': s.color }}
-                      onClick={() => setF({ statuses: on ? filters.statuses.filter((x) => x !== s.id) : [...filters.statuses, s.id] })}
+                      className="btn small-btn"
+                      onClick={() => {
+                        setChatChannel('announcements');
+                        setView('chat');
+                      }}
                     >
-                      <span className="dot" />
-                      {s.short || s.label}
-                      <strong>{counts[s.id]}</strong>
+                      Open
                     </button>
-                  );
-                })}
-              </div>
-            )}
-
-            <PageAds view={view} spot="top" />
-            {tasks === null ? (
-              <main className="content">
-                {tasksError ? (
-                  <div className="empty-card">
-                    <h2>Couldn't load tasks</h2>
-                    <p className="muted">{tasksError}</p>
-                    <button className="btn primary" onClick={() => location.reload()}>
-                      Reload
+                    <button
+                      className="icon-btn small"
+                      aria-label="Dismiss"
+                      onClick={() => setChatRead({ ...chatRead, announcements: announcement.at })}
+                    >
+                      ✕
                     </button>
                   </div>
-                ) : (
-                  <p className="empty">Loading…</p>
                 )}
-              </main>
-            ) : view === 'milestones' ? (
-              <MilestonesView
-                milestones={milestones}
-                competitionDate={competitionDate}
-                isManager={actor.admin}
-                tasks={tasks}
-                roster={roster}
-                api={api}
-                onOpenTask={setOpenId}
-                onAddTask={(m) => setNewTask({ status: 'todo', milestoneId: m.id, subteam: m.subteam || '' })}
-              />
-            ) : view === 'parts' ? (
-              <div className={`parts-layout${partsConv ? '' : ' no-chat'}`}>
-                <PartsView parts={parts} tasks={tasks} api={api} onOpenTask={setOpenId} />
-                {partsConv && (
-                  <ChatView
-                    embedded
+
+                {taskView && (
+                  <div className={`toolbar${phone ? ' phone' : ''}`}>
+                    <input
+                      className="search"
+                      type="search"
+                      placeholder="Search tasks…"
+                      value={filters.q}
+                      onChange={(e) => setF({ q: e.target.value })}
+                    />
+                    <div className="filters">
+                      <button
+                        className={`chip${filters.person === '__me' ? ' on' : ''}`}
+                        onClick={() => setF({ person: filters.person === '__me' ? '' : '__me' })}
+                      >
+                        My tasks
+                      </button>
+                      {phone ? (
+                        <button className={`chip${filterCount ? ' on' : ''}`} onClick={() => setPhoneSheet('filters')}>
+                          Filters{filterCount ? ` · ${filterCount}` : ''}
+                        </button>
+                      ) : (
+                        <span className="filters-wrap">
+                          <button
+                            className={`chip${filterCount || filtersOpen ? ' on' : ''}`}
+                            onClick={() => setFiltersOpen(!filtersOpen)}
+                            aria-expanded={filtersOpen}
+                          >
+                            <Icon name="filter" size={16} /> Filters{filterCount ? ` · ${filterCount}` : ''}
+                            {trash.length > 0 && !filterCount ? <span className="filters-dot" aria-hidden="true" /> : null}
+                          </button>
+                          {filtersOpen && (
+                            <Popover wrap=".filters-wrap" className="filters-pop" onClose={() => setFiltersOpen(false)}>
+                              {filterControls}
+                            </Popover>
+                          )}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {view === 'table' && (
+                  <div className="status-strip">
+                    {STATUSES.map((s) => {
+                      const on = filters.statuses.includes(s.id);
+                      return (
+                        <button
+                          key={s.id}
+                          className={`status-count${on ? ' on' : ''}`}
+                          style={{ '--c': s.color }}
+                          onClick={() => setF({ statuses: on ? filters.statuses.filter((x) => x !== s.id) : [...filters.statuses, s.id] })}
+                        >
+                          <span className="dot" />
+                          {s.short || s.label}
+                          <strong>{counts[s.id]}</strong>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                <PageAds view={view} spot="top" />
+                {tasks === null ? (
+                  <main className="content">
+                    {tasksError ? (
+                      <div className="empty-card">
+                        <h2>Couldn't load tasks</h2>
+                        <p className="muted">{tasksError}</p>
+                        <button className="btn primary" onClick={() => location.reload()}>
+                          Reload
+                        </button>
+                      </div>
+                    ) : (
+                      <p className="empty">Loading…</p>
+                    )}
+                  </main>
+                ) : view === 'today' ? (
+                  <Today
+                    actor={actor}
+                    tasks={tasks}
+                    milestones={milestones}
+                    competition={{ name: COMPETITION.name, date: competitionDate }}
+                    shifts={namedShifts}
+                    myShift={myShift}
                     convs={convs}
-                    current={partsConv}
-                    setCurrent={(key) => {
-                      setChatChannel(key);
-                      setView('chat');
-                    }}
-                    onOpenFull={() => {
-                      setChatChannel(partsConv.key);
-                      setView('chat');
-                    }}
+                    unread={unread}
+                    chat={chat}
+                    on={sidebarOn}
+                    onOpenTask={setOpenId}
+                    onOpenConv={openConv}
+                    onPage={openPage}
+                    onNewTask={() => setNewTask({ status: 'todo', assignees: [actor.name] })}
+                    onStartShift={startMyShift}
+                    onOpenShift={() => setShiftPanel(true)}
+                    onPerson={openPerson}
+                  />
+                ) : view === 'milestones' ? (
+                  <MilestonesView
+                    milestones={milestones}
+                    competitionDate={competitionDate}
+                    isManager={actor.admin}
+                    tasks={tasks}
+                    roster={roster}
+                    api={api}
+                    onOpenTask={setOpenId}
+                    onAddTask={(m) => setNewTask({ status: 'todo', milestoneId: m.id, subteam: m.subteam || '' })}
+                  />
+                ) : view === 'parts' ? (
+                  <div className={`parts-layout${partsConv ? '' : ' no-chat'}`}>
+                    <PartsView parts={parts} tasks={tasks} api={api} onOpenTask={setOpenId} />
+                    {partsConv && (
+                      <ChatView
+                        embedded
+                        convs={convs}
+                        current={partsConv}
+                        setCurrent={(key) => {
+                          setChatChannel(key);
+                          setView('chat');
+                        }}
+                        onOpenFull={() => {
+                          setChatChannel(partsConv.key);
+                          setView('chat');
+                        }}
+                        messages={chat}
+                        unread={unread}
+                        readAt={chatRead || {}}
+                        actor={actor}
+                        isManager={actor.admin}
+                        roster={roster}
+                        tasks={tasks}
+                        api={api}
+                        teamEmoji={teamEmoji}
+                        stickers={stickers}
+                        typing={typingIn(partsConv.key)}
+                        levelOf={levelOf}
+                        setLevel={(c, v) => api.saveProfile(actor.name, { notify: { [c.key]: v } })}
+                        onPerson={openPerson}
+                        onOpenTask={setOpenId}
+                        onMakeTask={(m, c) =>
+                          setNewTask({
+                            status: 'todo',
+                            subteam: c.subteam || '',
+                            title: (m.text || m.poll?.question || 'Follow up on chat photo').replace(/\s+/g, ' ').slice(0, 90),
+                            description: `From ${c.label}, ${m.by}: ${m.text || m.poll?.question || '(photo)'}`,
+                          })
+                        }
+                      />
+                    )}
+                  </div>
+                ) : view === 'checklists' ? (
+                  <ChecklistsView checklists={checklists} api={api} isManager={actor.admin} />
+                ) : view === 'chat' && !currentConv ? (
+                  <main className="content">
+                    <p className="muted empty-note">No channels right now.</p>
+                  </main>
+                ) : view === 'chat' ? (
+                  <ChatView
+                    convs={convs}
+                    current={currentConv}
+                    setCurrent={setChatChannel}
+                    noList={!phone}
+                    ask={chatAsk}
+                    onAsked={clearChatAsk}
                     messages={chat}
                     unread={unread}
                     readAt={chatRead || {}}
@@ -1771,7 +1912,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
                     api={api}
                     teamEmoji={teamEmoji}
                     stickers={stickers}
-                    typing={typingIn(partsConv.key)}
+                    typing={typingIn(currentConv.key)}
                     levelOf={levelOf}
                     setLevel={(c, v) => api.saveProfile(actor.name, { notify: { [c.key]: v } })}
                     onPerson={openPerson}
@@ -1785,399 +1926,364 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
                       })
                     }
                   />
+                ) : view === 'robot' ? (
+                  <Suspense
+                    fallback={
+                      <main className="content">
+                        <p className="empty">Loading the 3D viewer…</p>
+                      </main>
+                    }
+                  >
+                    <RobotView
+                      robot={robot}
+                      tasks={tasks}
+                      parts={parts}
+                      actor={actor}
+                      isManager={actor.admin}
+                      api={api}
+                      theme={theme}
+                      onOpenTask={setOpenId}
+                      onMakeTask={(data) => setNewTask({ status: 'todo', ...data })}
+                    />
+                  </Suspense>
+                ) : view === 'shifts' ? (
+                  <ShiftsView
+                    shifts={shifts}
+                    plans={shiftPlans}
+                    actor={actor}
+                    roster={roster}
+                    tasks={tasks || []}
+                    goal={settings.shiftGoal || 0}
+                    api={api}
+                    rename={rename}
+                    onStartMine={startMyShift}
+                    onOpenMine={() => setShiftPanel(true)}
+                    onOpenTask={setOpenId}
+                    checkins={upcomingCheckins}
+                    checkinSchedule={settings.checkinSchedule}
+                    gradeOf={gradeOf}
+                  />
+                ) : view === 'resources' ? (
+                  <ResourcesView
+                    resources={resources}
+                    diagram={diagram}
+                    actor={actor}
+                    isManager={actor.admin}
+                    canEditDiagram={actor.admin || (peopleInfo.get(actor.name)?.subteams || []).includes('Electrical')}
+                    api={api}
+                  />
+                ) : view === 'runs' ? (
+                  <RunsView runs={runs} roster={roster} api={api} />
+                ) : view === 'team' ? (
+                  <TeamView roster={roster} roles={roles} tasks={tasks} api={api} isManager={actor.admin} rename={rename} />
+                ) : (
+                  <main className="content">
+                    {view === 'table' ? (
+                      <TableView tasks={filtered} api={api} onOpen={setOpenId} total={tasks.length} />
+                    ) : (
+                      <BoardView
+                        phone={phone}
+                        tasks={filtered}
+                        milestones={milestones}
+                        api={api}
+                        onOpen={setOpenId}
+                        onAdd={(status) => setNewTask({ status })}
+                      />
+                    )}
+                  </main>
+                )}
+                <PageAds view={view} spot="bottom" />
+
+                {openTask && (
+                  <TaskPanel
+                    task={openTask}
+                    api={api}
+                    roster={roster}
+                    milestones={milestones}
+                    parts={parts}
+                    onClose={() => {
+                      setOpenId(null);
+                      goBack('task', openTask.id);
+                    }}
+                  />
+                )}
+                {newTask && (
+                  <NewTaskDialog
+                    initial={newTask}
+                    roster={roster}
+                    milestones={milestones}
+                    me={actor.name}
+                    onClose={() => {
+                      setNewTask(null);
+                      goBack('newtask');
+                    }}
+                    onCreate={async (data) => {
+                      setNewTask(null);
+                      clearBack();
+                      await api.create(data);
+                    }}
+                  />
+                )}
+                {showTrash && (
+                  <TrashDialog trash={trash} days={TRASH_DAYS} isManager={actor.admin} api={api} onClose={() => setShowTrash(false)} />
+                )}
+                {!welcomed && (
+                  <WelcomeCard
+                    name={actor.name}
+                    showRobot={showRobot}
+                    pushStatus={pushStatus}
+                    onEnablePush={enablePush}
+                    onClose={() => setWelcomed(true)}
+                  />
+                )}
+                {showHelp && (
+                  <HelpDialog
+                    isManager={actor.admin}
+                    showRobot={showRobot}
+                    onClose={() => setShowHelp(false)}
+                    onVersionLog={() => {
+                      openFrom('log', undefined, () => setShowHelp(true));
+                      setShowHelp(false);
+                      setShowLog(true);
+                    }}
+                    onRequests={() => {
+                      openFrom('requests', undefined, () => setShowHelp(true));
+                      setShowHelp(false);
+                      setShowRequests(true);
+                    }}
+                  />
+                )}
+                {whatsNew?.length > 0 && !showLog && (
+                  <WhatsNew
+                    versions={whatsNew}
+                    onClose={() => setSeenVersion(VERSION)}
+                    onFullLog={() => {
+                      setSeenVersion(VERSION);
+                      setShowLog(true);
+                    }}
+                    onRequest={api.addRequest}
+                  />
+                )}
+                {showRequests && (
+                  <RequestsDialog
+                    requests={requests}
+                    actor={actor}
+                    api={api}
+                    focusId={showRequests === true ? null : showRequests}
+                    onClose={() => {
+                      setShowRequests(null);
+                      goBack('requests');
+                    }}
+                    onMakeTask={(r) => {
+                      const back = showRequests;
+                      openFrom('newtask', undefined, () => setShowRequests(back));
+                      setShowRequests(null);
+                      if (r.status === 'new') api.updateRequest(r.id, { status: 'planned' });
+                      setNewTask({
+                        status: 'todo',
+                        title: r.text.replace(/\s+/g, ' ').slice(0, 90),
+                        description: `Feature request from ${r.by}:\n${r.text}`,
+                      });
+                    }}
+                  />
+                )}
+                {showLog && (
+                  <VersionLogDialog
+                    current={VERSION}
+                    onClose={() => {
+                      setShowLog(false);
+                      goBack('log');
+                    }}
+                  />
+                )}
+                {cat && <CatParty onClose={() => setCat(false)} />}
+                {studio && (
+                  <ThemeStudio
+                    value={customTheme}
+                    onChange={setCustomTheme}
+                    profile={myProfile}
+                    profileColor={myColor}
+                    upload={(file, oldPath) => api.uploadEffectImage(actor.name, file, oldPath)}
+                    onClose={() => setStudio(false)}
+                  />
+                )}
+                {!pendingCheckin && pendingPoll && (
+                  <PollGate
+                    msg={pendingPoll}
+                    rename={rename}
+                    onSkip={skipInPreview?.(`poll:${pendingPoll.id}`)}
+                    onVote={async (ids) => {
+                      for (const id of ids) await api.vote('announcements', pendingPoll, id, true);
+                    }}
+                    onAnswer={(text) => api.answerPoll('announcements', pendingPoll, text)}
+                  />
+                )}
+                {(labLog || (owedDay && !pendingCheckin && !pendingPoll)) &&
+                  (() => {
+                    const st = labLog || { mode: 'missing', day: owedDay, person: actor.name };
+                    const id = logId(st.day, st.person);
+                    return (
+                      <LabLogDialog
+                        key={`${st.mode}-${id}`}
+                        day={st.day}
+                        person={st.person}
+                        log={(labLogs || []).find((l) => l.id === id)}
+                        shift={st.shift}
+                        tasks={tasks || []}
+                        hours={hoursOn(st.day, namedShifts)[st.person]}
+                        mode={st.mode}
+                        onSave={saveLabLog}
+                        // A missing log has to be written (unless Asher is previewing); ending a shift can wait ("Not yet").
+                        onCancel={st.mode === 'missing' ? skipInPreview?.(`lablog:${st.day}`) || null : () => setLabLog(null)}
+                        // Optional lab log: end the shift without one.
+                        onSkip={
+                          st.mode === 'end' && st.shift && controls.labLog === 'optional'
+                            ? async () => {
+                                await api.updateShift(st.shift.id, {
+                                  note: st.shift.note || '',
+                                  subteam: st.shift.subteam || '',
+                                  taskIds: st.shift.taskIds || [],
+                                  end: Date.now(),
+                                });
+                                setLabLog(null);
+                                setToast({ text: '⏱ Shift ended. See you next time!' });
+                              }
+                            : null
+                        }
+                        uploadPhoto={async (f) => store.uploadLabPhoto(await preparePhoto(f))}
+                      />
+                    );
+                  })()}
+                {pendingCheckin && (
+                  <CheckinGate
+                    checkin={pendingCheckin}
+                    rename={rename}
+                    onAnswer={(a) => api.answerCheckin(pendingCheckin.id, a)}
+                    onSkip={skipInPreview?.(`checkin:${pendingCheckin.id}`)}
+                  />
+                )}
+                {toast && (
+                  <Overlay>
+                    <div className="toast" role="alert" onClick={() => setToast(null)}>
+                      <span>{toast.text}</span>
+                      {toast.action && (
+                        <button
+                          className="toast-action"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toast.action.run();
+                            setToast(null);
+                          }}
+                        >
+                          {toast.action.label}
+                        </button>
+                      )}
+                    </div>
+                  </Overlay>
+                )}
+                {profileFor && (
+                  <ProfileCard
+                    name={profileFor}
+                    actor={actor}
+                    tasks={tasks || []}
+                    onClose={() => setProfileFor(null)}
+                    onEdit={() => {
+                      const n = profileFor;
+                      openFrom('edit', n, () => setProfileFor(n));
+                      setEditProfileFor(n);
+                      setProfileFor(null);
+                    }}
+                    onFull={() => {
+                      const n = profileFor;
+                      openFrom('full', n, () => setProfileFor(n));
+                      setFullProfileFor(n);
+                      setProfileFor(null);
+                    }}
+                    onMessage={async () => {
+                      const key = await api.openDm([actor.name, profileFor]);
+                      clearBack();
+                      setProfileFor(null);
+                      if (key) {
+                        setChatChannel(key);
+                        setView('chat');
+                      }
+                    }}
+                  />
+                )}
+                {editTabs && (
+                  <TabsEditor
+                    all={allViews}
+                    order={byRank(allViews).map(([id]) => id)}
+                    hidden={hiddenTabs}
+                    canHide={actor.admin && actor.name === REQUESTS_TO}
+                    onSave={(order, hidden) => {
+                      api.saveProfile(actor.name, { tabOrder: order });
+                      if (isOwner && hidden.join() !== hiddenTabs.join()) {
+                        store.saveControls({ tabsOff: hidden }, actor);
+                        if (settings.hiddenTabs?.length) api.saveSettings({ hiddenTabs: [] });
+                      }
+                    }}
+                    onClose={() => setEditTabs(false)}
+                  />
+                )}
+                {fullProfileFor && (
+                  <ProfilePage
+                    name={fullProfileFor}
+                    actor={actor}
+                    tasks={tasks || []}
+                    shifts={shifts}
+                    joinedAt={TEAM_STARTED}
+                    lastSeen={lastSeenOf(fullProfileFor)}
+                    notes={notes}
+                    api={api}
+                    onPerson={(n) => {
+                      const from = fullProfileFor;
+                      openFrom('full', n, () => setFullProfileFor(from));
+                      setFullProfileFor(n);
+                    }}
+                    onOpenTask={(id) => {
+                      const from = fullProfileFor;
+                      openFrom('task', id, () => setFullProfileFor(from));
+                      setFullProfileFor(null);
+                      setOpenId(id);
+                    }}
+                    onEdit={() => {
+                      const n = fullProfileFor;
+                      openFrom('edit', n, () => setFullProfileFor(n));
+                      setEditProfileFor(n);
+                      setFullProfileFor(null);
+                    }}
+                    onMessage={async () => {
+                      const key = await api.openDm([actor.name, fullProfileFor]);
+                      clearBack();
+                      setFullProfileFor(null);
+                      if (key) {
+                        setChatChannel(key);
+                        setView('chat');
+                      }
+                    }}
+                    onClose={() => {
+                      setFullProfileFor(null);
+                      goBack('full', fullProfileFor);
+                    }}
+                  />
+                )}
+                {editProfileFor && (
+                  <ProfileEditor
+                    name={editProfileFor}
+                    actor={actor}
+                    api={api}
+                    tasks={tasks || []}
+                    onClose={() => {
+                      setEditProfileFor(null);
+                      goBack('edit', editProfileFor);
+                    }}
+                  />
                 )}
               </div>
-            ) : view === 'checklists' ? (
-              <ChecklistsView checklists={checklists} api={api} isManager={actor.admin} />
-            ) : view === 'chat' && !currentConv ? (
-              <main className="content">
-                <p className="muted empty-note">No channels right now.</p>
-              </main>
-            ) : view === 'chat' ? (
-              <ChatView
-                convs={convs}
-                current={currentConv}
-                setCurrent={setChatChannel}
-                messages={chat}
-                unread={unread}
-                readAt={chatRead || {}}
-                actor={actor}
-                isManager={actor.admin}
-                roster={roster}
-                tasks={tasks}
-                api={api}
-                teamEmoji={teamEmoji}
-                stickers={stickers}
-                typing={typingIn(currentConv.key)}
-                levelOf={levelOf}
-                setLevel={(c, v) => api.saveProfile(actor.name, { notify: { [c.key]: v } })}
-                onPerson={openPerson}
-                onOpenTask={setOpenId}
-                onMakeTask={(m, c) =>
-                  setNewTask({
-                    status: 'todo',
-                    subteam: c.subteam || '',
-                    title: (m.text || m.poll?.question || 'Follow up on chat photo').replace(/\s+/g, ' ').slice(0, 90),
-                    description: `From ${c.label}, ${m.by}: ${m.text || m.poll?.question || '(photo)'}`,
-                  })
-                }
-              />
-            ) : view === 'robot' ? (
-              <Suspense
-                fallback={
-                  <main className="content">
-                    <p className="empty">Loading the 3D viewer…</p>
-                  </main>
-                }
-              >
-                <RobotView
-                  robot={robot}
-                  tasks={tasks}
-                  parts={parts}
-                  actor={actor}
-                  isManager={actor.admin}
-                  api={api}
-                  theme={theme}
-                  onOpenTask={setOpenId}
-                  onMakeTask={(data) => setNewTask({ status: 'todo', ...data })}
-                />
-              </Suspense>
-            ) : view === 'shifts' ? (
-              <ShiftsView
-                shifts={shifts}
-                plans={shiftPlans}
-                actor={actor}
-                roster={roster}
-                tasks={tasks || []}
-                goal={settings.shiftGoal || 0}
-                api={api}
-                rename={rename}
-                onStartMine={startMyShift}
-                onOpenMine={() => setShiftPanel(true)}
-                onOpenTask={setOpenId}
-                checkins={upcomingCheckins}
-                checkinSchedule={settings.checkinSchedule}
-                gradeOf={gradeOf}
-              />
-            ) : view === 'resources' ? (
-              <ResourcesView
-                resources={resources}
-                diagram={diagram}
-                actor={actor}
-                isManager={actor.admin}
-                canEditDiagram={actor.admin || (peopleInfo.get(actor.name)?.subteams || []).includes('Electrical')}
-                api={api}
-              />
-            ) : view === 'runs' ? (
-              <RunsView runs={runs} roster={roster} api={api} />
-            ) : view === 'team' ? (
-              <TeamView roster={roster} roles={roles} tasks={tasks} api={api} isManager={actor.admin} rename={rename} />
-            ) : (
-              <main className="content">
-                {view === 'table' ? (
-                  <TableView tasks={filtered} api={api} onOpen={setOpenId} total={tasks.length} />
-                ) : (
-                  <BoardView
-                    phone={phone}
-                    tasks={filtered}
-                    milestones={milestones}
-                    api={api}
-                    onOpen={setOpenId}
-                    onAdd={(status) => setNewTask({ status })}
-                  />
-                )}
-              </main>
-            )}
-            <PageAds view={view} spot="bottom" />
-
-            {openTask && (
-              <TaskPanel
-                task={openTask}
-                api={api}
-                roster={roster}
-                milestones={milestones}
-                parts={parts}
-                onClose={() => {
-                  setOpenId(null);
-                  goBack('task', openTask.id);
-                }}
-              />
-            )}
-            {newTask && (
-              <NewTaskDialog
-                initial={newTask}
-                roster={roster}
-                milestones={milestones}
-                me={actor.name}
-                onClose={() => {
-                  setNewTask(null);
-                  goBack('newtask');
-                }}
-                onCreate={async (data) => {
-                  setNewTask(null);
-                  clearBack();
-                  await api.create(data);
-                }}
-              />
-            )}
-            {showTrash && (
-              <TrashDialog trash={trash} days={TRASH_DAYS} isManager={actor.admin} api={api} onClose={() => setShowTrash(false)} />
-            )}
-            {!welcomed && (
-              <WelcomeCard
-                name={actor.name}
-                showRobot={showRobot}
-                pushStatus={pushStatus}
-                onEnablePush={enablePush}
-                onClose={() => setWelcomed(true)}
-              />
-            )}
-            {showHelp && (
-              <HelpDialog
-                isManager={actor.admin}
-                showRobot={showRobot}
-                onClose={() => setShowHelp(false)}
-                onVersionLog={() => {
-                  openFrom('log', undefined, () => setShowHelp(true));
-                  setShowHelp(false);
-                  setShowLog(true);
-                }}
-                onRequests={() => {
-                  openFrom('requests', undefined, () => setShowHelp(true));
-                  setShowHelp(false);
-                  setShowRequests(true);
-                }}
-              />
-            )}
-            {whatsNew?.length > 0 && !showLog && (
-              <WhatsNew
-                versions={whatsNew}
-                onClose={() => setSeenVersion(VERSION)}
-                onFullLog={() => {
-                  setSeenVersion(VERSION);
-                  setShowLog(true);
-                }}
-                onRequest={api.addRequest}
-              />
-            )}
-            {showRequests && (
-              <RequestsDialog
-                requests={requests}
-                actor={actor}
-                api={api}
-                focusId={showRequests === true ? null : showRequests}
-                onClose={() => {
-                  setShowRequests(null);
-                  goBack('requests');
-                }}
-                onMakeTask={(r) => {
-                  const back = showRequests;
-                  openFrom('newtask', undefined, () => setShowRequests(back));
-                  setShowRequests(null);
-                  if (r.status === 'new') api.updateRequest(r.id, { status: 'planned' });
-                  setNewTask({
-                    status: 'todo',
-                    title: r.text.replace(/\s+/g, ' ').slice(0, 90),
-                    description: `Feature request from ${r.by}:\n${r.text}`,
-                  });
-                }}
-              />
-            )}
-            {showLog && (
-              <VersionLogDialog
-                current={VERSION}
-                onClose={() => {
-                  setShowLog(false);
-                  goBack('log');
-                }}
-              />
-            )}
-            {cat && <CatParty onClose={() => setCat(false)} />}
-            {studio && (
-              <ThemeStudio
-                value={customTheme}
-                onChange={setCustomTheme}
-                profile={myProfile}
-                profileColor={myColor}
-                upload={(file, oldPath) => api.uploadEffectImage(actor.name, file, oldPath)}
-                onClose={() => setStudio(false)}
-              />
-            )}
-            {!pendingCheckin && pendingPoll && (
-              <PollGate
-                msg={pendingPoll}
-                rename={rename}
-                onSkip={skipInPreview?.(`poll:${pendingPoll.id}`)}
-                onVote={async (ids) => {
-                  for (const id of ids) await api.vote('announcements', pendingPoll, id, true);
-                }}
-                onAnswer={(text) => api.answerPoll('announcements', pendingPoll, text)}
-              />
-            )}
-            {(labLog || (owedDay && !pendingCheckin && !pendingPoll)) &&
-              (() => {
-                const st = labLog || { mode: 'missing', day: owedDay, person: actor.name };
-                const id = logId(st.day, st.person);
-                return (
-                  <LabLogDialog
-                    key={`${st.mode}-${id}`}
-                    day={st.day}
-                    person={st.person}
-                    log={(labLogs || []).find((l) => l.id === id)}
-                    shift={st.shift}
-                    tasks={tasks || []}
-                    hours={hoursOn(st.day, namedShifts)[st.person]}
-                    mode={st.mode}
-                    onSave={saveLabLog}
-                    // A missing log has to be written (unless Asher is previewing); ending a shift can wait ("Not yet").
-                    onCancel={st.mode === 'missing' ? skipInPreview?.(`lablog:${st.day}`) || null : () => setLabLog(null)}
-                    // Optional lab log: end the shift without one.
-                    onSkip={
-                      st.mode === 'end' && st.shift && controls.labLog === 'optional'
-                        ? async () => {
-                            await api.updateShift(st.shift.id, {
-                              note: st.shift.note || '',
-                              subteam: st.shift.subteam || '',
-                              taskIds: st.shift.taskIds || [],
-                              end: Date.now(),
-                            });
-                            setLabLog(null);
-                            setToast({ text: '⏱ Shift ended. See you next time!' });
-                          }
-                        : null
-                    }
-                    uploadPhoto={async (f) => store.uploadLabPhoto(await preparePhoto(f))}
-                  />
-                );
-              })()}
-            {pendingCheckin && (
-              <CheckinGate
-                checkin={pendingCheckin}
-                rename={rename}
-                onAnswer={(a) => api.answerCheckin(pendingCheckin.id, a)}
-                onSkip={skipInPreview?.(`checkin:${pendingCheckin.id}`)}
-              />
-            )}
-            {toast && (
-              <Overlay>
-                <div className="toast" role="alert" onClick={() => setToast(null)}>
-                  <span>{toast.text}</span>
-                  {toast.action && (
-                    <button
-                      className="toast-action"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toast.action.run();
-                        setToast(null);
-                      }}
-                    >
-                      {toast.action.label}
-                    </button>
-                  )}
-                </div>
-              </Overlay>
-            )}
-            {profileFor && (
-              <ProfileCard
-                name={profileFor}
-                actor={actor}
-                tasks={tasks || []}
-                onClose={() => setProfileFor(null)}
-                onEdit={() => {
-                  const n = profileFor;
-                  openFrom('edit', n, () => setProfileFor(n));
-                  setEditProfileFor(n);
-                  setProfileFor(null);
-                }}
-                onFull={() => {
-                  const n = profileFor;
-                  openFrom('full', n, () => setProfileFor(n));
-                  setFullProfileFor(n);
-                  setProfileFor(null);
-                }}
-                onMessage={async () => {
-                  const key = await api.openDm([actor.name, profileFor]);
-                  clearBack();
-                  setProfileFor(null);
-                  if (key) {
-                    setChatChannel(key);
-                    setView('chat');
-                  }
-                }}
-              />
-            )}
-            {editTabs && (
-              <TabsEditor
-                all={allViews}
-                order={byRank(allViews).map(([id]) => id)}
-                hidden={hiddenTabs}
-                canHide={actor.admin && actor.name === REQUESTS_TO}
-                onSave={(order, hidden) => {
-                  api.saveProfile(actor.name, { tabOrder: order });
-                  if (isOwner && hidden.join() !== hiddenTabs.join()) {
-                    store.saveControls({ tabsOff: hidden }, actor);
-                    if (settings.hiddenTabs?.length) api.saveSettings({ hiddenTabs: [] });
-                  }
-                }}
-                onClose={() => setEditTabs(false)}
-              />
-            )}
-            {fullProfileFor && (
-              <ProfilePage
-                name={fullProfileFor}
-                actor={actor}
-                tasks={tasks || []}
-                shifts={shifts}
-                joinedAt={TEAM_STARTED}
-                lastSeen={lastSeenOf(fullProfileFor)}
-                notes={notes}
-                api={api}
-                onPerson={(n) => {
-                  const from = fullProfileFor;
-                  openFrom('full', n, () => setFullProfileFor(from));
-                  setFullProfileFor(n);
-                }}
-                onOpenTask={(id) => {
-                  const from = fullProfileFor;
-                  openFrom('task', id, () => setFullProfileFor(from));
-                  setFullProfileFor(null);
-                  setOpenId(id);
-                }}
-                onEdit={() => {
-                  const n = fullProfileFor;
-                  openFrom('edit', n, () => setFullProfileFor(n));
-                  setEditProfileFor(n);
-                  setFullProfileFor(null);
-                }}
-                onMessage={async () => {
-                  const key = await api.openDm([actor.name, fullProfileFor]);
-                  clearBack();
-                  setFullProfileFor(null);
-                  if (key) {
-                    setChatChannel(key);
-                    setView('chat');
-                  }
-                }}
-                onClose={() => {
-                  setFullProfileFor(null);
-                  goBack('full', fullProfileFor);
-                }}
-              />
-            )}
-            {editProfileFor && (
-              <ProfileEditor
-                name={editProfileFor}
-                actor={actor}
-                api={api}
-                tasks={tasks || []}
-                onClose={() => {
-                  setEditProfileFor(null);
-                  goBack('edit', editProfileFor);
-                }}
-              />
-            )}
-          </div>
-          <AdBanner position="bottom" />
+              <AdBanner position="bottom" />
+            </>,
+          )}
           {ads.full &&
             (ads.full.video ? (
               <VideoAd

@@ -77,7 +77,7 @@ export default function TableView({ tasks, api, onOpen, total }) {
                   )}
                   {t.checklist?.length > 0 && (
                     <span className="meta-count" title="Checklist">
-                      ☑ {t.checklist.filter((i) => i.done).length}/{t.checklist.length}
+                      {t.checklist.filter((i) => i.done).length}/{t.checklist.length} done
                     </span>
                   )}
                   {t.commentCount > 0 && (
@@ -89,7 +89,7 @@ export default function TableView({ tasks, api, onOpen, total }) {
                     Open ›
                   </button>
                 </div>
-                {t.status === 'blocked' && t.blockedReason && <div className="blocked-note">⛔ {t.blockedReason}</div>}
+                {t.status === 'blocked' && t.blockedReason && <div className="blocked-note">Waiting: {t.blockedReason}</div>}
               </td>
               <td className="col-status">
                 <StatusSelect value={t.status} compact onChange={(status) => api.update(t, { status })} />

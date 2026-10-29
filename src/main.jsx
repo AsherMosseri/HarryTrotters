@@ -4,6 +4,7 @@ import App from './App.jsx';
 import { reloadOnceForNewVersion } from './data/store.js';
 import UpdateGate from './components/UpdateGate.jsx';
 import './styles.css';
+import './shell.css';
 import { installEmojiKeyFix } from './emojiKeyFix.js';
 import { installKeyboardFit, installNoPageZoom } from './keyboard.js';
 

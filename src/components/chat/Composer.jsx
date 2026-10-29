@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Icon } from '../shell/icons.jsx';
 import { SUBTEAMS, SUBTEAM_COLORS } from '../../config.js';
 import { useControls } from '../../controls.js';
 import { preparePhoto } from '../../util.js';
@@ -536,12 +537,30 @@ export default function Composer({
             </button>
             {panel === 'more' && (
               <div className="composer-more" ref={moreMenu}>
-                {feat('photos') && <button onClick={() => (setPanel(null), fileInput.current?.click())}>📷 Photo</button>}
+                {feat('photos') && (
+                  <button onClick={() => (setPanel(null), fileInput.current?.click())}>
+                    <Icon name="camera" /> Photo
+                  </button>
+                )}
                 {feat('gifs') && <button onClick={() => setPanel('gif')}>🎞 GIF</button>}
-                {feat('polls') && <button onClick={() => setPanel('poll')}>📊 Poll</button>}
-                {feat('files') && <button onClick={() => (setPanel(null), anyFileInput.current?.click())}>📎 File or video</button>}
-                {feat('stickers') && <button onClick={() => setPanel('sticker')}>🎫 Sticker</button>}
-                <button onClick={() => setPanel('emoji')}>😊 Emoji</button>
+                {feat('polls') && (
+                  <button onClick={() => setPanel('poll')}>
+                    <Icon name="poll" /> Poll
+                  </button>
+                )}
+                {feat('files') && (
+                  <button onClick={() => (setPanel(null), anyFileInput.current?.click())}>
+                    <Icon name="clip" /> File or video
+                  </button>
+                )}
+                {feat('stickers') && (
+                  <button onClick={() => setPanel('sticker')}>
+                    <Icon name="sticker" /> Sticker
+                  </button>
+                )}
+                <button onClick={() => setPanel('emoji')}>
+                  <Icon name="smile" /> Emoji
+                </button>
               </div>
             )}
             {feat('photos') && (
@@ -551,7 +570,7 @@ export default function Composer({
                 aria-label="Add a photo"
                 title="Add a photo"
               >
-                📷
+                <Icon name="camera" />
               </button>
             )}
             {feat('gifs') && (
@@ -566,7 +585,7 @@ export default function Composer({
             )}
             {feat('polls') && (
               <button className="icon-btn hide-phone" onClick={() => setPanel('poll')} aria-label="Make a poll" title="Poll">
-                📊
+                <Icon name="poll" />
               </button>
             )}
             {feat('files') && (
@@ -576,7 +595,7 @@ export default function Composer({
                 aria-label="Attach a file"
                 title="File or video (25 MB)"
               >
-                📎
+                <Icon name="clip" />
               </button>
             )}
             {feat('stickers') && (
@@ -586,7 +605,7 @@ export default function Composer({
                 aria-label="Stickers"
                 title="Stickers"
               >
-                🎫
+                <Icon name="sticker" />
               </button>
             )}
             <input
@@ -678,7 +697,7 @@ export default function Composer({
           aria-label="Emoji"
           title="Emoji"
         >
-          😊
+          <Icon name="smile" />
         </button>
         <button className="btn primary" onClick={send} disabled={sending || (!text.trim() && !photo)}>
           {editing ? 'Save' : sending ? '…' : 'Send'}
