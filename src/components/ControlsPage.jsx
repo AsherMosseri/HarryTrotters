@@ -18,6 +18,7 @@ export default function ControlsPage({
   onPreview,
   onShutdown,
   onCommands,
+  onAds,
   onClose,
 }) {
   // Shutdown or Commands open on top: Escape closes that one, not this.
@@ -79,6 +80,9 @@ export default function ControlsPage({
             </button>
             <button className="btn" onClick={onCommands}>
               Commands{commandsOff ? ` (${commandsOff} off)` : ''}
+            </button>
+            <button className="btn" onClick={onAds}>
+              Ads
             </button>
           </div>
           <div className="ctl-preview">

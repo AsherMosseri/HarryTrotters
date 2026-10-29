@@ -474,3 +474,23 @@ button.sb-head-row { width: 100%; border: 0; background: none; color: var(--mute
 .sidebar.rail .sb-foot .me-chip .user-name, .sidebar.rail .sb-foot .me-chip .me-more { display: none; }
 .sidebar.rail .inbox-pop, .sidebar.rail .shift-pop { left: 0; top: 0; transform: translateX(46px); }
 .sidebar.rail .shift-pill { padding: 4px 6px; font-size: 11px; }
+
+/* Your menu: you, a few things, Appearance, and Switch user. */
+.me-menu { gap: 4px; padding: 6px; width: 280px; }
+.me-who { display: flex; align-items: center; gap: 12px; width: 100%; border: 0; background: none; padding: 10px; border-radius: 10px; text-align: left; color: var(--text); }
+.me-who:hover { background: color-mix(in srgb, var(--text) 5%, transparent); }
+.me-who b { display: block; font-size: 16px; }
+.me-who .grow > span { font-size: 13px; color: var(--muted); }
+.me-who .icon { color: var(--muted); }
+.me-menu .me-list { border-top: 1px solid var(--hairline); padding-top: 4px; }
+.me-menu .me-list button { border-bottom: 0; padding: 9px 10px; font-size: 15px; border-radius: 8px; }
+.me-menu .me-list button:hover { background: color-mix(in srgb, var(--text) 5%, transparent); }
+.me-list button .me-coins, .me-list button .me-value { margin-left: auto; }
+.me-value { font-size: 14px; color: var(--muted); font-weight: 400; }
+.me-switch { align-self: flex-start; color: var(--muted); font-weight: 500; font-size: 14px; padding: 6px 10px 4px; }
+.me-switch:hover { color: var(--danger); }
+.sheet .me-who { padding: 6px 0 12px; }
+.dialog.appearance { width: min(420px, 100%); }
+.dialog.appearance .theme-menu { display: flex; flex-direction: column; gap: 12px; }
+.sidebar:not(.rail) .sb-foot { display: flex; align-items: center; gap: 2px; }
+.sidebar:not(.rail) .sb-foot .me-wrap { flex: 1; min-width: 0; }

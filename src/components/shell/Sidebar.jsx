@@ -117,9 +117,6 @@ export default function Sidebar({
           </span>
         </button>
         <span className="sb-top-tools">{topRight}</span>
-        <button className="sb-fold" onClick={onToggleRail} aria-label="Fold the sidebar" title="Fold the sidebar">
-          <Icon name="sidebar" size={18} />
-        </button>
       </div>
       <nav className="sb-scroll" aria-label="Pages">
         {GROUPS.map(([title, ids]) => {
@@ -224,7 +221,12 @@ export default function Sidebar({
           </div>
         )}
       </nav>
-      <div className="sb-foot">{me}</div>
+      <div className="sb-foot">
+        {me}
+        <button className="sb-fold" onClick={onToggleRail} aria-label="Fold the sidebar" title="Fold the sidebar">
+          <Icon name="sidebar" size={18} />
+        </button>
+      </div>
     </aside>
   );
 }

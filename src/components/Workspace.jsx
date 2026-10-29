@@ -16,8 +16,8 @@ import { ONLINE_MS, TYPING_MS, activeStatus, buildPeopleInfo, buildProfiles } fr
 import { PALETTES } from '../nitro.js';
 import { daysBetween, mondayOf, parseDay, todayISO } from '../milestones.js';
 import { newTaskDefaults, personId } from '../data/diff.js';
-import { preparePhoto, useLocalStorage, useMedia } from '../util.js';
-import { Avatar, Overlay, PeopleContext } from './common.jsx';
+import { preparePhoto, useEscape, useLocalStorage, useMedia } from '../util.js';
+import { Avatar, CloseIcon, Overlay, PeopleContext } from './common.jsx';
 import { ProfileCard, ProfileEditor } from './People.jsx';
 import ProfilePage from './ProfilePage.jsx';
 import TabsEditor from './TabsEditor.jsx';
@@ -39,7 +39,7 @@ import Today from './shell/Today.jsx';
 import { Icon } from './shell/icons.jsx';
 // The 3D viewer pulls in three.js, so it loads only when the Robot tab opens.
 const RobotView = lazy(() => import('./RobotView.jsx'));
-import { HelpDialog, UpdateCheck, WelcomeCard } from './Help.jsx';
+import { HelpDialog, WelcomeCard } from './Help.jsx';
 import { VersionLogDialog, WhatsNew } from './VersionLog.jsx';
 import { RequestsDialog } from './Requests.jsx';
 import { BottomNav, MoreSheet, Sheet } from './PhoneChrome.jsx';
@@ -169,6 +169,27 @@ function ThemeMenu({
   );
 }
 
+// Light, dark, or automatic; the color theme; and Calm chat (from your menu).
+function AppearanceDialog({ themeMenuProps, onClose }) {
+  useEscape(onClose);
+  return (
+    <Overlay>
+      <div className="panel-backdrop center" onClick={onClose}>
+        <div className="dialog appearance" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Appearance">
+          <div className="panel-head">
+            <h2>Appearance</h2>
+            <span className="spacer" />
+            <button className="icon-btn" onClick={onClose} aria-label="Close">
+              <CloseIcon />
+            </button>
+          </div>
+          <ThemeMenu {...themeMenuProps} inline onClose={() => {}} />
+        </div>
+      </div>
+    </Overlay>
+  );
+}
+
 // A small menu that closes when you tap outside it or press Escape.
 function Popover({ wrap, className, onClose, children }) {
   useEffect(() => {
@@ -221,16 +242,6 @@ function ThemeIcon({ theme }) {
       <circle cx="12" cy="12" r="9" />
       <path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor" />
     </svg>
-  );
-}
-
-function Countdown({ date }) {
-  const left = daysBetween(todayISO(), date);
-  if (left < 0) return null;
-  return (
-    <span className="me-countdown" title={`${COMPETITION.name}: ${date}`}>
-      {left === 0 ? `${COMPETITION.name} day` : `${left} day${left === 1 ? '' : 's'} until ${COMPETITION.name.toLowerCase()}`}
-    </span>
   );
 }
 
@@ -1335,6 +1346,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
   // Asher's shutdown switch (Shutdown.jsx) and the replies people send him.
   const [shutdownPage, setShutdownPage] = useState(false);
   const [controlsPage, setControlsPage] = useState(false);
+  const [appearanceOpen, setAppearanceOpen] = useState(false);
   const [shutdownReplies, setShutdownReplies] = useState([]);
   useEffect(() => (isOwner ? store.subscribeShutdownReplies(setShutdownReplies) : undefined), [store, isOwner]);
   const shutdownNew = shutdown?.on ? shutdownUnread(shutdownReplies, actor.name) : 0;
@@ -1610,6 +1622,64 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
         )}
       </header>
     );
+  // Your menu (sidebar, or the You sheet on a phone): who you are, the few
+  // things you use, Controls for Asher, and Appearance in its own window.
+  const themeName =
+    !controls.isOn('themes') || palette === 'classic'
+      ? 'Classic'
+      : palette === 'profile'
+        ? 'My profile'
+        : palette === 'custom'
+          ? 'Custom'
+          : PALETTES.find((x) => x.id === palette)?.label || 'Classic';
+  const meBody = (close, onPhone) => (
+    <>
+      <button className="me-who" onClick={() => (close(), setProfileFor(actor.name))}>
+        <Avatar name={actor.name} size={40} />
+        <span className="grow">
+          <b>{actor.name}</b>
+          <span>View profile</span>
+        </span>
+        <Icon name="chevron" size={16} />
+      </button>
+      <div className="me-list">
+        <button onClick={() => (close(), setEditProfileFor(actor.name))}>Edit profile</button>
+        {controls.isOn('coins') && (
+          <button onClick={() => (close(), setCoinsOpen(true))}>
+            Jackson coins{' '}
+            <span className="me-coins">
+              <Coins n={myWallet.balance} />
+            </span>
+          </button>
+        )}
+        {controls.isOn('requests') && (
+          <button onClick={() => (close(), setShowRequests(true))}>
+            Request a feature {newRequests > 0 && <span className="me-badge">{newRequests}</span>}
+          </button>
+        )}
+        {adOrders.length > 0 && (
+          <button onClick={() => (close(), setOrdersOpen(true))}>
+            Orders & bookings {activeOrders > 0 && <span className="me-badge">{activeOrders}</span>}
+          </button>
+        )}
+        <button onClick={() => (close(), setAppearanceOpen(true))}>
+          Appearance
+          <span className="me-value">
+            {theme === 'dark' ? 'Dark' : theme === 'light' ? 'Light' : 'Auto'} · {themeName}
+          </span>
+        </button>
+        {onPhone && <button onClick={() => (close(), setEditTabs(true))}>Edit tabs</button>}
+        <button onClick={() => (close(), setShowHelp(true))}>Help</button>
+        {isOwner && <button onClick={() => (close(), setControlsPage(true))}>Controls</button>}
+      </div>
+      <button
+        className="link-btn me-switch"
+        onClick={() => confirm('Switch user? You will need the team code again on this device.') && store.leave()}
+      >
+        Switch user
+      </button>
+    </>
+  );
   const meChip = (
     <div className="user-chip me-wrap">
       <button
@@ -1623,44 +1693,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
         <Icon name="more" size={18} className="me-more" />
         {newRequests > 0 && <span className="bell-badge">{newRequests > 9 ? '9+' : newRequests}</span>}
       </button>
-      {meMenu && (
-        <MeMenu onClose={() => setMeMenu(false)}>
-          <div className="me-list">
-            <button onClick={() => (setMeMenu(false), setProfileFor(actor.name))}>My profile</button>
-            <button onClick={() => (setMeMenu(false), setEditProfileFor(actor.name))}>Edit profile</button>
-            {controls.isOn('requests') && (
-              <button onClick={() => (setMeMenu(false), setShowRequests(true))}>
-                Request a feature {newRequests > 0 && <span className="me-badge">{newRequests}</span>}
-              </button>
-            )}
-            <button onClick={() => (setMeMenu(false), setShowHelp(true))}>Help</button>
-            {controls.isOn('coins') && (
-              <button onClick={() => (setMeMenu(false), setCoinsOpen(true))}>
-                Jackson coins{' '}
-                <span className="me-coins">
-                  <Coins n={myWallet.balance} />
-                </span>
-              </button>
-            )}
-            {adOrders.length > 0 && (
-              <button onClick={() => (setMeMenu(false), setOrdersOpen(true))}>
-                Orders & bookings {activeOrders > 0 && <span className="me-badge">{activeOrders}</span>}
-              </button>
-            )}
-            <button onClick={() => (setMeMenu(false), setEditTabs(true))}>Edit tabs</button>
-            {isOwner && <button onClick={() => (setMeMenu(false), setAdsPage(true))}>Ads</button>}
-            {isOwner && <button onClick={() => (setMeMenu(false), setControlsPage(true))}>Controls</button>}
-          </div>
-          <ThemeMenu {...themeMenuProps} inline onClose={() => {}} />
-          <UpdateCheck />
-          <button
-            className="btn me-switch"
-            onClick={() => confirm('Switch user? You will need the team code again on this device.') && store.leave()}
-          >
-            Switch user
-          </button>
-        </MeMenu>
-      )}
+      {meMenu && <MeMenu onClose={() => setMeMenu(false)}>{meBody(() => setMeMenu(false))} </MeMenu>}
     </div>
   );
   return (
@@ -2403,6 +2436,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
               onClose={ads.closeRemoving}
             />
           )}
+          {appearanceOpen && <AppearanceDialog themeMenuProps={themeMenuProps} onClose={() => setAppearanceOpen(false)} />}
           {controlsPage && isOwner && (
             <ControlsPage
               doc={{ ...controlsDoc, tabsOff: hiddenTabs }}
@@ -2416,6 +2450,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
               onPreview={(p) => onPreview?.(p)}
               onShutdown={() => setShutdownPage(true)}
               onCommands={() => setCommandsPage(true)}
+              onAds={() => setAdsPage(true)}
               onClose={() => setControlsPage(false)}
             />
           )}
@@ -2491,49 +2526,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
               )}
               {phoneSheet === 'me' && (
                 <Sheet title="You" onClose={closeSheet}>
-                  <div className="me-head">
-                    <Avatar name={actor.name} size={48} />
-                    <div className="grow">
-                      <b>{actor.name}</b>
-                      <div>
-                        <Countdown date={competitionDate} />
-                      </div>
-                    </div>
-                  </div>
-                  <div className="me-list">
-                    <button onClick={() => (closeSheet(), setProfileFor(actor.name))}>My profile</button>
-                    <button onClick={() => (closeSheet(), setEditProfileFor(actor.name))}>Edit profile</button>
-                    {controls.isOn('requests') && (
-                      <button onClick={() => (closeSheet(), setShowRequests(true))}>
-                        Request a feature {newRequests > 0 && <span className="me-badge">{newRequests}</span>}
-                      </button>
-                    )}
-                    <button onClick={() => (closeSheet(), setShowHelp(true))}>Help</button>
-                    {controls.isOn('coins') && (
-                      <button onClick={() => (closeSheet(), setCoinsOpen(true))}>
-                        Jackson coins{' '}
-                        <span className="me-coins">
-                          <Coins n={myWallet.balance} />
-                        </span>
-                      </button>
-                    )}
-                    {adOrders.length > 0 && (
-                      <button onClick={() => (closeSheet(), setOrdersOpen(true))}>
-                        Orders & bookings {activeOrders > 0 && <span className="me-badge">{activeOrders}</span>}
-                      </button>
-                    )}
-                    <button onClick={() => (closeSheet(), setEditTabs(true))}>Edit tabs</button>
-                    {isOwner && <button onClick={() => (closeSheet(), setAdsPage(true))}>Ads</button>}
-                    {isOwner && <button onClick={() => (closeSheet(), setControlsPage(true))}>Controls</button>}
-                  </div>
-                  <ThemeMenu {...themeMenuProps} inline onClose={() => {}} />
-                  <UpdateCheck />
-                  <button
-                    className="btn me-switch"
-                    onClick={() => confirm('Switch user? You will need the team code again on this device.') && store.leave()}
-                  >
-                    Switch user
-                  </button>
+                  {meBody(closeSheet, true)}
                 </Sheet>
               )}
             </>
