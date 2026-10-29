@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { AutoTextarea, Avatar, CloseIcon, Overlay } from './common.jsx';
 import { REQUESTS_TO } from '../config.js';
 import { useEscape } from '../util.js';
+import { useQuietUpdates } from './UpdateGate.jsx';
 
 // Asher can shut the app down for everyone else (settings/shutdown). They see
 // a full screen with his message and a plain-text chat with him
@@ -139,6 +140,8 @@ export function shutdownUnread(replies, me) {
 
 // What everyone but Asher sees while the app is shut down.
 export function ShutdownScreen({ shutdown, store, actor }) {
+  // No version numbers or version log here: a new version just says Refresh.
+  useQuietUpdates();
   const [messages, setMessages] = useState([]);
   useEffect(() => store.subscribeShutdownThread(actor.name, setMessages), [store, actor.name]);
   const thread = messages.filter((m) => m.round === shutdown.at);

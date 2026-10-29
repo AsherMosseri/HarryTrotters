@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { VersionLogDialog } from './VersionLog.jsx';
 import { Overlay } from './common.jsx';
 
@@ -22,6 +22,25 @@ async function fetchLive() {
   }
 }
 
+// Screens that keep the version and its log private (the shutdown screen):
+// while one is up, a new version only offers a plain Refresh.
+let quietScreens = 0;
+const quietSubs = new Set();
+const setQuiet = (d) => {
+  quietScreens += d;
+  quietSubs.forEach((f) => f());
+};
+export function useQuietUpdates() {
+  useEffect(() => {
+    setQuiet(1);
+    return () => setQuiet(-1);
+  }, []);
+}
+const subscribeQuiet = (f) => {
+  quietSubs.add(f);
+  return () => quietSubs.delete(f);
+};
+
 // The "Check for updates" button: 'new' (the update screen opens), 'latest',
 // or 'offline'.
 export async function checkForUpdate() {
@@ -38,6 +57,7 @@ export default function UpdateGate({ children }) {
   const [newVersion, setNewVersion] = useState(null);
   const [info, setInfo] = useState(null); // { release, changelog } of the new version
   const [showLog, setShowLog] = useState(false);
+  const quiet = useSyncExternalStore(subscribeQuiet, () => quietScreens > 0);
 
   useEffect(() => {
     // Tidy the ?v= cache-buster out of the address bar after an update.
@@ -86,7 +106,24 @@ export default function UpdateGate({ children }) {
   return (
     <>
       {children}
-      {newVersion && (
+      {newVersion && quiet && (
+        <Overlay>
+          <div className="update-gate" role="alertdialog" aria-labelledby="update-title">
+            <div className="gate-card update-quiet">
+              <div className="logo-mark big">✦</div>
+              <h1 id="update-title">Laying the groundwork for 3.0</h1>
+              <p className="muted">
+                Behind the scenes, we’ve been refining, polishing, and fine-tuning every corner of the app to pave the way for something
+                bigger. Refresh to bring yours up to speed.
+              </p>
+              <button className="btn primary big-btn" onClick={() => loadNewVersion(newVersion)}>
+                Refresh
+              </button>
+            </div>
+          </div>
+        </Overlay>
+      )}
+      {newVersion && !quiet && (
         <Overlay>
           <div className="update-gate" role="alertdialog" aria-labelledby="update-title">
             <div className="gate-card">
@@ -116,7 +153,7 @@ export default function UpdateGate({ children }) {
           </div>
         </Overlay>
       )}
-      {showLog && info?.changelog && (
+      {showLog && !quiet && info?.changelog && (
         <VersionLogDialog log={info.changelog} current={info.release} currentLabel="New" onClose={() => setShowLog(false)} />
       )}
     </>
