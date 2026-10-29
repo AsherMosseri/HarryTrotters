@@ -20,6 +20,7 @@ import { DEFAULT_BORDER, borderProps } from '../borders.js';
 import BorderEditor from './BorderEditor.jsx';
 import { EmojiPicker, GifPicker } from './chat/Pickers.jsx';
 import { activeStatus } from '../people.js';
+import { useControls } from '../controls.js';
 import { Avatar, CloseIcon, Nameplate, Overlay, usePeople } from './common.jsx';
 import DecorationEditor from './DecorationEditor.jsx';
 import { DEFAULT_DECO } from './decoRender.jsx';
@@ -541,6 +542,8 @@ function StyleRequest({ kind, setKind, onSend }) {
 }
 
 export function ProfileEditor({ name, actor, api, tasks = [], onClose }) {
+  // Looks switched off in Controls can't be changed here either.
+  const { isOn } = useControls();
   const people = usePeople();
   useEscape(onClose);
   const profile = people?.profileOf(name) || {};
@@ -600,6 +603,7 @@ export function ProfileEditor({ name, actor, api, tasks = [], onClose }) {
   const pickAvatar = (f) => {
     // GIFs stay animated (no cropping); other pictures go through the cropper.
     if (f.type === 'image/gif') {
+      if (!isOn('gifAvatars') || !isOn('gifs')) return setErr('GIF profile pictures are off right now. Pick a regular picture.');
       if (f.size > 4e6) return setErr('That GIF is too big for a picture (4 MB max).');
       run('avatar', () => api.uploadAvatar(name, f, profile.photo?.path));
     } else setFile(f);
@@ -639,11 +643,7 @@ export function ProfileEditor({ name, actor, api, tasks = [], onClose }) {
             <div className="editor-grid">
               <div className="editor-form">
                 <div className="segmented editor-tabs">
-                  {[
-                    ['profile', 'Profile'],
-                    ['style', 'Style'],
-                    ['status', 'Status'],
-                  ].map(([id, label]) => (
+                  {[['profile', 'Profile'], ['style', 'Style'], ...(isOn('status') ? [['status', 'Status']] : [])].map(([id, label]) => (
                     <button key={id} className={tab === id ? 'active' : ''} onClick={() => setTab(id)}>
                       {label}
                     </button>
@@ -651,28 +651,32 @@ export function ProfileEditor({ name, actor, api, tasks = [], onClose }) {
                 </div>
                 {tab === 'profile' && (
                   <>
-                    <h3 className="field-label">Picture</h3>
-                    <div className="row gap">
-                      <button className="btn" onClick={() => avatarInput.current?.click()} disabled={!!busy}>
-                        {busy === 'avatar' ? 'Saving…' : profile.photo ? 'Change picture' : 'Add a picture'}
-                      </button>
-                      {profile.photo && (
-                        <button
-                          className="link-btn danger-text"
-                          onClick={() => run('avatar', () => api.removeAvatar(name, profile.photo.path))}
-                        >
-                          Remove
-                        </button>
-                      )}
-                    </div>
-                    <p className="muted tiny">GIFs stay animated.</p>
-                    <input
-                      ref={avatarInput}
-                      type="file"
-                      accept="image/*"
-                      hidden
-                      onChange={(e) => (e.target.files[0] && pickAvatar(e.target.files[0]), (e.target.value = ''))}
-                    />
+                    {isOn('profilePictures') && (
+                      <>
+                        <h3 className="field-label">Picture</h3>
+                        <div className="row gap">
+                          <button className="btn" onClick={() => avatarInput.current?.click()} disabled={!!busy}>
+                            {busy === 'avatar' ? 'Saving…' : profile.photo ? 'Change picture' : 'Add a picture'}
+                          </button>
+                          {profile.photo && (
+                            <button
+                              className="link-btn danger-text"
+                              onClick={() => run('avatar', () => api.removeAvatar(name, profile.photo.path))}
+                            >
+                              Remove
+                            </button>
+                          )}
+                        </div>
+                        {isOn('gifAvatars') && isOn('gifs') && <p className="muted tiny">GIFs stay animated.</p>}
+                        <input
+                          ref={avatarInput}
+                          type="file"
+                          accept="image/*"
+                          hidden
+                          onChange={(e) => (e.target.files[0] && pickAvatar(e.target.files[0]), (e.target.value = ''))}
+                        />
+                      </>
+                    )}
                     <h3 className="field-label">Banner</h3>
                     <div className="row gap">
                       <button className="btn" onClick={() => bannerInput.current?.click()} disabled={!!busy}>
@@ -726,141 +730,161 @@ export function ProfileEditor({ name, actor, api, tasks = [], onClose }) {
                 )}
                 {tab === 'style' && (
                   <>
-                    <h3 className="field-label">Name font</h3>
-                    <div className="choice-grid">
-                      {NAME_FONTS.map((f) => (
-                        <button
-                          key={f.id}
-                          className={`choice${(look.nameStyle.font || '') === f.id ? ' on' : ''}`}
-                          style={f.css ? { fontFamily: f.css } : undefined}
-                          onClick={() => set({ nameStyle: { ...look.nameStyle, font: f.id } })}
-                        >
-                          {f.label}
-                        </button>
-                      ))}
-                    </div>
-                    <More k="font" />
-                    <h3 className="field-label">Name color</h3>
-                    <ColorRow
-                      value={colors[0] || ''}
-                      onChange={(c) => set({ nameStyle: { ...look.nameStyle, colors: c ? [c, colors[1] || ''] : [] } })}
-                    />
-                    {colors[0] && (
+                    {isOn('fonts') && (
                       <>
-                        <p className="muted tiny">Second color for a gradient (optional):</p>
-                        <ColorRow
-                          value={colors[1] || ''}
-                          onChange={(c) =>
-                            set({ nameStyle: { ...look.nameStyle, colors: c ? [colors[0], c, colors[2] || ''] : [colors[0]] } })
-                          }
-                        />
+                        <h3 className="field-label">Name font</h3>
+                        <div className="choice-grid">
+                          {NAME_FONTS.map((f) => (
+                            <button
+                              key={f.id}
+                              className={`choice${(look.nameStyle.font || '') === f.id ? ' on' : ''}`}
+                              style={f.css ? { fontFamily: f.css } : undefined}
+                              onClick={() => set({ nameStyle: { ...look.nameStyle, font: f.id } })}
+                            >
+                              {f.label}
+                            </button>
+                          ))}
+                        </div>
+                        <More k="font" />
                       </>
                     )}
-                    {colors[0] && colors[1] && (
+                    {isOn('nameEffects') && (
                       <>
-                        <p className="muted tiny">Third color (optional):</p>
+                        <h3 className="field-label">Name color</h3>
                         <ColorRow
-                          value={colors[2] || ''}
-                          onChange={(c) => set({ nameStyle: { ...look.nameStyle, colors: [colors[0], colors[1], c] } })}
+                          value={colors[0] || ''}
+                          onChange={(c) => set({ nameStyle: { ...look.nameStyle, colors: c ? [c, colors[1] || ''] : [] } })}
                         />
-                      </>
-                    )}
-                    <h3 className="field-label">Name effect</h3>
-                    <div className="ne-grid">
-                      {NAME_EFFECTS.map((e) => (
-                        <button
-                          key={e.id}
-                          className={`ne-choice${(look.nameStyle.effect || '') === e.id ? ' on' : ''}`}
-                          aria-pressed={(look.nameStyle.effect || '') === e.id}
-                          onClick={() => set({ nameStyle: { ...look.nameStyle, effect: e.id } })}
-                        >
-                          <span
-                            {...nameProps(
-                              { nameStyle: { ...look.nameStyle, effect: e.id } },
-                              people?.infoOf(name)?.color,
-                              name.split(' ')[0],
-                              'ne-sample',
-                            )}
-                          >
-                            {name.split(' ')[0]}
-                          </span>
-                          <span className="ne-label">{e.label}</span>
-                        </button>
-                      ))}
-                    </div>
-                    <More k="name-effect" />
-                    <h3 className="field-label">Nameplate</h3>
-                    <p className="muted tiny">Shows behind your name in the members list and in DMs.</p>
-                    <div className="np-grid">
-                      {NAMEPLATES.map((np) => {
-                        const colors = look.nameplate?.colors || ['#6366f1', '#ec4899'];
-                        const plate = np.id === 'custom' ? { id: 'custom', colors } : np.id ? { id: np.id } : null;
-                        return (
-                          <button
-                            key={np.id}
-                            className={`np-choice${(look.nameplate?.id || '') === np.id ? ' on' : ''}`}
-                            aria-pressed={(look.nameplate?.id || '') === np.id}
-                            onClick={() => set({ nameplate: plate })}
-                          >
-                            <Nameplate plate={plate} />
-                            <span>{np.label}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                    {look.nameplate?.id === 'custom' && (
-                      <div className="row gap">
-                        {[0, 1].map((i) => (
-                          <label key={i} className="row gap-sm small">
-                            {i ? 'Right' : 'Left'}{' '}
-                            <input
-                              type="color"
-                              value={look.nameplate.colors?.[i] || (i ? '#ec4899' : '#6366f1')}
-                              onChange={(e) => {
-                                const colors = [...(look.nameplate.colors || ['#6366f1', '#ec4899'])];
-                                colors[i] = e.target.value;
-                                set({ nameplate: { id: 'custom', colors } });
-                              }}
+                        {colors[0] && (
+                          <>
+                            <p className="muted tiny">Second color for a gradient (optional):</p>
+                            <ColorRow
+                              value={colors[1] || ''}
+                              onChange={(c) =>
+                                set({ nameStyle: { ...look.nameStyle, colors: c ? [colors[0], c, colors[2] || ''] : [colors[0]] } })
+                              }
                             />
-                          </label>
-                        ))}
-                      </div>
+                          </>
+                        )}
+                        {colors[0] && colors[1] && (
+                          <>
+                            <p className="muted tiny">Third color (optional):</p>
+                            <ColorRow
+                              value={colors[2] || ''}
+                              onChange={(c) => set({ nameStyle: { ...look.nameStyle, colors: [colors[0], colors[1], c] } })}
+                            />
+                          </>
+                        )}
+                      </>
                     )}
-                    <More k="nameplate" />
-                    <h3 className="field-label">Avatar decoration</h3>
-                    <div className="choice-grid deco-grid">
-                      {DECORATIONS.map((d) => (
-                        <button
-                          key={d.id}
-                          className={`choice${look.decoration === d.id ? ' on' : ''}`}
-                          onClick={() =>
-                            set(
-                              d.id === 'custom' && !look.decorationCustom
-                                ? { decoration: d.id, decorationCustom: DEFAULT_DECO }
-                                : { decoration: d.id },
-                            )
-                          }
-                          title={d.label}
-                        >
-                          <Avatar
+                    {isOn('nameEffects') && (
+                      <>
+                        <h3 className="field-label">Name effect</h3>
+                        <div className="ne-grid">
+                          {NAME_EFFECTS.map((e) => (
+                            <button
+                              key={e.id}
+                              className={`ne-choice${(look.nameStyle.effect || '') === e.id ? ' on' : ''}`}
+                              aria-pressed={(look.nameStyle.effect || '') === e.id}
+                              onClick={() => set({ nameStyle: { ...look.nameStyle, effect: e.id } })}
+                            >
+                              <span
+                                {...nameProps(
+                                  { nameStyle: { ...look.nameStyle, effect: e.id } },
+                                  people?.infoOf(name)?.color,
+                                  name.split(' ')[0],
+                                  'ne-sample',
+                                )}
+                              >
+                                {name.split(' ')[0]}
+                              </span>
+                              <span className="ne-label">{e.label}</span>
+                            </button>
+                          ))}
+                        </div>
+                        <More k="name-effect" />
+                      </>
+                    )}
+                    {isOn('nameplates') && (
+                      <>
+                        <h3 className="field-label">Nameplate</h3>
+                        <p className="muted tiny">Shows behind your name in the members list and in DMs.</p>
+                        <div className="np-grid">
+                          {NAMEPLATES.map((np) => {
+                            const colors = look.nameplate?.colors || ['#6366f1', '#ec4899'];
+                            const plate = np.id === 'custom' ? { id: 'custom', colors } : np.id ? { id: np.id } : null;
+                            return (
+                              <button
+                                key={np.id}
+                                className={`np-choice${(look.nameplate?.id || '') === np.id ? ' on' : ''}`}
+                                aria-pressed={(look.nameplate?.id || '') === np.id}
+                                onClick={() => set({ nameplate: plate })}
+                              >
+                                <Nameplate plate={plate} />
+                                <span>{np.label}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                        {look.nameplate?.id === 'custom' && (
+                          <div className="row gap">
+                            {[0, 1].map((i) => (
+                              <label key={i} className="row gap-sm small">
+                                {i ? 'Right' : 'Left'}{' '}
+                                <input
+                                  type="color"
+                                  value={look.nameplate.colors?.[i] || (i ? '#ec4899' : '#6366f1')}
+                                  onChange={(e) => {
+                                    const colors = [...(look.nameplate.colors || ['#6366f1', '#ec4899'])];
+                                    colors[i] = e.target.value;
+                                    set({ nameplate: { id: 'custom', colors } });
+                                  }}
+                                />
+                              </label>
+                            ))}
+                          </div>
+                        )}
+                        <More k="nameplate" />
+                      </>
+                    )}
+                    {isOn('decorations') && (
+                      <>
+                        <h3 className="field-label">Avatar decoration</h3>
+                        <div className="choice-grid deco-grid">
+                          {DECORATIONS.map((d) => (
+                            <button
+                              key={d.id}
+                              className={`choice${look.decoration === d.id ? ' on' : ''}`}
+                              onClick={() =>
+                                set(
+                                  d.id === 'custom' && !look.decorationCustom
+                                    ? { decoration: d.id, decorationCustom: DEFAULT_DECO }
+                                    : { decoration: d.id },
+                                )
+                              }
+                              title={d.label}
+                            >
+                              <Avatar
+                                name={name}
+                                size={36}
+                                decoration={d.id}
+                                decorationCustom={d.id === 'custom' ? look.decorationCustom || DEFAULT_DECO : undefined}
+                              />
+                              <span className="tiny">{d.label}</span>
+                            </button>
+                          ))}
+                        </div>
+                        {look.decoration === 'custom' && (
+                          <DecorationEditor
                             name={name}
-                            size={36}
-                            decoration={d.id}
-                            decorationCustom={d.id === 'custom' ? look.decorationCustom || DEFAULT_DECO : undefined}
+                            value={look.decorationCustom || DEFAULT_DECO}
+                            onChange={(c) => set({ decorationCustom: c })}
+                            upload={(file, oldPath) => api.uploadEffectImage(name, file, oldPath)}
                           />
-                          <span className="tiny">{d.label}</span>
-                        </button>
-                      ))}
-                    </div>
-                    {look.decoration === 'custom' && (
-                      <DecorationEditor
-                        name={name}
-                        value={look.decorationCustom || DEFAULT_DECO}
-                        onChange={(c) => set({ decorationCustom: c })}
-                        upload={(file, oldPath) => api.uploadEffectImage(name, file, oldPath)}
-                      />
+                        )}
+                        <More k="decoration" />
+                      </>
                     )}
-                    <More k="decoration" />
                     <h3 className="field-label">Profile effect</h3>
                     <div className="fx-tiles">
                       {EFFECTS.map((f) => (
@@ -933,64 +957,73 @@ export function ProfileEditor({ name, actor, api, tasks = [], onClose }) {
                         </button>
                       )}
                     </div>
-                    <h3 className="field-label">Borders</h3>
-                    <div className="segmented">
-                      {[
-                        ['card', 'Profile card'],
-                        ['msg', 'My messages'],
-                        ['avatar', 'Avatar'],
-                      ].map(([id, label]) => (
-                        <button key={id} className={`plain-seg${borderFor === id ? ' on' : ''}`} onClick={() => setBorderFor(id)}>
-                          {label}
-                        </button>
-                      ))}
-                    </div>
-                    {borderFor === 'card' && (
-                      <BorderEditor
-                        value={look.cardBorder || { ...DEFAULT_BORDER, style: 'none' }}
-                        onChange={(cardBorder) => set({ cardBorder })}
-                      />
-                    )}
-                    {borderFor === 'msg' && (
-                      <BorderEditor
-                        value={look.msgBorder || { ...DEFAULT_BORDER, style: 'none', radius: 12 }}
-                        maxRadius={24}
-                        onChange={(msgBorder) => set({ msgBorder })}
-                        sample={
-                          <div className="border-sample">
-                            <span className={`msg-text ${borderProps(look.msgBorder).className}`} style={borderProps(look.msgBorder).style}>
-                              This is how your messages look.
-                            </span>
+                    {isOn('borders') && (
+                      <>
+                        <h3 className="field-label">Borders</h3>
+                        <div className="segmented">
+                          {[
+                            ['card', 'Profile card'],
+                            ['msg', 'My messages'],
+                            ['avatar', 'Avatar'],
+                          ].map(([id, label]) => (
+                            <button key={id} className={`plain-seg${borderFor === id ? ' on' : ''}`} onClick={() => setBorderFor(id)}>
+                              {label}
+                            </button>
+                          ))}
+                        </div>
+                        {borderFor === 'card' && (
+                          <BorderEditor
+                            value={look.cardBorder || { ...DEFAULT_BORDER, style: 'none' }}
+                            onChange={(cardBorder) => set({ cardBorder })}
+                          />
+                        )}
+                        {borderFor === 'msg' && (
+                          <BorderEditor
+                            value={look.msgBorder || { ...DEFAULT_BORDER, style: 'none', radius: 12 }}
+                            maxRadius={24}
+                            onChange={(msgBorder) => set({ msgBorder })}
+                            sample={
+                              <div className="border-sample">
+                                <span
+                                  className={`msg-text ${borderProps(look.msgBorder).className}`}
+                                  style={borderProps(look.msgBorder).style}
+                                >
+                                  This is how your messages look.
+                                </span>
+                              </div>
+                            }
+                          />
+                        )}
+                        {borderFor === 'avatar' && (
+                          <div className="border-editor">
+                            <p className="muted small">
+                              Your avatar’s border is its decoration ring: any style, up to 3 colors, thickness, and spin.
+                            </p>
+                            <button
+                              className="btn"
+                              onClick={() => {
+                                set(
+                                  look.decorationCustom
+                                    ? { decoration: 'custom' }
+                                    : { decoration: 'custom', decorationCustom: DEFAULT_DECO },
+                                );
+                                setTimeout(
+                                  () => document.querySelector('.deco-editor')?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
+                                  50,
+                                );
+                              }}
+                            >
+                              Edit my avatar border
+                            </button>
                           </div>
-                        }
-                      />
+                        )}
+                        <More k="border" />
+                      </>
                     )}
-                    {borderFor === 'avatar' && (
-                      <div className="border-editor">
-                        <p className="muted small">
-                          Your avatar’s border is its decoration ring: any style, up to 3 colors, thickness, and spin.
-                        </p>
-                        <button
-                          className="btn"
-                          onClick={() => {
-                            set(
-                              look.decorationCustom ? { decoration: 'custom' } : { decoration: 'custom', decorationCustom: DEFAULT_DECO },
-                            );
-                            setTimeout(
-                              () => document.querySelector('.deco-editor')?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
-                              50,
-                            );
-                          }}
-                        >
-                          Edit my avatar border
-                        </button>
-                      </div>
-                    )}
-                    <More k="border" />
-                    <StyleRequest kind={reqKind} setKind={setReqKind} onSend={api.addRequest} />
+                    {isOn('requests') && <StyleRequest kind={reqKind} setKind={setReqKind} onSend={api.addRequest} />}
                   </>
                 )}
-                {tab === 'status' && (
+                {tab === 'status' && isOn('status') && (
                   <>
                     <div className="row gap">
                       <input
