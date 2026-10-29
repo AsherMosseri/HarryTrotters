@@ -48,8 +48,14 @@ button.sb-head-row { width: 100%; border: 0; background: none; color: var(--mute
 .sb-add:hover, .sb-gear:hover { background: color-mix(in srgb, var(--text) 8%, transparent); color: var(--text); }
 .sb-row-wrap { position: relative; display: flex; align-items: center; }
 .sb-gear { position: absolute; right: 4px; opacity: 0; }
-.sb-row-wrap:hover .sb-gear, .sb-row-wrap.active .sb-gear, .sb-gear:focus-visible { opacity: 1; }
-.sb-row-wrap:hover .sb-count, .sb-row-wrap.active:has(.sb-gear) .sb-count { visibility: hidden; }
+.sb-row-wrap.active .sb-gear, .sb-gear:focus-visible { opacity: 1; }
+.sb-row-wrap.active:has(.sb-gear) .sb-count { visibility: hidden; }
+/* Hover reveals only with a mouse: on an iPad, anything that appears or
+   hides on hover makes the first tap a hover and the second the tap. */
+@media (hover: hover) and (pointer: fine) {
+  .sb-row-wrap:hover .sb-gear { opacity: 1; }
+  .sb-row-wrap:has(.sb-gear):hover .sb-count { visibility: hidden; }
+}
 .sb-row {
   flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; min-height: 34px; padding: 0 8px;
   border: 0; border-radius: 7px; background: transparent; color: var(--text); font-size: 15px; text-align: left;
