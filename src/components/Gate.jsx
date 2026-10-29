@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { TEAM_NAME, TEAM_NICKNAME, ROSTER, isManagerName } from '../config.js';
 import { Avatar } from './common.jsx';
 
@@ -16,8 +16,17 @@ function Shell({ children }) {
 }
 
 // The splash while the app starts (index.html shows the same one before the
-// code loads), or what went wrong.
-export function LoadingScreen({ error }) {
+// code loads), or what went wrong. step: 1 loading the app, 2 signing in,
+// 3 checking the team; the bar fills as each one finishes, and if one takes
+// a while it says which, with a way to reload.
+const STEPS = ['Opening', 'Loading the app', 'Signing in', 'Checking the team'];
+export function LoadingScreen({ error, step = 1 }) {
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    setSlow(false);
+    const t = setTimeout(() => setSlow(true), 10000);
+    return () => clearTimeout(t);
+  }, [step]);
   return (
     <div className="gate splash" role={error ? 'alert' : 'status'} aria-label={error ? undefined : 'Loading'}>
       <div className="splash-mark">
@@ -35,9 +44,20 @@ export function LoadingScreen({ error }) {
             </button>
           </div>
         ) : (
-          <div className="splash-bar" aria-hidden="true">
-            <span />
-          </div>
+          <>
+            <div className="splash-bar" aria-hidden="true">
+              <span style={{ width: `${[12, 35, 65, 88][step] ?? 88}%` }} />
+            </div>
+            <p className="splash-step">{STEPS[step]}…</p>
+            {slow && (
+              <div className="splash-slow">
+                <span>This is taking longer than usual. Check your Wi&#8209;Fi.</span>
+                <button className="btn" onClick={() => location.reload()}>
+                  Reload
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

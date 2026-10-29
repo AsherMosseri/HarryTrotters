@@ -196,7 +196,14 @@ export const firebaseStore = {
     const token = savedToken();
     if (token) await deleteDoc(doc(pushTokensCol, token)).catch(() => {});
     saveToken('');
-    if (auth.currentUser) await deleteDoc(doc(presenceCol, auth.currentUser.uid)).catch(() => {});
+    if (auth.currentUser) {
+      await deleteDoc(doc(presenceCol, auth.currentUser.uid)).catch(() => {});
+      try {
+        localStorage.removeItem(`member-${auth.currentUser.uid}`);
+      } catch {
+        /* private mode */
+      }
+    }
     return fbSignOut(auth);
   },
 

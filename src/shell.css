@@ -534,9 +534,13 @@ button.sb-head-row { width: 100%; border: 0; background: none; color: var(--mute
 .splash-mark h1 { margin: 0; font-size: 44px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.05; color: var(--text); }
 .splash-mark p { margin: 0; font-size: 18px; font-weight: 600; color: var(--muted); letter-spacing: 0.02em; }
 .splash-bar { position: relative; width: 180px; height: 4px; margin-top: 28px; border-radius: 2px; background: color-mix(in srgb, var(--accent) 15%, transparent); overflow: hidden; }
-.splash-bar span { position: absolute; top: 0; bottom: 0; width: 40%; border-radius: 2px; background: var(--accent); animation: splash-slide 1.1s ease-in-out infinite; }
-@keyframes splash-slide { from { left: -40%; } to { left: 100%; } }
-@media (prefers-reduced-motion: reduce) { .splash-bar span { animation: none; left: 0; width: 100%; opacity: 0.5; } }
+/* Fills as the app starts (Gate.jsx steps), with a sheen running across so it never looks stuck. */
+.splash-bar span { position: absolute; top: 0; bottom: 0; left: 0; border-radius: 2px; background: var(--accent); overflow: hidden; transition: width 0.5s ease; }
+.splash-bar span::after { content: ''; position: absolute; inset: 0; width: 60%; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent); animation: splash-sheen 1.2s ease-in-out infinite; }
+@keyframes splash-sheen { from { transform: translateX(-100%); } to { transform: translateX(260%); } }
+.splash-step { margin-top: 12px !important; font-size: 14px !important; font-weight: 500 !important; letter-spacing: 0 !important; }
+.splash-slow { text-wrap: balance; display: flex; flex-direction: column; align-items: center; gap: 10px; margin-top: 18px; color: var(--muted); font-size: 14px; max-width: 320px; }
+@media (prefers-reduced-motion: reduce) { .splash-bar span::after { animation-duration: 2.4s; } }
 .splash-error { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-top: 26px; max-width: 420px; }
 .splash-error b { font-size: 18px; }
 .splash-error span { color: var(--muted); }

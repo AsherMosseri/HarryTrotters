@@ -165,7 +165,7 @@ export default function Today({
                     You’re in since {timeOf(myShift.start)}
                   </button>
                 ) : (
-                  <button className="text-btn" onClick={onStartShift}>
+                  <button className="text-btn" onClick={() => onStartShift()}>
                     Start a shift
                   </button>
                 )}

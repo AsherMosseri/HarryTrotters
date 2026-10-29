@@ -18,6 +18,26 @@ const AUTH_ERRORS = {
   'auth/network-request-failed': 'No internet connection. Check your Wi-Fi and reload.',
 };
 
+// Who this device joined as, remembered so the app opens right away next time
+// (the check with the server still runs, and a removed member goes back to Join).
+const memberKey = (uid) => `member-${uid}`;
+function savedMember(uid) {
+  try {
+    const m = JSON.parse(localStorage.getItem(memberKey(uid)));
+    return m && typeof m.name === 'string' ? m : undefined;
+  } catch {
+    return undefined;
+  }
+}
+function saveMember(uid, m) {
+  try {
+    if (m) localStorage.setItem(memberKey(uid), JSON.stringify(m));
+    else localStorage.removeItem(memberKey(uid));
+  } catch {
+    /* private mode */
+  }
+}
+
 export default function App() {
   const [store, setStore] = useState(null);
   const [user, setUser] = useState(null);
@@ -36,7 +56,7 @@ export default function App() {
     return store.onAuth(
       (u) => {
         setUser(u);
-        setMember(undefined);
+        setMember(u ? savedMember(u.uid) : undefined);
       },
       (e) => setError(AUTH_ERRORS[e.code] || e.message || String(e)),
     );
@@ -45,9 +65,15 @@ export default function App() {
   useEffect(() => {
     if (!store || !user) return;
     let alive = true;
+    const saved = savedMember(user.uid);
     store.getMember(user.uid).then(
-      (m) => alive && setMember(m),
-      (e) => alive && setError(e.message || String(e)),
+      (m) => {
+        if (!alive) return;
+        saveMember(user.uid, m);
+        setMember((prev) => (prev && m && prev.name === m.name && prev.admin === m.admin ? prev : m));
+      },
+      // Offline or a slow connection: keep going as who this device joined as.
+      (e) => alive && !saved && setError(e.message || String(e)),
     );
     return () => {
       alive = false;
@@ -87,13 +113,14 @@ export default function App() {
 
   if (install) return <InstallScreen {...install} />;
   if (error) return <LoadingScreen error={error} />;
-  if (!store || !user || member === undefined) return <LoadingScreen />;
+  if (!store || !user || member === undefined) return <LoadingScreen step={!store ? 1 : !user ? 2 : 3} />;
   if (!actor)
     return (
       <JoinScreen
         rename={rename}
         onJoin={async (name, code, managerCode) => {
           await store.join(user.uid, name, code, managerCode);
+          saveMember(user.uid, { name, admin: !!managerCode });
           setMember({ name, admin: !!managerCode });
         }}
       />
