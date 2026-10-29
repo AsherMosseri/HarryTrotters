@@ -2,18 +2,19 @@ import { useEffect, useRef, useState } from 'react';
 import { relTime } from '../util.js';
 import { isIOS } from '../data/push.js';
 import { PopupAds } from './Ads.jsx';
+import { Icon } from './shell/icons.jsx';
 
 const ICONS = {
-  announcement: '📣',
-  mention: '@',
-  assigned: '📋',
-  due: '⏰',
-  message: '💬',
-  dm: '✉️',
-  request: '💡',
-  shutdown: '🛑',
-  shift: '⏱',
-  checkin: '🧪',
+  announcement: 'announce',
+  mention: 'at',
+  assigned: 'tasks',
+  due: 'shifts',
+  message: 'chat',
+  dm: 'chat',
+  request: 'plus',
+  shutdown: 'lock',
+  shift: 'shifts',
+  checkin: 'flag',
 };
 
 function BellIcon() {
@@ -165,7 +166,7 @@ export default function Inbox({ items, pushStatus, onEnablePush, onDisablePush, 
                   }}
                 >
                   <span className={`inbox-icon type-${n.type}`} aria-hidden="true">
-                    {n.icon || ICONS[n.type] || '🔔'}
+                    {n.icon || <Icon name={ICONS[n.type] || 'bell'} size={18} />}
                   </span>
                   <span className="inbox-text">
                     <b>{n.title}</b>

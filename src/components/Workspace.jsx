@@ -126,8 +126,8 @@ function ThemeMenu({
     <div className={`theme-menu${inline ? ' inline' : ''}`} role="dialog" aria-label="Theme">
       <div className="segmented">
         {[
-          ['light', '☀️ Light'],
-          ['dark', '🌙 Dark'],
+          ['light', 'Light'],
+          ['dark', 'Dark'],
           ['system', 'Auto'],
         ].map(([id, label]) => (
           <button key={id} className={theme === id ? 'active' : ''} onClick={() => setTheme(id)}>
@@ -147,11 +147,11 @@ function ThemeMenu({
             ))}
             <button className={`palette${palette === 'profile' ? ' on' : ''}`} onClick={() => setPalette('profile')}>
               <span className="palette-dot" style={{ background: `linear-gradient(135deg, ${profileColors[0]}, ${profileColors[1]})` }} />
-              🪞 My profile
+              My profile
             </button>
             <button className={`palette${palette === 'custom' ? ' on' : ''}`} onClick={onCustom}>
               <span className="palette-dot" style={{ background: `linear-gradient(135deg, ${customColors[0]}, ${customColors[1]})` }} />
-              🎨 Custom…
+              Custom…
             </button>
           </div>
         </>

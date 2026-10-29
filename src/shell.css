@@ -322,3 +322,40 @@ button.sb-head-row { width: 100%; border: 0; background: none; color: var(--mute
 .shell .content.robot { padding-top: 0; }
 .shell .content.robot .link-btn.danger { color: var(--muted); font-weight: 500; }
 .shell .content.robot .link-btn.danger:hover { color: var(--danger); }
+
+/* ---------- pop-ups (everywhere; they draw outside the frame) ---------- */
+.dialog { border-radius: 14px; }
+.panel-head { border-bottom-color: var(--hairline); }
+.panel-head h2 { font-size: 19px; font-weight: 700; letter-spacing: -0.01em; }
+.field-label { font-size: 13px; font-weight: 600; text-transform: none; letter-spacing: 0; color: var(--muted); }
+/* Pickers inside forms: soft buttons, the pick tinted. */
+.segmented { gap: 4px; }
+.segmented button { border: 0; background: var(--surface-2); border-radius: 7px; font-size: 14px; color: var(--text); font-weight: 500; }
+.segmented button:hover { background: color-mix(in srgb, var(--text) 9%, var(--surface)); }
+.segmented button.on, .segmented button.plain-seg.on, .segmented button.active {
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface)); color: var(--accent); box-shadow: none; font-weight: 600;
+}
+.segmented button.status-seg.on, .segmented button.part-seg.on { background: color-mix(in srgb, var(--c) 18%, var(--surface)); color: var(--text); box-shadow: none; }
+.segmented button.on.prio-urgent, .segmented button.on.prio-high { box-shadow: none; }
+.person { border: 0; background: var(--surface-2); font-weight: 500; }
+.person.on { background: color-mix(in srgb, var(--accent) 14%, var(--surface)); color: var(--text); }
+.input, .search, .filter { border-radius: 8px; }
+.btn { border-radius: 8px; }
+/* Task details */
+.panel { box-shadow: -1px 0 0 var(--border), -20px 0 60px rgb(0 0 0 / 12%); }
+.panel-title { font-size: 24px; font-weight: 700; letter-spacing: -0.015em; }
+.panel-head .link-btn.danger, .panel-head .danger-text { color: var(--muted); font-weight: 500; }
+.panel-head .link-btn.danger:hover { color: var(--danger); }
+.panel-head .status-select { background: transparent; border-color: transparent; padding-left: 4px; font-size: 15px; }
+/* Menus and notifications */
+.me-menu, .inbox-pop, .shift-pop { border-radius: 12px; }
+.me-list button { font-weight: 500; }
+.theme-menu h4 { text-transform: none; letter-spacing: 0; font-size: 13px; font-weight: 600; }
+.inbox-icon { background: none; color: var(--muted); }
+.inbox-item.unread { background: color-mix(in srgb, var(--accent) 7%, transparent); }
+/* Help */
+.tips { gap: 14px; }
+.tips b { font-size: 15px; }
+.rules { background: none; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); border-radius: 0; padding: 12px 0; }
+.version-chip { border: 0; border-radius: 8px; }
+.help-sections summary { font-weight: 600; }

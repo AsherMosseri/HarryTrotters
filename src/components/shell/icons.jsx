@@ -155,6 +155,12 @@ const PATHS = {
       <path d="M3 3l14 14" />
     </>
   ),
+  at: (
+    <>
+      <circle cx="10" cy="10" r="3" />
+      <path d="M13 7v4a2 2 0 0 0 4 0v-1a7 7 0 1 0-2.8 5.6" />
+    </>
+  ),
   chevron: <path d="m7.5 4.5 5.5 5.5-5.5 5.5" />,
   sidebar: (
     <>

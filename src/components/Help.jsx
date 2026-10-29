@@ -7,29 +7,22 @@ import { checkForUpdate } from './UpdateGate.jsx';
 import { useEscape } from '../util.js';
 
 const QUICK_TIPS = [
-  ['+', 'Add a task', 'Tap + New task, or the + at the top of a column. Give it an owner and a due date.'],
-  ['✋', 'Move it as you work', 'Press and hold a card, then drag it to another column. Or tap the card and change its status.'],
+  ['Start on Today', 'The app opens on Today: your tasks, what’s due this week, who’s at the lab, and unread messages.'],
+  ['Add a task', 'Tap New task (on Tasks or Today), or + at the top of a column. Give it an owner and a due date.'],
+  ['Move it as you work', 'Press and hold a card, then drag it to another column. Or tap the card and change its status.'],
   [
-    '🗂',
-    'Use the tabs',
-    'Chat: team and subteam channels. Shifts: clock in and out, the schedule, and hours. Milestones: big steps to the competition. Parts: what to buy. Checklists: competition prep. Match Log: practice scores. Robot: the 3D model. Team: who does what.',
+    'Find your way around',
+    'On an iPad or computer, every page is in the sidebar on the left, with the chat channels and your messages under them. On a phone, use the tabs at the bottom (More has the rest).',
   ],
   [
-    '🔔',
     'Turn on notifications',
-    'The bell shows announcements, @mentions, tasks given to you, and what’s due tomorrow. Tap 🔔 → Turn on to get them on this device even when the app is closed.',
+    'The bell lists announcements, @mentions, tasks given to you, and what’s due tomorrow. Tap the bell, then Turn on, to get them on this device even when the app is closed.',
   ],
   [
-    '💡',
     'Have an idea for the app?',
-    `Tap your name at the top right (Me on a phone) → Request a feature, type it, and tap Send idea. It goes straight to ${REQUESTS_TO.split(' ')[0]}.`,
+    `Open your menu (your name at the bottom of the sidebar, or your picture on a phone), then Request a feature. It goes straight to ${REQUESTS_TO.split(' ')[0]}.`,
   ],
-  [
-    '📱',
-    'On a phone',
-    'Use the tabs at the bottom (More has the rest). On the board, pick a status at the top, tap a task to open it, and tap ＋ to add one. Tap your picture for theme, help, and more.',
-  ],
-  ['🗑', 'Deleted something by mistake?', 'Tap Undo, or find it under Filters → Recently deleted for 30 days.'],
+  ['Deleted something by mistake?', 'Tap Undo, or find it under Filters → Recently deleted for 30 days.'],
 ];
 
 const RULES = [
@@ -44,7 +37,7 @@ const SECTIONS = [
     'Tasks',
     [
       'Tap a card to open it: change who, priority, subteam, due date, and milestone.',
-      'Add checklist steps, photos (📷 Add photos), links, and comments.',
+      'Add checklist steps, photos, links, and comments.',
       'Everything you change is saved right away and shown in the task’s Activity.',
       'Filters (My tasks, person, subteam, priority, Hide done) are remembered on this device. If a task seems missing, tap Clear.',
     ],
@@ -72,7 +65,7 @@ const SECTIONS = [
   [
     'Shifts',
     [
-      'Tap ⏱ at the top to start a shift. It shows a timer while you’re on shift; tap it to say what you’re working on, fix your start time (−15 min, −30 min, −1 h, or pick a time), or End shift now.',
+      'Tap the clock next to the bell to start a shift. It shows a timer while you’re on shift; tap it to say what you’re working on, fix your start time (−15 min, −30 min, −1 h, or pick a time), or End shift now.',
       'Tapped it by mistake? Tap Undo, or Cancel shift in the first 15 minutes.',
       'Shifts tab: who’s at the lab now, the schedule (tap I’m in or Can’t), everyone’s hours, and the log of past shifts.',
       'You get a reminder after 4 hours on shift and an hour before a shift you said you’d come to. A shift left running past midnight ends at the last time you used the app (marked auto-ended).',
@@ -93,7 +86,7 @@ const SECTIONS = [
   [
     'Chat',
     [
-      '📣 #announcements is for news from team management; everyone can read it, only they can post. New announcements also show at the top of the board.',
+      '#announcements is for news from team management; everyone can read it, only they can post. New announcements also show at the top of the board.',
       '#general is for everyone; each subteam has its own channel. A number means unread messages (red means someone @mentioned you, your subteam, or @everyone).',
       'Type @ to mention someone, @Programming (or any subteam) to ping that subteam, # to link a task, and : for emoji (like :fire:).',
       'Tap Aa for text styles: bold, italic, bold italic, underline, strikethrough, big/medium/small headings, small gray text, quotes, lists, code, and ||spoilers|| (hidden until tapped). You can also type them: **bold**, *italic*, ***bold italic***, __underline__, ~~strike~~, # Big, ## Medium, ### Small, -# small text, > quote.',
@@ -101,12 +94,12 @@ const SECTIONS = [
       'Games in #arcade: challenge anyone (or @Trotbot) to /rps, /tictactoe, /connect4, or /duel, with an optional bet. Everyone can jump into /trivia, /hangman, /typerace, and /heist.',
       'Team commands, anywhere: /task Fix the intake @Cooper friday, /mytasks (check them off right in chat), /overdue, /shift (clock in or out; /shift who), /match 20 45 15 win #7 (saves to the Match Log), /standup.',
       'Type / for commands (Trotbot answers): /help lists them all. Try /8ball, /roll 2d6, /remind 2h charge batteries, /pet @someone, /whois @someone, or /afk lunch.',
-      'Tap 📷 for a photo, GIF for GIFs, 📊 for a poll (choices, or a written answer everyone types; whoever made it, or team management, can end it and reopen it later), 📎 for any file up to 25 MB (videos play right in the chat), 🎫 for team stickers, and 😊 for every emoji (on a phone or iPad these are under ＋). Pasting a picture or file works too. Links show a preview, and YouTube videos play in the chat.',
-      'Tap (or hover over) a message to react (✨ for an animated super reaction), reply, 📌 pin it, edit or delete your own, or turn it into a task with +Task. Tapping a message also shows who reacted with what. 📌 at the top shows the channel’s pinned messages; 🔍 searches messages.',
-      'Resources: the team’s links (＋ Add link for CAD, code, and docs) and good FTC links. The ⚡ Electrical diagram shows what plugs in where; Electrical and team management can edit it.',
-      '🔔 at the top of a channel: All messages, Only @mentions (the default), or Nothing. Announcements and DMs default to All.',
-      'Direct messages: tap ＋ next to Direct messages (or Message on someone’s profile) to message one person or a group.',
-      'Tap anyone’s name or picture for their profile. Tap your name (top right, or Me on a phone) → Edit profile for a picture (GIFs stay animated), a banner, pronouns, about me, your name’s font, colors, and effect (shimmer, neon, outline, 3D pop, glitch, rainbow), a nameplate behind your name in the members list and DMs, an avatar decoration (animated ones like comets, a flame ring, or electric; or a custom one: any ring, colors, and spin, plus stickers you place, size, rotate, and animate), a profile effect (aurora, warp speed, lightning, matrix, sakura, and more, or a custom one that rains, rises, or floats any emoji, GIF, or picture you pick), profile colors (2 or 3), borders around your profile card and your messages, and a status like “🔧 At the lab”. Tap View full profile for their activity, subteammates, when they joined, and a private note only you can see. Calm chat (in the theme menu) keeps animations in chat still until you hover or tap. A green dot means they have the app open; you’ll see when someone is typing.',
+      'The buttons by the message box add a photo, a GIF, a poll (choices, or a written answer everyone types; whoever made it, or team management, can end it and reopen it later), any file up to 25 MB (videos play right in the chat), team stickers, and emoji (on a phone these are under ＋). Pasting a picture or file works too. Links show a preview, and YouTube videos play in the chat.',
+      'Tap (or hover over) a message to react (✨ for an animated super reaction), reply, pin it, edit or delete your own, or turn it into a task with +Task. Tapping a message also shows who reacted with what. The pin and search buttons at the top of a channel show its pinned messages and search it.',
+      'Resources: the team’s links (＋ Add link for CAD, code, and docs) and good FTC links. The Electrical diagram shows what plugs in where; Electrical and team management can edit it.',
+      'The bell at the top of a channel: All messages, Only @mentions (the default), or Nothing. Announcements and DMs default to All.',
+      'Direct messages: tap ＋ next to Messages in the sidebar (Direct messages in Chat on a phone), or Message on someone’s profile, to message one person or a group.',
+      'Tap anyone’s name or picture for their profile. Open your menu → Edit profile for a picture (GIFs stay animated), a banner, pronouns, about me, your name’s font, colors, and effect (shimmer, neon, outline, 3D pop, glitch, rainbow), a nameplate behind your name in the members list and DMs, an avatar decoration (animated ones like comets, a flame ring, or electric; or a custom one: any ring, colors, and spin, plus stickers you place, size, rotate, and animate), a profile effect (aurora, warp speed, lightning, matrix, sakura, and more, or a custom one that rains, rises, or floats any emoji, GIF, or picture you pick), profile colors (2 or 3), borders around your profile card and your messages, and a status like “🔧 At the lab”. Tap View full profile for their activity, subteammates, when they joined, and a private note only you can see. Calm chat (in the theme menu) keeps animations in chat still until you hover or tap. A green dot means they have the app open; you’ll see when someone is typing.',
     ],
   ],
   [
@@ -114,62 +107,59 @@ const SECTIONS = [
     [
       'The CAD team uploads each version from Onshape (Export → GLTF, Coarse or Medium detail).',
       'Spin with one finger, pinch to zoom, two fingers to pan. Tap a part to select it; the eye in the Parts list hides or shows it.',
-      '📍 Pins: tap the robot to leave a note on a part, link it to a task or part, and resolve it when fixed.',
-      '✋ Sandbox: move or rotate parts to try ideas and save the layout. It never changes the real CAD.',
-      '⇄ Compare: two versions side by side. Green = added, red = removed, orange = moved.',
+      'Pins: tap the robot to leave a note on a part, link it to a task or part, and resolve it when fixed.',
+      'Sandbox: move or rotate parts to try ideas and save the layout. It never changes the real CAD.',
+      'Compare: two versions side by side. Green = added, red = removed, orange = moved.',
     ],
   ],
   ['Team', ['The org chart and everyone’s responsibilities and open tasks.']],
   [
     'Notifications',
     [
-      'The 🔔 at the top lists announcements, @mentions, tasks someone gave you, and a 7:30 AM reminder of what’s due tomorrow. Tap one to go there.',
-      'Phone notifications: tap 🔔 → Turn on, and allow them. Turn them on for each device you use.',
+      'The bell lists announcements, @mentions, tasks someone gave you, and a 7:30 AM reminder of what’s due tomorrow. Tap one to go there.',
+      'Phone notifications: tap the bell, then Turn on, and allow them. Turn them on for each device you use.',
       'On iPad and iPhone the board opens only from the Home Screen app, which is what lets notifications work (iOS 16.4 or later). On a computer, it works in the browser.',
       'Turned them off by mistake? On iPad/iPhone: Settings → Notifications → 32313 Tasks.',
-      'Switch user (in your menu at the top right) stops sending your notifications to that device.',
+      'Switch user (in your menu) stops sending your notifications to that device.',
     ],
   ],
   [
     'Your account',
     [
       'You only enter the team code once per device.',
-      'Switch user (in your menu at the top right) signs this device out so someone else can use it. You’ll need the code again.',
-      'Your menu (tap your name at the top right) picks light, dark, or automatic, and a color theme (Sunset, Ocean, Forest…) for this device.',
-      '🎨 Custom… in that menu makes your own theme: any colors (even moving), a picture, GIF, or emoji pattern behind the app, and floating emoji or GIFs. 🎲 Surprise me picks for you, and 🪞 My profile matches your profile.',
-      '🗂 Edit tabs in that menu: drag the tabs into your order. It follows you to every device; on a phone, your first four are the tab bar.',
-      '🪙 Jackson coins: 15 for each task you were given that gets done (when someone else made it) and 5 an hour at the lab, up to 10 hours a day. Your balance, history, Send, and the leaderboard are in your menu.',
+      'Switch user (in your menu) signs this device out so someone else can use it. You’ll need the code again.',
+      'Your menu (your name at the bottom of the sidebar, or your picture on a phone) picks light, dark, or automatic, and a color theme (Sunset, Ocean, Forest…) for this device.',
+      'Custom… in that menu makes your own theme: any colors (even moving), a picture, GIF, or emoji pattern behind the app, and floating emoji or GIFs. Surprise me picks for you, and My profile matches your profile.',
+      'Edit tabs in that menu: drag the tabs into your order. It follows you to every device; on a phone, your first four are the tab bar.',
+      'Jackson coins: 15 for each task you were given that gets done (when someone else made it) and 5 an hour at the lab, up to 10 hours a day. Your balance, history, Send, and the leaderboard are in your menu.',
       'New friends showing up around the app? Their buttons take bookings, orders, and submissions. Want a spot of your own? Tap “Get your spot here” on one of them. Need a break? Look for the button that clears them away for a while.',
-      '📦 Orders & bookings (in your menu): what you ordered or booked from them, with tracking. Each one asks its own questions, and when it’s delivered or it’s time, you get a notification (quietly at night) and something to do: open it, play it, or answer back.',
+      'Orders & bookings (in your menu): what you ordered or booked from them, with tracking. Each one asks its own questions, and when it’s delivered or it’s time, you get a notification (quietly at night) and something to do: open it, play it, or answer back.',
       'When the site is updated, you’ll be asked to tap Update now.',
     ],
   ],
 ];
 
 const MANAGER_TIPS = [
-  'Team tab: Edit anyone’s role, subteams, responsibilities, and name. Add or remove people.',
-  'Milestones tab: Change the competition date, and delete milestones.',
+  'Roster: Edit anyone’s role, subteams, responsibilities, and name. Add or remove people.',
+  'Milestones: Change the competition date, and delete milestones.',
   'Delete checklists, and permanently delete tasks from Recently deleted.',
   'Chat: post in #announcements (everyone gets a notification), use @everyone, delete any message, and remove reactions (🚫☺ on a message).',
-  'Channels: ＋ next to Channels adds one; ⚙ on a channel renames it, sets its topic and subteam color, moves it up or down, or deletes it.',
-  'Team emoji: open 😊 and tap ＋ under Team emoji to add your own (:name:), or remove them. Stickers: open 🎫 and tap ＋.',
+  'Channels: ＋ next to Channels adds one; ⋯ on a channel in the sidebar (⚙ in Chat on a phone) renames it, sets its topic and subteam color, moves it up or down, or deletes it.',
+  'Team emoji: open the emoji picker and tap ＋ under Team emoji to add your own (:name:), or remove them. Stickers: open stickers and tap ＋.',
   'Lab log: ending your shift asks what you did (a note, the tasks you worked on, photos, blockers, and next time). It’s required, and it shows up in #lab-log, where Trotbot keeps one post per lab day with everyone’s logs and hours. Edit yours from that post. If a shift ends without a log (you forgot to clock out), the app asks the next time you open it.',
-  'Shifts tab: 🧪 Lab check-in asks everyone who’s going to the lab (lunch / after school). Lunch is split by middle and high school lunch using each person’s grade, which you set on the Team tab (Edit). Repeat makes it ask by itself every weekday, or on the days you pick, at a set time. In #announcements, polls can be set so everyone has to answer.',
-  'Shifts tab: Clock in… several people at once, End anyone’s shift, Plan a shift (once or weekly), set the season hours goal, add a missed shift, fix or delete any shift, and Export CSV.',
-  'DMs: you can read every DM (under Team DMs) but can’t post in other people’s. You can change anyone’s profile picture and custom status from their profile (Edit profile → Status).',
+  'Shifts: Lab check-in asks everyone who’s going to the lab (lunch / after school). Lunch is split by middle and high school lunch using each person’s grade, which you set on the Roster (Edit). Repeat makes it ask by itself every weekday, or on the days you pick, at a set time. In #announcements, polls can be set so everyone has to answer.',
+  'Shifts: Clock in… several people at once, End anyone’s shift, Plan a shift (once or weekly), set the season hours goal, add a missed shift, fix or delete any shift, and Export CSV.',
+  'DMs: you can read every DM (under Team messages in the sidebar, or Team DMs on a phone) but can’t post in other people’s. You can change anyone’s profile picture and custom status from their profile (Edit profile → Status).',
 ];
 
-function TipList({ showRobot }) {
+function TipList() {
   return (
     <ul className="tips">
-      {QUICK_TIPS.map(([icon, title, text]) => (
+      {QUICK_TIPS.map(([title, text]) => (
         <li key={title}>
-          <span className={`tip-icon${icon === '+' ? ' tip-plus' : ''}`} aria-hidden="true">
-            {icon}
-          </span>
           <div>
             <b>{title}</b>
-            <p>{showRobot ? text : text.replace(' Robot: the 3D model.', '')}</p>
+            <p>{text}</p>
           </div>
         </li>
       ))}
@@ -200,9 +190,9 @@ export function WelcomeCard({ name, showRobot, pushStatus, onEnablePush, onClose
         <div className="dialog welcome" onClick={(e) => e.stopPropagation()} role="dialog" aria-labelledby="welcome-title">
           <h2 id="welcome-title">Welcome, {name.split(' ')[0]}! 👋</h2>
           <p className="muted">Here’s how the {TEAM_NAME} task board works.</p>
-          <TipList showRobot={showRobot} />
+          <TipList />
           <Rules />
-          <p className="muted small">You can see these tips again anytime with Help in your menu at the top right.</p>
+          <p className="muted small">You can see these tips again anytime with Help in your menu.</p>
           {pushStatus === 'off' ? (
             <>
               <button
@@ -263,13 +253,13 @@ const SECTION_TABS = {
   'Robot (3D)': 'robot',
 };
 const LINE_FEATURES = [
-  [/^Casino and coins|^Games in #arcade|^🪙 Jackson coins/, 'coins'],
+  [/^Casino and coins|^Games in #arcade|^Jackson coins/, 'coins'],
   [/^Lab check-in|Lab check-in asks/, 'checkins'],
   [/^Required polls/, 'requiredPolls'],
   [/^Tap Aa/, 'formatting'],
   [/^Direct messages|^DMs:/, 'dms'],
-  [/^New friends showing up|^📦 Orders & bookings/, 'ads'],
-  [/^🎨 Custom…/, 'themes'],
+  [/^New friends showing up|^Orders & bookings/, 'ads'],
+  [/^Custom… in that menu/, 'themes'],
   [/^Team emoji:/, 'teamEmoji'],
 ];
 const helpShows = (line, controls) => LINE_FEATURES.every(([re, id]) => !re.test(line) || controls.isOn(id));
@@ -302,12 +292,12 @@ export function HelpDialog({ isManager, showRobot, onClose, onVersionLog, onRequ
           {controls.isOn('requests') && (
             <button className="version-chip idea-chip" onClick={onRequests}>
               <span>
-                💡 <b>Request a feature</b> · ideas go straight to {REQUESTS_TO.split(' ')[0]}
+                <b>Request a feature</b> · ideas go straight to {REQUESTS_TO.split(' ')[0]}
               </span>
               <span className="link-btn">Send →</span>
             </button>
           )}
-          <TipList showRobot={showRobot} />
+          <TipList />
           <Rules />
           <div className="help-sections">
             {SECTIONS.filter(([title]) => (showRobot || title !== 'Robot (3D)') && controls.tabOn(SECTION_TABS[title])).map(
