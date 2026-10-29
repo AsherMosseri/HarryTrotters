@@ -599,7 +599,8 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
   const allConvs = useMemo(() => [...convs.channels, ...convs.dms, ...convs.teamDms], [convs]);
   const currentConv = allConvs.find((c) => c.key === chatChannel) || convs.channels.find((c) => c.id === 'general') || convs.channels[0];
   // #parts also shows inside the Parts tab; the conversation on screen is that or the Chat tab's.
-  const partsConv = convs.channels.find((c) => c.id === 'parts');
+  // (Not when the Chat tab is switched off in Controls: chat is hidden everywhere.)
+  const partsConv = controls.tabOn('chat') ? convs.channels.find((c) => c.id === 'parts') : null;
   const shownConv = view === 'chat' ? currentConv : view === 'parts' ? partsConv : null;
 
   // Live chat for every channel and my DMs (for unread counts), plus a team DM
@@ -1745,7 +1746,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
                 onAddTask={(m) => setNewTask({ status: 'todo', milestoneId: m.id, subteam: m.subteam || '' })}
               />
             ) : view === 'parts' ? (
-              <div className="parts-layout">
+              <div className={`parts-layout${partsConv ? '' : ' no-chat'}`}>
                 <PartsView parts={parts} tasks={tasks} api={api} onOpenTask={setOpenId} />
                 {partsConv && (
                   <ChatView

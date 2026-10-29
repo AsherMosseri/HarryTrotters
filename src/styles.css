@@ -1629,6 +1629,7 @@ h3.md-h { font-size: 16.5px; }
 
 /* ---------- parts tab with #parts chat ---------- */
 .parts-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(320px, 400px); align-items: start; }
+.parts-layout.no-chat { grid-template-columns: minmax(0, 1fr); }
 .content.chat.embedded {
   grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr);
   position: sticky; top: 12px; height: calc(var(--vvh, 100dvh) - 190px); min-height: 420px; padding: 12px 16px 12px 0;
