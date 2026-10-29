@@ -3270,9 +3270,9 @@ html.kb-open .toast { bottom: auto; top: calc(var(--vvt) + var(--vvh) - 64px); }
 .cmd-house-table th:first-child, .cmd-house-table td:first-child { text-align: left; }
 .cmd-house-lists { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
 @media (min-width: 761px) {
-  .dialog.cmd-admin { height: min(820px, calc(var(--vvh, 100dvh) - 40px)); }
+  .dialog.cmd-admin, .dialog.controls-page { height: min(820px, calc(var(--vvh, 100dvh) - 40px)); }
 }
-.cmd-admin .ads-body { flex-shrink: 1; }
+.cmd-admin .ads-body, .controls-page .ads-body { flex-shrink: 1; }
 /* Avatar decorations reach past the picture: keep them off the text beside it. */
 .cmd-whois > .avatar-btn, .cmd-whois > .deco, .cmd-whois > .avatar { margin: 8px 6px 8px 8px; }
 .cmd-ship-pair { gap: 18px; padding: 8px 8px 10px; }
@@ -3354,3 +3354,14 @@ html.kb-open .toast { bottom: auto; top: calc(var(--vvt) + var(--vvh) - 64px); }
 .sd-compose .btn { flex: none; min-height: 40px; }
 .sd-picker { width: auto; max-width: 46%; min-height: 34px; padding: 4px 8px; font-size: 14px; margin-right: 4px; }
 .shutdown-switch { position: absolute; top: max(12px, env(safe-area-inset-top)); right: max(16px, env(safe-area-inset-right)); z-index: 1; }
+.ctl-quick, .ctl-preview { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.ctl-quick .btn { flex: 1 1 160px; justify-content: center; }
+.ctl-preview select { flex: 1 1 140px; width: auto; min-height: 40px; }
+.ctl-title { min-width: 0; font-size: 14px; flex: none; max-width: 45%; }
+.ctl-lablog { margin: 4px 0 2px; }
+.preview-strip { flex: none; display: flex; align-items: center; justify-content: center; gap: 12px; padding: 6px 16px; padding-top: max(14px, env(safe-area-inset-top)); background: #111827; color: #fff; font-size: 13px; font-weight: 700; }
+.preview-strip span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.preview-strip .btn { flex: none; background: #fff; color: #111827; border-color: #fff; }
+.app.previewing .topbar { padding-top: 10px; }
+.update-plain { padding: 28px; }
+.update-plain .big-btn { width: 100%; }

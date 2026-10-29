@@ -27,31 +27,34 @@ function Spoiler({ children }) {
 
 // Inline patterns, in priority order when two start at the same place.
 function inlineRules(ctx) {
-  const rules = [
-    // \_ \* and friends: show the character itself (so ¯\_(ツ)_/¯ survives).
-    { re: /\\([\\`*_~|#>-])/, render: (m) => m[1] },
-    { re: /`([^`\n]+)`/, render: (m, k) => <code key={k}>{m[1]}</code> },
-    { re: /\|\|([\s\S]+?)\|\|/, render: (m, k) => <Spoiler key={k}>{inline(m[1], ctx)}</Spoiler> },
-    { re: /\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/, render: (m, k) => link(m[2], inline(m[1], ctx), k) },
-    { re: URL_RE, render: (m, k) => link(m[0], m[0], k) },
-    {
-      re: /\*\*\*([\s\S]+?)\*\*\*/,
-      render: (m, k) => (
-        <strong key={k}>
-          <em>{inline(m[1], ctx)}</em>
-        </strong>
-      ),
-    },
-    { re: /\*\*([\s\S]+?)\*\*/, render: (m, k) => <strong key={k}>{inline(m[1], ctx)}</strong> },
-    { re: /__([\s\S]+?)__/, render: (m, k) => <u key={k}>{inline(m[1], ctx)}</u> },
-    { re: /~~([\s\S]+?)~~/, render: (m, k) => <s key={k}>{inline(m[1], ctx)}</s> },
-    { re: /\*(?![\s*])([\s\S]*?[^\s*])\*/, render: (m, k) => <em key={k}>{inline(m[1], ctx)}</em> },
-    // _italic_ only at word edges (so snake_case stays). No lookbehind: older iPads lack it.
-    {
-      re: /(^|[^\w])_(?![\s_])([\s\S]*?[^\s_])_(?![\w])/,
-      render: (m, k) => [m[1], <em key={k}>{inline(m[2], ctx)}</em>],
-    },
-  ];
+  // Formatting switched off (Controls): only links, @mentions, and team emoji.
+  const rules = ctx.plain
+    ? [{ re: URL_RE, render: (m, k) => link(m[0], m[0], k) }]
+    : [
+        // \_ \* and friends: show the character itself (so ¯\_(ツ)_/¯ survives).
+        { re: /\\([\\`*_~|#>-])/, render: (m) => m[1] },
+        { re: /`([^`\n]+)`/, render: (m, k) => <code key={k}>{m[1]}</code> },
+        { re: /\|\|([\s\S]+?)\|\|/, render: (m, k) => <Spoiler key={k}>{inline(m[1], ctx)}</Spoiler> },
+        { re: /\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/, render: (m, k) => link(m[2], inline(m[1], ctx), k) },
+        { re: URL_RE, render: (m, k) => link(m[0], m[0], k) },
+        {
+          re: /\*\*\*([\s\S]+?)\*\*\*/,
+          render: (m, k) => (
+            <strong key={k}>
+              <em>{inline(m[1], ctx)}</em>
+            </strong>
+          ),
+        },
+        { re: /\*\*([\s\S]+?)\*\*/, render: (m, k) => <strong key={k}>{inline(m[1], ctx)}</strong> },
+        { re: /__([\s\S]+?)__/, render: (m, k) => <u key={k}>{inline(m[1], ctx)}</u> },
+        { re: /~~([\s\S]+?)~~/, render: (m, k) => <s key={k}>{inline(m[1], ctx)}</s> },
+        { re: /\*(?![\s*])([\s\S]*?[^\s*])\*/, render: (m, k) => <em key={k}>{inline(m[1], ctx)}</em> },
+        // _italic_ only at word edges (so snake_case stays). No lookbehind: older iPads lack it.
+        {
+          re: /(^|[^\w])_(?![\s_])([\s\S]*?[^\s_])_(?![\w])/,
+          render: (m, k) => [m[1], <em key={k}>{inline(m[2], ctx)}</em>],
+        },
+      ];
   if (ctx.mentionRe)
     rules.push({
       re: ctx.mentionRe,
@@ -187,7 +190,8 @@ function joinLines(lines, ctx) {
 export function renderRich(text, ctx = {}) {
   if (!text) return null;
   const local = { ...ctx, _rules: null };
-  return parseBlocks(text).map((b, i) => {
+  const blocks = ctx.plain ? [{ type: 'p', lines: text.split('\n') }] : parseBlocks(text);
+  return blocks.map((b, i) => {
     switch (b.type) {
       case 'code':
         return (

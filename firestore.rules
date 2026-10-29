@@ -58,10 +58,23 @@ service cloud.firestore {
     // settings/names (renames) is readable before joining so the join screen shows current names.
     match /settings/{id} {
       allow read: if isMember() || (id == 'names' && signedIn());
-      allow write: if isManager() && id != 'shutdown';
+      allow write: if isManager() && id != 'shutdown' && id != 'controls';
+      // settings/controls: Asher's switches (src/controls.js). Asher only.
+      allow write: if id == 'controls' && isOwner()
+        && request.resource.data.keys().hasOnly(['off', 'tabsOff', 'channelsOff', 'labLog', 'by', 'updatedAt'])
+        && request.resource.data.get('off', []) is list && request.resource.data.get('tabsOff', []) is list
+        && request.resource.data.get('channelsOff', []) is list
+        && request.resource.data.get('labLog', 'required') in ['required', 'optional', 'off'];
       // settings/shutdown shuts the app down for everyone else: Asher only.
       allow write: if id == 'shutdown' && isOwner() && validShutdown(request.resource.data);
     }
+    // Asher's Controls (settings/controls): what's switched off for everyone
+    // but him. The app hides it; these refuse it. Ids match src/controls.js.
+    function controlsPath() { return /databases/$(database)/documents/settings/controls; }
+    function controlsList(key) { return exists(controlsPath()) ? get(controlsPath()).data.get(key, []) : []; }
+    function featureOff(id) { return !isOwner() && id in controlsList('off'); }
+    function channelOff(id) { return !isOwner() && id in controlsList('channelsOff'); }
+    function labLogOff() { return !isOwner() && exists(controlsPath()) && get(controlsPath()).data.get('labLog', 'required') == 'off'; }
     // Asher: the manager who joined as Asher Mosseri (that needs his manager code).
     function isOwner() { return isManager() && myName().lower() == 'asher mosseri'; }
     function validShutdown(d) {
@@ -128,7 +141,7 @@ service cloud.firestore {
           && d.amount is int && d.amount != 0 && d.amount >= -100000 && d.amount <= 100000 && shortStr(d.get('note', ''), 140);
       }
       allow read: if isMember();
-      allow create: if isMember() && request.resource.data.at is int && (
+      allow create: if isMember() && !featureOff('coins') && request.resource.data.at is int && (
         (request.resource.data.type == 'spend' && validSpend(request.resource.data))
         || (request.resource.data.type == 'gift' && validGift(request.resource.data))
         || (request.resource.data.type == 'prize' && validPrize(request.resource.data))
@@ -207,8 +220,8 @@ service cloud.firestore {
           && d.get('doneTaskIds', []) is list && d.get('doneTaskIds', []).size() <= 30;
       }
       allow read: if isMember();
-      allow create: if isMember() && validLog(request.resource.data) && (isMe(request.resource.data.person) || isManager());
-      allow update: if isMember() && validLog(request.resource.data) && request.resource.data.person == resource.data.person
+      allow create: if isMember() && !labLogOff() && validLog(request.resource.data) && (isMe(request.resource.data.person) || isManager());
+      allow update: if isMember() && !labLogOff() && validLog(request.resource.data) && request.resource.data.person == resource.data.person
         && (isMe(resource.data.person) || isManager());
       allow delete: if isManager();
     }
@@ -301,7 +314,28 @@ service cloud.firestore {
       return m.byUid == request.auth.uid
         && m.text is string && m.text.size() <= 4000
         && (m.get('everyone', false) == false || isManager())
-        && !serverCommand(m);
+        && !serverCommand(m)
+        && contentAllowed(m);
+    }
+    // Nothing that's switched off (Controls) in a new message.
+    function contentAllowed(m) {
+      return (m.get('gif', null) == null || !featureOff('gifs'))
+        && (m.get('photo', null) == null || !featureOff('photos'))
+        && (m.get('files', []).size() == 0 || !featureOff('files'))
+        && (m.get('poll', null) == null || !featureOff('polls'))
+        && (m.get('sticker', null) == null || !featureOff('stickers'))
+        && (m.get('replyTo', null) == null || !featureOff('replies'))
+        && (m.get('mentions', []).size() == 0 || !featureOff('mentions'))
+        && (m.get('everyone', false) == false || !featureOff('everyone'));
+    }
+    // Changes to a message that are switched off (Controls): reactions, pins,
+    // poll votes, and editing (deleting your own still works).
+    function changeAllowed() {
+      let k = request.resource.data.diff(resource.data).affectedKeys();
+      return (!k.hasAny(['reactions', 'supers']) || !featureOff('reactions'))
+        && (!k.hasAny(['pinned', 'pinnedBy', 'pinnedAt']) || !featureOff('pins'))
+        && (!k.hasAny(['votes']) || !featureOff('polls'))
+        && (!k.hasAny(['text']) || request.resource.data.get('deleted', false) == true || !featureOff('editing'));
     }
     // Casino, economy, and arcade game cards only come from the server (the
     // play function), so nobody can post a fake jackpot or a fake win.
@@ -331,8 +365,9 @@ service cloud.firestore {
     // leaves a placeholder); managers can change or remove any message.
     match /channels/{channelId}/messages/{msgId} {
       allow read: if isMember();
-      allow create: if isMember() && validMessage() && (channelId != 'announcements' || isManager());
-      allow update: if isMember() && (isManager() || ((resource.data.byUid == request.auth.uid || sharedChange()) && keepsCmd()));
+      allow create: if isMember() && validMessage() && (channelId != 'announcements' || isManager()) && !channelOff(channelId);
+      allow update: if isMember() && !channelOff(channelId) && changeAllowed()
+        && (isManager() || ((resource.data.byUid == request.auth.uid || sharedChange()) && keepsCmd()));
       allow delete: if isManager();
     }
 
@@ -340,7 +375,7 @@ service cloud.firestore {
     // read every DM but can't post in other people's DMs.
     match /dms/{dmId} {
       allow read: if isMember() && (isManager() || inPeople(resource.data.people));
-      allow create: if isMember() && request.resource.data.people is list
+      allow create: if isMember() && !featureOff('dms') && request.resource.data.people is list
         && request.resource.data.people.size() >= 2 && request.resource.data.people.size() <= 12
         && inPeople(request.resource.data.people);
       allow update: if isMember() && (isManager() || (inPeople(resource.data.people)
@@ -350,8 +385,8 @@ service cloud.firestore {
       function dmPeople() { return get(/databases/$(database)/documents/dms/$(dmId)).data.people; }
       match /messages/{msgId} {
         allow read: if isMember() && (isManager() || inPeople(dmPeople()));
-        allow create: if isMember() && validMessage() && inPeople(dmPeople());
-        allow update: if isMember() && (isManager() || (inPeople(dmPeople())
+        allow create: if isMember() && !featureOff('dms') && validMessage() && inPeople(dmPeople());
+        allow update: if isMember() && !featureOff('dms') && changeAllowed() && (isManager() || (inPeople(dmPeople())
           && (resource.data.byUid == request.auth.uid || sharedChange()) && keepsCmd()));
         allow delete: if isManager();
       }
@@ -404,7 +439,7 @@ service cloud.firestore {
     // team management sets the status and replies. Authors can delete theirs.
     match /requests/{id} {
       allow read: if isMember();
-      allow create: if isMember() && request.resource.data.byUid == request.auth.uid
+      allow create: if isMember() && !featureOff('requests') && request.resource.data.byUid == request.auth.uid
         && isMe(request.resource.data.by)
         && request.resource.data.text is string && request.resource.data.text.size() > 0
         && request.resource.data.text.size() <= 2000
@@ -457,7 +492,7 @@ service cloud.firestore {
     match /checkins/{id} {
       allow read: if isMember();
       allow create, delete: if isManager();
-      allow update: if isManager() || (isMember()
+      allow update: if isManager() || (isMember() && !featureOff('checkins')
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['answers'])
         && request.resource.data.answers.diff(resource.data.answers).affectedKeys().hasOnly([myName(), renamedMe()]));
     }

@@ -11,7 +11,7 @@ export const LabLogContext = createContext(null);
 
 const MAX_PHOTOS = 4;
 
-export function LabLogDialog({ day, person, log, shift, tasks, hours, mode, onSave, onCancel, uploadPhoto }) {
+export function LabLogDialog({ day, person, log, shift, tasks, hours, mode, onSave, onCancel, onSkip, uploadPhoto }) {
   const [note, setNote] = useState(log?.note ?? shift?.note ?? '');
   const [taskIds, setTaskIds] = useState(log?.taskIds ?? shift?.taskIds ?? []);
   const [done, setDone] = useState(log?.doneTaskIds ?? []);
@@ -188,12 +188,17 @@ export function LabLogDialog({ day, person, log, shift, tasks, hours, mode, onSa
           <button className="btn primary big-btn" disabled={!note.trim() || !!busy} onClick={save}>
             {busy === 'save' ? 'Saving…' : mode === 'end' ? 'Save and end shift' : 'Save'}
           </button>
+          {mode === 'end' && onSkip && (
+            <button className="btn lablog-skip" disabled={!!busy} onClick={onSkip}>
+              Skip the log and end shift
+            </button>
+          )}
           {mode === 'end' && onCancel && (
             <button className="link-btn small lablog-notyet" onClick={onCancel}>
               Not yet, keep my shift going
             </button>
           )}
-          {!note.trim() && <p className="muted tiny lablog-hint">Write at least a short note to save.</p>}
+          {!note.trim() && !onSkip && <p className="muted tiny lablog-hint">Write at least a short note to save.</p>}
         </div>
       </div>
     </Overlay>

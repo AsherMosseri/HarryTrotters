@@ -56,6 +56,7 @@ export async function checkForUpdate() {
 export default function UpdateGate({ children }) {
   const [newVersion, setNewVersion] = useState(null);
   const [info, setInfo] = useState(null); // { release, changelog } of the new version
+  const [plain, setPlain] = useState(false); // a plain update: just an Update button
   const [showLog, setShowLog] = useState(false);
   const quiet = useSyncExternalStore(subscribeQuiet, () => quietScreens > 0);
 
@@ -78,6 +79,7 @@ export default function UpdateGate({ children }) {
         return;
       }
       setNewVersion(data.version);
+      setPlain(!!data.plain);
       if (Array.isArray(data.changelog)) setInfo({ release: data.release, changelog: data.changelog });
     };
     // Offline or the local dev server: try again later.
@@ -123,7 +125,18 @@ export default function UpdateGate({ children }) {
           </div>
         </Overlay>
       )}
-      {newVersion && !quiet && (
+      {newVersion && !quiet && plain && (
+        <Overlay>
+          <div className="update-gate" role="alertdialog" aria-label="Update">
+            <div className="gate-card update-plain">
+              <button className="btn primary big-btn" onClick={() => loadNewVersion(newVersion)}>
+                Update
+              </button>
+            </div>
+          </div>
+        </Overlay>
+      )}
+      {newVersion && !quiet && !plain && (
         <Overlay>
           <div className="update-gate" role="alertdialog" aria-labelledby="update-title">
             <div className="gate-card">

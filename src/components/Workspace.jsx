@@ -62,6 +62,9 @@ import {
 } from './Ads.jsx';
 import CommandsPage from './CommandsPage.jsx';
 import { ShutdownPage, shutdownUnread } from './Shutdown.jsx';
+import ControlsPage from './ControlsPage.jsx';
+import { PreviewBar } from './Preview.jsx';
+import { ControlsContext, commandCfgFor, makeControls, profileView } from '../controls.js';
 import { CoinsDialog, Coins } from './Coins.jsx';
 import { LabLogContext, LabLogDialog } from './LabLog.jsx';
 import { LotteryContext } from './chat/Casino.jsx';
@@ -93,6 +96,7 @@ try {
 
 // Light / dark / automatic, plus the app color themes.
 function ThemeMenu({
+  colorsOn = true,
   theme,
   setTheme,
   palette,
@@ -128,23 +132,27 @@ function ThemeMenu({
           </button>
         ))}
       </div>
-      <h4>Color theme</h4>
-      <div className="palette-grid">
-        {PALETTES.map((p) => (
-          <button key={p.id} className={`palette${palette === p.id ? ' on' : ''}`} onClick={() => setPalette(p.id)}>
-            <span className="palette-dot" style={{ background: `linear-gradient(135deg, ${p.colors[0]}, ${p.colors[1]})` }} />
-            {p.label}
-          </button>
-        ))}
-        <button className={`palette${palette === 'profile' ? ' on' : ''}`} onClick={() => setPalette('profile')}>
-          <span className="palette-dot" style={{ background: `linear-gradient(135deg, ${profileColors[0]}, ${profileColors[1]})` }} />
-          🪞 My profile
-        </button>
-        <button className={`palette${palette === 'custom' ? ' on' : ''}`} onClick={onCustom}>
-          <span className="palette-dot" style={{ background: `linear-gradient(135deg, ${customColors[0]}, ${customColors[1]})` }} />
-          🎨 Custom…
-        </button>
-      </div>
+      {colorsOn && (
+        <>
+          <h4>Color theme</h4>
+          <div className="palette-grid">
+            {PALETTES.map((p) => (
+              <button key={p.id} className={`palette${palette === p.id ? ' on' : ''}`} onClick={() => setPalette(p.id)}>
+                <span className="palette-dot" style={{ background: `linear-gradient(135deg, ${p.colors[0]}, ${p.colors[1]})` }} />
+                {p.label}
+              </button>
+            ))}
+            <button className={`palette${palette === 'profile' ? ' on' : ''}`} onClick={() => setPalette('profile')}>
+              <span className="palette-dot" style={{ background: `linear-gradient(135deg, ${profileColors[0]}, ${profileColors[1]})` }} />
+              🪞 My profile
+            </button>
+            <button className={`palette${palette === 'custom' ? ' on' : ''}`} onClick={onCustom}>
+              <span className="palette-dot" style={{ background: `linear-gradient(135deg, ${customColors[0]}, ${customColors[1]})` }} />
+              🎨 Custom…
+            </button>
+          </div>
+        </>
+      )}
       <label className="calm-toggle">
         <input type="checkbox" checked={calm} onChange={(e) => setCalm(e.target.checked)} />
         <span>
@@ -266,17 +274,19 @@ const CHAT_PAGE = 60;
 const EMPTY_FILTERS = { q: '', person: '', subteam: '', priority: '', statuses: [], hideDone: false };
 
 // What components deep in the app read: people (profiles, who's online) and the lab log.
-function Contexts({ people, lab, lottery, children }) {
+function Contexts({ people, lab, lottery, controls, children }) {
   return (
-    <PeopleContext.Provider value={people}>
-      <LabLogContext.Provider value={lab}>
-        <LotteryContext.Provider value={lottery}>{children}</LotteryContext.Provider>
-      </LabLogContext.Provider>
-    </PeopleContext.Provider>
+    <ControlsContext.Provider value={controls}>
+      <PeopleContext.Provider value={people}>
+        <LabLogContext.Provider value={lab}>
+          <LotteryContext.Provider value={lottery}>{children}</LotteryContext.Provider>
+        </LabLogContext.Provider>
+      </PeopleContext.Provider>
+    </ControlsContext.Provider>
   );
 }
 
-export default function Workspace({ store, actor, rename, renames, shutdown }) {
+export default function Workspace({ store, actor, rename, renames, shutdown, onPreview, preview, onExitPreview }) {
   const [rawTasks, setRawTasks] = useState(null);
   const [people, setPeople] = useState([]);
   const [rawMilestones, setMilestones] = useState([]);
@@ -311,15 +321,21 @@ export default function Workspace({ store, actor, rename, renames, shutdown }) {
   const phone = useMedia('(max-width: 760px)');
   const showRobot = ROBOT_TAB_PEOPLE.includes(actor.name);
   const [profileDocs, setProfileDocs] = useState([]);
-  // Tabs: the owner can turn tabs off for everyone (settings.hiddenTabs);
-  // each person orders their own (profile.tabOrder, on every device).
+  // Asher's Controls (controls.js): tabs, channels, and features off for
+  // everyone but him. He's never switched off himself (unless previewing).
+  const [controlsDoc, setControlsDoc] = useState({});
+  useEffect(() => store.subscribeControls(setControlsDoc), [store]);
+  const exempt = actor.admin && actor.name === REQUESTS_TO;
+  const controls = useMemo(() => makeControls(controlsDoc, exempt, settings.hiddenTabs), [controlsDoc, exempt, settings.hiddenTabs]);
+  // Tabs: Asher turns tabs off for everyone else (controls.tabsOff, and the
+  // older settings.hiddenTabs); each person orders their own (profile.tabOrder).
   const allViews = showRobot ? VIEWS : VIEWS.filter(([id]) => id !== 'robot');
-  const hiddenTabs = settings.hiddenTabs || [];
+  const hiddenTabs = [...new Set([...(controlsDoc.tabsOff || []), ...(settings.hiddenTabs || [])])];
   const tabOrder = profileDocs.find((d) => d.id === personId(actor.name))?.tabOrder;
   // No saved order: phones start with Board, Chat, Shifts, Parts on the tab bar.
   const order = tabOrder || (phone ? ['board', 'chat', 'shifts', 'parts'] : []);
   const rank = (id) => (order.includes(id) ? order.indexOf(id) : order.length + allViews.findIndex(([v]) => v === id));
-  const shownViews = allViews.filter(([id]) => !hiddenTabs.includes(id));
+  const shownViews = allViews.filter(([id]) => controls.tabOn(id));
   const byRank = (list) => [...list].sort((a, b) => rank(a[0]) - rank(b[0]));
   const views = byRank(shownViews.length ? shownViews : allViews);
   const [editTabs, setEditTabs] = useState(false);
@@ -352,6 +368,8 @@ export default function Workspace({ store, actor, rename, renames, shutdown }) {
   const loadFailures = useRef(new Map());
   const loadFail = useCallback(
     (what) => (e) => {
+      // Previewing as someone: their private things can't load for you; that's fine.
+      if (actor.preview) return console.warn(what, e);
       console.error(what, e);
       const why =
         e?.code === 'permission-denied' ? 'the database rules need updating (ask team management)' : e?.message || 'unknown error';
@@ -427,7 +445,19 @@ export default function Workspace({ store, actor, rename, renames, shutdown }) {
   const competitionDate = settings.competitionDate || COMPETITION.date;
 
   // Notifications: the bell's list, and phone notifications on this device.
-  const [inbox, setInbox] = useState([]);
+  const [allInbox, setInbox] = useState([]);
+  // Notifications about something that's switched off (Controls) stay out of sight.
+  const inbox = useMemo(
+    () =>
+      allInbox.filter((n) => {
+        const [kind, id] = (n.open || '').split(/:(.*)/s);
+        if (kind === 'chat') return id?.startsWith('dm:') ? controls.isOn('dms') : controls.channelOn(id);
+        if (kind === 'requests') return controls.isOn('requests');
+        if (n.type === 'checkin') return controls.isOn('checkins');
+        return true;
+      }),
+    [allInbox, controls],
+  );
   const [pushStatus, setPushStatus] = useState(() => store.pushStatus());
   // Quiet if the rules for notifications aren't published yet: the bell just stays empty.
   useEffect(
@@ -535,7 +565,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown }) {
     for (const d of channelDocs)
       merged.set(d.id, { ...(merged.get(d.id) || { name: d.id, order: 99 }), ...d, announce: d.id === 'announcements' });
     const channels = [...merged.values()]
-      .filter((c) => !c.deleted || c.id === 'announcements' || c.id === 'general')
+      .filter((c) => (!c.deleted || c.id === 'announcements' || c.id === 'general') && controls.channelOn(c.id))
       .sort((a, b) => (a.order ?? 99) - (b.order ?? 99) || a.name.localeCompare(b.name))
       .map((c) => ({ ...c, key: c.id, kind: 'channel', label: `#${c.name}` }));
     const dms = dmDocs
@@ -547,13 +577,14 @@ export default function Workspace({ store, actor, rename, renames, shutdown }) {
         return { ...d, key: `dm:${d.id}`, kind: 'dm', people: ppl, label, short, mine: ppl.includes(actor.name) };
       })
       .sort((a, b) => (b.lastAt || 0) - (a.lastAt || 0));
+    const dmsOn = controls.isOn('dms');
     return {
       channels,
-      dms: dms.filter((d) => d.mine),
-      teamDms: dms.filter((d) => !d.mine),
+      dms: dmsOn ? dms.filter((d) => d.mine) : [],
+      teamDms: dmsOn ? dms.filter((d) => !d.mine) : [],
       allChannelIds: [...merged.keys(), ...Object.keys(docs)],
     };
-  }, [channelDocs, dmDocs, rename, actor.name]);
+  }, [channelDocs, dmDocs, rename, actor.name, controls]);
   const allConvs = useMemo(() => [...convs.channels, ...convs.dms, ...convs.teamDms], [convs]);
   const currentConv = allConvs.find((c) => c.key === chatChannel) || convs.channels.find((c) => c.id === 'general') || convs.channels[0];
   // #parts also shows inside the Parts tab; the conversation on screen is that or the Chat tab's.
@@ -615,15 +646,20 @@ export default function Workspace({ store, actor, rename, renames, shutdown }) {
   );
   const [profileFor, setProfileFor] = useState(null);
   const [editProfileFor, setEditProfileFor] = useState(null);
+  // What everyone sees of a profile: Controls can switch looks off (profileView).
+  const shownProfiles = useMemo(
+    () => (controls.exempt ? profiles : new Map([...profiles].map(([n, p]) => [n, profileView(p, controls.isOn)]))),
+    [profiles, controls],
+  );
   const peopleCtx = useMemo(
     () => ({
-      photoOf: (name) => profiles.get(name)?.photo?.url || '',
-      profileOf: (name) => profiles.get(name),
+      photoOf: (name) => shownProfiles.get(name)?.photo?.url || '',
+      profileOf: (name) => shownProfiles.get(name),
       isOnline: (name) => online.has(name),
       infoOf: (name) => peopleInfo.get(name) || { subteams: [], responsibilities: [], title: '', color: '' },
       roster,
     }),
-    [profiles, online, peopleInfo, roster],
+    [shownProfiles, online, peopleInfo, roster],
   );
   const openPerson = useCallback((name) => setProfileFor(name), []);
   // Going back: a pop-up opened from another pop-up returns to it when it's
@@ -652,14 +688,22 @@ export default function Workspace({ store, actor, rename, renames, shutdown }) {
   const myProfile = profiles.get(actor.name);
   const myColor = peopleInfo.get(actor.name)?.color;
   const profileTheme = useMemo(() => themeFromProfile(myProfile, myColor), [myProfile, myColor]);
-  const activeTheme = palette === 'custom' ? { ...CUSTOM_DEFAULT, ...customTheme } : palette === 'profile' ? profileTheme : null;
+  // Themes switched off (Controls): everyone gets the standard look.
+  const activeTheme = !controls.isOn('themes')
+    ? null
+    : palette === 'custom'
+      ? { ...CUSTOM_DEFAULT, ...customTheme }
+      : palette === 'profile'
+        ? profileTheme
+        : null;
   const themeKey = JSON.stringify(activeTheme);
   useEffect(() => {
     applyThemeVars(themeKey === 'null' ? null : JSON.parse(themeKey));
   }, [themeKey]);
   const gradeOf = useCallback((name) => peopleInfo.get(name)?.grade || 9, [peopleInfo]);
   const today = todayISO();
-  const pendingCheckin = checkins.find((c) => c.date === today && (c.slots || []).length && !answerOf(c, actor.name, rename));
+  const pendingCheckin =
+    controls.isOn('checkins') && checkins.find((c) => c.date === today && (c.slots || []).length && !answerOf(c, actor.name, rename));
   const upcomingCheckins = checkins
     .filter((c) => c.date >= today)
     .sort((a, b) => a.date.localeCompare(b.date) || (a.at || 0) - (b.at || 0));
@@ -738,6 +782,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown }) {
   // when they open the app, like a lab check-in).
   const pendingPoll = useMemo(() => {
     const me = personId(actor.name);
+    if (!controls.isOn('requiredPolls') || !controls.isOn('polls') || !controls.channelOn('announcements')) return null;
     return (chat.announcements || []).find(
       (m) =>
         m.poll?.required &&
@@ -746,7 +791,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown }) {
         rename(m.by || '') !== actor.name &&
         !Object.values(m.votes || {}).some((v) => v?.[me]),
     );
-  }, [chat, actor.name, rename]);
+  }, [chat, actor.name, rename, controls]);
 
   // Mark the open channel read while it's on screen.
   useEffect(() => {
@@ -1061,7 +1106,8 @@ export default function Workspace({ store, actor, rename, renames, shutdown }) {
   useEffect(() => store.subscribeLabLogs(dayOf(Date.now() - 30 * 86400000), setLabLogs, loadFail('the lab log')), [store, loadFail]);
   const [labLog, setLabLog] = useState(null); // { mode: 'end' | 'edit', day, person, shift? }
   const namedShifts = useMemo(() => shifts.map((s) => (s.person ? { ...s, person: rename(s.person) } : s)), [shifts, rename]);
-  const owedDay = labLogs ? missingLogDay(actor.name, namedShifts, labLogs) : null;
+  // Lab log (Controls): required, optional (ending a shift can skip it), or off.
+  const owedDay = labLogs && controls.labLog === 'required' ? missingLogDay(actor.name, namedShifts, labLogs) : null;
   const labCtx = useMemo(
     () => ({
       logs: labLogs || [],
@@ -1166,9 +1212,13 @@ export default function Workspace({ store, actor, rename, renames, shutdown }) {
       myTasks={myOpenTasks}
       onStart={startMyShift}
       onUpdate={(patch) => myShift && api.updateShift(myShift.id, patch)}
-      // Ending a shift asks for the lab log first (it ends the shift when saved).
-      onEnd={(details) =>
-        myShift && setLabLog({ mode: 'end', day: dayOf(myShift.start), person: actor.name, shift: { ...myShift, ...details } })
+      // Ending a shift asks for the lab log first (it ends the shift when saved),
+      // unless the lab log is switched off.
+      onEnd={
+        controls.labLog === 'off'
+          ? undefined
+          : (details) =>
+              myShift && setLabLog({ mode: 'end', day: dayOf(myShift.start), person: actor.name, shift: { ...myShift, ...details } })
       }
       onCancel={() => {
         setShiftPanel(false);
@@ -1181,6 +1231,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown }) {
     />
   );
   const themeMenuProps = {
+    colorsOn: controls.isOn('themes'),
     calm,
     setCalm,
     theme,
@@ -1247,6 +1298,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown }) {
   const [commandsPage, setCommandsPage] = useState(false);
   // Asher's shutdown switch (Shutdown.jsx) and the replies people send him.
   const [shutdownPage, setShutdownPage] = useState(false);
+  const [controlsPage, setControlsPage] = useState(false);
   const [shutdownReplies, setShutdownReplies] = useState([]);
   useEffect(() => (isOwner ? store.subscribeShutdownReplies(setShutdownReplies) : undefined), [store, isOwner]);
   const shutdownNew = shutdown?.on ? shutdownUnread(shutdownReplies, actor.name) : 0;
@@ -1275,7 +1327,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown }) {
     roster,
     lottery,
     team: {
-      commandCfg: settings.commands || {},
+      commandCfg: commandCfgFor(settings.commands || {}, controls),
       tasks: tasks || [],
       runs: () => runs,
       createRun: (data) => api.createRun(data),
@@ -1375,7 +1427,12 @@ export default function Workspace({ store, actor, rename, renames, shutdown }) {
   }, [actor.name, tasks, shifts, myWallet.balance, competitionDate, peopleInfo]);
   const trackOrder = trackId ? adOrders.find((o) => o.id === trackId) : null;
   const activeOrders = useMemo(() => adOrders.filter((o) => orderActive(o, Date.now())).length, [adOrders]);
-  const ads = useAdsEngine({ settings, actor, view, shifts, submissions: adSubs, ledger, coins, viewer, competitionDate, api });
+  // Ads switched off (Controls): as if they were paused.
+  const adSettings = useMemo(
+    () => (controls.isOn('ads') ? settings : { ...settings, ads: { ...(settings.ads || {}), paused: true } }),
+    [settings, controls],
+  );
+  const ads = useAdsEngine({ settings: adSettings, actor, view, shifts, submissions: adSubs, ledger, coins, viewer, competitionDate, api });
   botHook.current = ads.onChatSent;
   const inboxButton = (
     <Inbox
@@ -1416,9 +1473,13 @@ export default function Workspace({ store, actor, rename, renames, shutdown }) {
   ).length;
 
   return (
-    <Contexts people={peopleCtx} lab={labCtx} lottery={lottery}>
+    <Contexts people={peopleCtx} lab={labCtx} lottery={lottery} controls={controls}>
       <AdsProvider value={ads.value}>
-        <div className={`app${view === 'chat' || view === 'robot' ? ' chat-mode' : ''}`} style={takeoverStyle(ads.value.takeover)}>
+        <div
+          className={`app${view === 'chat' || view === 'robot' ? ' chat-mode' : ''}${preview ? ' previewing' : ''}`}
+          style={takeoverStyle(ads.value.takeover)}
+        >
+          {preview && <PreviewBar as={preview.as} onExit={onExitPreview} />}
           {store.mode === 'demo' && (
             <div className="demo-banner">
               Demo mode — sample data saved only in this browser. <a href="./">Go to the real board</a>
@@ -1427,7 +1488,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown }) {
           <AppBackdrop theme={activeTheme} />
           {phone ? (
             <header className="topbar phone-top">
-              <button className="brand" onClick={() => setCat(true)} aria-label="Team logo">
+              <button className="brand" onClick={() => controls.isOn('catParty') && setCat(true)} aria-label="Team logo">
                 <span className="logo-mark">✓</span>
               </button>
               <h1 className="phone-title">{views.find(([id]) => id === view)?.[1] || 'Board'}</h1>
@@ -1441,7 +1502,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown }) {
             </header>
           ) : (
             <header className="topbar">
-              <button className="brand" onClick={() => setCat(true)}>
+              <button className="brand" onClick={() => controls.isOn('catParty') && setCat(true)}>
                 <span className="logo-mark">✓</span>
                 <span className="brand-text">
                   {TEAM_NAME} <span className="muted">Tasks</span>
@@ -1488,16 +1549,20 @@ export default function Workspace({ store, actor, rename, renames, shutdown }) {
                       <div className="me-list">
                         <button onClick={() => (setMeMenu(false), setProfileFor(actor.name))}>👤 My profile</button>
                         <button onClick={() => (setMeMenu(false), setEditProfileFor(actor.name))}>✏️ Edit profile</button>
-                        <button onClick={() => (setMeMenu(false), setShowRequests(true))}>
-                          💡 Request a feature {newRequests > 0 && <span className="me-badge">{newRequests}</span>}
-                        </button>
+                        {controls.isOn('requests') && (
+                          <button onClick={() => (setMeMenu(false), setShowRequests(true))}>
+                            💡 Request a feature {newRequests > 0 && <span className="me-badge">{newRequests}</span>}
+                          </button>
+                        )}
                         <button onClick={() => (setMeMenu(false), setShowHelp(true))}>❓ Help</button>
-                        <button onClick={() => (setMeMenu(false), setCoinsOpen(true))}>
-                          🪙 Jackson coins{' '}
-                          <span className="me-coins">
-                            <Coins n={myWallet.balance} />
-                          </span>
-                        </button>
+                        {controls.isOn('coins') && (
+                          <button onClick={() => (setMeMenu(false), setCoinsOpen(true))}>
+                            🪙 Jackson coins{' '}
+                            <span className="me-coins">
+                              <Coins n={myWallet.balance} />
+                            </span>
+                          </button>
+                        )}
                         {adOrders.length > 0 && (
                           <button onClick={() => (setMeMenu(false), setOrdersOpen(true))}>
                             📦 Orders & bookings {activeOrders > 0 && <span className="me-badge">{activeOrders}</span>}
@@ -1505,8 +1570,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown }) {
                         )}
                         <button onClick={() => (setMeMenu(false), setEditTabs(true))}>🗂 Edit tabs</button>
                         {isOwner && <button onClick={() => (setMeMenu(false), setAdsPage(true))}>📺 Ads</button>}
-                        {isOwner && <button onClick={() => (setMeMenu(false), setCommandsPage(true))}>🤖 Commands</button>}
-                        {isOwner && <button onClick={() => (setMeMenu(false), setShutdownPage(true))}>🛑 Shut down app</button>}
+                        {isOwner && <button onClick={() => (setMeMenu(false), setControlsPage(true))}>🎛 Controls</button>}
                       </div>
                       <ThemeMenu {...themeMenuProps} inline onClose={() => {}} />
                       <UpdateCheck />
@@ -1698,6 +1762,10 @@ export default function Workspace({ store, actor, rename, renames, shutdown }) {
               </div>
             ) : view === 'checklists' ? (
               <ChecklistsView checklists={checklists} api={api} isManager={actor.admin} />
+            ) : view === 'chat' && !currentConv ? (
+              <main className="content">
+                <p className="muted empty-note">No channels right now.</p>
+              </main>
             ) : view === 'chat' ? (
               <ChatView
                 convs={convs}
@@ -1935,6 +2003,21 @@ export default function Workspace({ store, actor, rename, renames, shutdown }) {
                     onSave={saveLabLog}
                     // A missing log has to be written; ending a shift can wait ("Not yet").
                     onCancel={st.mode === 'missing' ? null : () => setLabLog(null)}
+                    // Optional lab log: end the shift without one.
+                    onSkip={
+                      st.mode === 'end' && st.shift && controls.labLog === 'optional'
+                        ? async () => {
+                            await api.updateShift(st.shift.id, {
+                              note: st.shift.note || '',
+                              subteam: st.shift.subteam || '',
+                              taskIds: st.shift.taskIds || [],
+                              end: Date.now(),
+                            });
+                            setLabLog(null);
+                            setToast({ text: '⏱ Shift ended. See you next time!' });
+                          }
+                        : null
+                    }
                     uploadPhoto={async (f) => store.uploadLabPhoto(await preparePhoto(f))}
                   />
                 );
@@ -1998,8 +2081,10 @@ export default function Workspace({ store, actor, rename, renames, shutdown }) {
                 canHide={actor.admin && actor.name === REQUESTS_TO}
                 onSave={(order, hidden) => {
                   api.saveProfile(actor.name, { tabOrder: order });
-                  if (actor.admin && actor.name === REQUESTS_TO && hidden.join() !== hiddenTabs.join())
-                    api.saveSettings({ hiddenTabs: hidden });
+                  if (isOwner && hidden.join() !== hiddenTabs.join()) {
+                    store.saveControls({ tabsOff: hidden }, actor);
+                    if (settings.hiddenTabs?.length) api.saveSettings({ hiddenTabs: [] });
+                  }
                 }}
                 onClose={() => setEditTabs(false)}
               />
@@ -2148,6 +2233,22 @@ export default function Workspace({ store, actor, rename, renames, shutdown }) {
               onClose={ads.closeRemoving}
             />
           )}
+          {controlsPage && isOwner && (
+            <ControlsPage
+              doc={controlsDoc}
+              views={showRobot ? VIEWS : VIEWS.filter(([id]) => id !== 'robot')}
+              channels={convs.channels}
+              people={roster.filter((n) => n !== actor.name)}
+              shutdown={shutdown}
+              commandsOff={(settings.commands?.off || []).length}
+              covered={shutdownPage || commandsPage}
+              onSave={(patch) => store.saveControls(patch, actor)}
+              onPreview={(p) => onPreview?.(p)}
+              onShutdown={() => setShutdownPage(true)}
+              onCommands={() => setCommandsPage(true)}
+              onClose={() => setControlsPage(false)}
+            />
+          )}
           {shutdownPage && isOwner && (
             <ShutdownPage
               shutdown={shutdown}
@@ -2236,16 +2337,20 @@ export default function Workspace({ store, actor, rename, renames, shutdown }) {
                   <div className="me-list">
                     <button onClick={() => (closeSheet(), setProfileFor(actor.name))}>👤 My profile</button>
                     <button onClick={() => (closeSheet(), setEditProfileFor(actor.name))}>✏️ Edit profile</button>
-                    <button onClick={() => (closeSheet(), setShowRequests(true))}>
-                      💡 Request a feature {newRequests > 0 && <span className="me-badge">{newRequests}</span>}
-                    </button>
+                    {controls.isOn('requests') && (
+                      <button onClick={() => (closeSheet(), setShowRequests(true))}>
+                        💡 Request a feature {newRequests > 0 && <span className="me-badge">{newRequests}</span>}
+                      </button>
+                    )}
                     <button onClick={() => (closeSheet(), setShowHelp(true))}>❓ Help</button>
-                    <button onClick={() => (closeSheet(), setCoinsOpen(true))}>
-                      🪙 Jackson coins{' '}
-                      <span className="me-coins">
-                        <Coins n={myWallet.balance} />
-                      </span>
-                    </button>
+                    {controls.isOn('coins') && (
+                      <button onClick={() => (closeSheet(), setCoinsOpen(true))}>
+                        🪙 Jackson coins{' '}
+                        <span className="me-coins">
+                          <Coins n={myWallet.balance} />
+                        </span>
+                      </button>
+                    )}
                     {adOrders.length > 0 && (
                       <button onClick={() => (closeSheet(), setOrdersOpen(true))}>
                         📦 Orders & bookings {activeOrders > 0 && <span className="me-badge">{activeOrders}</span>}
@@ -2253,8 +2358,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown }) {
                     )}
                     <button onClick={() => (closeSheet(), setEditTabs(true))}>🗂 Edit tabs</button>
                     {isOwner && <button onClick={() => (closeSheet(), setAdsPage(true))}>📺 Ads</button>}
-                    {isOwner && <button onClick={() => (closeSheet(), setCommandsPage(true))}>🤖 Commands</button>}
-                    {isOwner && <button onClick={() => (closeSheet(), setShutdownPage(true))}>🛑 Shut down app</button>}
+                    {isOwner && <button onClick={() => (closeSheet(), setControlsPage(true))}>🎛 Controls</button>}
                   </div>
                   <ThemeMenu {...themeMenuProps} inline onClose={() => {}} />
                   <UpdateCheck />

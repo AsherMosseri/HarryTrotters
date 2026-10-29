@@ -6,8 +6,23 @@ import { borderProps } from '../../borders.js';
 import { isJumbo, renderRich } from './format.jsx';
 import { EmojiPicker } from './Pickers.jsx';
 import { CUSTOM_RE } from './emoji.js';
+import { isCoinCommand, useControls } from '../../controls.js';
 
 export const QUICK_REACTIONS = ['👍', '✅', '😂', '❤️', '🔥', '👀'];
+
+// Whether a message still has something to show with some features switched
+// off (Controls): a GIF-only message disappears when GIFs are off.
+export function messageShows(m, feat) {
+  if (m.cmd && isCoinCommand(m.cmd.name)) return feat('coins');
+  if (m.deleted || m.cmd || (m.text && !m.poll)) return true;
+  return !!(
+    (m.poll && feat('polls')) ||
+    (m.gif && feat('gifs')) ||
+    (m.sticker && feat('stickers')) ||
+    (m.files?.length && feat('files')) ||
+    (m.photo && feat('photos'))
+  );
+}
 export const timeOf = (ms) => new Date(ms).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
 
 // A YouTube link's video id, for the inline player.
@@ -342,13 +357,19 @@ export default function Message({
 }) {
   const [picker, setPicker] = useState(false);
   const [removing, setRemoving] = useState(false);
+  const feat = useControls().isOn;
   const mine = m.byUid === actor.uid;
   // The author's message border (Edit profile → Style → Borders).
   const frame = borderProps(usePeople()?.profileOf(m.by)?.msgBorder);
-  const reactions = Object.entries(m.reactions || {}).filter(([, who]) => who && Object.keys(who).length);
+  // Team emoji off: reactions with them are hidden too. Reactions off: none.
+  const shownReaction = ([emoji, who]) => who && Object.keys(who).length && (feat('teamEmoji') || !CUSTOM_RE.test(emoji));
+  const reactions = feat('reactions') ? Object.entries(m.reactions || {}).filter(shownReaction) : [];
   const myRoles = ctx.myRoles || [];
   // Highlight messages that ping me (not my own).
-  const mentionsMe = !mine && ((m.mentions || []).includes(actor.name) || m.everyone || (m.roles || []).some((r) => myRoles.includes(r)));
+  const mentionsMe =
+    !mine &&
+    feat('mentions') &&
+    ((m.mentions || []).includes(actor.name) || (m.everyone && feat('everyone')) || (m.roles || []).some((r) => myRoles.includes(r)));
   const react = (emoji) => {
     if (picker === 'super') return superReact(emoji);
     const on = !(m.reactions?.[emoji] && m.reactions[emoji][actor.uid]);
@@ -360,18 +381,18 @@ export default function Message({
     api.superReact(conv, m.id, emoji, on);
     setPicker(false);
   };
-  const supers = Object.entries(m.supers || {}).filter(([, who]) => who && Object.keys(who).length);
+  const supers = feat('reactions') ? Object.entries(m.supers || {}).filter(shownReaction) : [];
   // Set once the message has rendered, so later super reactions animate.
   const shown = useRef(false);
   useEffect(() => {
     shown.current = true;
   }, []);
-  const yt = youtubeId(m.preview?.url) || youtubeId(/https?:\/\/\S+/.exec(m.text || '')?.[0]);
+  const yt = feat('linkPreviews') && (youtubeId(m.preview?.url) || youtubeId(/https?:\/\/\S+/.exec(m.text || '')?.[0]));
   const jumbo = !m.poll && isJumbo(m.text, ctx.emoji);
 
   return (
     <div
-      className={`msg${first ? ' first' : ''}${selected ? ' selected' : ''}${mentionsMe ? ' mentions-me' : ''}${m.pinned ? ' pinned' : ''}`}
+      className={`msg${first ? ' first' : ''}${selected ? ' selected' : ''}${mentionsMe ? ' mentions-me' : ''}${m.pinned && feat('pins') ? ' pinned' : ''}`}
       id={`msg-${m.id}`}
       onClick={(e) => {
         if (e.target.closest('a,button,input,.emoji-picker,.spoiler:not(.shown)')) return;
@@ -402,7 +423,7 @@ export default function Message({
               <DisplayName as="button" name={m.by} className="name-btn" onClick={(e) => onPerson(m.by, e)} />
             )}{' '}
             <span className="muted tiny">{timeOf(m.at)}</span>
-            {m.pinned && (
+            {m.pinned && feat('pins') && (
               <span className="muted tiny" title={`Pinned by ${m.pinnedBy}`}>
                 {' '}
                 📌
@@ -410,7 +431,7 @@ export default function Message({
             )}
           </div>
         )}
-        {m.replyTo && (
+        {m.replyTo && feat('replies') && (
           <button className="msg-reply-quote" onClick={() => onJump(m.replyTo.id)}>
             ↩ <b>{m.replyTo.by?.split(' ')[0]}</b> {m.replyTo.text || 'a photo'}
           </button>
@@ -424,7 +445,7 @@ export default function Message({
             {m.text && !m.poll && (!m.cmd || m.cmd.name === 'me') && (
               <div className={`msg-text${jumbo ? ' jumbo' : ''}${m.cmd ? ' msg-me' : ''} ${frame.className}`} style={frame.style}>
                 {m.cmd ? <em>{renderRich(m.text, ctx)}</em> : renderRich(m.text, ctx)}
-                {m.editedAt && <span className="muted tiny edited"> (edited)</span>}
+                {m.editedAt && feat('editing') && <span className="muted tiny edited"> (edited)</span>}
               </div>
             )}
             {m.cmd && m.cmd.name !== 'me' && m.cmd.name !== 'wyr' && (
@@ -437,7 +458,7 @@ export default function Message({
               />
             )}
             {m.cmd?.name === 'wyr' && <Trotbot name="wyr" />}
-            {m.poll && (
+            {m.poll && feat('polls') && (
               <Poll
                 m={m}
                 actor={actor}
@@ -448,14 +469,14 @@ export default function Message({
                 onReopen={() => api.editMessage(conv, m.id, { poll: { ...m.poll, closed: false } })}
               />
             )}
-            {m.gif && <img className="msg-gif" src={m.gif.url} alt={m.gif.title || 'GIF'} loading="lazy" />}
-            {m.sticker && (
+            {m.gif && feat('gifs') && <img className="msg-gif" src={m.gif.url} alt={m.gif.title || 'GIF'} loading="lazy" />}
+            {m.sticker && feat('stickers') && (
               <img className="msg-sticker" src={m.sticker.url} alt={`Sticker: ${m.sticker.name}`} title={m.sticker.name} loading="lazy" />
             )}
-            {(m.files || []).map((f) => (
+            {(feat('files') ? m.files || [] : []).map((f) => (
               <Attachment key={f.path || f.url} f={f} />
             ))}
-            {m.photo && (
+            {m.photo && feat('photos') && (
               <button className="msg-photo" onClick={() => onPhoto(m)} aria-label="Open photo">
                 <img src={m.photo.thumbUrl || m.photo.url} alt="" loading="lazy" />
               </button>
@@ -463,7 +484,7 @@ export default function Message({
             {yt ? (
               <YouTube id={yt} />
             ) : (
-              m.preview && <LinkPreview p={m.preview} canHide={mine} onHide={() => api.hidePreview(conv, m.id)} />
+              m.preview && feat('linkPreviews') && <LinkPreview p={m.preview} canHide={mine} onHide={() => api.hidePreview(conv, m.id)} />
             )}
             {(m.taskIds || []).filter((id) => taskById[id]).length > 0 && (
               <div className="msg-tasks">
@@ -540,33 +561,41 @@ export default function Message({
       </div>
       {!m.deleted && (
         <div className="msg-actions" onClick={(e) => e.stopPropagation()}>
-          {QUICK_REACTIONS.slice(0, 3).map((e) => (
-            <button key={e} onClick={() => react(e)} aria-label={`React ${e}`}>
-              {e}
-            </button>
-          ))}
-          <button onClick={() => setPicker((p) => !p)} aria-label="More reactions" title="More reactions">
-            ☺+
-          </button>
-          <button
-            onClick={() => setPicker((p) => (p === 'super' ? false : 'super'))}
-            aria-label="Super reaction"
-            title="Super reaction (animated)"
-          >
-            ✨
-          </button>
-          {canPost && (
+          {feat('reactions') && (
+            <>
+              {QUICK_REACTIONS.slice(0, 3).map((e) => (
+                <button key={e} onClick={() => react(e)} aria-label={`React ${e}`}>
+                  {e}
+                </button>
+              ))}
+              <button onClick={() => setPicker((p) => !p)} aria-label="More reactions" title="More reactions">
+                ☺+
+              </button>
+              <button
+                onClick={() => setPicker((p) => (p === 'super' ? false : 'super'))}
+                aria-label="Super reaction"
+                title="Super reaction (animated)"
+              >
+                ✨
+              </button>
+            </>
+          )}
+          {canPost && feat('replies') && (
             <button onClick={() => onReply(m)} title="Reply">
               ↩
             </button>
           )}
-          <button onClick={() => api.pin(conv, m.id, !m.pinned)} title={m.pinned ? 'Unpin' : 'Pin to this channel'}>
-            {m.pinned ? '📍' : '📌'}
-          </button>
-          <button onClick={() => onMakeTask(m)} title="Make a task from this message">
-            ＋Task
-          </button>
-          {mine && !m.poll && !m.cmd && (
+          {feat('pins') && (
+            <button onClick={() => api.pin(conv, m.id, !m.pinned)} title={m.pinned ? 'Unpin' : 'Pin to this channel'}>
+              {m.pinned ? '📍' : '📌'}
+            </button>
+          )}
+          {feat('makeTask') && (
+            <button onClick={() => onMakeTask(m)} title="Make a task from this message">
+              ＋Task
+            </button>
+          )}
+          {mine && feat('editing') && !m.poll && !m.cmd && (
             <button onClick={() => onEdit(m)} title="Edit">
               ✏️
             </button>
@@ -581,7 +610,7 @@ export default function Message({
               🗑
             </button>
           )}
-          {picker && (
+          {picker && feat('reactions') && (
             <EmojiPicker
               title={picker === 'super' ? '✨ Super reaction' : ''}
               onPick={react}

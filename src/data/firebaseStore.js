@@ -839,6 +839,18 @@ export const firebaseStore = {
       () => cb(null),
     );
   },
+  // Asher's switches (settings/controls, controls.js): tabs, channels, and
+  // features that are off for everyone but him.
+  subscribeControls(cb) {
+    return onSnapshot(
+      doc(db, 'settings', 'controls'),
+      (snap) => cb(snap.data() || {}),
+      () => {},
+    );
+  },
+  saveControls(patch, actor) {
+    return setDoc(doc(db, 'settings', 'controls'), { ...patch, by: actor.name, updatedAt: Date.now() }, { merge: true });
+  },
   // Asher's switch that shuts the app down for everyone else (settings/shutdown),
   // and what people write back from the shutdown screen (shutdownReplies).
   subscribeShutdown(cb) {

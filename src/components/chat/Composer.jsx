@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { SUBTEAMS, SUBTEAM_COLORS } from '../../config.js';
+import { useControls } from '../../controls.js';
 import { preparePhoto } from '../../util.js';
 import { Avatar, CloseIcon, PlusIcon, StatusDot, usePeople } from '../common.jsx';
 import { prefixLines, wrapSelection } from './format.jsx';
@@ -59,7 +60,7 @@ export default function Composer({
   replyTo,
   editing,
   onDone,
-  teamEmoji,
+  teamEmoji: allTeamEmoji,
   stickers = [],
   onManageStickers,
   onManageEmoji,
@@ -71,6 +72,9 @@ export default function Composer({
   useCommand,
 }) {
   const people = usePeople();
+  // Asher's Controls: features switched off don't show up here at all.
+  const feat = useControls().isOn;
+  const teamEmoji = feat('teamEmoji') ? allTeamEmoji : [];
   const [text, setText] = useState(() => readDrafts()[conv] || '');
   const [taskIds, setTaskIds] = useState([]);
   const [photo, setPhoto] = useState(null); // { file, preview }
@@ -145,8 +149,10 @@ export default function Composer({
     if (suggest.kind === '/')
       return matchCommands(q, api.team().commandCfg).map((c) => ({ type: 'cmd', key: c.name, insert: `/${c.name}`, c }));
     if (suggest.kind === '@') {
+      if (!feat('mentions')) return [];
       const out = [];
-      if (!isDm && isManager && 'everyone'.startsWith(q)) out.push({ type: 'everyone', key: 'everyone', insert: '@everyone' });
+      if (!isDm && isManager && feat('everyone') && 'everyone'.startsWith(q))
+        out.push({ type: 'everyone', key: 'everyone', insert: '@everyone' });
       if (!isDm)
         for (const s of SUBTEAMS)
           if (
@@ -333,9 +339,9 @@ export default function Composer({
     const parsed = !editing && !photo && parseCommand(body);
     if (parsed) return runSlash(parsed);
     // @Subteam pings that subteam; @everyone (team management only) pings everyone.
-    const everyone = !isDm && isManager && /@everyone(?![\w])/.test(body);
-    const roles = isDm ? [] : SUBTEAMS.filter((s) => body.includes(`@${s}`));
-    const named = roster.filter((n) => body.includes(`@${n}`));
+    const everyone = !isDm && isManager && feat('everyone') && /@everyone(?![\w])/.test(body);
+    const roles = isDm || !feat('mentions') ? [] : SUBTEAMS.filter((s) => body.includes(`@${s}`));
+    const named = feat('mentions') ? roster.filter((n) => body.includes(`@${n}`)) : [];
     const mentions = [...new Set([...named, ...roles.flatMap(subteamMembers), ...(everyone ? roster : [])])].filter(
       (n) => n !== actor.name,
     );
@@ -499,7 +505,7 @@ export default function Composer({
           <span className="muted small">{cmdHint.desc}</span>
         </div>
       )}
-      {formatBar && (
+      {formatBar && feat('formatting') && (
         <div className="format-bar" role="toolbar" aria-label="Formatting">
           {FORMATS.map(([lab, title, how]) => (
             <button
@@ -530,44 +536,59 @@ export default function Composer({
             </button>
             {panel === 'more' && (
               <div className="composer-more" ref={moreMenu}>
-                <button onClick={() => (setPanel(null), fileInput.current?.click())}>📷 Photo</button>
-                <button onClick={() => setPanel('gif')}>🎞 GIF</button>
-                <button onClick={() => setPanel('poll')}>📊 Poll</button>
-                <button onClick={() => (setPanel(null), anyFileInput.current?.click())}>📎 File or video</button>
-                <button onClick={() => setPanel('sticker')}>🎫 Sticker</button>
+                {feat('photos') && <button onClick={() => (setPanel(null), fileInput.current?.click())}>📷 Photo</button>}
+                {feat('gifs') && <button onClick={() => setPanel('gif')}>🎞 GIF</button>}
+                {feat('polls') && <button onClick={() => setPanel('poll')}>📊 Poll</button>}
+                {feat('files') && <button onClick={() => (setPanel(null), anyFileInput.current?.click())}>📎 File or video</button>}
+                {feat('stickers') && <button onClick={() => setPanel('sticker')}>🎫 Sticker</button>}
                 <button onClick={() => setPanel('emoji')}>😊 Emoji</button>
               </div>
             )}
-            <button className="icon-btn hide-phone" onClick={() => fileInput.current?.click()} aria-label="Add a photo" title="Add a photo">
-              📷
-            </button>
-            <button
-              className="icon-btn gif-btn hide-phone"
-              onClick={() => setPanel(panel === 'gif' ? null : 'gif')}
-              aria-label="Add a GIF"
-              title="GIFs"
-            >
-              GIF
-            </button>
-            <button className="icon-btn hide-phone" onClick={() => setPanel('poll')} aria-label="Make a poll" title="Poll">
-              📊
-            </button>
-            <button
-              className="icon-btn hide-phone"
-              onClick={() => anyFileInput.current?.click()}
-              aria-label="Attach a file"
-              title="File or video (25 MB)"
-            >
-              📎
-            </button>
-            <button
-              className="icon-btn hide-phone"
-              onClick={() => setPanel(panel === 'sticker' ? null : 'sticker')}
-              aria-label="Stickers"
-              title="Stickers"
-            >
-              🎫
-            </button>
+            {feat('photos') && (
+              <button
+                className="icon-btn hide-phone"
+                onClick={() => fileInput.current?.click()}
+                aria-label="Add a photo"
+                title="Add a photo"
+              >
+                📷
+              </button>
+            )}
+            {feat('gifs') && (
+              <button
+                className="icon-btn gif-btn hide-phone"
+                onClick={() => setPanel(panel === 'gif' ? null : 'gif')}
+                aria-label="Add a GIF"
+                title="GIFs"
+              >
+                GIF
+              </button>
+            )}
+            {feat('polls') && (
+              <button className="icon-btn hide-phone" onClick={() => setPanel('poll')} aria-label="Make a poll" title="Poll">
+                📊
+              </button>
+            )}
+            {feat('files') && (
+              <button
+                className="icon-btn hide-phone"
+                onClick={() => anyFileInput.current?.click()}
+                aria-label="Attach a file"
+                title="File or video (25 MB)"
+              >
+                📎
+              </button>
+            )}
+            {feat('stickers') && (
+              <button
+                className="icon-btn hide-phone"
+                onClick={() => setPanel(panel === 'sticker' ? null : 'sticker')}
+                aria-label="Stickers"
+                title="Stickers"
+              >
+                🎫
+              </button>
+            )}
             <input
               ref={anyFileInput}
               type="file"
@@ -599,12 +620,13 @@ export default function Composer({
           onChange={onChange}
           onPaste={(e) => {
             const f = e.clipboardData?.files?.[0];
-            if (f && !editing) {
-              e.preventDefault();
-              if (f.type === 'image/gif') uploadGif(f);
-              else if (/^image\/(jpeg|png|webp|heic)/.test(f.type)) addPhoto(f);
-              else sendFile(f);
-            }
+            if (!f || editing) return;
+            const how = f.type === 'image/gif' ? 'gifs' : /^image\/(jpeg|png|webp|heic)/.test(f.type) ? 'photos' : 'files';
+            if (!feat(how)) return;
+            e.preventDefault();
+            if (how === 'gifs') uploadGif(f);
+            else if (how === 'photos') addPhoto(f);
+            else sendFile(f);
           }}
           onKeyDown={(e) => {
             if (suggest && options.length) {
@@ -625,7 +647,7 @@ export default function Composer({
               }
             }
             const mod = e.metaKey || e.ctrlKey;
-            if (mod && ['b', 'i', 'u'].includes(e.key.toLowerCase())) {
+            if (mod && feat('formatting') && ['b', 'i', 'u'].includes(e.key.toLowerCase())) {
               e.preventDefault();
               format(['wrap', { b: '**', i: '*', u: '__' }[e.key.toLowerCase()]]);
             } else if (e.key === 'Enter' && !e.shiftKey) {
@@ -640,14 +662,16 @@ export default function Composer({
           placeholder={`Message ${label}`}
           title="/ for commands, @ to mention, # to link a task, : for emoji"
         />
-        <button
-          className={`icon-btn${formatBar ? ' on' : ''}`}
-          onClick={() => setFormatBar(!formatBar)}
-          aria-label="Text formatting"
-          title="Text formatting"
-        >
-          <span className="aa">Aa</span>
-        </button>
+        {feat('formatting') && (
+          <button
+            className={`icon-btn${formatBar ? ' on' : ''}`}
+            onClick={() => setFormatBar(!formatBar)}
+            aria-label="Text formatting"
+            title="Text formatting"
+          >
+            <span className="aa">Aa</span>
+          </button>
+        )}
         <button
           className="icon-btn hide-phone"
           onClick={() => setPanel(panel === 'emoji' ? null : 'emoji')}

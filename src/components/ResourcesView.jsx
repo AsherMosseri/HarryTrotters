@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { BUILTIN_RESOURCES, LINK_KINDS, guessKind, kindOf } from '../resources.js';
 import { fullTime } from '../util.js';
 import ElectricalEditor, { DiagramPreview } from './ElectricalEditor.jsx';
+import { useFeature } from '../controls.js';
 
 const host = (url) => {
   try {
@@ -89,6 +90,7 @@ export default function ResourcesView({ resources, diagram, actor, isManager, ca
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState(null);
   const [openDiagram, setOpenDiagram] = useState(false);
+  const electrical = useFeature('electrical');
   const order = LINK_KINDS.map(([k]) => k);
   const team = [...resources].sort((a, b) => order.indexOf(a.kind) - order.indexOf(b.kind) || (a.at || 0) - (b.at || 0));
 
@@ -101,27 +103,31 @@ export default function ResourcesView({ resources, diagram, actor, isManager, ca
         </div>
       </div>
 
-      <section className="res-diagram">
-        <button className="res-diagram-pic" onClick={() => setOpenDiagram(true)} aria-label="Open the electrical diagram">
-          <DiagramPreview diagram={diagram} />
-        </button>
-        <div className="res-diagram-side">
-          <h2>⚡ Electrical diagram</h2>
-          <p className="muted small">
-            Every motor, servo, and sensor and the hub port it plugs into.{' '}
-            {canEditDiagram ? 'You can edit it: add parts, rename them, and rewire.' : 'Electrical and team management keep it up to date.'}
-          </p>
-          {diagram?.updatedBy && (
-            <p className="muted tiny">
-              Last changed by {diagram.updatedBy}
-              {diagram.updatedAt ? ` · ${fullTime(diagram.updatedAt)}` : ''}
-            </p>
-          )}
-          <button className="btn primary" onClick={() => setOpenDiagram(true)}>
-            {canEditDiagram ? '✏️ Open and edit' : 'Open'}
+      {electrical && (
+        <section className="res-diagram">
+          <button className="res-diagram-pic" onClick={() => setOpenDiagram(true)} aria-label="Open the electrical diagram">
+            <DiagramPreview diagram={diagram} />
           </button>
-        </div>
-      </section>
+          <div className="res-diagram-side">
+            <h2>⚡ Electrical diagram</h2>
+            <p className="muted small">
+              Every motor, servo, and sensor and the hub port it plugs into.{' '}
+              {canEditDiagram
+                ? 'You can edit it: add parts, rename them, and rewire.'
+                : 'Electrical and team management keep it up to date.'}
+            </p>
+            {diagram?.updatedBy && (
+              <p className="muted tiny">
+                Last changed by {diagram.updatedBy}
+                {diagram.updatedAt ? ` · ${fullTime(diagram.updatedAt)}` : ''}
+              </p>
+            )}
+            <button className="btn primary" onClick={() => setOpenDiagram(true)}>
+              {canEditDiagram ? '✏️ Open and edit' : 'Open'}
+            </button>
+          </div>
+        </section>
+      )}
 
       <section className="res-section">
         <div className="res-section-head">
@@ -212,7 +218,7 @@ export default function ResourcesView({ resources, diagram, actor, isManager, ca
         ))}
       </div>
 
-      {openDiagram && (
+      {openDiagram && electrical && (
         <ElectricalEditor
           remote={diagram}
           canEdit={canEditDiagram}

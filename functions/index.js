@@ -771,6 +771,12 @@ export const play = onCall({ maxInstances: 5, invoker: 'public' }, async (req) =
   // Asher's switches: off, or not allowed in this channel (read fresh, not cached).
   const stop = blocked(game, serverGroup(game), conv, (await db.doc('settings/team').get()).get('commands'));
   if (stop) return { note: stop };
+  // Asher's Controls (src/controls.js): coins or this channel switched off for everyone but him.
+  if (me !== REQUESTS_TO) {
+    const controls = (await db.doc('settings/controls').get()).data() || {};
+    if ((controls.channelsOff || []).includes(conv)) return note('Not here.', 'This channel is off right now.');
+    if ((controls.off || []).includes('coins')) return note('🪙 Jackson coins are off right now.');
+  }
   const roster = isArcade ? (await db.collection('people').get()).docs.map((d) => data.rename(d.get('name') || '')).filter(Boolean) : [];
   const msgRef = db.collection(`channels/${conv}/messages`).doc();
   const text = `/${game}${words.length ? ` ${words.join(' ')}` : ''}`.slice(0, 200);

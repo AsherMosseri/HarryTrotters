@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { REQUESTS_TO, TEAM_NAME } from '../config.js';
+import { useControls } from '../controls.js';
 import { CHANGELOG, VERSION } from '../changelog.js';
 import { CloseIcon, Overlay } from './common.jsx';
 import { checkForUpdate } from './UpdateGate.jsx';
@@ -251,7 +252,30 @@ export function UpdateCheck() {
   );
 }
 
+// Help about something switched off (Controls) is hidden with it: whole
+// sections for tabs, single lines for features.
+const SECTION_TABS = {
+  Parts: 'parts',
+  Checklists: 'checklists',
+  Shifts: 'shifts',
+  'Match Log': 'runs',
+  Chat: 'chat',
+  'Robot (3D)': 'robot',
+};
+const LINE_FEATURES = [
+  [/^Casino and coins|^Games in #arcade|^🪙 Jackson coins/, 'coins'],
+  [/^Lab check-in|Lab check-in asks/, 'checkins'],
+  [/^Required polls/, 'requiredPolls'],
+  [/^Tap Aa/, 'formatting'],
+  [/^Direct messages|^DMs:/, 'dms'],
+  [/^New friends showing up|^📦 Orders & bookings/, 'ads'],
+  [/^🎨 Custom…/, 'themes'],
+  [/^Team emoji:/, 'teamEmoji'],
+];
+const helpShows = (line, controls) => LINE_FEATURES.every(([re, id]) => !re.test(line) || controls.isOn(id));
+
 export function HelpDialog({ isManager, showRobot, onClose, onVersionLog, onRequests }) {
+  const controls = useControls();
   useEffect(() => {
     const esc = (e) => e.key === 'Escape' && onClose();
     window.addEventListener('keydown', esc);
@@ -275,30 +299,36 @@ export function HelpDialog({ isManager, showRobot, onClose, onVersionLog, onRequ
             <span className="link-btn">Version log →</span>
           </button>
           <UpdateCheck />
-          <button className="version-chip idea-chip" onClick={onRequests}>
-            <span>
-              💡 <b>Request a feature</b> · ideas go straight to {REQUESTS_TO.split(' ')[0]}
-            </span>
-            <span className="link-btn">Send →</span>
-          </button>
+          {controls.isOn('requests') && (
+            <button className="version-chip idea-chip" onClick={onRequests}>
+              <span>
+                💡 <b>Request a feature</b> · ideas go straight to {REQUESTS_TO.split(' ')[0]}
+              </span>
+              <span className="link-btn">Send →</span>
+            </button>
+          )}
           <TipList showRobot={showRobot} />
           <Rules />
           <div className="help-sections">
-            {SECTIONS.filter(([title]) => showRobot || title !== 'Robot (3D)').map(([title, items]) => (
-              <details key={title}>
-                <summary>{title}</summary>
-                <ul>
-                  {items.map((t) => (
-                    <li key={t}>{t}</li>
-                  ))}
-                </ul>
-              </details>
-            ))}
+            {SECTIONS.filter(([title]) => (showRobot || title !== 'Robot (3D)') && controls.tabOn(SECTION_TABS[title])).map(
+              ([title, items]) => (
+                <details key={title}>
+                  <summary>{title}</summary>
+                  <ul>
+                    {items
+                      .filter((t) => helpShows(t, controls))
+                      .map((t) => (
+                        <li key={t}>{t}</li>
+                      ))}
+                  </ul>
+                </details>
+              ),
+            )}
             {isManager && (
               <details open>
                 <summary>Team management only</summary>
                 <ul>
-                  {MANAGER_TIPS.map((t) => (
+                  {MANAGER_TIPS.filter((t) => helpShows(t, controls)).map((t) => (
                     <li key={t}>{t}</li>
                   ))}
                 </ul>

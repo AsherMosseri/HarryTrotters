@@ -1,9 +1,10 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { SUBTEAMS, SUBTEAM_COLORS } from '../config.js';
+import { useControls } from '../controls.js';
 import { Avatar, Nameplate, PlusIcon, usePeople } from './common.jsx';
 import PhotoViewer from './PhotoViewer.jsx';
 import Composer from './chat/Composer.jsx';
-import Message from './chat/Message.jsx';
+import Message, { messageShows } from './chat/Message.jsx';
 import { CommandNote } from './chat/Commands.jsx';
 import { mentionPattern } from './chat/format.jsx';
 import { EmojiManager, StickerManager } from './chat/Pickers.jsx';
@@ -86,7 +87,7 @@ export default function ChatView({
   roster,
   tasks,
   api,
-  teamEmoji,
+  teamEmoji: allTeamEmoji,
   stickers,
   typing,
   levelOf,
@@ -99,6 +100,9 @@ export default function ChatView({
   embedded = false,
   onOpenFull,
 }) {
+  // Asher's Controls: what's switched off isn't shown here at all.
+  const feat = useControls().isOn;
+  const teamEmoji = feat('teamEmoji') ? allTeamEmoji : [];
   const people = usePeople();
   const [selected, setSelected] = useState(null);
   const [replyTo, setReplyTo] = useState(null);
@@ -139,11 +143,14 @@ export default function ChatView({
   const adSpots = chatAdSpots(ads, all.length);
   const taskById = useMemo(() => Object.fromEntries(tasks.map((t) => [t.id, t])), [tasks]);
   const emojiMap = useMemo(() => new Map(teamEmoji.map((e) => [e.name, e.url])), [teamEmoji]);
+  // Messages with nothing left to show once Controls switch things off.
+  const shownMessages = useMemo(() => all.filter((m) => messageShows(m, feat)), [all, feat]);
   const myRoles = people?.infoOf(actor.name)?.subteams || [];
   const ctx = useMemo(
     () => ({
       me: actor.name,
-      mentionRe: mentionPattern(['everyone', ...SUBTEAMS, ...roster, ...all.map((m) => m.by)]),
+      mentionRe: feat('mentions') ? mentionPattern(['everyone', ...SUBTEAMS, ...roster, ...all.map((m) => m.by)]) : null,
+      plain: !feat('formatting'),
       roles: SUBTEAMS,
       myRoles,
       everyoneOk: true,
@@ -152,7 +159,7 @@ export default function ChatView({
       onPerson,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [actor.name, roster, all, emojiMap, onPerson, myRoles.join()],
+    [actor.name, roster, all, emojiMap, onPerson, myRoles.join(), feat],
   );
   // Where "new" starts: what this device had read when the conversation was
   // opened. Taken while rendering, so the "New" line and the jump use this
@@ -320,12 +327,14 @@ export default function ChatView({
           onSettings={isManager ? () => setDialog({ type: 'channel', channel: c }) : null}
         />
       ))}
-      <div className="side-section">
-        <h2>Direct messages</h2>
-        <button className="side-add" onClick={() => setDialog({ type: 'dm' })} title="New message" aria-label="New direct message">
-          <PlusIcon />
-        </button>
-      </div>
+      {feat('dms') && (
+        <div className="side-section">
+          <h2>Direct messages</h2>
+          <button className="side-add" onClick={() => setDialog({ type: 'dm' })} title="New message" aria-label="New direct message">
+            <PlusIcon />
+          </button>
+        </div>
+      )}
       {convs.dms.map((c) => (
         <ConvButton
           key={c.key}
@@ -387,9 +396,11 @@ export default function ChatView({
               </optgroup>
             )}
           </select>
-          <button className="btn" onClick={() => setDialog({ type: 'dm' })} aria-label="New direct message">
-            ✉️ New
-          </button>
+          {feat('dms') && (
+            <button className="btn" onClick={() => setDialog({ type: 'dm' })} aria-label="New direct message">
+              ✉️ New
+            </button>
+          )}
         </div>
       )}
 
@@ -428,22 +439,26 @@ export default function ChatView({
             )}
             {!embedded && (
               <>
-                <button
-                  className={`icon-btn${side === 'search' ? ' on' : ''}`}
-                  onClick={() => setSide(side === 'search' ? null : 'search')}
-                  title="Search"
-                  aria-label="Search messages"
-                >
-                  🔍
-                </button>
-                <button
-                  className={`icon-btn${side === 'pins' ? ' on' : ''}`}
-                  onClick={() => setSide(side === 'pins' ? null : 'pins')}
-                  title="Pinned messages"
-                  aria-label="Pinned messages"
-                >
-                  📌
-                </button>
+                {feat('search') && (
+                  <button
+                    className={`icon-btn${side === 'search' ? ' on' : ''}`}
+                    onClick={() => setSide(side === 'search' ? null : 'search')}
+                    title="Search"
+                    aria-label="Search messages"
+                  >
+                    🔍
+                  </button>
+                )}
+                {feat('pins') && (
+                  <button
+                    className={`icon-btn${side === 'pins' ? ' on' : ''}`}
+                    onClick={() => setSide(side === 'pins' ? null : 'pins')}
+                    title="Pinned messages"
+                    aria-label="Pinned messages"
+                  >
+                    📌
+                  </button>
+                )}
               </>
             )}
             {(conv.kind !== 'dm' || conv.mine) && (
@@ -504,8 +519,8 @@ export default function ChatView({
               )}
             </div>
           )}
-          {all.map((m, i) => {
-            const prev = all[i - 1];
+          {shownMessages.map((m, i) => {
+            const prev = shownMessages[i - 1];
             const adHere = adSpots.has(i);
             const day = dayLabel(m.at);
             const showDay = day !== lastDay;
@@ -630,10 +645,10 @@ export default function ChatView({
       </section>
 
       {side === 'members' && <MembersPanel names={memberNames} onPerson={onPerson} onClose={() => setSide(null)} />}
-      {side === 'pins' && (
+      {side === 'pins' && feat('pins') && (
         <PinsPanel conv={conv} api={api} ctx={ctx} canUnpin={canPost} onJump={(id) => openAt(conv.key, id)} onClose={() => setSide(null)} />
       )}
-      {side === 'search' && (
+      {side === 'search' && feat('search') && (
         <SearchPanel convs={myConvs} current={conv} api={api} roster={roster} onOpen={openAt} onClose={() => setSide(null)} />
       )}
 

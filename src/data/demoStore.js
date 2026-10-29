@@ -1034,6 +1034,13 @@ export const demoStore = {
       off();
     };
   },
+  subscribeControls(cb) {
+    return listen(() => cb(state.controls || {}));
+  },
+  async saveControls(patch, actor) {
+    state.controls = { ...(state.controls || {}), ...patch, by: actor.name, updatedAt: Date.now() };
+    commit();
+  },
   subscribeShutdown(cb) {
     return listen(() => cb(state.shutdown || null));
   },
