@@ -3,6 +3,8 @@ import { BUILTIN_RESOURCES, LINK_KINDS, guessKind, kindOf } from '../resources.j
 import { fullTime } from '../util.js';
 import ElectricalEditor, { DiagramPreview } from './ElectricalEditor.jsx';
 import { useFeature } from '../controls.js';
+import { Icon } from './shell/icons.jsx';
+import { PlusIcon } from './common.jsx';
 
 const host = (url) => {
   try {
@@ -67,7 +69,7 @@ function LinkForm({ initial, onSave, onCancel }) {
             aria-pressed={shownKind === id}
             onClick={() => setKind(id)}
           >
-            {icon} {label}
+            <Icon name={icon} size={16} /> {label}
           </button>
         ))}
       </div>
@@ -133,7 +135,7 @@ export default function ResourcesView({ resources, diagram, actor, isManager, ca
           <h2>Our links</h2>
           {!adding && (
             <button className="btn" onClick={() => setAdding(true)}>
-              ＋ Add link
+              <PlusIcon /> Add link
             </button>
           )}
         </div>
@@ -163,7 +165,7 @@ export default function ResourcesView({ resources, diagram, actor, isManager, ca
               ) : (
                 <li key={r.id} className="res-item">
                   <span className="res-icon" aria-hidden="true">
-                    {kindOf(r.kind)[1]}
+                    <Icon name={kindOf(r.kind)[1]} size={20} />
                   </span>
                   <span className="res-text">
                     <a href={r.url} target="_blank" rel="noreferrer">

@@ -2,14 +2,14 @@
 // Firestore so private links stay out of this public repo; these are the
 // public FTC links everyone gets, grouped into sections.
 
-// Kinds for team links: icon + label.
+// Kinds for team links: line icon (shell/icons.jsx) + label.
 export const LINK_KINDS = [
-  ['cad', '📐', 'CAD'],
-  ['code', '💻', 'Code'],
-  ['electrical', '⚡', 'Electrical'],
-  ['doc', '📄', 'Doc'],
-  ['video', '🎬', 'Video'],
-  ['other', '🔗', 'Link'],
+  ['cad', 'ruler', 'CAD'],
+  ['code', 'code', 'Code'],
+  ['electrical', 'bolt', 'Electrical'],
+  ['doc', 'doc', 'Doc'],
+  ['video', 'video', 'Video'],
+  ['other', 'link', 'Link'],
 ];
 export const kindOf = (id) => LINK_KINDS.find(([k]) => k === id) || LINK_KINDS[LINK_KINDS.length - 1];
 

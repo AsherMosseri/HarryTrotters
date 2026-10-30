@@ -1,5 +1,6 @@
 import { createContext, useContext, useRef, useState } from 'react';
-import { AutoTextarea, Avatar, CloseIcon, DisplayName, Overlay } from './common.jsx';
+import { AutoTextarea, Avatar, CloseIcon, DisplayName, Overlay, PlusIcon } from './common.jsx';
+import { Icon } from './shell/icons.jsx';
 import { dayLabel, dayOf, hoursOn } from '../labLog.js';
 
 // The lab log (labLog.js): the "what did you do today?" form you fill in when
@@ -111,7 +112,7 @@ export function LabLogDialog({ day, person, log, shift, tasks, hours, mode, onSa
                   return (
                     <div key={t.id} className={`lablog-task${on ? ' on' : ''}`}>
                       <button type="button" className={`chip${on ? ' on' : ''}`} aria-pressed={on} onClick={() => toggle(t.id)}>
-                        {on ? '✓ ' : ''}
+                        {on && <Icon name="check" size={14} />}
                         {t.title || 'Untitled task'}
                       </button>
                       {on && t.status !== 'done' && (
@@ -142,13 +143,19 @@ export function LabLogDialog({ day, person, log, shift, tasks, hours, mode, onSa
                     aria-label="Remove photo"
                     onClick={() => setPhotos(photos.filter((_, j) => j !== i))}
                   >
-                    ×
+                    <CloseIcon />
                   </button>
                 </span>
               ))}
               {photos.length < MAX_PHOTOS && (
                 <button type="button" className="lablog-add-photo" disabled={busy === 'photos'} onClick={() => fileInput.current?.click()}>
-                  {busy === 'photos' ? 'Adding…' : '＋ Photo'}
+                  {busy === 'photos' ? (
+                    'Adding…'
+                  ) : (
+                    <>
+                      <PlusIcon /> Photo
+                    </>
+                  )}
                 </button>
               )}
               <input

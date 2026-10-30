@@ -4,6 +4,7 @@ import { colorFor, initials, dueInfo } from '../util.js';
 import { decorationById, nameProps } from '../nitro.js';
 import { AnimatedDecoration, CustomDecoration, DecorationBehind } from './decoRender.jsx';
 import { createPortal } from 'react-dom';
+import { Icon } from './shell/icons.jsx';
 
 // Profiles, who's online, and each person's subteams, for any component that
 // shows people (set up in Workspace; empty on the join screen).
@@ -173,7 +174,7 @@ export function StatusSelect({ value, onChange, compact }) {
       <span>{compact ? s.short || s.label : s.label}</span>
       {!compact && (
         <span className="status-caret" aria-hidden="true">
-          ▾
+          <Icon name="chevronDown" size={12} />
         </span>
       )}
       <select value={s.id} onChange={(e) => onChange(e.target.value)} aria-label="Status">
@@ -221,7 +222,7 @@ export function DueChip({ dueDate, status }) {
 
 // Text input that edits locally and saves on blur / Enter, so live updates
 // from teammates don't clobber what you're typing.
-export function DraftInput({ value, onSave, multiline, className = '', placeholder, autoFocus, ...rest }) {
+export function DraftInput({ value, onSave, multiline, className = '', placeholder, autoFocus, onKeyDown, ...rest }) {
   const [draft, setDraft] = useState(value ?? '');
   const focused = useRef(false);
   const cancelled = useRef(false);
@@ -255,13 +256,19 @@ export function DraftInput({ value, onSave, multiline, className = '', placehold
       if (cancelled.current) cancelled.current = false;
       else commit();
     },
+    // A caller's onKeyDown runs first (e.g. Enter saves a multi-line title);
+    // Escape always undoes the edit.
     onKeyDown: (e) => {
-      if (e.key === 'Enter' && (!multiline || e.metaKey || e.ctrlKey)) {
-        e.preventDefault();
-        e.currentTarget.blur();
-      } else if (e.key === 'Escape') {
+      onKeyDown?.(e);
+      if (e.key === 'Escape') {
+        // With an edit to undo, Escape only undoes it (the panel stays open).
+        if (draft !== (value ?? '')) e.stopPropagation();
         cancelled.current = true;
         setDraft(value ?? '');
+        e.currentTarget.blur();
+      } else if (e.defaultPrevented) return;
+      else if (e.key === 'Enter' && (!multiline || e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
         e.currentTarget.blur();
       }
     },
