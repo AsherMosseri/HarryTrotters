@@ -1113,3 +1113,28 @@ button, [role='button'] { -webkit-user-select: none; user-select: none; -webkit-
   .pit-line { font-size: 14.5px; }
 }
 .phone-shell .content.today { padding-top: 8px; }
+
+/* ---------- App-wide: the pit-board look (started on Today) ----------
+   One typeface for titles and text, small uppercase labels for sections,
+   and numbers (counts, dates, hours, scores) in a monospace face. The
+   condensed face stays only for the team name and the splash. */
+:root { --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace; }
+.mono, .sb-count, .shell .column-head .count, .shell .status-count strong, .shell .stat b, .shell td.num,
+.shell .due, .shell .due-cell, .shell .shift-hours, .shift-elapsed, .chip.lablog-hours, .shell .checklist-count,
+.shell .meta-count, .shell .card-count, .arc-timer, .cmd-countdown {
+  font-family: var(--mono); font-variant-numeric: tabular-nums; letter-spacing: -0.02em;
+}
+.page-head h1, .shell .ms-header h1, .phone-title { font-family: inherit; font-weight: 780; letter-spacing: -0.028em; }
+.page-head h1, .shell .ms-header h1 { font-size: 30px; }
+.phone-title { font-size: 26px; }
+.sec-head h2, .shell .chart-card > h2, .shell .shift-sec-head h2, .shell .res-section h2, .shell .res-diagram-side h2, .shell .column-head h2 {
+  font-family: inherit; font-size: 12.5px; font-weight: 750; text-transform: uppercase; letter-spacing: 0.08em;
+}
+.panel-head h2, .sheet-head h2, .shell .chat-head h2 { font-family: inherit; font-weight: 720; letter-spacing: -0.015em; font-size: 19px; }
+.shell .grid th { font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+/* Stat rows read like a scoreboard: label above, number below. */
+.shell .stat span { font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; }
+.shell .stat b { font-size: 28px; font-weight: 700; letter-spacing: -0.04em; }
+/* Denser lists. */
+.shell .card { padding: 9px 11px 8px; }
+.shell .column-body { gap: 8px; }
