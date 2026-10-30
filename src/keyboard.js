@@ -10,6 +10,9 @@
 const TYPING = /^(INPUT|TEXTAREA|SELECT)$/;
 const NOT_TEXT = /^(button|checkbox|radio|range|color|file|submit|reset|image)$/;
 
+// Anything shorter than this is the iPad suggestion bar, not a keyboard.
+const BAR_MAX = 150;
+
 const typingIn = (el) => !!el && ((TYPING.test(el.tagName) && !NOT_TEXT.test(el.type || '')) || el.isContentEditable);
 
 export function installKeyboardFit() {
@@ -23,7 +26,14 @@ export function installKeyboardFit() {
     // How much the keyboard (or the iPad shortcut bar) covers. Pinch-zoom
     // also shrinks the visual viewport, so only count it at normal zoom.
     const covered = window.innerHeight - vv.height;
-    const now = vv.scale < 1.05 && covered > 40;
+    // With a keyboard attached, iPad shows only its short suggestion bar.
+    // That's not worth squeezing the whole app (pop-ups jumped up): just lift
+    // the message box above it (html.kb-bar, --kb-bar).
+    const bar = vv.scale < 1.05 && covered > 20 && covered <= BAR_MAX;
+    root.classList.toggle('kb-bar', bar);
+    if (bar) root.style.setProperty('--kb-bar', `${Math.round(covered)}px`);
+    else root.style.removeProperty('--kb-bar');
+    const now = vv.scale < 1.05 && covered > BAR_MAX;
     if (now) {
       root.style.setProperty('--vvh', `${Math.round(vv.height)}px`);
       root.style.setProperty('--vvt', `${Math.round(vv.offsetTop)}px`);

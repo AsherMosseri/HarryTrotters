@@ -790,3 +790,12 @@ button.sb-head-row { width: 100%; border: 0; background: none; color: var(--mute
 .poll-write { margin-top: 6px; padding-top: 8px; border-top: 1px dashed var(--border); display: flex; flex-direction: column; gap: 6px; }
 .poll-write-head { font-weight: 600; }
 .acct-waiting { color: var(--accent); font-weight: 600; }
+/* iPad with a keyboard attached: only the suggestion bar shows. The app stays
+   as it is; the message box lifts above the bar (keyboard.js). */
+html.kb-bar .composer { padding-bottom: calc(10px + var(--kb-bar, 0px)); }
+/* Your menu (bottom-left) opens like the other pop-ups: a quick slide and
+   scale up from where you tapped, not a flat fade. Decorations that spin get
+   their own layer so they stay smooth in the sidebar too. */
+.sb-foot .me-menu { transform-origin: 20px calc(100% + 20px); animation: me-pop 0.2s cubic-bezier(0.2, 0.9, 0.3, 1.1); }
+@keyframes me-pop { from { opacity: 0; transform: translateY(8px) scale(0.96); } }
+.sidebar :is(.deco-ring, .deco-orbit, .deco-b, .adeco) { will-change: transform; }
