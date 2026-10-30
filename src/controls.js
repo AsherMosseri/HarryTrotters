@@ -47,7 +47,7 @@ export const FEATURE_GROUPS = [
       ['coins', 'Jackson coins', 'Coins, the casino, games, and coin commands'],
       ['ads', 'Ads', 'Every ad in the app'],
       ['themes', 'Themes', 'Color themes (everyone gets the standard look)'],
-      ['catParty', 'Cat party', 'The team logo surprise'],
+      ['catParty', 'Robot dance party', 'The team logo surprise'],
     ],
   ],
   [
