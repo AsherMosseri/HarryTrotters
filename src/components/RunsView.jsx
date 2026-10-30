@@ -189,7 +189,7 @@ function RunDialog({ run, roster, onClose, onSave, onDelete }) {
   return (
     <Overlay>
       <div className="panel-backdrop center" onClick={onClose}>
-        <form className="dialog" onClick={(e) => e.stopPropagation()} onSubmit={submit}>
+        <form className="dialog run-dialog" onClick={(e) => e.stopPropagation()} onSubmit={submit}>
           <div className="panel-head">
             <h2>{isNew ? 'Log a run' : 'Edit run'}</h2>
             <span className="spacer" />
@@ -316,7 +316,7 @@ function RunDialog({ run, roster, onClose, onSave, onDelete }) {
             onChange={(e) => set({ notes: e.target.value })}
             placeholder="Notes: strategy, what worked, cycle times… (optional)"
           />
-          <div className="row gap end">
+          <div className="row gap end dialog-actions">
             {onDelete && (
               <button type="button" className="link-btn danger" onClick={onDelete}>
                 Delete

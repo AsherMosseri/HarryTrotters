@@ -634,7 +634,7 @@ export default function ElectricalEditor({ remote, canEdit, actor, onSave, onClo
           {canEdit ? (
             <div className="dg-tools">
               <button className="btn primary" onClick={() => setAdding((a) => !a)} aria-expanded={adding}>
-                ＋ Add
+                <PlusIcon /> Add
               </button>
               <button className="btn" onClick={undo} disabled={!past.length} title="Undo (⌘Z)">
                 Undo
@@ -655,7 +655,9 @@ export default function ElectricalEditor({ remote, canEdit, actor, onSave, onClo
               </button>
             </div>
           ) : (
-            <span className="muted small">View only · Electrical and team management can edit</span>
+            <span className="muted small dg-viewonly" title="Electrical and team management can edit">
+              View only
+            </span>
           )}
           <span className="spacer" />
           <span className="muted small dg-saving">{saving}</span>
@@ -665,7 +667,7 @@ export default function ElectricalEditor({ remote, canEdit, actor, onSave, onClo
           <button className="btn" onClick={exportPng}>
             Save PNG
           </button>
-          <button className="icon-btn" onClick={onClose} aria-label="Close">
+          <button className="icon-btn dg-close" onClick={onClose} aria-label="Close">
             <CloseIcon />
           </button>
         </div>
@@ -894,10 +896,10 @@ export default function ElectricalEditor({ remote, canEdit, actor, onSave, onClo
                 <ul className="dg-tips small">
                   {canEdit ? (
                     <>
-                      <li>＋ Add puts a part in the middle. Drag parts to move them.</li>
+                      <li>Add puts a part in the middle. Drag parts to move them.</li>
                       <li>To wire: tap a port, then the port to plug it into (or drag from one to the other).</li>
                       <li>Tap a part to rename it or pick which side its wires come out of.</li>
-                      <li>Drag the background (or scroll) to move around; pinch to zoom, or use ＋ and −.</li>
+                      <li>Drag the background (or scroll) to move around; pinch to zoom, or use the zoom buttons.</li>
                       <li>Changes save on their own. Versions brings back older ones.</li>
                     </>
                   ) : (
@@ -905,6 +907,7 @@ export default function ElectricalEditor({ remote, canEdit, actor, onSave, onClo
                       <li>Tap a part to see what it’s plugged into.</li>
                       <li>Port list shows every port in one table.</li>
                       <li>Drag (or scroll) to move around; pinch to zoom.</li>
+                      <li>Electrical and team management can edit it.</li>
                     </>
                   )}
                 </ul>

@@ -105,7 +105,7 @@ function Timeline({ items, competitionDate, onOpen }) {
                   >
                     <span className="tl-fill" style={{ width: `${progress.pct * 100}%` }} />
                     <span className="tl-bar-text">
-                      {state === 'done' ? '✓ ' : ''}
+                      {state === 'done' && <Icon name="check" size={12} />}
                       {progress.total ? `${progress.done}/${progress.total}` : ''}
                     </span>
                   </button>
@@ -121,9 +121,8 @@ function Timeline({ items, competitionDate, onOpen }) {
               ) : null;
             })}
             {today >= first && today <= last && (
-              <span className="tl-today" style={{ left: `${pos(today) + 50 / days}%` }}>
-                <em>Today</em>
-              </span>
+              // No "Today" label: it covered the first row's bar, and the header already rings today's date.
+              <span className="tl-today" style={{ left: `${pos(today) + 50 / days}%` }} title="Today" />
             )}
             <span className="tl-comp" style={{ left: `${pos(comp) + 50 / days}%` }} />
           </div>

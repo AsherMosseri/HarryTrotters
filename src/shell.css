@@ -373,8 +373,10 @@ button.sb-head-row { width: 100%; border: 0; background: none; color: var(--mute
 .phone-shell .announce-banner { margin-left: 16px; margin-right: 16px; }
 .phone-shell .ms-header { margin-top: 4px; }
 .phone-shell .ms-header h1 { font-size: 26px; }
-.phone-shell .stat-tiles { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
-.phone-shell .stat { padding: 0 14px; flex: none; }
+/* Two to a row, so every label shows in full (a sideways scroll hid the last ones). */
+.phone-shell .stat-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 14px; }
+.phone-shell .stat { padding: 0 14px; min-width: 0; }
+.phone-shell .stat:nth-child(odd) { border-left: 0; padding-left: 0; }
 .phone-shell .stat b { font-size: 24px; }
 .phone-shell .today-head h1 { font-size: 28px; }
 .phone-shell .today-head { margin-bottom: 22px; }
@@ -883,3 +885,101 @@ button, [role='button'] { -webkit-user-select: none; user-select: none; -webkit-
 }
 /* Phones: Board or Table, as two icons beside the filters. */
 .seg.seg-icons button { padding: 6px 9px; }
+/* Electrical diagram on phones: the toolbar wraps onto two rows (one row that
+   scrolled sideways hid Port list and Save PNG off the edge). */
+@media (max-width: 760px) {
+  .dg-bar { flex-wrap: wrap; overflow: visible; row-gap: 8px; }
+  .dg-bar > .dg-tools, .dg-bar > .dg-viewonly { order: 0; flex: 1 1 calc(100% - 60px); min-width: 0; }
+  .dg-tools { flex-wrap: wrap; }
+  .dg-viewonly { align-self: center; }
+  .dg-bar > .icon-btn.dg-close { order: 1; position: static; box-shadow: none; margin-left: auto; }
+  .dg-bar > .btn { order: 2; }
+  .dg-bar > .dg-saving { order: 3; }
+  .dg-bar .btn { padding: 0 11px; }
+  /* View only: the note, Port list, Save PNG and × all fit on one row. */
+  .dg-bar > .dg-viewonly { flex: 1 1 auto; }
+  .dg-bar:has(> .dg-viewonly) > .icon-btn.dg-close { order: 4; margin-left: 0; }
+}
+
+/* Checklists: the name's focus ring stays inside the list (it stuck out past
+   the left edge); remove is a line icon; a new list is named before it's made. */
+.shell .checklist-title { margin: 0 -8px 0 0; }
+.check-remove { display: grid; place-items: center; }
+.check-remove svg { width: 16px; height: 16px; }
+.checklist-name { flex: 1; min-width: 0; font-size: 17px; font-weight: 700; }
+
+/* Resources: link kinds as line icons; the kind buttons wrap on a phone. */
+.res-icon { display: grid; place-items: center; width: 22px; height: 24px; color: var(--muted); }
+.shell .segmented.res-kinds, .segmented.res-kinds { flex-wrap: wrap; overflow: visible; }
+.res-kinds button { display: inline-flex; align-items: center; gap: 5px; }
+
+/* Line icons where text glyphs used to be (sort arrows, carets, ✓, ×, ↗). */
+.sort-arrow .icon, .status-caret .icon { vertical-align: -2px; }
+.open-btn { display: inline-flex; align-items: center; gap: 2px; }
+.link-remove { display: inline-grid; place-items: center; color: var(--muted); }
+.link-remove svg { width: 16px; height: 16px; }
+.lablog-task .chip { display: inline-flex; align-items: center; gap: 5px; }
+.lablog-task .chip .icon { flex: none; }
+.lablog-photo-x { display: grid; place-items: center; }
+.lablog-photo-x svg { width: 15px; height: 15px; }
+.lablog-add-photo { display: inline-flex; align-items: center; justify-content: center; gap: 4px; }
+.part-name + .muted a .icon { vertical-align: -1px; }
+
+/* Milestones: the status counts line up with the page (the toolbar strip's
+   padding pushed them in). */
+.shell .status-strip.flush { padding: 0 0 12px; }
+.tl-bar-text { display: inline-flex; align-items: center; gap: 3px; }
+
+/* Tasks table: fits beside the sidebar on an iPad in landscape (Updated was cut
+   off), and the subteam picker shows the whole name. */
+.shell .tasks-grid { min-width: 820px; }
+.shell .tasks-grid th, .shell .tasks-grid td { padding-left: 8px; padding-right: 8px; }
+.shell .tasks-grid .col-title { width: 34%; min-width: 220px; }
+/* The title box takes the room the column has instead of setting its width. */
+.shell .tasks-grid .title-cell .draft { width: 0; }
+.tasks-grid .cell-select { max-width: none; }
+/* iPad in portrait: the open count drops under the title so New task stays on the first row. */
+@media (max-width: 900px) {
+  .page-head .page-sub { order: 10; flex-basis: 100%; margin-top: -4px; }
+}
+/* Narrow screens: the columns that matter stay on screen (iPad portrait, phones). */
+@media (max-width: 1100px) and (min-width: 761px) {
+  .parts-grid, .runs-grid { min-width: 0; }
+  .parts-grid th:nth-child(3), .parts-grid td:nth-child(3), .parts-grid th:nth-child(7), .parts-grid td:nth-child(7) { display: none; }
+  .parts-grid .task-link { white-space: normal; max-width: 150px; }
+  .runs-grid th:nth-child(3), .runs-grid td:nth-child(3) { display: none; }
+  :is(.parts-grid, .runs-grid) :is(th, td) { padding-left: 8px; padding-right: 8px; }
+}
+@media (max-width: 760px) {
+  .runs-grid { min-width: 0; }
+  .runs-grid th:nth-child(n + 3):nth-child(-n + 6), .runs-grid td:nth-child(n + 3):nth-child(-n + 6) { display: none; }
+  .runs-grid th, .runs-grid td { padding-left: 8px; padding-right: 8px; }
+}
+
+/* Org chart: subteam boxes are narrow beside the sidebar (iPad), so names
+   wrap onto a second line instead of being cut off. */
+.org-branches { gap: 10px; }
+.org-branches > .org-box { padding-left: 8px; padding-right: 8px; }
+.org-branches .org-member { gap: 7px; }
+.org-branches .org-member b { white-space: normal; overflow-wrap: break-word; }
+
+/* Log a run: Save stays in reach at the bottom while the form scrolls (on a
+   phone it was just below the fold). */
+.run-dialog > .dialog-actions {
+  position: sticky; bottom: -20px; z-index: 5; background: var(--surface); margin: 0 -20px -20px;
+  padding: 10px 20px max(14px, env(safe-area-inset-bottom)); border-top: 1px solid var(--hairline);
+}
+
+/* Robot on an iPad in portrait: the viewer on top and the parts list under it
+   (a fixed side column squeezed the viewer to a sliver). */
+@media (max-width: 1100px) and (min-width: 761px) and (orientation: portrait) {
+  .robot-body { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(360px, 55vh) auto; }
+  .robot-side { order: 2; max-height: none; }
+  .content.robot, .content.robot .robot-body { flex: none; }
+  .viewports { order: 1; grid-auto-flow: row; grid-auto-rows: minmax(0, 1fr); }
+  .robot-body.comparing { grid-template-rows: minmax(640px, 75vh) auto; }
+  /* The page scrolls, so the parts list under the viewer can be reached. */
+  .app.chat-mode:has(.content.robot) .app-scroll { overflow-y: auto; }
+}
+/* Comparing: each version's name sits bottom-left, clear of the view buttons. */
+.robot-body.comparing .viewport-label { top: auto; bottom: 10px; }

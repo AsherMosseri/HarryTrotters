@@ -669,7 +669,7 @@ export default function RobotView({ robot, tasks, parts, actor, isManager, api, 
                             })
                           }
                         >
-                          ＋ Make task
+                          <PlusIcon /> Make task
                         </button>
                       )}
                       {(p.byUid === actor.uid || isManager) && (

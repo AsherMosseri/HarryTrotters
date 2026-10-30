@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { SUBTEAMS, PRIORITIES, STATUSES, statusById, priorityById } from '../config.js';
 import { fullTime, relTime } from '../util.js';
 import { Avatar, CloseIcon, DraftInput, Overlay, StatusSelect } from './common.jsx';
+import { Icon } from './shell/icons.jsx';
 import { PartStatusSelect } from './PartsView.jsx';
 import PhotoViewer from './PhotoViewer.jsx';
 import { itemId } from '../data/diff.js';
@@ -190,7 +191,7 @@ function TaskChecklist({ items, onChange }) {
               <span className="check-text">{i.text}</span>
             </label>
             <button className="check-remove" aria-label={`Remove ${i.text}`} onClick={() => onChange(items.filter((x) => x.id !== i.id))}>
-              ×
+              <CloseIcon />
             </button>
           </li>
         ))}
@@ -443,11 +444,11 @@ export default function TaskPanel({ task, api, roster, milestones = [], parts = 
                     {hostOf(url)}
                   </a>
                   <button
-                    className="link-btn"
+                    className="link-btn link-remove"
                     onClick={() => set({ links: task.links.filter((_, j) => j !== i) })}
                     aria-label="Remove link"
                   >
-                    ✕
+                    <CloseIcon />
                   </button>
                 </li>
               ))}

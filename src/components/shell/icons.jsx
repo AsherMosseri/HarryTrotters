@@ -219,6 +219,25 @@ const PATHS = {
       <circle cx="6.8" cy="7.2" r="1" />
     </>
   ),
+  check: <path d="m4.5 10.5 3.5 3.5 7.5-8" />,
+  chevronDown: <path d="m5 7.5 5 5 5-5" />,
+  chevronUp: <path d="m5 12.5 5-5 5 5" />,
+  // Opens somewhere else (a link to another site).
+  external: <path d="M8.5 4.5h-4v11h11v-4M11.5 3.5h5v5M16.5 3.5l-7 7" />,
+  // Resource link kinds.
+  doc: (
+    <>
+      <path d="M5 2.8h6.5L15.5 7v10.2H5z" />
+      <path d="M11.5 2.8V7h4M7.8 10.5h4.8M7.8 13.5h4.8" />
+    </>
+  ),
+  video: (
+    <>
+      <rect x="2.5" y="4.5" width="15" height="11" rx="2" />
+      <path d="m8.5 7.6 4 2.4-4 2.4z" />
+    </>
+  ),
+  link: <path d="M8.6 11.4a3.2 3.2 0 0 0 4.5 0l2.6-2.6a3.2 3.2 0 0 0-4.5-4.5l-1 1M11.4 8.6a3.2 3.2 0 0 0-4.5 0l-2.6 2.6a3.2 3.2 0 0 0 4.5 4.5l1-1" />,
   sidebar: (
     <>
       <rect x="2.5" y="3.5" width="15" height="13" rx="2" />

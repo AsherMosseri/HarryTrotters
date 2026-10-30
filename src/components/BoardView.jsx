@@ -201,7 +201,8 @@ export default function BoardView({ tasks, milestones = [], api, onOpen, onAdd, 
     return map;
   }, [tasks, milestones]);
 
-  const active = tasks.find((t) => t.id === activeId);
+  // The column's copy, so the drag preview keeps its milestone name.
+  const active = activeId ? Object.values(columns).flat().find((t) => t.id === activeId) : null;
   if (phone) return <PhoneBoard columns={columns} onOpen={onOpen} onAdd={onAdd} />;
 
   return (

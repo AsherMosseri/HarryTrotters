@@ -42,7 +42,7 @@ export default function TableView({ tasks, api, onOpen, total }) {
 
   return (
     <div className="table-wrap">
-      <table className="grid">
+      <table className="grid tasks-grid">
         <thead>
           <tr>
             {COLUMNS.map((c) => (
@@ -53,7 +53,7 @@ export default function TableView({ tasks, api, onOpen, total }) {
                 onClick={() => setSort({ key: c.key, dir: sort.key === c.key ? -sort.dir : 1 })}
               >
                 {c.label}
-                <span className="sort-arrow">{sort.key === c.key ? (sort.dir > 0 ? '▲' : '▼') : ''}</span>
+                <span className="sort-arrow">{sort.key === c.key && <Icon name={sort.dir > 0 ? 'chevronUp' : 'chevronDown'} size={12} />}</span>
               </th>
             ))}
           </tr>
@@ -87,7 +87,7 @@ export default function TableView({ tasks, api, onOpen, total }) {
                     </span>
                   )}
                   <button className="open-btn" aria-label="Open task" onClick={(e) => (e.stopPropagation(), onOpen(t.id))}>
-                    Open ›
+                    Open <Icon name="chevron" size={12} />
                   </button>
                 </div>
                 {t.status === 'blocked' && t.blockedReason && <div className="blocked-note">{waitingNote(t.blockedReason)}</div>}

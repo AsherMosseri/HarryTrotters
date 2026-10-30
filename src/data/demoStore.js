@@ -1594,10 +1594,11 @@ export const demoStore = {
     state.shiftPlans = (state.shiftPlans || []).map((p) => (p.id === id ? { ...p, ...patch } : p));
     commit();
   },
-  async rsvpShiftPlan(id, name, answer) {
+  async rsvpShiftPlan(id, name, answer, oldKeys = []) {
     state.shiftPlans = (state.shiftPlans || []).map((p) => {
       if (p.id !== id) return p;
       const people = { ...p.people };
+      for (const k of oldKeys) delete people[k];
       if (answer) people[name] = answer;
       else delete people[name];
       return { ...p, people };

@@ -3,6 +3,7 @@ import { SUBTEAMS } from '../config.js';
 import { PART_STATUSES } from '../data/diff.js';
 import { relTime, useEscape } from '../util.js';
 import { CloseIcon, Overlay, PlusIcon } from './common.jsx';
+import { Icon } from './shell/icons.jsx';
 
 const VENDORS = ['goBILDA', 'REV Robotics', 'AndyMark', 'ServoCity', 'McMaster-Carr', 'Amazon', 'Home Depot'];
 const statusById = Object.fromEntries(PART_STATUSES.map((s) => [s.id, s]));
@@ -288,7 +289,7 @@ export default function PartsView({ parts, tasks, api, onOpenTask, chatToggle })
                         <>
                           {(p.partNumber || p.subteam) && ' · '}
                           <a href={p.url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>
-                            Link ↗
+                            Link <Icon name="external" size={12} />
                           </a>
                         </>
                       )}
