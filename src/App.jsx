@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { loadStore } from './data/store.js';
 import { REQUESTS_TO, TEAM_NAME, isManagerName, makeRenamer } from './config.js';
-import { InstallScreen, JoinScreen, LoadingScreen } from './components/Gate.jsx';
+import { InstallScreen, LoadingScreen, SignInScreen } from './components/Gate.jsx';
 import { installNeeded } from './data/push.js';
 import { isDemo } from './data/store.js';
 import { NEXT } from './next.js';
@@ -18,13 +18,14 @@ const AUTH_ERRORS = {
   'auth/network-request-failed': 'No internet connection. Check your Wi-Fi and reload.',
 };
 
-// Who this device joined as, remembered so the app opens right away next time
-// (the check with the server still runs, and a removed member goes back to Join).
+// Who this device is signed in as, remembered so the app opens right away next
+// time (the check with the server still runs; signed out or reset goes back to
+// Sign in). Only password sign-ins count.
 const memberKey = (uid) => `member-${uid}`;
 function savedMember(uid) {
   try {
     const m = JSON.parse(localStorage.getItem(memberKey(uid)));
-    return m && typeof m.name === 'string' ? m : undefined;
+    return m && typeof m.name === 'string' && m.via === 'password' ? m : undefined;
   } catch {
     return undefined;
   }
@@ -70,7 +71,7 @@ export default function App() {
       (m) => {
         if (!alive) return;
         saveMember(user.uid, m);
-        setMember((prev) => (prev && m && prev.name === m.name && prev.admin === m.admin ? prev : m));
+        setMember((prev) => (prev && m && prev.name === m.name && prev.admin === m.admin && prev.via === m.via ? prev : m));
       },
       // Offline or a slow connection: keep going as who this device joined as.
       (e) => alive && !saved && setError(e.message || String(e)),
@@ -90,9 +91,17 @@ export default function App() {
     );
   }, [store, user]);
 
+  // Before 3.0 is live, the test copy (/next/) has no account function to
+  // sign in with yet: it keeps the old team-code sign-in until then.
+  const [passwordsLive, setPasswordsLive] = useState(true);
+  useEffect(() => {
+    if (!NEXT || isDemo || !store?.account || !member || member.via === 'password') return;
+    store.account({ action: 'status' }).catch((e) => /not-found|internal|unavailable/.test(e?.code || '') && setPasswordsLive(false));
+  }, [store, member]);
+  const signedIn = member && (member.via === 'password' || !passwordsLive);
   const actor = useMemo(
-    () => (user && member ? { uid: user.uid, name: rename(member.name), admin: member.admin } : null),
-    [user, member, rename],
+    () => (user && signedIn ? { uid: user.uid, name: rename(member.name), admin: member.admin } : null),
+    [user, member, signedIn, rename],
   );
 
   useEffect(() => {
@@ -116,12 +125,14 @@ export default function App() {
   if (!store || !user || member === undefined) return <LoadingScreen step={!store ? 1 : !user ? 2 : 3} />;
   if (!actor)
     return (
-      <JoinScreen
+      <SignInScreen
         rename={rename}
-        onJoin={async (name, code, managerCode) => {
-          await store.join(user.uid, name, code, managerCode);
-          saveMember(user.uid, { name, admin: !!managerCode });
-          setMember({ name, admin: !!managerCode });
+        current={member?.name ? rename(member.name) : ''}
+        account={(data) => store.account(data)}
+        saveTicket={(name, code) => store.saveSetupTicket(user.uid, name, code)}
+        onSignedIn={(m) => {
+          saveMember(user.uid, m);
+          setMember(m);
         }}
       />
     );

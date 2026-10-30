@@ -11,6 +11,7 @@ import {
   REQUESTS_TO,
   TEAM_NAME,
   TEAM_STARTED,
+  PASSWORD_MIN,
 } from '../config.js';
 import { ONLINE_MS, TYPING_MS, activeStatus, buildPeopleInfo, buildProfiles } from '../people.js';
 import { PALETTES, presetTheme } from '../nitro.js';
@@ -195,6 +196,103 @@ function ThemeMenu({
 }
 
 // Light, dark, or automatic; the color theme; and Calm chat (from your menu).
+// Your password: the current one, then a new one twice.
+function PasswordDialog({ account, onClose }) {
+  useEscape(onClose);
+  const [old, setOld] = useState('');
+  const [pw, setPw] = useState('');
+  const [again, setAgain] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState(null); // { ok, text }
+  const ready = old && pw.length >= PASSWORD_MIN && pw === again && !busy;
+  return (
+    <Overlay>
+      <div className="panel-backdrop center" onClick={onClose}>
+        <form
+          className="dialog password-dialog"
+          onClick={(e) => e.stopPropagation()}
+          onSubmit={async (e) => {
+            e.preventDefault();
+            if (!ready) return;
+            setBusy(true);
+            const r = await account({ action: 'change', old, password: pw }).catch((x) => ({ error: x?.message || String(x) }));
+            setBusy(false);
+            setMsg(r?.ok ? { ok: true, text: 'Password changed.' } : { text: r?.error || 'That didn’t work.' });
+          }}
+        >
+          <div className="panel-head">
+            <h2>Change password</h2>
+            <span className="spacer" />
+            <button type="button" className="icon-btn" onClick={onClose} aria-label="Close">
+              <CloseIcon />
+            </button>
+          </div>
+          {msg?.ok ? (
+            <>
+              <p>{msg.text}</p>
+              <button type="button" className="btn primary" onClick={onClose}>
+                Done
+              </button>
+            </>
+          ) : (
+            <>
+              <input className="input" type="password" autoComplete="current-password" value={old} onChange={(e) => setOld(e.target.value)} placeholder="Current password" autoFocus />
+              <input className="input" type="password" autoComplete="new-password" value={pw} onChange={(e) => setPw(e.target.value)} placeholder={`New password (at least ${PASSWORD_MIN} characters)`} />
+              <input className="input" type="password" autoComplete="new-password" value={again} onChange={(e) => setAgain(e.target.value)} placeholder="New password again" />
+              {again && pw !== again && <p className="form-error">The two new passwords don’t match.</p>}
+              {msg && <p className="form-error">{msg.text}</p>}
+              <button className="btn primary" disabled={!ready}>
+                {busy ? 'Saving…' : 'Change password'}
+              </button>
+            </>
+          )}
+        </form>
+      </div>
+    </Overlay>
+  );
+}
+
+// Asher asked to reset your password: you have to answer before using the
+// app (on every device you're signed in on). Yes means making a new password
+// right here (your other devices sign out); No keeps it.
+function ResetGate({ request, account }) {
+  const [pw, setPw] = useState('');
+  const [again, setAgain] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const send = async (accept) => {
+    setBusy(true);
+    setErr('');
+    const r = await account({ action: 'answerReset', accept, password: pw }).catch((x) => ({ error: x?.message || String(x) }));
+    if (r?.error) setErr(r.error);
+    setBusy(false);
+  };
+  const ready = pw.length >= PASSWORD_MIN && pw === again && !busy;
+  return (
+    <Overlay>
+      <div className="checkin-gate" role="alertdialog" aria-labelledby="reset-title">
+        <div className="gate-card checkin-card">
+          <p className="gate-eyebrow">Your password</p>
+          <h1 id="reset-title">{request.by ? `${request.by.split(' ')[0]} wants to reset your password` : 'Reset your password?'}</h1>
+          <p className="muted">
+            If you asked for this, make a new password now. You’ll be signed out on your other devices. If you didn’t ask, keep your password.
+          </p>
+          <input className="input" type="password" autoComplete="new-password" value={pw} onChange={(e) => setPw(e.target.value)} placeholder={`New password (at least ${PASSWORD_MIN} characters)`} />
+          <input className="input" type="password" autoComplete="new-password" value={again} onChange={(e) => setAgain(e.target.value)} placeholder="New password again" />
+          {again && pw !== again && <p className="form-error">The two passwords don’t match.</p>}
+          {err && <p className="form-error">{err}</p>}
+          <button className="btn primary big-btn" disabled={!ready} onClick={() => send(true)}>
+            {busy ? 'Saving…' : 'Make my new password'}
+          </button>
+          <button className="btn" disabled={busy} onClick={() => send(false)}>
+            Keep my password
+          </button>
+        </div>
+      </div>
+    </Overlay>
+  );
+}
+
 const MOTION = [
   ['auto', 'Match device'],
   ['on', 'On'],
@@ -1471,6 +1569,10 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
   const [shutdownPage, setShutdownPage] = useState(false);
   const [controlsPage, setControlsPage] = useState(false);
   const [appearanceOpen, setAppearanceOpen] = useState(false);
+  const [passwordOpen, setPasswordOpen] = useState(false);
+  // Asher asked to reset my password (answered in ResetGate).
+  const [resetRequest, setResetRequest] = useState(null);
+  useEffect(() => (store.subscribeResetRequest && !actor.preview ? store.subscribeResetRequest(actor.name, setResetRequest) : undefined), [store, actor.name, actor.preview]);
   const [shutdownReplies, setShutdownReplies] = useState([]);
   useEffect(() => (isOwner ? store.subscribeShutdownReplies(setShutdownReplies) : undefined), [store, isOwner]);
   const shutdownNew = shutdown?.on ? shutdownUnread(shutdownReplies, actor.name) : 0;
@@ -1834,11 +1936,12 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
         </button>
         {onPhone && <button onClick={go('tabs', () => setEditTabs(true))}>Edit tabs</button>}
         <button onClick={go('help', () => setShowHelp(true))}>Help</button>
+        <button onClick={go('password', () => setPasswordOpen(true))}>Change password</button>
         {isOwner && <button onClick={go('controls', () => setControlsPage(true))}>Controls</button>}
       </div>
       <button
         className="link-btn me-switch"
-        onClick={() => confirm('Switch user? You will need the team code again on this device.') && store.leave()}
+        onClick={() => confirm('Switch user? You’ll sign in again with a name and password.') && store.leave()}
       >
         Switch user
       </button>
@@ -2629,6 +2732,16 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
               onClose={ads.closeRemoving}
             />
           )}
+          {resetRequest && <ResetGate request={resetRequest} account={(data) => store.account(data)} />}
+          {passwordOpen && (
+            <PasswordDialog
+              account={(data) => store.account(data)}
+              onClose={() => {
+                setPasswordOpen(false);
+                goBack('password');
+              }}
+            />
+          )}
           {appearanceOpen && <AppearanceDialog
               themeMenuProps={themeMenuProps}
               onClose={() => {
@@ -2650,6 +2763,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
               onShutdown={() => setShutdownPage(true)}
               onCommands={() => setCommandsPage(true)}
               onAds={() => setAdsPage(true)}
+              account={(data) => store.account(data)}
               onClose={() => {
                 setControlsPage(false);
                 goBack('controls');

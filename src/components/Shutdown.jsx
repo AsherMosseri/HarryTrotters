@@ -150,7 +150,7 @@ export function ShutdownScreen({ shutdown, store, actor }) {
     <div className="gate shutdown-gate">
       <button
         className="btn small-btn shutdown-switch"
-        onClick={() => confirm('Switch user? You will need the team code again on this device.') && store.leave()}
+        onClick={() => confirm('Switch user? You’ll sign in again with a name and password.') && store.leave()}
       >
         Switch user
       </button>

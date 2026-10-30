@@ -2,6 +2,7 @@
 // inbox (the 🔔 on the site) and pushed to every device they turned
 // notifications on for.
 import { readFileSync } from 'node:fs';
+import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 import { setGlobalOptions } from 'firebase-functions/v2';
 import { onDocumentCreated, onDocumentWritten } from 'firebase-functions/v2/firestore';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
@@ -15,6 +16,7 @@ import { coinSettings, coinsByName, giftEntry, prizeEntry, wallet } from './shar
 import * as casino from './shared/casino.js';
 import * as arcade from './shared/arcade.js';
 import { blocked, serverGroup } from './shared/commandRules.js';
+import { PASSWORD_MIN, isManagerName } from './shared/team.js';
 
 // Functions run next to the database. The deploy workflow writes location.json
 // from the database's location; nam5 (the US multi-region) pairs with us-central1.
@@ -619,6 +621,167 @@ export const reminders = onSchedule({ schedule: 'every 1 minutes', timeZone: TIM
   await batch.commit();
 });
 
+// ---------- accounts: everyone signs in with their own password ----------
+// accounts/{personId}: { name, salt, hash, setAt, lastSignIn, fails, lockedUntil }
+// (phones can't read or write it). A device counts as signed in once this
+// writes its members/{uid} doc with via: 'password'; the rules only let
+// those devices in, and only this sets who's team management (MANAGER_NAMES).
+const accountRef = (name) => db.doc(`accounts/${personId(name)}`);
+const hashOf = (password, salt) => scryptSync(String(password), salt, 64).toString('hex');
+const LOCK_AFTER = 6;
+const LOCK_MS = 10 * 60000;
+
+async function signDeviceIn(uid, name) {
+  const batch = db.batch();
+  batch.set(db.doc(`members/${uid}`), { name, admin: isManagerName(name), via: 'password', joinedAt: Date.now() });
+  batch.set(db.doc(`people/${uid}`), { name, joinedAt: Date.now() }, { merge: true });
+  await batch.commit();
+  return { name, admin: isManagerName(name), via: 'password' };
+}
+
+export const account = onCall({ maxInstances: 5, invoker: 'public' }, async (req) => {
+  const uid = req.auth?.uid;
+  if (!uid) throw new HttpsError('unauthenticated', 'Sign in first.');
+  const rename = await renamer();
+  const { action } = req.data || {};
+  const name = rename(String(req.data?.name || '').trim()).slice(0, 60);
+  const password = String(req.data?.password || '');
+  const now = Date.now();
+  const memberSnap = await db.doc(`members/${uid}`).get();
+  const me = memberSnap.exists ? rename(memberSnap.get('name') || '') : '';
+  const signedIn = memberSnap.exists && memberSnap.get('via') === 'password';
+  const fail = (message) => ({ error: message });
+
+  // Does this name have a password yet? (The sign-in screen asks.)
+  if (action === 'status') {
+    if (!name) return { member: signedIn ? { name: me, admin: isManagerName(me) } : null };
+    const acc = await accountRef(name).get();
+    return { hasPassword: !!acc.get('hash'), thisDevice: me === name };
+  }
+
+  // A first password for a name that has none: from a device already signed
+  // in as that person (before passwords), or with the team code (a setup
+  // ticket the rules only accept with the right code).
+  if (action === 'create') {
+    if (!name) return fail('Pick your name.');
+    if (password.length < PASSWORD_MIN) return fail(`Use at least ${PASSWORD_MIN} characters.`);
+    const ticketRef = db.doc(`setupTickets/${uid}`);
+    const ticket = await ticketRef.get();
+    const viaTicket = ticket.exists && rename(ticket.get('name') || '') === name && now - (ticket.get('at') || 0) < 10 * 60000;
+    if (me !== name && !viaTicket) return fail('Enter the team code to set up this name on a new device.');
+    return db.runTransaction(async (tx) => {
+      const acc = await tx.get(accountRef(name));
+      if (acc.get('hash')) return fail('That name already has a password. Sign in with it.');
+      const salt = randomBytes(16).toString('hex');
+      tx.set(accountRef(name), { name, salt, hash: hashOf(password, salt), setAt: now, lastSignIn: now, fails: 0, lockedUntil: 0 });
+      if (ticket.exists) tx.delete(ticketRef);
+      return { ok: true };
+    }).then(async (r) => (r.ok ? { ok: true, member: await signDeviceIn(uid, name) } : r));
+  }
+
+  if (action === 'signIn') {
+    if (!name) return fail('Pick your name.');
+    const ref = accountRef(name);
+    const acc = await ref.get();
+    if (!acc.get('hash')) return fail('That name has no password yet. Create one.');
+    if ((acc.get('lockedUntil') || 0) > now)
+      return fail(`Too many tries. Try again in ${Math.ceil((acc.get('lockedUntil') - now) / 60000)} min, or ask Asher to reset it.`);
+    const given = Buffer.from(hashOf(password, acc.get('salt')), 'hex');
+    const right = Buffer.from(acc.get('hash'), 'hex');
+    if (given.length !== right.length || !timingSafeEqual(given, right)) {
+      const fails = (acc.get('fails') || 0) + 1;
+      await ref.update({ fails: fails >= LOCK_AFTER ? 0 : fails, lockedUntil: fails >= LOCK_AFTER ? now + LOCK_MS : 0 });
+      return fail(fails >= LOCK_AFTER ? 'Too many tries. Try again in 10 min.' : 'That password isn’t right.');
+    }
+    await ref.update({ fails: 0, lockedUntil: 0, lastSignIn: now });
+    return { ok: true, member: await signDeviceIn(uid, name) };
+  }
+
+  // Change your own password (signed in, knowing the old one).
+  if (action === 'change') {
+    if (!signedIn) return fail('Sign in first.');
+    const ref = accountRef(me);
+    const acc = await ref.get();
+    const old = Buffer.from(hashOf(String(req.data?.old || ''), acc.get('salt') || ''), 'hex');
+    const right = Buffer.from(acc.get('hash') || '', 'hex');
+    if (!acc.get('hash') || old.length !== right.length || !timingSafeEqual(old, right)) return fail('Your current password isn’t right.');
+    if (password.length < PASSWORD_MIN) return fail(`Use at least ${PASSWORD_MIN} characters.`);
+    const salt = randomBytes(16).toString('hex');
+    await ref.update({ salt, hash: hashOf(password, salt), setAt: now });
+    return { ok: true };
+  }
+
+  // Answering Asher's reset request (resetRequests/{personId}), on your own
+  // signed-in device: a new password (signs you out everywhere else), or no.
+  if (action === 'answerReset') {
+    if (!signedIn) return fail('Sign in first.');
+    const reqRef = db.doc(`resetRequests/${personId(me)}`);
+    if (!(await reqRef.get()).exists) return fail('There’s no reset request.');
+    if (!req.data?.accept) {
+      await reqRef.delete();
+      await accountRef(me).set({ resetAnswer: { no: true, at: now } }, { merge: true });
+      return { ok: true };
+    }
+    if (password.length < PASSWORD_MIN) return fail(`Use at least ${PASSWORD_MIN} characters.`);
+    const salt = randomBytes(16).toString('hex');
+    await accountRef(me).set(
+      { name: me, salt, hash: hashOf(password, salt), setAt: now, fails: 0, lockedUntil: 0, resetAnswer: { yes: true, at: now } },
+      { merge: true },
+    );
+    await reqRef.delete();
+    const devices = await db.collection('members').get();
+    const batch = db.batch();
+    for (const d of devices.docs) if (rename(d.get('name') || '') === me && d.id !== uid) batch.delete(d.ref);
+    await batch.commit();
+    return { ok: true };
+  }
+
+  // Asher only: everyone's account (no passwords), and resetting one. A reset
+  // asks the person first, on every device they're signed in on (they make a
+  // new password there, or say no). Only someone signed in nowhere (who can't
+  // be asked) can be reset straight away; then they make a new password the
+  // next time they sign in.
+  if (action === 'list' || action === 'reset' || action === 'cancelReset') {
+    if (!signedIn || me !== REQUESTS_TO) throw new HttpsError('permission-denied', 'Only Asher can do that.');
+    const [all, devices, asks] = await Promise.all([
+      db.collection('accounts').get(),
+      db.collection('members').where('via', '==', 'password').get(),
+      db.collection('resetRequests').get(),
+    ]);
+    const devicesOf = (n) => devices.docs.filter((d) => rename(d.get('name') || '') === n).length;
+    if (action === 'list')
+      return {
+        accounts: all.docs.map((d) => ({
+          name: d.get('name'),
+          hasPassword: !!d.get('hash'),
+          setAt: d.get('setAt') || 0,
+          lastSignIn: d.get('lastSignIn') || 0,
+          locked: (d.get('lockedUntil') || 0) > now,
+          devices: devicesOf(d.get('name')),
+          asked: asks.docs.some((a) => a.id === d.id),
+          answer: d.get('resetAnswer') || null,
+        })),
+      };
+    if (!name) return fail('Who?');
+    if (action === 'cancelReset') {
+      await db.doc(`resetRequests/${personId(name)}`).delete();
+      return { ok: true };
+    }
+    if (devicesOf(name) > 0 && !req.data?.force) {
+      await db.doc(`resetRequests/${personId(name)}`).set({ name, by: me, at: now });
+      await accountRef(name).set({ resetAnswer: null }, { merge: true });
+      await notify([
+        { to: name, type: 'account', title: `${first(me)} wants to reset your password`, body: 'Open the app to make a new one, or keep yours.', open: 'view:today', by: me },
+      ]);
+      return { ok: true, asked: true };
+    }
+    if (devicesOf(name) > 0) return fail(`${first(name)} is signed in somewhere, so they have to confirm it.`);
+    await accountRef(name).set({ name, salt: '', hash: '', fails: 0, lockedUntil: 0, resetAt: now }, { merge: true });
+    return { ok: true };
+  }
+  throw new HttpsError('invalid-argument', 'Unknown action.');
+});
+
 // ---------- Jackson coins casino and economy (slash commands) ----------
 // The house: every roll, card, and coin change for /slots, /blackjack,
 // /daily, /rob… happens here, so nobody can fake a win. Each person's
@@ -806,7 +969,7 @@ export const play = onCall({ maxInstances: 5, invoker: 'public' }, async (req) =
   const uid = req.auth?.uid;
   if (!uid) throw new HttpsError('unauthenticated', 'Sign in first.');
   const member = await db.doc(`members/${uid}`).get();
-  if (!member.exists) throw new HttpsError('permission-denied', 'Join the team first.');
+  if (!member.exists || member.get('via') !== 'password') throw new HttpsError('permission-denied', 'Sign in first.');
   const data = await coinData();
   const me = data.rename(member.get('name'));
   const { action, game, conv = '', args = [], msgId, move, replyTo = null } = req.data || {};

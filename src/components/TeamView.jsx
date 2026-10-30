@@ -24,8 +24,8 @@ const STAFF_GROUP = 'Secretary';
 const EMPTY_ROLE = { title: '', subteams: [], responsibilities: [] };
 
 // person.isNew = adding someone to the team (asks for their name).
-// Managers' names are tied to their manager codes in the security rules, so
-// they can't be renamed here.
+// Managers' names are the team management list (functions/shared/team.js),
+// so they can't be renamed here.
 function PersonDialog({ person, taken, onClose, onSave, onRemove, onPerson }) {
   useEscape(onClose);
   const [name, setName] = useState(person.name || '');

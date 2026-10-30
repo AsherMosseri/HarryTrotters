@@ -1,38 +1,47 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Codes: replace the placeholders (lowercase) when you paste these rules into
-    // the Firebase console. Keep the real codes out of this file so they never
-    // end up on GitHub.
+    // The team code: replace the placeholder (lowercase) when you paste these
+    // rules into the Firebase console. Keep the real code out of this file so
+    // it never ends up on GitHub. It's only needed to set up a name on a new
+    // device the first time; after that everyone signs in with their password.
     function teamCode() { return 'CHANGE-ME'; }
-    // Each manager's name (lowercase) and their own manager code. Joining under
-    // one of these names requires that code.
-    function managerCodes() {
-      return { 'asher mosseri': 'CHANGE-ME-ASHER', 'sebastian tolbert': 'CHANGE-ME-SEBASTIAN' };
-    }
 
     function signedIn() { return request.auth != null; }
     function memberPath() { return /databases/$(database)/documents/members/$(request.auth.uid); }
-    function isMember() { return signedIn() && exists(memberPath()); }
+    // A device signed in with a password (the account function writes these;
+    // older code-only sign-ins don't count until they set or enter a password).
+    function isMember() { return signedIn() && exists(memberPath()) && get(memberPath()).data.get('via', '') == 'password'; }
     function isManager() { return isMember() && get(memberPath()).data.get('admin', false) == true; }
     function validName(data) {
       return data.name is string && data.name.size() > 0 && data.name.size() <= 60;
     }
-    // Either a normal member who isn't using a manager's name, or a manager
-    // with their own manager code.
-    function validJoin(data) {
-      return (data.get('admin', false) == false && !(data.name.lower() in managerCodes()))
-        || (data.get('admin', false) == true && data.name.lower() in managerCodes()
-            && data.get('adminCode', '') == managerCodes()[data.name.lower()]);
-    }
 
-    // One doc per device that entered the right code. Only that device can read it.
+    // One doc per signed-in device, written only by the account function
+    // (which also decides who's team management). Only that device reads it.
     match /members/{uid} {
       allow read, delete: if signedIn() && request.auth.uid == uid;
-      allow create: if signedIn() && request.auth.uid == uid
-        && request.resource.data.code == teamCode()
-        && validName(request.resource.data)
-        && validJoin(request.resource.data);
+      allow create, update: if false;
+    }
+    // Setting up a name with no password yet on a new device: the device leaves
+    // a ticket with the team code (checked here), and the account function
+    // accepts it. Nobody reads them.
+    match /setupTickets/{uid} {
+      allow create, update: if signedIn() && request.auth.uid == uid
+        && request.resource.data.code == teamCode() && validName(request.resource.data)
+        && request.resource.data.keys().hasOnly(['code', 'name', 'at']) && request.resource.data.at is int;
+      allow read: if false;
+      allow delete: if signedIn() && request.auth.uid == uid;
+    }
+    // Asher's request to reset your password: your devices show it (you answer
+    // through the account function).
+    match /resetRequests/{id} {
+      allow read: if isMember() && isMe(resource.data.name);
+      allow write: if false;
+    }
+    // Passwords (hashed): the account function only.
+    match /accounts/{id} {
+      allow read, write: if false;
     }
 
     // Public name list for the assignee picker; must match the member's name.

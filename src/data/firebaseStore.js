@@ -51,8 +51,9 @@ const db = initializeFirestore(app, {
 });
 
 const tasksCol = collection(db, 'tasks');
-// members/{uid} holds the team code a device joined with (only readable by that
-// device); people/{uid} is the public name list everyone on the team can read.
+// members/{uid}: who a device is signed in as (written by the account function
+// after a password check; only readable by that device); people/{uid} is the
+// public name list everyone on the team can read.
 const membersCol = collection(db, 'members');
 const peopleCol = collection(db, 'people');
 const milestonesCol = collection(db, 'milestones');
@@ -161,8 +162,8 @@ const actorFields = (actor) => ({ by: actor.name, byUid: actor.uid });
 export const firebaseStore = {
   mode: 'firebase',
 
-  // Every device gets a silent anonymous account; the team code (checked by
-  // the security rules) is what actually grants access.
+  // Every device gets a silent anonymous account; signing in with a name and
+  // password (the account function) is what actually grants access.
   onAuth(cb, onError) {
     return onAuthStateChanged(auth, (user) => {
       if (user) cb({ uid: user.uid });
@@ -173,21 +174,31 @@ export const firebaseStore = {
   async getMember(uid) {
     try {
       const snap = await getDoc(doc(membersCol, uid));
-      return snap.exists() ? { name: snap.data().name, admin: snap.data().admin === true } : null;
+      return snap.exists() ? { name: snap.data().name, admin: snap.data().admin === true, via: snap.data().via || '' } : null;
     } catch (err) {
       if (err.code === 'permission-denied') return null;
       throw err;
     }
   },
 
-  // adminCode is only sent when joining as the manager; the rules check it.
-  async join(uid, name, code, adminCode) {
-    const member = { name, code: code.trim().toLowerCase(), joinedAt: serverTimestamp() };
-    if (adminCode) Object.assign(member, { admin: true, adminCode: adminCode.trim().toLowerCase() });
-    const batch = writeBatch(db);
-    batch.set(doc(membersCol, uid), member);
-    batch.set(doc(peopleCol, uid), { name, joinedAt: serverTimestamp() });
-    await batch.commit();
+  // Accounts (functions/index.js account): status, create, signIn, change,
+  // list, reset. Returns { ok, member } or { error } (or what was asked for).
+  async account(data) {
+    const call = httpsCallable(getFunctions(app, FUNCTIONS_REGION), 'account');
+    return (await call(data)).data;
+  },
+  // Asher asked to reset this person's password (they answer with account()).
+  subscribeResetRequest(name, cb) {
+    return onSnapshot(
+      doc(db, 'resetRequests', personId(name)),
+      (snap) => cb(snap.exists() ? snap.data() : null),
+      () => cb(null),
+    );
+  },
+  // Setting up a name on a new device: the rules accept this only with the
+  // right team code, and the account function then lets the name get a password.
+  saveSetupTicket(uid, name, code) {
+    return setDoc(doc(db, 'setupTickets', uid), { name, code: code.trim().toLowerCase(), at: Date.now() });
   },
 
   // Forget this device; it gets a fresh anonymous account and must re-enter the code.

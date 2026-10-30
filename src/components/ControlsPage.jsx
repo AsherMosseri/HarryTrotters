@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { relTime } from '../util.js';
 import { CloseIcon, Overlay } from './common.jsx';
 import { Switch } from './Ads.jsx';
 import { FEATURE_GROUPS, LAB_LOG_MODES, offCount } from '../controls.js';
@@ -19,6 +20,7 @@ export default function ControlsPage({
   onShutdown,
   onCommands,
   onAds,
+  account,
   onClose,
 }) {
   // Shutdown or Commands open on top: Escape closes that one, not this.
@@ -106,6 +108,7 @@ export default function ControlsPage({
               ['features', 'Features'],
               ['tabs', 'Tabs'],
               ['channels', 'Channels'],
+              ['accounts', 'Accounts'],
             ].map(([id, label]) => (
               <button
                 key={id}
@@ -119,6 +122,7 @@ export default function ControlsPage({
             ))}
           </div>
           <div className="ads-body">
+            {tab === 'accounts' && <Accounts people={people} account={account} />}
             {tab === 'features' && (
               <>
                 {FEATURE_GROUPS.map(([g, label, items]) => group('off', label, items))}
@@ -171,5 +175,84 @@ export default function ControlsPage({
         </div>
       </div>
     </Overlay>
+  );
+}
+
+// Who has a password and when they last signed in. Reset asks the person
+// first: a popup they have to answer on every device they're signed in on.
+// Someone signed in nowhere can't be asked, so they can be reset straight away
+// (they make a new password the next time they sign in).
+function Accounts({ people, account }) {
+  const [list, setList] = useState(null);
+  const [err, setErr] = useState('');
+  const [asking, setAsking] = useState('');
+  const [note, setNote] = useState('');
+  const load = () =>
+    account({ action: 'list' })
+      .then((r) => setList(r.accounts || []))
+      .catch((e) => setErr(e?.message || String(e)));
+  useEffect(() => {
+    load();
+    const t = setInterval(load, 15000); // see answers come in
+    return () => clearInterval(t);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  if (err) return <p className="form-error">{err}</p>;
+  if (!list) return <p className="muted">Loading…</p>;
+  const by = new Map(list.map((a) => [a.name, a]));
+  const names = [...new Set([...people, ...list.map((a) => a.name)])].sort();
+  const set = names.filter((n) => by.get(n)?.hasPassword).length;
+  const reset = async (n) => {
+    const r = await account({ action: 'reset', name: n });
+    setAsking('');
+    setNote(r?.error || (r?.asked ? `Asked ${n.split(' ')[0]} to confirm on their screen.` : `${n.split(' ')[0]}’s password was cleared. They’ll make a new one next time they sign in.`));
+    load();
+  };
+  return (
+    <section className="cmd-admin-group">
+      <p className="muted small">
+        {set} of {names.length} have a password. Everyone signs in with their own; nobody can sign in as someone else. Resetting asks the
+        person to confirm on their screen first.
+      </p>
+      {note && <p className="small">{note}</p>}
+      {names.map((n) => {
+        const a = by.get(n);
+        const answered = a?.answer && Date.now() - a.answer.at < 7 * 864e5 ? (a.answer.yes ? ' · made a new password' : ' · said no to the reset') : '';
+        return (
+          <div key={n} className="cmd-admin-row">
+            <b className="ctl-title">{n}</b>
+            <span className="muted small grow">
+              {a?.hasPassword
+                ? `Password set ${relTime(a.setAt)}${a.lastSignIn ? ` · last signed in ${relTime(a.lastSignIn)}` : ''}${a.locked ? ' · locked after wrong tries' : ''}${a.asked ? '' : answered}`
+                : 'No password yet'}
+              {a?.asked && <b className="acct-waiting"> · Waiting for them to confirm</b>}
+            </span>
+            {a?.hasPassword && a.asked && (
+              <button className="btn small-btn" onClick={() => account({ action: 'cancelReset', name: n }).then(load)}>
+                Cancel request
+              </button>
+            )}
+            {a?.hasPassword &&
+              !a.asked &&
+              (asking === n ? (
+                <>
+                  <button className="btn small-btn danger" onClick={() => reset(n)}>
+                    {a.devices ? 'Ask them' : 'Reset anyway'}
+                  </button>
+                  <button className="btn small-btn" onClick={() => setAsking('')}>
+                    Cancel
+                  </button>
+                  <span className="muted tiny">
+                    {a.devices ? 'They’ll get a popup to confirm.' : 'Not signed in anywhere, so they can’t be asked.'}
+                  </span>
+                </>
+              ) : (
+                <button className="btn small-btn" onClick={() => setAsking(n)}>
+                  Reset password
+                </button>
+              ))}
+          </div>
+        );
+      })}
+    </section>
   );
 }

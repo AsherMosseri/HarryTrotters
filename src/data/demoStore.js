@@ -535,11 +535,38 @@ export const demoStore = {
     return () => {};
   },
   async getMember() {
-    // ?demo=member previews the app as a regular teammate.
-    const asMember = new URLSearchParams(location.search).get('demo') === 'member';
-    return asMember ? { name: 'Cooper Mlezcko', admin: false } : { name: 'Asher Mosseri', admin: true };
+    // ?demo=member previews the app as a regular teammate; ?demo=signin shows
+    // the sign-in screen (Asher "has" a password there, everyone else makes one).
+    const as = new URLSearchParams(location.search).get('demo');
+    if (as === 'signin' && !sessionStorage.getItem('demo-signed-in')) return null;
+    const asMember = as === 'member';
+    return asMember ? { name: 'Cooper Mlezcko', admin: false, via: 'password' } : { name: 'Asher Mosseri', admin: true, via: 'password' };
   },
-  async join() {},
+  async account({ action, name, password }) {
+    if (action === 'answerReset') {
+      state.resetRequest = null;
+      commit();
+      return { ok: true };
+    }
+    if (action === 'reset') {
+      state.resetRequest = { name, by: 'Asher Mosseri', at: Date.now() };
+      commit();
+      return { ok: true, asked: true };
+    }
+    if (action === 'status') return { hasPassword: name === 'Asher Mosseri', thisDevice: false };
+    if (action === 'signIn' && password !== 'trotters1') return { error: 'That password isn’t right.' };
+    if (action === 'signIn' || action === 'create') {
+      sessionStorage.setItem('demo-signed-in', '1');
+      return { ok: true, member: { name, admin: name === 'Asher Mosseri', via: 'password' } };
+    }
+    if (action === 'list')
+      return { accounts: ['Asher Mosseri', 'Sebastian Tolbert', 'Cooper Mlezcko'].map((name, i) => ({ name, hasPassword: i < 2, setAt: Date.now() - 864e5, lastSignIn: Date.now() - i * 36e5 })) };
+    return { ok: true };
+  },
+  async saveSetupTicket() {},
+  subscribeResetRequest(name, cb) {
+    return listen(() => cb(state.resetRequest?.name === name ? state.resetRequest : null));
+  },
   async leave() {
     localStorage.removeItem(KEY);
     location.search = '';

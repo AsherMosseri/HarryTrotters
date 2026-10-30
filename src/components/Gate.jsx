@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { TEAM_NAME, TEAM_NICKNAME, ROSTER, isManagerName } from '../config.js';
+import { TEAM_NAME, TEAM_NICKNAME, ROSTER, PASSWORD_MIN } from '../config.js';
 import { Avatar } from './common.jsx';
 
 function Shell({ children }) {
@@ -162,37 +162,75 @@ export function InstallScreen({ device, browser }) {
 
 const OTHER = '__other';
 
-export function JoinScreen({ onJoin, rename }) {
+// Signing in: pick your name, then your password. A name with no password
+// yet gets one now: right away on a device that was already signed in as that
+// person (before passwords), or with the team code on a new device.
+// account(data) calls the account function; it returns { ok, member } or { error }.
+export function SignInScreen({ rename, account, saveTicket, current, onSignedIn }) {
   const names = [...new Set(ROSTER.map(rename))];
-  const [picked, setPicked] = useState('');
-  const [other, setOther] = useState('');
+  const [picked, setPicked] = useState(current && names.includes(current) ? current : current ? OTHER : '');
+  const [other, setOther] = useState(current && !names.includes(current) ? current : '');
+  const name = (picked === OTHER ? other : picked).trim();
+  const [step, setStep] = useState(null); // null | { hasPassword, thisDevice }
+  const [password, setPassword] = useState('');
+  const [again, setAgain] = useState('');
   const [code, setCode] = useState('');
-  const [managerCode, setManagerCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
-  const name = (picked === OTHER ? other : picked).trim();
-  const isManager = isManagerName(name);
-  const ready = name && code.trim() && (!isManager || managerCode.trim());
+
+  // Which step: sign in, or make a first password (once a name is picked).
+  useEffect(() => {
+    setStep(null);
+    setErr('');
+    if (!name || (picked === OTHER && name.length < 3)) return;
+    let alive = true;
+    const t = setTimeout(
+      () =>
+        account({ action: 'status', name })
+          .then((r) => alive && setStep(r))
+          .catch((e) => alive && setErr(e?.message || String(e))),
+      picked === OTHER ? 500 : 0,
+    );
+    return () => {
+      alive = false;
+      clearTimeout(t);
+    };
+  }, [name]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const creating = step && !step.hasPassword;
+  const needCode = creating && !step.thisDevice;
+  const ready = name && step && password && (!creating || (password.length >= PASSWORD_MIN && password === again && (!needCode || code.trim())));
 
   const submit = async (e) => {
     e.preventDefault();
-    if (!ready) return;
+    if (!ready || busy) return;
     setBusy(true);
     setErr('');
     try {
-      await onJoin(name, code, isManager ? managerCode : '');
+      if (needCode) {
+        try {
+          await saveTicket(name, code);
+        } catch (ex) {
+          throw new Error(ex?.code === 'permission-denied' ? 'That team code isn’t right. Check with a teammate.' : ex?.message || String(ex));
+        }
+      }
+      const r = await account({ action: creating ? 'create' : 'signIn', name, password });
+      if (r?.error) throw new Error(r.error);
+      onSignedIn(r.member);
     } catch (ex) {
-      // The security rules reject the write when the code is wrong.
-      const wrong = isManager ? "The team code or manager code isn't right." : "That team code isn't right. Check with a teammate.";
-      setErr(ex?.code === 'permission-denied' ? wrong : ex?.message || String(ex));
+      setErr(ex?.message || String(ex));
       setBusy(false);
     }
   };
 
   return (
     <Shell>
-      <h1>{TEAM_NAME} Task Board</h1>
-      <p className="muted">Pick your name and enter the team code. You only have to do this once on each device.</p>
+      <h1>{current && creating && step?.thisDevice ? 'Create your password' : 'Sign in'}</h1>
+      <p className="muted">
+        {current && creating && step?.thisDevice
+          ? `${TEAM_NICKNAME} uses passwords now, so nobody else can sign in as you. Make one for ${current.split(' ')[0]}. You’ll use it on any new device.`
+          : 'Pick your name and enter your password.'}
+      </p>
       <form className="join-form" onSubmit={submit}>
         <div className="join-names">
           {names.map((n) => (
@@ -214,31 +252,50 @@ export function JoinScreen({ onJoin, rename }) {
             autoFocus
           />
         )}
-        <input
-          className="input"
-          type="password"
-          autoCapitalize="none"
-          autoComplete="current-password"
-          value={code}
-          onChange={(e) => setCode(e.target.value)}
-          placeholder="Team code"
-        />
-        {isManager && (
-          <input
-            className="input"
-            type="password"
-            autoCapitalize="none"
-            autoComplete="off"
-            value={managerCode}
-            onChange={(e) => setManagerCode(e.target.value)}
-            placeholder="Manager code"
-          />
+        {name && step && (
+          <>
+            {creating && <p className="small muted">{name.split(' ')[0]} doesn’t have a password yet. Make one (at least {PASSWORD_MIN} characters).</p>}
+            <input
+              className="input"
+              type="password"
+              autoCapitalize="none"
+              autoComplete={creating ? 'new-password' : 'current-password'}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder={creating ? 'New password' : 'Password'}
+              autoFocus
+            />
+            {creating && (
+              <input
+                className="input"
+                type="password"
+                autoCapitalize="none"
+                autoComplete="new-password"
+                value={again}
+                onChange={(e) => setAgain(e.target.value)}
+                placeholder="Same password again"
+              />
+            )}
+            {creating && again && password !== again && <p className="form-error">The two passwords don’t match.</p>}
+            {needCode && (
+              <input
+                className="input"
+                type="password"
+                autoCapitalize="none"
+                autoComplete="off"
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                placeholder="Team code (first time only)"
+              />
+            )}
+          </>
         )}
         <button className="btn primary" disabled={busy || !ready}>
-          {busy ? 'Checking…' : name ? `Join as ${name.split(' ')[0]}` : 'Pick your name'}
+          {busy ? 'Checking…' : !name ? 'Pick your name' : creating ? 'Create password' : `Sign in as ${name.split(' ')[0]}`}
         </button>
       </form>
       {err && <p className="form-error">{err}</p>}
+      {step?.hasPassword && <p className="muted small">Forgot your password? Ask Asher to reset it.</p>}
     </Shell>
   );
 }

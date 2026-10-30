@@ -126,7 +126,7 @@ const SECTIONS = [
   [
     'Your account',
     [
-      'You only enter the team code once per device.',
+      'Sign in with your name and your own password; each device stays signed in. Change it from your menu → Change password. Forgot it? Ask Asher to reset it.',
       'Switch user (in your menu) signs this device out so someone else can use it. You’ll need the code again.',
       'Your menu (your name at the bottom of the sidebar, or your picture on a phone) picks light, dark, or automatic, and a color theme (Sunset, Ocean, Forest…) for this device.',
       'Custom… in that menu makes your own theme: any colors (even moving), a picture, GIF, or emoji pattern behind the app, and floating emoji or GIFs. Surprise me picks for you, and My profile matches your profile.',
