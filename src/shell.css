@@ -617,3 +617,98 @@ button.sb-head-row { width: 100%; border: 0; background: none; color: var(--mute
   .super-fx-spark, .super-fx-mini, .super-fx-wave { display: none; }
   .super-fx-big { animation-duration: 1.2s; }
 }
+
+/* ==========================================================================
+   Team look (3.0): dark navy and white, the Harry Trotters / Stallion Robotics
+   colors. Navy sidebar, navy buttons and highlights, cool white pages; a
+   condensed heading font; tighter corners. Fun things people pick for
+   themselves (decorations, nameplates, games) keep their own colors.
+   ========================================================================== */
+:root {
+  --bg: #f2f4f8;
+  --surface: #ffffff;
+  --surface-2: #edf0f5;
+  --border: #dce1ea;
+  --text: #0e1a2e;
+  --muted: #5d6879;
+  --accent: #14284b;
+  --accent-soft: #e2e8f2;
+  --radius: 9px;
+  --sidebar: #14284b;
+  --sb-text: #f3f6fb;
+  --sb-muted: #9eb0c9;
+  --font-display: 'Barlow Condensed', 'Arial Narrow', system-ui, sans-serif;
+  --shadow: 0 1px 2px rgb(14 26 46 / 6%), 0 1px 3px rgb(14 26 46 / 7%);
+  --shadow-lg: 0 14px 40px rgb(14 26 46 / 20%);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --bg: #0a111d;
+    --surface: #101a2a;
+    --surface-2: #162236;
+    --border: #23324a;
+    --text: #e7edf6;
+    --muted: #91a0b6;
+    --accent: #6f9be0;
+    --accent-soft: #1a2a46;
+    --sidebar: #070d18;
+    --sb-text: #e7edf6;
+    --sb-muted: #8395b0;
+  }
+}
+:root[data-theme='dark'] {
+  --bg: #0a111d;
+  --surface: #101a2a;
+  --surface-2: #162236;
+  --border: #23324a;
+  --text: #e7edf6;
+  --muted: #91a0b6;
+  --accent: #6f9be0;
+  --accent-soft: #1a2a46;
+  --sidebar: #070d18;
+  --sb-text: #e7edf6;
+  --sb-muted: #8395b0;
+}
+
+/* The navy sidebar: its own light text (pop-ups opened from it keep the page colors). */
+.sidebar { color: var(--sb-text); border-right-color: transparent; }
+.sb-team, .sb-row, .sb-foot .me-chip, .sb-foot .me-chip .user-name, .sb-top-tools .icon-btn, .sb-rail-tools .icon-btn { color: var(--sb-text); }
+.sb-team-name small, .sb-head, .sb-row .icon, .sb-count, .sb-hint, .sb-add, .sb-gear, .sb-fold, .sb-foot .me-chip .me-more, .sb-rail-btn { color: var(--sb-muted); }
+.sb-row:hover, .sb-add:hover, .sb-gear:hover, .sb-fold:hover, .sb-rail-btn:hover, .sb-foot .me-chip:hover, .sb-foot .me-chip.on, .sb-top-tools .icon-btn:hover, .sb-team:hover {
+  background: rgb(255 255 255 / 8%); color: #fff;
+}
+.sb-row.active, .sb-rail-btn.active { background: rgb(255 255 255 / 14%); color: #fff; }
+.sb-row.active .icon { color: #fff; }
+.sb-count.strong { color: #ff8a8a; }
+.sb-foot { border-top-color: rgb(255 255 255 / 10%); }
+.sb-rail-tools { border-bottom-color: rgb(255 255 255 / 10%); }
+.sidebar .avatar { box-shadow: 0 0 0 1px rgb(255 255 255 / 10%); }
+/* The mark: a white plate with navy letters until the team logo arrives. */
+.sb-mark { display: inline-grid; place-items: center; width: 34px; height: 34px; border-radius: 7px; background: #fff; color: #14284b; font-family: var(--font-display); font-style: normal; font-weight: 700; font-size: 18px; letter-spacing: 0; padding: 0; }
+.sb-team-name b { font-family: var(--font-display); font-size: 19px; font-weight: 700; letter-spacing: 0.01em; }
+/* Pop-ups that open from the sidebar use the page's colors, not the sidebar's. */
+.sidebar :is(.inbox-pop, .shift-pop, .me-menu) { color: var(--text); }
+
+/* Headings: condensed, with some weight. */
+.page-head h1, .today-head h1, .shell .ms-header h1, .phone-title, .gate-card h1, .splash-mark h1, .dialog.welcome h2 {
+  font-family: var(--font-display); font-weight: 700; letter-spacing: 0;
+}
+.page-head h1, .shell .ms-header h1 { font-size: 34px; }
+.today-head h1 { font-size: 40px; }
+.phone-title { font-size: 30px; }
+.splash-mark h1 { font-size: 52px; }
+.sec-head h2, .shell .chart-card > h2, .shell .shift-sec-head h2, .shell .res-section h2, .shell .res-diagram-side h2, .panel-head h2, .sheet-head h2, .shell .chat-head h2 {
+  font-family: var(--font-display); font-weight: 700; letter-spacing: 0.005em; font-size: 22px;
+}
+.shell .chat-head h2 { font-size: 24px; }
+.splash-ht { font-family: var(--font-display); font-style: normal; letter-spacing: 0; color: var(--accent); }
+
+/* Navy buttons read as the team's; corners a little tighter. */
+.btn.primary { background: var(--accent); border-color: var(--accent); }
+:root[data-theme='dark'] .btn.primary { color: #fff; }
+.btn, .input { border-radius: 7px; }
+.dialog, .panel { border-radius: 12px; }
+/* Dark mode: the highlight color is a light navy (readable on dark), so
+   buttons get a deeper navy to keep white text readable. */
+@media (prefers-color-scheme: dark) { :root:not([data-theme='light']) .btn.primary { background: #2a4f8f; border-color: #2a4f8f; } }
+:root[data-theme='dark'] .btn.primary { background: #2a4f8f; border-color: #2a4f8f; }
