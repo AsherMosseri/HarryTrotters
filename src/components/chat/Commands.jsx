@@ -1,3 +1,4 @@
+import { Icon } from '../shell/icons.jsx';
 import { Avatar, DisplayName } from '../common.jsx';
 import { COMMANDS, GROUPS } from '../../commands.js';
 import { CASINO_CARDS, CasinoBody, ECONOMY_CARDS } from './Casino.jsx';
@@ -14,7 +15,7 @@ export function Trotbot({ name }) {
   return (
     <div className="cmd-head">
       <span className="cmd-bot" aria-hidden="true">
-        🤖
+        <Icon name="robot" size={14} />
       </span>
       <b>Trotbot</b>
       <span className="cmd-tag">BOT</span>
@@ -449,7 +450,7 @@ export function CommandNote({ note, onDismiss, onUse, onGo, tasks = [], onOpenTa
     <div className="cmd-note" role="status">
       <div className="cmd-head">
         <span className="cmd-bot" aria-hidden="true">
-          🤖
+          <Icon name="robot" size={14} />
         </span>
         <b>Trotbot</b>
         <span className="cmd-tag">BOT</span>

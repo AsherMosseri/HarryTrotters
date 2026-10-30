@@ -9,6 +9,7 @@ import { emojiList, loadEmoji, rememberEmoji, searchEmoji } from './emoji.js';
 import { EmojiPicker, GifPicker, PollDialog, StandupDialog, StickerPicker } from './Pickers.jsx';
 import { matchCommands, parseCommand, runCommand } from '../../commands.js';
 import { CommandOption } from './Commands.jsx';
+import { whatIs } from './Message.jsx';
 import { relTime } from '../../util.js';
 
 // The formatting bar: [label, title, what it does].
@@ -56,6 +57,8 @@ export default function Composer({
   actor,
   isManager,
   roster,
+  // A DM's people: @ suggests only them there.
+  members,
   tasks,
   api,
   replyTo,
@@ -154,26 +157,17 @@ export default function Composer({
       const out = [];
       if (!isDm && isManager && feat('everyone') && 'everyone'.startsWith(q))
         out.push({ type: 'everyone', key: 'everyone', insert: '@everyone' });
-      if (!isDm)
-        for (const s of SUBTEAMS)
-          if (
-            s
-              .toLowerCase()
-              .split(' ')
-              .some((w) => w.startsWith(q)) ||
-            s.toLowerCase().startsWith(q)
-          )
-            out.push({ type: 'role', key: `r-${s}`, insert: `@${s}`, name: s });
-      for (const n of roster)
-        if (
-          n
-            .toLowerCase()
-            .split(' ')
-            .some((w) => w.startsWith(q)) ||
-          n.toLowerCase().startsWith(q)
-        )
-          out.push({ type: 'person', key: `p-${n}`, insert: `@${n}`, name: n });
-      return out.slice(0, 8);
+      const matches = (n) =>
+        n
+          .toLowerCase()
+          .split(' ')
+          .some((w) => w.startsWith(q)) || n.toLowerCase().startsWith(q);
+      const roles = isDm ? [] : SUBTEAMS.filter(matches).map((s) => ({ type: 'role', key: `r-${s}`, insert: `@${s}`, name: s }));
+      // Not yourself; in a DM, only the people in it.
+      const names = (isDm && members ? members : roster).filter((n) => n !== actor.name && matches(n));
+      const ppl = names.map((n) => ({ type: 'person', key: `p-${n}`, insert: `@${n}`, name: n }));
+      // With nothing typed yet, people come first so subteams don't crowd them out.
+      return [...out, ...(q ? [...roles, ...ppl] : [...ppl.slice(0, 5), ...roles])].slice(0, 8);
     }
     if (suggest.kind === '#')
       return tasks
@@ -185,7 +179,7 @@ export default function Composer({
     const std = searchEmoji(q, 8).map((e) => ({ type: 'emoji', key: e.char, insert: e.char, char: e.char, code: e.code }));
     return [...team, ...std].slice(0, 8);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [suggest, roster, tasks, teamEmoji, isManager, isDm, emojiReady]);
+  }, [suggest, roster, members, tasks, teamEmoji, isManager, isDm, emojiReady]);
 
   const onChange = (e) => {
     const value = e.target.value;
@@ -243,7 +237,11 @@ export default function Composer({
     onDone();
   };
 
-  const replyInfo = () => (replyTo ? { id: replyTo.id, by: replyTo.by, text: (replyTo.text || '').slice(0, 120) } : null);
+  // Cancelling a reply only drops the reply; what you typed stays.
+  const cancel = () => (editing ? reset() : onDone());
+
+  const replyInfo = () =>
+    replyTo ? { id: replyTo.id, by: replyTo.by, text: (replyTo.text || '').slice(0, 120), what: whatIs(replyTo) } : null;
 
   // GIFs and polls go out as their own message (keeping any reply).
   const sendExtra = async (extra) => {
@@ -383,10 +381,10 @@ export default function Composer({
             <span>Editing your message</span>
           ) : (
             <span>
-              <Icon name="reply" size={15} className="reply-ic" /> Replying to <b>{replyTo.by.split(' ')[0]}</b>: {replyTo.text?.slice(0, 80) || 'a photo'}
+              <Icon name="reply" size={15} className="reply-ic" /> Replying to <b>{replyTo.by.split(' ')[0]}</b>: {replyTo.text?.slice(0, 80) || whatIs(replyTo)}
             </span>
           )}
-          <button className="icon-btn small" onClick={reset} aria-label="Cancel">
+          <button className="icon-btn small" onClick={cancel} aria-label={editing ? 'Cancel editing' : 'Cancel reply'}>
             <CloseIcon />
           </button>
         </div>
@@ -476,7 +474,10 @@ export default function Composer({
                     <span className="suggest-icon" style={{ color: SUBTEAM_COLORS[o.name] }}>
                       ●
                     </span>{' '}
-                    @{o.name} <span className="muted small">{subteamMembers(o.name).length} people</span>
+                    @{o.name}{' '}
+                    <span className="muted small">
+                      {subteamMembers(o.name).length} {subteamMembers(o.name).length === 1 ? 'person' : 'people'}
+                    </span>
                   </>
                 )}
                 {o.type === 'task' && (
@@ -648,6 +649,9 @@ export default function Composer({
             else sendFile(f);
           }}
           onKeyDown={(e) => {
+            // A keyboard still putting a word together (Japanese, Chinese…)
+            // uses Return and the arrows itself: Return confirms the word.
+            if (e.nativeEvent.isComposing) return;
             if (suggest && options.length) {
               if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
                 e.preventDefault();
@@ -675,7 +679,7 @@ export default function Composer({
               send();
             } else if (e.key === 'Escape') {
               if (suggest) setSuggest(null);
-              else if (editing || replyTo) reset();
+              else if (editing || replyTo) cancel();
             }
           }}
           placeholder={`Message ${label}`}

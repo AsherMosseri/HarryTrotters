@@ -1,4 +1,4 @@
-import { renameMessage } from '../people.js';
+import { renameMessage, sentByMe } from '../people.js';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { SUBTEAMS, SUBTEAM_COLORS } from '../config.js';
 import { useControls } from '../controls.js';
@@ -15,6 +15,14 @@ import { BotReplies, ChatAd, chatAdSpots, useAds } from './Ads.jsx';
 
 const GROUP_MINUTES = 5;
 const PAGE = 60;
+const NONE = [];
+
+// Messages by id, newest copy winning, oldest first.
+function mergeMessages(a, b) {
+  const byId = new Map(a.map((m) => [m.id, m]));
+  for (const m of b) byId.set(m.id, m);
+  return [...byId.values()].sort((x, y) => x.at - y.at);
+}
 
 function dayLabel(ms) {
   const d = new Date(ms);
@@ -119,15 +127,19 @@ export default function ChatView({
   const [picks, setPicks] = useState(null);
   const [deleteAsk, setDeleteAsk] = useState(null); // the messages to delete, waiting for OK
   // A tapped message's buttons go away when you tap anything else: the text
-  // box, a name or picture, another message, the sidebar. Tapping the message
-  // itself again still toggles them (its own click does that).
+  // box, a name or picture, the sidebar. Tapping another message moves them
+  // there, and tapping the message itself again toggles them (its own click
+  // does both).
   useEffect(() => {
     if (!selected) return;
     const away = (e) => {
       const t = e.target;
       if (!(t instanceof Element) || t.closest('.msg-actions, .floating-picker, .picker-scrim')) return;
-      const inMsg = t.closest('.msg.selected');
-      if (inMsg && !t.closest('button, a, .avatar, .avatar-wrap, .msg-name, [role="button"]')) return;
+      // A tap on a message (this one, or another one that takes over) is left
+      // to its own click: clearing now would move things (on phones the
+      // buttons make room under the message) before the click lands.
+      const inMsg = t.closest('.msg');
+      if (inMsg && !t.closest('button, a, .avatar, .avatar-wrap, .msg-name, [role="button"], .spoiler')) return;
       setSelected(null);
     };
     document.addEventListener('pointerdown', away, true);
@@ -138,7 +150,8 @@ export default function ChatView({
   // Slash-command notes only you see, per conversation (gone on reload).
   const [notes, setNotes] = useState({});
   const [useCmd, setUseCmd] = useState(null);
-  const [older, setOlder] = useState({});
+  // Older pages of the conversation on screen. done: nothing older is left.
+  const [older, setOlder] = useState({ key: current.key, msgs: [], done: false });
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [viewing, setViewing] = useState(null);
   const [newBelow, setNewBelow] = useState(false);
@@ -170,13 +183,33 @@ export default function ChatView({
     setReplyTo(null);
     setEditing(null);
     setUseCmd(null);
+    setOlder({ key: conv.key, msgs: [], done: false });
+  }
+  // The live window holds the newest PAGE messages, so as new ones come in the
+  // oldest slide out of it. With older pages loaded, those are kept with the
+  // pages, or they'd fall into a gap between the pages and the window.
+  const live = messages[conv.key] || NONE;
+  const [seenLive, setSeenLive] = useState({ key: conv.key, msgs: live });
+  if (seenLive.key !== conv.key || seenLive.msgs !== live) {
+    setSeenLive({ key: conv.key, msgs: live });
+    if (seenLive.key === conv.key && older.key === conv.key && older.msgs.length && live.length >= PAGE) {
+      const ids = new Set(live.map((m) => m.id));
+      const slid = seenLive.msgs.filter((m) => !ids.has(m.id) && m.at < live[0].at);
+      if (slid.length) setOlder((o) => (o.key === conv.key ? { ...o, msgs: mergeMessages(o.msgs, slid) } : o));
+    }
   }
   const renameNow = usePeople()?.rename;
-  // Older pages load here, so they get people's current names here too.
-  const all = useMemo(
-    () => [...(older[conv.key] || []), ...(messages[conv.key] || [])].map((m) => (renameNow ? renameMessage(m, renameNow) : m)),
-    [older, messages, conv.key, renameNow],
-  );
+  // Older pages load here, so they get people's current names here too. A
+  // message shows once: from the live window when it's there. Older ones the
+  // window reaches again (after messages were removed for good) come from it,
+  // and with the whole conversation in the window, the pages aren't needed.
+  const all = useMemo(() => {
+    const ids = new Set(live.map((m) => m.id));
+    const kept =
+      older.key === conv.key && live.length >= PAGE ? older.msgs.filter((m) => !ids.has(m.id) && m.at < live[0].at) : NONE;
+    return [...kept, ...live].map((m) => (renameNow ? renameMessage(m, renameNow) : m));
+  }, [older, live, conv.key, renameNow]);
+  const byId = useMemo(() => new Map(all.map((m) => [m.id, m])), [all]);
   const ads = useAds();
   const adSpots = chatAdSpots(ads, all.length);
   const taskById = useMemo(() => Object.fromEntries(tasks.map((t) => [t.id, t])), [tasks]);
@@ -207,7 +240,7 @@ export default function ChatView({
   const opened = useRef({ key: null, since: 0, until: 0 });
   if (opened.current.key !== conv.key) opened.current = { key: conv.key, since: readAt[conv.key] ?? Date.now(), until: Date.now() };
   const lastMsg = all[all.length - 1];
-  if (lastMsg && lastMsg.byUid === actor.uid && lastMsg.at > opened.current.until) opened.current.since = Infinity;
+  if (lastMsg && sentByMe(lastMsg, actor) && lastMsg.at > opened.current.until) opened.current.since = Infinity;
   const newSince = opened.current.since;
   const newUntil = opened.current.until;
 
@@ -267,14 +300,14 @@ export default function ChatView({
     else if (!newestChanged) {
       // Same messages, changed (an edit, a reaction, a link preview): stay at the bottom.
       if (atBottom.current) el.scrollTop = el.scrollHeight;
-    } else if (atBottom.current || newest.byUid === actor.uid) {
+    } else if (atBottom.current || sentByMe(newest, actor)) {
       el.scrollTop = el.scrollHeight;
       atBottom.current = true;
       setNewBelow(false);
     } else setNewBelow(true);
     if (pendingJump.current) jumpTo(pendingJump.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [all, actor.uid]);
+  }, [all, actor]);
 
   // At the bottom, stay there when things grow later: photos, GIFs, and videos
   // finishing loading, or the list getting shorter (a reply bar, the keyboard).
@@ -304,8 +337,10 @@ export default function ChatView({
     setLoadingOlder(true);
     const el = list.current;
     const before = el.scrollHeight;
-    const more = await api.loadOlderMessages(conv.key, all[0].at);
-    setOlder((o) => ({ ...o, [conv.key]: [...more, ...(o[conv.key] || [])] }));
+    const key = conv.key;
+    const more = await api.loadOlderMessages(key, all[0].at);
+    // A short page was the last one: the button goes away.
+    setOlder((o) => (o.key === key ? { key, msgs: mergeMessages(more, o.msgs), done: more.length < PAGE } : o));
     setLoadingOlder(false);
     requestAnimationFrame(() => (el.scrollTop = el.scrollHeight - before));
     return more;
@@ -340,6 +375,19 @@ export default function ChatView({
   const memberNames = conv.kind === 'dm' ? conv.people : roster;
   let lastDay = '';
   let newShown = false;
+  const myNotes = notes[conv.key] || NONE;
+  const noteView = (n) => (
+    <CommandNote
+      key={n.id}
+      note={n}
+      onDismiss={() => setNotes((all) => ({ ...all, [conv.key]: all[conv.key].filter((x) => x.id !== n.id) }))}
+      onUse={(c) => setUseCmd({ ...c, at: Date.now() })}
+      onGo={(id) => setCurrent(id)}
+      tasks={tasks}
+      onOpenTask={onOpenTask}
+      onTaskDone={(t) => api.update(t, { status: 'done' })}
+    />
+  );
 
   const moveChannel = (channel, dir) => {
     const ordered = [...convs.channels];
@@ -425,7 +473,7 @@ export default function ChatView({
                 {convs.dms.map((c) => (
                   <option key={c.key} value={c.key}>
                     {c.short}
-                    {unread[c.key]?.count ? ` (${unread[c.key].count})` : ''}
+                    {unread[c.key]?.count && !unread[c.key].muted ? ` (${unread[c.key].count})` : ''}
                   </option>
                 ))}
               </optgroup>
@@ -458,12 +506,12 @@ export default function ChatView({
                 ) : (
                   <Icon name="team" size={20} />
                 )}{' '}
-                {conv.label}
+                <span className="chat-name">{conv.label}</span>
               </h2>
             ) : (
               <h2>
                 <ChannelIcon conv={conv} />
-                {conv.name}
+                <span className="chat-name">{conv.name}</span>
               </h2>
             )}
             <span className="muted small chat-topic">
@@ -548,7 +596,7 @@ export default function ChatView({
         </header>
         <div className="msg-list" ref={list} onScroll={onScroll}>
           {/* Pretend ads, every N messages (Asher's Ads page). */}
-          {all.length >= PAGE && (
+          {live.length >= PAGE && !older.done && (
             <button className="btn ghost load-older" onClick={loadOlder} disabled={loadingOlder}>
               {loadingOlder ? 'Loading…' : 'Load older messages'}
             </button>
@@ -564,12 +612,22 @@ export default function ChatView({
             const day = dayLabel(m.at);
             const showDay = day !== lastDay;
             lastDay = day;
-            const isNew = !newShown && m.at > newSince && m.at <= newUntil && m.byUid !== actor.uid;
+            const isNew = !newShown && m.at > newSince && m.at <= newUntil && !sentByMe(m, actor);
             if (isNew) newShown = true;
             const first =
-              showDay || isNew || !prev || prev.byUid !== m.byUid || m.at - prev.at > GROUP_MINUTES * 60000 || !!m.replyTo || !!m.poll;
+              showDay ||
+              isNew ||
+              !prev ||
+              prev.by !== m.by ||
+              !!prev.bot !== !!m.bot ||
+              m.at - prev.at > GROUP_MINUTES * 60000 ||
+              !!m.replyTo ||
+              !!m.poll;
+            // Notes only you see go in time order with the messages.
+            const notesHere = myNotes.filter((n) => n.at <= m.at && (!prev || n.at > prev.at));
             return (
               <div key={m.id} className={flash === m.id ? 'flash' : ''}>
+                {notesHere.map(noteView)}
                 {showDay && (
                   <div className="day-sep">
                     <span>{day}</span>
@@ -582,6 +640,7 @@ export default function ChatView({
                 )}
                 <Message
                   m={m}
+                  quoted={m.replyTo ? byId.get(m.replyTo.id) : null}
                   conv={conv.key}
                   ctx={ctx}
                   canPost={canPost}
@@ -636,18 +695,7 @@ export default function ChatView({
             );
           })}
           <BotReplies conv={conv.key} />
-          {(notes[conv.key] || []).map((n) => (
-            <CommandNote
-              key={n.id}
-              note={n}
-              onDismiss={() => setNotes((all) => ({ ...all, [conv.key]: all[conv.key].filter((x) => x.id !== n.id) }))}
-              onUse={(c) => setUseCmd({ ...c, at: Date.now() })}
-              onGo={(id) => setCurrent(id)}
-              tasks={tasks}
-              onOpenTask={onOpenTask}
-              onTaskDone={(t) => api.update(t, { status: 'done' })}
-            />
-          ))}
+          {myNotes.filter((n) => !shownMessages.length || n.at > shownMessages[shownMessages.length - 1].at).map(noteView)}
         </div>
         {newBelow && (
           <button
@@ -668,6 +716,14 @@ export default function ChatView({
             onClose={() => setDeleteAsk(null)}
             onDelete={async (hard) => {
               await api.deleteMessages(conv.key, deleteAsk, hard);
+              // Older pages aren't live: show the change there too.
+              const gone = new Set(deleteAsk.map((m) => m.id));
+              setOlder((o) => ({
+                ...o,
+                msgs: hard
+                  ? o.msgs.filter((m) => !gone.has(m.id))
+                  : o.msgs.map((m) => (gone.has(m.id) ? { ...m, deleted: true, reactions: {}, supers: {}, pinned: false } : m)),
+              }));
               setDeleteAsk(null);
               setPicks(null);
             }}
@@ -701,6 +757,7 @@ export default function ChatView({
             actor={actor}
             isManager={isManager}
             roster={roster}
+            members={conv.kind === 'dm' ? conv.people : null}
             tasks={tasks}
             api={api}
             replyTo={replyTo}
@@ -714,7 +771,7 @@ export default function ChatView({
             onNote={(n) => {
               setNotes((all) => ({
                 ...all,
-                [conv.key]: [...(all[conv.key] || []).slice(-4), { ...n, id: `${Date.now()}-${Math.random()}` }],
+                [conv.key]: [...(all[conv.key] || []).slice(-4), { ...n, id: `${Date.now()}-${Math.random()}`, at: Date.now() }],
               }));
               requestAnimationFrame(() => list.current && (list.current.scrollTop = list.current.scrollHeight));
             }}
@@ -728,7 +785,7 @@ export default function ChatView({
 
       {side === 'members' && <MembersPanel names={memberNames} onPerson={onPerson} onClose={() => setSide(null)} />}
       {side === 'pins' && feat('pins') && (
-        <PinsPanel conv={conv} api={api} ctx={ctx} canUnpin={canPost} onJump={(id) => openAt(conv.key, id)} onClose={() => setSide(null)} />
+        <PinsPanel conv={conv} api={api} ctx={ctx} canUnpin={canPost || isManager} onJump={(id) => openAt(conv.key, id)} onClose={() => setSide(null)} />
       )}
       {side === 'search' && feat('search') && (
         <SearchPanel convs={myConvs} current={conv} api={api} roster={roster} onOpen={openAt} onClose={() => setSide(null)} />
@@ -796,7 +853,15 @@ function DeleteMessages({ msgs, canErase, onClose, onDelete }) {
       <div className="panel-backdrop center" onClick={onClose}>
         <div className="dialog delete-msgs" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Delete messages">
           <h2>{n === 1 ? 'Delete this message?' : `Delete ${n} messages?`}</h2>
-          <p className="muted">{erase ? 'They’ll be gone for everyone, with nothing left in their place.' : 'Each one leaves a “Message deleted” note.'}</p>
+          <p className="muted">
+            {n === 1
+              ? erase
+                ? 'It’ll be gone for everyone, with nothing left in its place.'
+                : 'It leaves a “Message deleted” note.'
+              : erase
+                ? 'They’ll be gone for everyone, with nothing left in their place.'
+                : 'Each one leaves a “Message deleted” note.'}
+          </p>
           {canErase && (
             <label className="row gap small">
               <input type="checkbox" checked={erase} onChange={(e) => setErase(e.target.checked)} /> Remove completely (no “Message deleted” note)
@@ -812,7 +877,12 @@ function DeleteMessages({ msgs, canErase, onClose, onDelete }) {
               disabled={busy}
               onClick={async () => {
                 setBusy(true);
-                await onDelete(erase);
+                // If it fails, the button works again (the error shows as a toast).
+                try {
+                  await onDelete(erase);
+                } finally {
+                  setBusy(false);
+                }
               }}
             >
               {busy ? 'Deleting…' : 'Delete'}

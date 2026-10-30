@@ -1,8 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { GIPHY_API_KEY } from '../../config.js';
 import { AutoTextarea, CloseIcon, Overlay, PlusIcon } from '../common.jsx';
-import { GROUPS, GROUP_ICONS, emojiList, firstEmoji, loadEmoji, recentEmoji, searchEmoji, rememberEmoji } from './emoji.js';
+import { GROUPS, emojiList, firstEmoji, loadEmoji, recentEmoji, searchEmoji, rememberEmoji } from './emoji.js';
 import { isTouch } from '../../util.js';
+import { Icon } from '../shell/icons.jsx';
+
+// The emoji groups' tabs, as line icons (in GROUPS order).
+const GROUP_ICONS = ['smile', 'person', 'leaf', 'food', 'car', 'ball', 'bulb', 'heart', 'flag'];
 
 function useEscape(onClose) {
   useEffect(() => {
@@ -104,12 +108,12 @@ export function EmojiPicker({ onPick, onClose, teamEmoji = [], canManage, onMana
       </div>
       {!q && (
         <div className="emoji-tabs">
-          <button className={group === -1 ? 'active' : ''} onClick={() => setGroup(-1)} title="Recent and team">
-            🕘
+          <button className={group === -1 ? 'active' : ''} onClick={() => setGroup(-1)} title="Recent and team" aria-label="Recent and team">
+            <Icon name="clock" />
           </button>
           {GROUPS.map((g, i) => (
-            <button key={g} className={group === i ? 'active' : ''} onClick={() => setGroup(i)} title={g}>
-              {GROUP_ICONS[i]}
+            <button key={g} className={group === i ? 'active' : ''} onClick={() => setGroup(i)} title={g} aria-label={g}>
+              <Icon name={GROUP_ICONS[i]} />
             </button>
           ))}
         </div>
@@ -362,8 +366,9 @@ export function GifPicker({ onPick, onUpload, onClose }) {
 
 // Create a poll: a question, 2–10 options, one or several choices.
 // New poll, or editing one (editing: the posted poll; its choices keep their
-// ids so votes stay with them, and new ones get the next free id).
-export function PollDialog({ onCreate, onClose, canRequire = false, initialQuestion = '', editing = null }) {
+// ids so votes stay with them, and new ones get an id no choice ever had, so
+// a removed choice's votes never move to a new one; votes: the poll's votes).
+export function PollDialog({ onCreate, onClose, canRequire = false, initialQuestion = '', editing = null, votes = null }) {
   const [question, setQuestion] = useState(editing?.question ?? initialQuestion);
   // 'choices': pick from options; 'text': everyone writes their own answer.
   const [kind, setKind] = useState(editing?.kind === 'text' ? 'text' : 'choices');
@@ -375,11 +380,15 @@ export function PollDialog({ onCreate, onClose, canRequire = false, initialQuest
   useEscape(onClose);
   const filled = options.filter((o) => o.text.trim());
   const ok = question.trim() && (kind === 'text' || filled.length >= 2 || (write && filled.length >= 1));
-  const nextId = () => {
-    const used = new Set(options.map((o) => o.id).filter(Boolean));
-    for (let i = 0; i < 26; i++) if (!used.has(String.fromCharCode(97 + i))) return String.fromCharCode(97 + i);
-    return `o${Date.now().toString(36)}`;
+  // Ids that are or ever were taken: the poll's choices, any choice that
+  // still has votes stored, and the ones in this dialog.
+  const [everUsed] = useState(() => new Set([...(editing?.options || []).map((o) => o.id), ...Object.keys(votes || {})]));
+  const freeId = (used) => {
+    const free = (id) => !used.has(id) && !everUsed.has(id);
+    for (let i = 0; i < 26; i++) if (free(String.fromCharCode(97 + i))) return String.fromCharCode(97 + i);
+    for (let i = 0; ; i++) if (free(`o${i}`)) return `o${i}`;
   };
+  const nextId = () => freeId(new Set(options.map((o) => o.id).filter(Boolean)));
   return (
     <Overlay>
       <div className="panel-backdrop center" onClick={onClose}>
@@ -391,8 +400,7 @@ export function PollDialog({ onCreate, onClose, canRequire = false, initialQuest
             if (!ok) return;
             const used = new Set();
             const ids = filled.slice(0, 10).map((o) => {
-              let id = o.id;
-              for (let i = 0; !id || used.has(id); i++) id = String.fromCharCode(97 + i);
+              const id = o.id && !used.has(o.id) ? o.id : freeId(used);
               used.add(id);
               return { id, text: o.text.trim().slice(0, 200) };
             });

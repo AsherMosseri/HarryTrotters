@@ -1376,6 +1376,13 @@ export const demoStore = {
       return { ...m, reactions };
     });
   },
+  async removeSuperReaction(conv, id, emoji) {
+    updateMsg(conv, id, (m) => {
+      const supers = { ...m.supers };
+      delete supers[emoji];
+      return { ...m, supers };
+    });
+  },
   async vote(conv, msg, optionId, actor, on) {
     const me = personId(actor.name);
     updateMsg(conv, msg.id, (m) => {

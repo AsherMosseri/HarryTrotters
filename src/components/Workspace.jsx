@@ -13,7 +13,7 @@ import {
   TEAM_STARTED,
   PASSWORD_MIN,
 } from '../config.js';
-import { ONLINE_MS, TYPING_MS, activeStatus, buildPeopleInfo, buildProfiles, renameMessage } from '../people.js';
+import { ONLINE_MS, TYPING_MS, activeStatus, buildPeopleInfo, buildProfiles, pollVotes, renameMessage, sentByMe } from '../people.js';
 import { PALETTES, presetTheme } from '../nitro.js';
 import { daysBetween, mondayOf, parseDay, todayISO } from '../milestones.js';
 import { newTaskDefaults, personId } from '../data/diff.js';
@@ -1015,7 +1015,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
     const myRoles = peopleInfo.get(actor.name)?.subteams || [];
     for (const c of [...convs.channels, ...convs.dms]) {
       const since = chatRead?.[c.key] ?? Date.now();
-      const fresh = (chat[c.key] || []).filter((m) => m.at > since && m.byUid !== actor.uid && !m.deleted);
+      const fresh = (chat[c.key] || []).filter((m) => m.at > since && !sentByMe(m, actor, rename) && !m.deleted);
       // Announcements and DMs always count as important (red), like a mention.
       const important =
         c.announce || c.kind === 'dm'
@@ -1026,15 +1026,15 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
       out[c.key] = { count: fresh.length, mentions: important, muted };
     }
     return out;
-  }, [chat, chatRead, actor.uid, actor.name, convs, levelOf, peopleInfo]);
+  }, [chat, chatRead, actor, convs, levelOf, peopleInfo, rename]);
   // Muted conversations don't count toward the Chat tab badge (mentions still do).
   const unreadTotal = Object.values(unread).reduce((s, u) => s + (u.muted ? u.mentions : u.count), 0);
   // Newest unread announcement from someone else, shown as a banner on the board.
   const announcement = useMemo(() => {
     const since = chatRead?.announcements ?? Date.now();
-    const fresh = (chat.announcements || []).filter((m) => m.at > since && m.byUid !== actor.uid && !m.deleted);
+    const fresh = (chat.announcements || []).filter((m) => m.at > since && !sentByMe(m, actor, rename) && !m.deleted);
     return fresh[fresh.length - 1] || null;
-  }, [chat, chatRead, actor.uid]);
+  }, [chat, chatRead, actor, rename]);
   const unreadMentions = Object.values(unread).reduce((s, u) => s + u.mentions, 0);
   // A required poll in #announcements this person hasn't voted on yet (asked
   // when they open the app, like a lab check-in).
@@ -1047,7 +1047,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
         !m.poll.closed &&
         !m.deleted &&
         rename(m.by || '') !== actor.name &&
-        !Object.values(m.votes || {}).some((v) => v?.[me]) &&
+        !Object.values(pollVotes(m)).some((v) => v?.[me]) &&
         !previewSkipped.includes(`poll:${m.id}`),
     );
   }, [chat, actor.name, rename, controls, previewSkipped]);
@@ -1304,6 +1304,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
       deleteMessages: (channel, msgs, hard) => store.deleteMessages(channel, msgs, hard).catch(fail),
       react: (channel, id, emoji, on) => store.react(channel, id, emoji, actor, on).catch(fail),
       removeReaction: (channel, id, emoji) => store.removeReaction(channel, id, emoji).catch(fail),
+      removeSuperReaction: (channel, id, emoji) => store.removeSuperReaction(channel, id, emoji).catch(fail),
       loadOlderMessages: (channel, beforeAt) =>
         store.loadOlderMessages(channel, beforeAt, CHAT_PAGE).catch((e) => {
           fail(e);

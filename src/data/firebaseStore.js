@@ -793,6 +793,9 @@ export const firebaseStore = {
   removeReaction(conv, id, emoji) {
     return updateDoc(doc(convCol(conv), id), new FieldPath('reactions', emoji), deleteField());
   },
+  removeSuperReaction(conv, id, emoji) {
+    return updateDoc(doc(convCol(conv), id), new FieldPath('supers', emoji), deleteField());
+  },
 
   // Polls: votes: { [optionId]: { [personKey]: name } }. One vote per person
   // (not per device); single-choice polls clear the person's other votes.
