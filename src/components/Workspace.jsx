@@ -2176,6 +2176,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
                     onStartShift={startMyShift}
                     onOpenShift={() => setShiftPanel(true)}
                     onPerson={openPerson}
+                    onEditProfile={() => setEditProfileFor(actor.name)}
                   />
                 ) : view === 'milestones' ? (
                   <MilestonesView

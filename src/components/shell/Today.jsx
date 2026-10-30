@@ -1,21 +1,26 @@
-import { Avatar } from '../common.jsx';
+import { Avatar, usePeople } from '../common.jsx';
+import robot from '../../assets/robot-dance.webp';
 import { Icon } from './icons.jsx';
 import { STATUSES } from '../../config.js';
 import { dueInfo } from '../../util.js';
 import { daysBetween, milestoneProgress, parseDay, todayISO } from '../../milestones.js';
 
-// The first page: what matters to you right now, in plain sections (your
-// tasks, what's due, who's at the lab, unread chat, the next milestone).
+// The first page, like a pit board: the countdown and the robot up top with a
+// few plain lines on what needs you, then your tasks, what's due, who's at the
+// lab, unread chat and the next milestone.
 const statusOf = Object.fromEntries(STATUSES.map((s) => [s.id, s]));
 const RANK = { blocked: 0, in_progress: 1, testing: 2, todo: 3, backlog: 4 };
 
-function greeting(name) {
-  const h = new Date().getHours();
-  const part = h < 5 ? 'Up late' : h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
-  return `${part}, ${name.split(' ')[0]}`;
+const first = (name = '') => name.split(' ')[0];
+// "Cooper", "Cooper and Sophia", "Cooper and 2 others"
+function namesLine(names) {
+  if (names.length <= 2) return names.join(' and ');
+  return `${names[0]} and ${names.length - 1} others`;
 }
-
-const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+const sinceLabel = (ms) => {
+  const mins = Math.max(0, Math.round((Date.now() - ms) / 60000));
+  return mins < 60 ? `${mins}m` : `${Math.floor(mins / 60)}h ${String(mins % 60).padStart(2, '0')}m`;
+};
 const timeOf = (ms) => new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 
 function TaskRow({ task, onOpen, showWho }) {
@@ -38,7 +43,7 @@ function TaskRow({ task, onOpen, showWho }) {
             ))}
           </span>
         )}
-        {due && <span className={`t-due ${due.tone}`}>{due.label}</span>}
+        {due && <span className={`t-due mono ${due.tone}`}>{due.label}</span>}
       </button>
     </li>
   );
@@ -62,7 +67,9 @@ export default function Today({
   onStartShift,
   onOpenShift,
   onPerson,
+  onEditProfile,
 }) {
+  const people = usePeople();
   const today = todayISO();
   const all = tasks || [];
   const mine = all
@@ -82,21 +89,92 @@ export default function Today({
   const msProgress = nextMs ? milestoneProgress(nextMs, all) : null;
   const left = competition.date ? daysBetween(today, competition.date) : -1;
 
-  // One plain sentence instead of a row of stat tiles.
-  const summary = [
-    mine.length ? `You have ${plural(mine.length, 'open task')}${overdue ? `, ${overdue} overdue` : ''}.` : 'Nothing assigned to you.',
-    on.includes('shifts') && (atLab.length ? `${plural(atLab.length, 'person', 'people')} at the lab.` : 'Nobody at the lab right now.'),
-  ]
-    .filter(Boolean)
-    .join(' ');
+  // The board's lines: short notes in plain words, each one tappable.
+  const firstOverdue = mine.find((t) => t.dueDate && t.dueDate < today);
+  const others = atLab.filter((s) => s.person !== actor.name).map((s) => first(s.person));
+  const unreadCount = waiting.reduce((n, w) => n + (w.u.count || 0), 0);
+  const lines = [
+    on.includes('tasks') &&
+      (overdue === 1
+        ? { tone: 'bad', text: `${firstOverdue.title || 'A task'} is overdue`, go: () => onOpenTask(firstOverdue.id) }
+        : overdue > 1
+          ? { tone: 'bad', text: `${overdue} of your tasks are overdue`, go: () => onOpenTask(firstOverdue.id) }
+          : mine.length
+            ? { tone: 'warn', text: `Next up: ${mine[0].title || 'Untitled'}`, go: () => onOpenTask(mine[0].id) }
+            : { tone: 'calm', text: 'Nothing on your plate', go: () => onPage('tasks') }),
+    on.includes('shifts') && {
+      tone: atLab.length ? 'good' : 'calm',
+      text: others.length
+        ? `${namesLine(others)} ${others.length === 1 ? 'is' : 'are'} at the lab${myShift ? ' with you' : ''}`
+        : myShift
+          ? 'Just you at the lab'
+          : 'Nobody’s at the lab',
+      go: () => onPage('shifts'),
+    },
+    on.includes('chat') &&
+      unreadCount > 0 && {
+        tone: waiting.some((w) => w.u.mentions) ? 'warn' : 'calm',
+        text: `${unreadCount} unread in ${waiting.length === 1 ? (waiting[0].c.kind === 'dm' ? first(waiting[0].c.short) + '’s DM' : `#${waiting[0].c.name}`) : `${waiting.length} chats`}`,
+        go: () => onOpenConv(waiting[0].c.key),
+      },
+  ].filter(Boolean);
+  const noPhoto = people && !people.photoOf(actor.name);
 
   return (
     <main className="content today">
-      <header className="today-head">
-        <p className="today-date">{parseDay(today).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}</p>
-        <h1>{greeting(actor.name)}</h1>
-        <p className="today-sum">{summary}</p>
+      <header className="pit">
+        <div className="pit-main">
+          <p className="pit-date">
+            {parseDay(today).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
+            <span> · {first(actor.name)}</span>
+          </p>
+          {left >= 0 ? (
+            <div className="pit-count">
+              <span className="pit-num">{left === 0 ? '0' : left}</span>
+              <span className="pit-num-label">
+                {left === 0 ? `${competition.name} is today` : `${left === 1 ? 'day' : 'days'} to ${competition.name}`}
+                <small>{parseDay(competition.date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</small>
+              </span>
+            </div>
+          ) : (
+            <h1 className="pit-title">Harry Trotters</h1>
+          )}
+          <ul className="pit-lines">
+            {lines.map((l) => (
+              <li key={l.text}>
+                <button className={`pit-line ${l.tone}`} onClick={l.go}>
+                  <span className="pit-dot" aria-hidden="true" />
+                  {l.text}
+                </button>
+              </li>
+            ))}
+          </ul>
+          {on.includes('shifts') && (
+            <div className="pit-actions">
+              {myShift ? (
+                <button className="pit-btn on" onClick={onOpenShift}>
+                  <Icon name="shifts" size={16} /> On shift <span className="mono">{sinceLabel(myShift.start)}</span>
+                </button>
+              ) : (
+                <button className="pit-btn" onClick={() => onStartShift()}>
+                  <Icon name="shifts" size={16} /> Start a shift
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+        <img className="pit-robot" src={robot} alt="" aria-hidden="true" />
       </header>
+
+      {noPhoto && (
+        <button className="photo-nudge" onClick={onEditProfile}>
+          <Avatar name={actor.name} size={32} />
+          <span className="grow">
+            <b>Add your photo.</b> Right now your initials stand in for your face everywhere.
+          </span>
+          <span className="photo-nudge-go">Add photo</span>
+        </button>
+      )}
 
       <div className="today-grid">
         <div className="today-col">
@@ -144,31 +222,13 @@ export default function Today({
         </div>
 
         <div className="today-col side">
-          {left >= 0 && (
-            <section className="today-sec countdown-sec">
-              <div className="big-num">{left === 0 ? 'Today' : left}</div>
-              <div className="big-num-label">
-                {left === 0 ? `${competition.name} day` : `${left === 1 ? 'day' : 'days'} until ${competition.name.toLowerCase()}`}
-                <span>
-                  {parseDay(competition.date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
-                </span>
-              </div>
-            </section>
-          )}
-
           {on.includes('shifts') && (
             <section className="today-sec">
               <div className="sec-head">
                 <h2>At the lab</h2>
-                {myShift ? (
-                  <button className="text-btn" onClick={onOpenShift}>
-                    You’re in since {timeOf(myShift.start)}
-                  </button>
-                ) : (
-                  <button className="text-btn" onClick={() => onStartShift()}>
-                    Start a shift
-                  </button>
-                )}
+                <button className="text-btn" onClick={() => onPage('shifts')}>
+                  Shifts
+                </button>
               </div>
               {atLab.length ? (
                 <ul className="p-list">
@@ -177,7 +237,7 @@ export default function Today({
                       <button className="p-row" onClick={() => onPerson(s.person)}>
                         <Avatar name={s.person} size={26} showOnline />
                         <span className="grow">{s.person}</span>
-                        <span className="p-since">since {timeOf(s.start)}</span>
+                        <span className="p-since mono">{timeOf(s.start)}</span>
                       </button>
                     </li>
                   ))}
