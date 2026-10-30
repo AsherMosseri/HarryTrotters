@@ -8,6 +8,7 @@ import { isJumbo, renderRich } from './format.jsx';
 import { EmojiPicker, PollDialog, QUICK_MAX } from './Pickers.jsx';
 import { CUSTOM_RE } from './emoji.js';
 import { isCoinCommand, useControls } from '../../controls.js';
+import { pollVotes, sentByMe } from '../../people.js';
 
 export const QUICK_REACTIONS = ['👍', '✅', '😂', '❤️', '🔥', '👀'];
 // Your quick reactions (the picker's Edit, saved on your profile), or the first three.
@@ -67,6 +68,16 @@ export function messageShows(m, feat) {
     (m.files?.length && feat('files')) ||
     (m.photo && feat('photos'))
   );
+}
+// What a message is, for a reply to one with no text: "Replying to Sam: a poll".
+export function whatIs(m) {
+  if (!m || m.deleted) return 'a message';
+  if (m.poll) return 'a poll';
+  if (m.sticker) return 'a sticker';
+  if (m.gif) return 'a GIF';
+  if (m.files?.length) return 'a file';
+  if (m.photo) return 'a photo';
+  return 'a message';
 }
 export const timeOf = (ms) => new Date(ms).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
 
@@ -250,7 +261,8 @@ function Poll({ m, actor, onVote, onEnd, onReopen, canEnd, onAnswer }) {
 
 function ChoicePoll({ m, actor, onVote, onEnd, onReopen, canEnd, onAnswer }) {
   const me = personId(actor.name);
-  const votes = m.votes || {};
+  // Only the current choices (and written answers) count.
+  const votes = pollVotes(m);
   const counts = m.poll.options.map((o) => Object.keys(votes[o.id] || {}).length);
   const voters = new Set(Object.values(votes).flatMap((v) => Object.keys(v || {})));
   const max = Math.max(1, ...counts);
@@ -424,6 +436,7 @@ export default function Message({
   onPick,
   onStartPick,
   onAskDelete,
+  quoted, // the message this one replies to, when it's loaded
 }) {
   const [picker, setPicker] = useState(false);
   const [removing, setRemoving] = useState(false);
@@ -431,7 +444,7 @@ export default function Message({
   const actionsRef = useRef(null);
   const quick = quickOf(usePeople()?.profileOf(actor.name));
   const feat = useControls().isOn;
-  const mine = m.byUid === actor.uid;
+  const mine = sentByMe(m, actor);
   // The author's message border (Edit profile → Style → Borders).
   const frame = borderProps(usePeople()?.profileOf(m.by)?.msgBorder);
   // Team emoji off: reactions with them are hidden too. Reactions off: none.
@@ -460,6 +473,35 @@ export default function Message({
   useEffect(() => {
     shown.current = true;
   }, []);
+  // The message's buttons sit just above it, so near the top of the list
+  // they'd be cut off: then they go just below it, or inside the list's top
+  // edge if that doesn't fit either. On phones they sit inside the message,
+  // under it, and the list scrolls a little if they're past the bottom.
+  const placeActions = (reveal = false) => {
+    const bar = actionsRef.current;
+    const list = bar?.closest('.msg-list');
+    if (!bar || !list || !bar.offsetHeight) return;
+    bar.style.top = '';
+    bar.style.bottom = '';
+    const room = list.getBoundingClientRect();
+    const b = bar.getBoundingClientRect();
+    const box = bar.parentElement.getBoundingClientRect();
+    if (b.top < room.top + 2) {
+      const below = box.bottom + 14;
+      const top = below - b.height >= room.top + 2 && below <= room.bottom - 2 ? below - b.height : room.top + 4;
+      bar.style.bottom = 'auto';
+      bar.style.top = `${top - box.top}px`;
+    } else if (reveal && b.bottom > room.bottom - 2) list.scrollTop += b.bottom - room.bottom + 6;
+  };
+  useLayoutEffect(() => {
+    if (!selected) return;
+    placeActions(true);
+    const list = actionsRef.current?.closest('.msg-list');
+    const onScroll = () => placeActions();
+    list?.addEventListener('scroll', onScroll, { passive: true });
+    return () => list?.removeEventListener('scroll', onScroll);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected]);
   const yt = feat('linkPreviews') && (youtubeId(m.preview?.url) || youtubeId(/https?:\/\/\S+/.exec(m.text || '')?.[0]));
   const jumbo = !m.poll && isJumbo(m.text, ctx.emoji);
 
@@ -467,6 +509,7 @@ export default function Message({
     <div
       className={`msg${first ? ' first' : ''}${(selected || picker) && !picking ? ' selected' : ''}${mentionsMe ? ' mentions-me' : ''}${m.pinned && feat('pins') ? ' pinned' : ''}${picking ? ' picking' : ''}${picked ? ' picked' : ''}`}
       id={`msg-${m.id}`}
+      onPointerEnter={(e) => e.pointerType === 'mouse' && requestAnimationFrame(() => placeActions())}
       onClickCapture={(e) => {
         // Choosing messages: a tap anywhere on one checks or unchecks it.
         if (!picking) return;
@@ -487,7 +530,7 @@ export default function Message({
       <div className="msg-gutter">
         {first && m.bot ? (
           <span className="cmd-bot big" aria-hidden="true">
-            🤖
+            <Icon name="robot" size={22} />
           </span>
         ) : first ? (
           <button className="avatar-btn" onClick={(e) => onPerson(m.by, e)} aria-label={m.by}>
@@ -517,7 +560,8 @@ export default function Message({
         )}
         {m.replyTo && feat('replies') && (
           <button className="msg-reply-quote" onClick={() => onJump(m.replyTo.id)}>
-            <Icon name="reply" size={14} /> <b>{m.replyTo.by?.split(' ')[0]}</b> {m.replyTo.text || 'a photo'}
+            <Icon name="reply" size={14} /> <b>{m.replyTo.by?.split(' ')[0]}</b>{' '}
+            {m.replyTo.text || m.replyTo.what || whatIs(quoted)}
           </button>
         )}
         {m.deleted ? (
@@ -629,16 +673,25 @@ export default function Message({
         {removing && (
           <div className="msg-reactions remove-mode">
             <span className="muted small">Remove a reaction:</span>
-            {reactions.map(([emoji]) => (
+            {/* Super reactions too: they're kept apart from the normal ones. */}
+            {[...supers.map(([e]) => [e, true]), ...reactions.map(([e]) => [e, false])].map(([emoji, sup]) => (
               <button
-                key={emoji}
+                key={`${sup ? 's' : 'r'}-${emoji}`}
                 className="reaction"
+                title={sup ? 'Super reaction' : undefined}
                 onClick={() => {
-                  api.removeReaction(conv, m.id, emoji);
-                  if (reactions.length <= 1) setRemoving(false);
+                  if (sup) api.removeSuperReaction(conv, m.id, emoji);
+                  else api.removeReaction(conv, m.id, emoji);
+                  if (reactions.length + supers.length <= 1) setRemoving(false);
                 }}
               >
-                <ReactionGlyph emoji={emoji} teamEmoji={teamEmoji} /> ✕
+                <ReactionGlyph emoji={emoji} teamEmoji={teamEmoji} />
+                {sup && (
+                  <span className="reacted-super">
+                    <Icon name="superReact" size={12} />
+                  </span>
+                )}{' '}
+                ✕
               </button>
             ))}
             <button className="link-btn" onClick={() => setRemoving(false)}>
@@ -674,7 +727,8 @@ export default function Message({
               <Icon name="reply" size={18} />
             </button>
           )}
-          {feat('pins') && (
+          {/* Pinning is for people who can post here (and team management). */}
+          {feat('pins') && (canPost || isManager) && (
             <button
               className={m.pinned ? 'on' : ''}
               onClick={() => api.pin(conv, m.id, !m.pinned)}
@@ -685,8 +739,8 @@ export default function Message({
             </button>
           )}
           {feat('makeTask') && (
-            <button onClick={() => onMakeTask(m)} title="Make a task from this message">
-              <Icon name="tasks" size={18} /> Task
+            <button onClick={() => onMakeTask(m)} title="Make a task from this message" aria-label="Make a task">
+              <Icon name="tasks" size={18} /> <span className="act-label">Task</span>
             </button>
           )}
           {m.poll && feat('polls') && (mine || isManager) && (
@@ -699,7 +753,7 @@ export default function Message({
               <Icon name="edit" size={18} />
             </button>
           )}
-          {isManager && reactions.length > 0 && (
+          {isManager && reactions.length + supers.length > 0 && (
             <button onClick={() => setRemoving(true)} title="Remove reactions" aria-label="Remove reactions">
               <Icon name="smileOff" size={18} />
             </button>
@@ -745,6 +799,7 @@ export default function Message({
       {editPoll && (
         <PollDialog
           editing={m.poll}
+          votes={m.votes}
           onClose={() => setEditPoll(false)}
           onCreate={async (poll) => {
             await api.editMessage(conv, m.id, { poll });

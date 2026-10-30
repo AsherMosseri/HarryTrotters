@@ -357,6 +357,11 @@ service cloud.firestore {
     function keepsCmd() {
       return !request.resource.data.diff(resource.data).affectedKeys().hasAny(['cmd', 'bot']);
     }
+    // The message's author: sent from this device, or by this person from
+    // another one (each device signs in with its own id).
+    function isAuthor() {
+      return resource.data.byUid == request.auth.uid || (resource.data.get('bot', false) != true && isMe(resource.data.get('by', '')));
+    }
     // Changes anyone in the conversation may make to someone else's message:
     // reactions, poll votes, and pins.
     function sharedChange() {
@@ -376,7 +381,7 @@ service cloud.firestore {
       allow read: if isMember();
       allow create: if isMember() && validMessage() && (channelId != 'announcements' || isManager()) && !channelOff(channelId);
       allow update: if isMember() && !channelOff(channelId) && changeAllowed()
-        && (isManager() || ((resource.data.byUid == request.auth.uid || sharedChange()) && keepsCmd()));
+        && (isManager() || ((isAuthor() || sharedChange()) && keepsCmd()));
       allow delete: if isManager();
     }
 
@@ -396,7 +401,7 @@ service cloud.firestore {
         allow read: if isMember() && (isManager() || inPeople(dmPeople()));
         allow create: if isMember() && !featureOff('dms') && validMessage() && inPeople(dmPeople());
         allow update: if isMember() && !featureOff('dms') && changeAllowed() && (isManager() || (inPeople(dmPeople())
-          && (resource.data.byUid == request.auth.uid || sharedChange()) && keepsCmd()));
+          && (isAuthor() || sharedChange()) && keepsCmd()));
         allow delete: if isManager();
       }
     }

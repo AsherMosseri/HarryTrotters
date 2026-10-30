@@ -1,7 +1,6 @@
 // The full emoji list (src/data/emoji.json) loads on first use: entries are
 // [emoji, shortcodes[], group, search words].
 export const GROUPS = ['Smileys', 'People', 'Nature', 'Food', 'Travel', 'Activities', 'Objects', 'Symbols', 'Flags'];
-export const GROUP_ICONS = ['😀', '👋', '🐶', '🍕', '🚗', '⚽', '💡', '❤️', '🏁'];
 
 let list = null;
 let loading = null;

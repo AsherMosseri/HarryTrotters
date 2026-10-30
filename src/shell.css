@@ -831,3 +831,58 @@ html.kb-bar .composer { padding-bottom: calc(10px + var(--kb-bar, 0px)); }
 /* iPad: a press or a small drag on a button's label selected the text
    instead of tapping the button. */
 button, [role='button'] { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+
+/* ---------- chat fixes ---------- */
+/* The channel's name gets cut short (…) instead of running under the header's
+   buttons; the topic gives way first. */
+.chat-title h2 { min-width: 0; flex: 0 1 auto; }
+.chat-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat-title .chat-topic { min-width: 0; flex: 0 1000 auto; }
+/* iPad portrait: next to the sidebar there's no room for Search, Pins, or
+   Members beside the chat, so the panel takes the chat's place until it's
+   closed (or a result is opened). */
+@media (min-width: 761px) and (max-width: 1099px) {
+  .shell:has(.sidebar:not(.rail)) .content.chat.no-list.with-side { grid-template-columns: minmax(0, 1fr); }
+  .shell:has(.sidebar:not(.rail)) .content.chat.no-list.with-side > .chat-main { display: none; }
+  .shell:has(.sidebar:not(.rail)) .content.chat.no-list.with-side > .chat-side { position: static; width: auto; border-width: 0; box-shadow: none; }
+  .shell .content.chat.no-list.with-side > .chat-side .chat-side-head { box-sizing: border-box; min-height: var(--top-h); padding: var(--top-pad) 14px 0 20px; }
+  .shell .content.chat.no-list.with-side > .chat-side .chat-side-body { padding: 10px 14px; }
+}
+@media (min-width: 761px) and (max-width: 849px) {
+  .shell .content.chat.no-list.with-side { grid-template-columns: minmax(0, 1fr); }
+  .shell .content.chat.no-list.with-side > .chat-main { display: none; }
+  .shell .content.chat.no-list.with-side > .chat-side { position: static; width: auto; border-width: 0; box-shadow: none; }
+}
+/* Phones: a tapped message's buttons sit in one row inside it, under its
+   text, so they don't cover it or the message above, and never slip under
+   the header. */
+@media (max-width: 760px) {
+  .msg.selected:not(.picking) { padding-bottom: 46px; }
+  .msg-actions {
+    top: auto; bottom: 6px; right: 8px; max-width: calc(100% - 16px);
+    flex-wrap: nowrap; justify-content: flex-start; overflow-x: auto; scrollbar-width: none;
+  }
+  .msg-actions::-webkit-scrollbar { display: none; }
+  .msg-actions > button { min-width: 30px; padding: 0 4px; }
+  .msg-actions .act-label { display: none; }
+}
+/* Trotbot's picture: a line icon on its colors. */
+.cmd-bot { color: #fff; }
+/* Emoji picker tabs are line icons. */
+.emoji-tabs button { display: inline-flex; align-items: center; justify-content: center; color: var(--muted); opacity: 1; }
+.emoji-tabs button.active { color: var(--accent); }
+/* GIF search messages span the picker, not one column of it. */
+.gif-grid > p { grid-column: 1 / -1; margin: 6px 2px; }
+/* Spoilers in dark mode: a muted bar, not a bright white one. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .spoiler:not(.shown) { background: color-mix(in srgb, var(--muted) 45%, var(--surface-2)); }
+}
+:root[data-theme='dark'] .spoiler:not(.shown) { background: color-mix(in srgb, var(--muted) 45%, var(--surface-2)); }
+/* Delete messages: a small dialog, also on phones. */
+.dialog.delete-msgs { padding-top: 20px; }
+.dialog.delete-msgs h2 { margin: 0; font-size: 20px; line-height: 1.25; }
+.dialog.delete-msgs p { margin: 0; }
+@media (max-width: 760px) {
+  .panel-backdrop.center:has(> .dialog.delete-msgs) { align-items: center; padding: 16px; }
+  .panel-backdrop.center > .dialog.delete-msgs { width: min(440px, 100%); height: auto; min-height: 0; max-height: 100%; border-radius: 16px; }
+}

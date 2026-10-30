@@ -44,6 +44,12 @@ export function activeStatus(profile, now = Date.now()) {
 export const ONLINE_MS = 150000;
 export const TYPING_MS = 6000;
 
+// Whether a chat message is yours. Every device signs in with its own id, so
+// a message sent from your other phone or computer is matched by your name
+// (through a rename); the device id still counts. Trotbot's never are.
+export const sentByMe = (m, actor, rename = (n) => n) =>
+  !m.bot && (m.byUid === actor.uid || (!!m.by && rename(m.by) === actor.name));
+
 // A chat message under people's current names (author, @mentions, and the
 // message it replies to), so a rename on the Roster shows on every message
 // right away. Unchanged messages are returned as they are.
@@ -77,4 +83,14 @@ function renameVotes(votes, rename) {
     out[opt] = next;
   }
   return changed ? out : votes;
+}
+
+// A poll's votes that still count: its current choices, plus written answers
+// when it takes them. Votes for a choice taken out in an edit stay stored
+// but don't count.
+export function pollVotes(m) {
+  const votes = m.votes || {};
+  const keep = new Set((m.poll?.options || []).map((o) => o.id));
+  if (m.poll?.kind === 'text' || m.poll?.write) keep.add('text');
+  return Object.fromEntries(Object.entries(votes).filter(([k]) => keep.has(k)));
 }
