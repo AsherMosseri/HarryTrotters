@@ -190,12 +190,17 @@ export default function ChatView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [actor.name, roster, all, emojiMap, onPerson, myRoles.join(), feat],
   );
-  // Where "new" starts: what this device had read when the conversation was
-  // opened. Taken while rendering, so the "New" line and the jump use this
+  // The "New" line: above the first message that was unread when you opened
+  // the conversation (read up to `since`, opened at `until`). Messages that
+  // come in while you're here aren't "new" to you, and sending a message
+  // clears the line. Taken while rendering, so the line and the jump use this
   // conversation's time right away (the parent marks it read right after).
-  const opened = useRef({ key: null, since: 0 });
-  if (opened.current.key !== conv.key) opened.current = { key: conv.key, since: readAt[conv.key] ?? Date.now() };
+  const opened = useRef({ key: null, since: 0, until: 0 });
+  if (opened.current.key !== conv.key) opened.current = { key: conv.key, since: readAt[conv.key] ?? Date.now(), until: Date.now() };
+  const lastMsg = all[all.length - 1];
+  if (lastMsg && lastMsg.byUid === actor.uid && lastMsg.at > opened.current.until) opened.current.since = Infinity;
   const newSince = opened.current.since;
+  const newUntil = opened.current.until;
 
   // Scrolls only the message list (never the page around it) so `node` sits
   // `offset` px below the top.
@@ -549,7 +554,7 @@ export default function ChatView({
             const day = dayLabel(m.at);
             const showDay = day !== lastDay;
             lastDay = day;
-            const isNew = !newShown && m.at > newSince && m.byUid !== actor.uid;
+            const isNew = !newShown && m.at > newSince && m.at <= newUntil && m.byUid !== actor.uid;
             if (isNew) newShown = true;
             const first =
               showDay || isNew || !prev || prev.byUid !== m.byUid || m.at - prev.at > GROUP_MINUTES * 60000 || !!m.replyTo || !!m.poll;
