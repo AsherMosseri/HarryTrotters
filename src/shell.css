@@ -554,10 +554,11 @@ button.sb-head-row { width: 100%; border: 0; background: none; color: var(--mute
 .chat-title h2 .avatar-wrap, .chat-title h2 .deco, .chat-title h2 > .avatar, .chat-title h2 > .icon { flex: none; }
 .chat-topic { font-size: 14px; line-height: 1.2; padding-top: 2px; }
 
-/* Status bubble: beside the top of the head, like a thought, with its little
-   trail pointing at the head (not down at the online dot). Card: 92px picture
-   at left 32px; full profile: 120px picture at left 46px. */
-.pc-bubble { left: 138px; top: auto; bottom: 84px; max-width: calc(100% - 214px); }
-.pc-bubble::before { left: -5px; bottom: -3px; }
-.pc-bubble::after { left: -14px; bottom: -9px; }
-.pp-bubble { left: 184px; top: auto; bottom: 112px; max-width: calc(100% - 260px); }
+/* Status bubble, Discord style: beside the picture, across the bottom edge of
+   the banner, with two thought dots rising from its top-left corner toward the
+   head. Card: 92px picture at left 32px (center 10px above the banner's edge);
+   full profile: 120px at left 46px. */
+.pc-bubble { left: 136px; top: -16px; bottom: auto; max-width: calc(100% - 214px); padding: 7px 12px; }
+.pc-bubble::before { width: 11px; height: 11px; left: 4px; top: -8px; bottom: auto; }
+.pc-bubble::after { width: 6px; height: 6px; left: -5px; top: -17px; bottom: auto; }
+.pp-bubble { left: 182px; top: -30px; bottom: auto; max-width: calc(100% - 260px); }
