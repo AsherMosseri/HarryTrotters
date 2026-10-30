@@ -6,7 +6,7 @@ import { activeStatus } from '../people.js';
 import { borderProps } from '../borders.js';
 import { fullTime, relTime, useEscape, useMedia } from '../util.js';
 import { Avatar, CloseIcon, DisplayName, Overlay, StatusDot, usePeople } from './common.jsx';
-import { BADGE_ICONS, ProfileEffect } from './People.jsx';
+import { ProfileEffect, SubteamBadges, SubteamIcon } from './People.jsx';
 import { hoursOf, mergedMs } from '../../functions/shared/hours.js';
 
 // Hours are added up the same way as the Shifts page (shared/hours.js).
@@ -133,15 +133,7 @@ export default function ProfilePage({
             <div className="pp-panel">
               <div className="pp-title">
                 <h2 {...nameProps(profile, info.color, name, 'pp-name')}>{name}</h2>
-                {(info.subteams || []).length > 0 && (
-                  <span className="pc-badges pp-badges" aria-label="Badges">
-                    {info.subteams.map((s) => (
-                      <span key={s} className="pc-badge" title={s} aria-label={s}>
-                        {BADGE_ICONS[s] || '🏷️'}
-                      </span>
-                    ))}
-                  </span>
-                )}
+                <SubteamBadges subteams={info.subteams} className="pp-badges" />
               </div>
               <p className="pc-sub">
                 {profile.pronouns && <span className="pronouns">{profile.pronouns} · </span>}
@@ -310,7 +302,7 @@ export default function ProfilePage({
                     [...subteammates].map(([s, names]) => (
                       <section key={s} className="profile-section">
                         <h3>
-                          {BADGE_ICONS[s] || '🏷️'} {s}
+                          <SubteamIcon s={s} size={16} /> {s}
                         </h3>
                         {names.length ? (
                           <div className="pp-mates">

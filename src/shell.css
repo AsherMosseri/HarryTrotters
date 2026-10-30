@@ -820,3 +820,14 @@ html.kb-bar .composer { padding-bottom: calc(10px + var(--kb-bar, 0px)); }
 /* Board columns run the full height, so a card can be dropped anywhere in one. */
 .shell .board .column { height: calc(var(--vvh, 100dvh) - 190px); }
 .shell .board .column-body { flex: 1; }
+
+/* Profile badges: line icons in each subteam's color, beside the name
+   (they used to sit in the corner, where a status bubble could cover them). */
+.pc-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.pc-badges, .pp-badges { position: static; display: inline-flex; align-items: center; gap: 6px; padding: 0; background: none; box-shadow: none; border-radius: 0; }
+.pc-badge { display: inline-flex; line-height: 0; cursor: default; }
+.profile-section h3 .icon { vertical-align: -3px; margin-right: 2px; }
+
+/* iPad: a press or a small drag on a button's label selected the text
+   instead of tapping the button. */
+button, [role='button'] { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }

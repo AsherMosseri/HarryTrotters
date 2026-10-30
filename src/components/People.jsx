@@ -25,6 +25,7 @@ import { Avatar, CloseIcon, Nameplate, Overlay, PlusIcon, usePeople } from './co
 import DecorationEditor from './DecorationEditor.jsx';
 import { DEFAULT_DECO } from './decoRender.jsx';
 import { PopupAds } from './Ads.jsx';
+import { Icon } from './shell/icons.jsx';
 
 const STATUS_IDEAS = [
   ['🔧', 'At the lab'],
@@ -188,17 +189,30 @@ export async function shrinkParticle(file) {
   return new File([blob], 'effect.png', { type: 'image/png' });
 }
 
-// Little badges in the card's corner, like Discord's: team management and
-// each subteam.
-export const BADGE_ICONS = {
-  'Team Management': '🛡️',
-  CAD: '📐',
-  Mechanical: '🔧',
-  Assembly: '🔩',
-  Electrical: '⚡',
-  Programming: '💻',
-  Secretary: '📝',
+// Little badges beside the name, like Discord's: team management and each
+// subteam, as line icons.
+const BADGE_ICONS = {
+  'Team Management': 'shield',
+  CAD: 'ruler',
+  Mechanical: 'wrench',
+  Assembly: 'nut',
+  Electrical: 'bolt',
+  Programming: 'code',
+  Secretary: 'edit',
 };
+export const SubteamIcon = ({ s, size = 15 }) => <Icon name={BADGE_ICONS[s] || 'tag'} size={size} />;
+export function SubteamBadges({ subteams = [], className = '' }) {
+  if (!subteams.length) return null;
+  return (
+    <span className={`pc-badges ${className}`} aria-label="Badges">
+      {subteams.map((s) => (
+        <span key={s} className="pc-badge" title={s} aria-label={s} style={{ color: SUBTEAM_COLORS[s] || 'var(--muted)' }}>
+          <SubteamIcon s={s} />
+        </span>
+      ))}
+    </span>
+  );
+}
 
 // The card itself, also used as the live preview in the editor (with `look`
 // overriding the saved profile). Discord-style: the profile colors fill the
@@ -214,7 +228,6 @@ function CardBody({ name, look, actor, tasks, children, replayKey }) {
   const themed = profile.theme?.a && profile.theme?.b;
   const banner = profile.banner?.url;
   const top = themed ? profile.theme.a : 'var(--surface)';
-  const badges = (info.subteams || []).map((s) => ({ s, icon: BADGE_ICONS[s] || '🏷️' }));
   return (
     <div
       className={`pc${themed ? ' themed' : ''}`}
@@ -248,18 +261,12 @@ function CardBody({ name, look, actor, tasks, children, replayKey }) {
             </p>
           </div>
         )}
-        {badges.length > 0 && (
-          <div className="pc-badges" aria-label="Badges">
-            {badges.map((b) => (
-              <span key={b.s} className="pc-badge" title={b.s} aria-label={b.s}>
-                {b.icon}
-              </span>
-            ))}
-          </div>
-        )}
       </div>
       <div className="pc-panel">
-        <h2 {...nameProps(profile, info.color, name, 'pc-name')}>{name}</h2>
+        <div className="pc-title">
+          <h2 {...nameProps(profile, info.color, name, 'pc-name')}>{name}</h2>
+          <SubteamBadges subteams={info.subteams} />
+        </div>
         <p className="pc-sub">
           {profile.pronouns && <span className="pronouns">{profile.pronouns} · </span>}
           {online ? (
