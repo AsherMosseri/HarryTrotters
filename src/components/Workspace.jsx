@@ -1672,9 +1672,20 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
         : palette === 'custom'
           ? 'Custom'
           : PALETTES.find((x) => x.id === palette)?.label || 'Classic';
-  const meBody = (close, onPhone) => (
+  // Everything in your menu returns to the menu when it's closed (✕, Escape,
+  // Cancel, Save), like going back on a phone.
+  const meBody = (close, onPhone) => {
+    const reopen = onPhone ? () => setPhoneSheet('me') : () => setMeMenu(true);
+    const go = (child, open, value) => () => {
+      close();
+      openFrom(child, value, reopen);
+      open();
+    };
+    return meList(close, onPhone, go);
+  };
+  const meList = (close, onPhone, go) => (
     <>
-      <button className="me-who" onClick={() => (close(), setProfileFor(actor.name))}>
+      <button className="me-who" onClick={go('card', () => setProfileFor(actor.name), actor.name)}>
         <Avatar name={actor.name} size={40} />
         <span className="grow">
           <b>{actor.name}</b>
@@ -1683,9 +1694,9 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
         <Icon name="chevron" size={16} />
       </button>
       <div className="me-list">
-        <button onClick={() => (close(), setEditProfileFor(actor.name))}>Edit profile</button>
+        <button onClick={go('edit', () => setEditProfileFor(actor.name), actor.name)}>Edit profile</button>
         {controls.isOn('coins') && (
-          <button onClick={() => (close(), setCoinsOpen(true))}>
+          <button onClick={go('coins', () => setCoinsOpen(true))}>
             Jackson coins{' '}
             <span className="me-coins">
               <Coins n={myWallet.balance} />
@@ -1693,24 +1704,24 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
           </button>
         )}
         {controls.isOn('requests') && (
-          <button onClick={() => (close(), setShowRequests(true))}>
+          <button onClick={go('requests', () => setShowRequests(true))}>
             Request a feature {newRequests > 0 && <span className="me-badge">{newRequests}</span>}
           </button>
         )}
         {adOrders.length > 0 && (
-          <button onClick={() => (close(), setOrdersOpen(true))}>
+          <button onClick={go('orders', () => setOrdersOpen(true))}>
             Orders & bookings {activeOrders > 0 && <span className="me-badge">{activeOrders}</span>}
           </button>
         )}
-        <button onClick={() => (close(), setAppearanceOpen(true))}>
+        <button onClick={go('appearance', () => setAppearanceOpen(true))}>
           Appearance
           <span className="me-value">
             {theme === 'dark' ? 'Dark' : theme === 'light' ? 'Light' : 'Auto'} · {themeName}
           </span>
         </button>
-        {onPhone && <button onClick={() => (close(), setEditTabs(true))}>Edit tabs</button>}
-        <button onClick={() => (close(), setShowHelp(true))}>Help</button>
-        {isOwner && <button onClick={() => (close(), setControlsPage(true))}>Controls</button>}
+        {onPhone && <button onClick={go('tabs', () => setEditTabs(true))}>Edit tabs</button>}
+        <button onClick={go('help', () => setShowHelp(true))}>Help</button>
+        {isOwner && <button onClick={go('controls', () => setControlsPage(true))}>Controls</button>}
       </div>
       <button
         className="link-btn me-switch"
@@ -2152,7 +2163,10 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
                   <HelpDialog
                     isManager={actor.admin}
                     showRobot={showRobot}
-                    onClose={() => setShowHelp(false)}
+                    onClose={() => {
+                      setShowHelp(false);
+                      goBack('help');
+                    }}
                     onVersionLog={() => {
                       openFrom('log', undefined, () => setShowHelp(true));
                       setShowHelp(false);
@@ -2298,7 +2312,11 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
                     name={profileFor}
                     actor={actor}
                     tasks={tasks || []}
-                    onClose={() => setProfileFor(null)}
+                    onClose={() => {
+                      const n = profileFor;
+                      setProfileFor(null);
+                      goBack('card', n);
+                    }}
                     onEdit={() => {
                       const n = profileFor;
                       openFrom('edit', n, () => setProfileFor(n));
@@ -2335,7 +2353,10 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
                         if (settings.hiddenTabs?.length) api.saveSettings({ hiddenTabs: [] });
                       }
                     }}
-                    onClose={() => setEditTabs(false)}
+                    onClose={() => {
+                      setEditTabs(false);
+                      goBack('tabs');
+                    }}
                   />
                 )}
                 {fullProfileFor && (
@@ -2428,7 +2449,10 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
               data={coinData}
               cfg={coinCfg}
               onGift={(g) => api.play({ action: 'gift', ...g })}
-              onClose={() => setCoinsOpen(false)}
+              onClose={() => {
+                setCoinsOpen(false);
+                goBack('coins');
+              }}
             />
           )}
           {ads.splash && <TakeoverSplash ad={ads.value.takeover} />}
@@ -2452,7 +2476,10 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
                 setOrdersOpen(false);
                 setTrackId(id);
               }}
-              onClose={() => setOrdersOpen(false)}
+              onClose={() => {
+                setOrdersOpen(false);
+                goBack('orders');
+              }}
             />
           )}
           {trackOrder && (
@@ -2489,7 +2516,13 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
               onClose={ads.closeRemoving}
             />
           )}
-          {appearanceOpen && <AppearanceDialog themeMenuProps={themeMenuProps} onClose={() => setAppearanceOpen(false)} />}
+          {appearanceOpen && <AppearanceDialog
+              themeMenuProps={themeMenuProps}
+              onClose={() => {
+                setAppearanceOpen(false);
+                goBack('appearance');
+              }}
+            />}
           {controlsPage && isOwner && (
             <ControlsPage
               doc={{ ...controlsDoc, tabsOff: hiddenTabs }}
@@ -2504,7 +2537,10 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
               onShutdown={() => setShutdownPage(true)}
               onCommands={() => setCommandsPage(true)}
               onAds={() => setAdsPage(true)}
-              onClose={() => setControlsPage(false)}
+              onClose={() => {
+                setControlsPage(false);
+                goBack('controls');
+              }}
             />
           )}
           {shutdownPage && isOwner && (
