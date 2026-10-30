@@ -553,3 +553,11 @@ button.sb-head-row { width: 100%; border: 0; background: none; color: var(--mute
 .chat-title h2 .hash { display: inline-flex; align-items: center; justify-content: center; width: 24px; line-height: 1; }
 .chat-title h2 .avatar-wrap, .chat-title h2 .deco, .chat-title h2 > .avatar, .chat-title h2 > .icon { flex: none; }
 .chat-topic { font-size: 14px; line-height: 1.2; padding-top: 2px; }
+
+/* Status bubble: beside the top of the head, like a thought, with its little
+   trail pointing at the head (not down at the online dot). Card: 92px picture
+   at left 32px; full profile: 120px picture at left 46px. */
+.pc-bubble { left: 138px; top: auto; bottom: 84px; max-width: calc(100% - 214px); }
+.pc-bubble::before { left: -5px; bottom: -3px; }
+.pc-bubble::after { left: -14px; bottom: -9px; }
+.pp-bubble { left: 184px; top: auto; bottom: 112px; max-width: calc(100% - 260px); }
