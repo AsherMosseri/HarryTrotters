@@ -14,7 +14,7 @@ import {
 import { STATUSES, priorityById } from '../config.js';
 import { AvatarStack, PlusIcon } from './common.jsx';
 import { Icon } from './shell/icons.jsx';
-import { dueInfo, useLocalStorage } from '../util.js';
+import { dueInfo, useLocalStorage, waitingNote } from '../util.js';
 import { SponsoredCard, boardAdCount, useAds } from './Ads.jsx';
 
 // Drop into whichever column is under the finger/cursor; fall back to overlap.
@@ -51,7 +51,7 @@ function CardBody({ task }) {
           {meta.join(' · ')}
         </div>
       )}
-      {task.status === 'blocked' && task.blockedReason && <div className="blocked-note">Waiting: {task.blockedReason}</div>}
+      {task.status === 'blocked' && task.blockedReason && <div className="blocked-note">{waitingNote(task.blockedReason)}</div>}
       <div className="card-foot">
         <AvatarStack names={task.assignees} size={22} />
         <span className="spacer" />
@@ -84,6 +84,11 @@ function Card({ task, onOpen }) {
       onClick={() => onOpen(task.id)}
       {...attributes}
       {...listeners}
+      onKeyDown={(e) => {
+        if (e.target !== e.currentTarget || (e.key !== 'Enter' && e.key !== ' ')) return;
+        e.preventDefault();
+        onOpen(task.id);
+      }}
     >
       <CardBody task={task} />
     </div>
@@ -107,7 +112,8 @@ function Column({ status, tasks, onOpen, onAdd }) {
   const { after, tail } = adSlots(boardAdCount(ads, status.id), tasks.length);
   const k0 = STATUSES.findIndex((s) => s.id === status.id) * 3;
   return (
-    <section className={`column${isOver ? ' over' : ''}`} style={{ '--c': status.color }}>
+    // The whole column takes a drop, not just the cards in it.
+    <section className={`column${isOver ? ' over' : ''}`} style={{ '--c': status.color }} ref={setNodeRef}>
       <header className="column-head">
         <span className="dot" />
         <h2>{status.label}</h2>
@@ -116,7 +122,7 @@ function Column({ status, tasks, onOpen, onAdd }) {
           <PlusIcon />
         </button>
       </header>
-      <div className="column-body" ref={setNodeRef}>
+      <div className="column-body">
         {tasks.map((t, i) => (
           <Fragment key={t.id}>
             <Card task={t} onOpen={onOpen} />

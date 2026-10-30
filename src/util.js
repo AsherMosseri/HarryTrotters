@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 export function initials(name = '') {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -54,6 +54,9 @@ export function dueInfo(dueDate, status) {
   if (days < 7) return { label: due.toLocaleDateString(undefined, { weekday: 'short' }), tone: 'normal', title: short };
   return { label: short, tone: 'normal' };
 }
+
+// A blocked task's note: "Waiting: <reason>", unless the reason already says waiting.
+export const waitingNote = (reason) => (/^\s*waiting\b/i.test(reason) ? reason : `Waiting: ${reason}`);
 
 export function useLocalStorage(key, initial) {
   const [value, setValue] = useState(() => {
@@ -113,13 +116,21 @@ export async function preparePhoto(file) {
 export const isTouch = typeof matchMedia === 'function' && matchMedia('(hover: none) and (pointer: coarse)').matches;
 
 // Close a pop-up with the Escape key (when `on`).
+// Escape closes only the newest open layer (a dialog over a panel closes the
+// dialog, not both).
+const escapeStack = [];
+if (typeof window !== 'undefined')
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && escapeStack.length) escapeStack.at(-1).current();
+  });
 export function useEscape(onClose, on = true) {
+  const ref = useRef(onClose);
+  ref.current = onClose;
   useEffect(() => {
     if (!on) return;
-    const key = (e) => e.key === 'Escape' && onClose();
-    window.addEventListener('keydown', key);
-    return () => window.removeEventListener('keydown', key);
-  }, [onClose, on]);
+    escapeStack.push(ref);
+    return () => escapeStack.splice(escapeStack.lastIndexOf(ref), 1);
+  }, [on]);
 }
 
 export function useMedia(query) {

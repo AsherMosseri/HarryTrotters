@@ -1,7 +1,7 @@
 import { Icon } from './shell/icons.jsx';
 import { useMemo, useState } from 'react';
 import { STATUSES, SUBTEAMS, priorityById } from '../config.js';
-import { relTime, fullTime, useLocalStorage } from '../util.js';
+import { relTime, fullTime, useLocalStorage, waitingNote } from '../util.js';
 import { AvatarStack, DraftInput, DueChip, PrioritySelect, StatusSelect, CommentIcon } from './common.jsx';
 
 const statusRank = Object.fromEntries(STATUSES.map((s, i) => [s.id, i]));
@@ -90,7 +90,7 @@ export default function TableView({ tasks, api, onOpen, total }) {
                     Open ›
                   </button>
                 </div>
-                {t.status === 'blocked' && t.blockedReason && <div className="blocked-note">Waiting: {t.blockedReason}</div>}
+                {t.status === 'blocked' && t.blockedReason && <div className="blocked-note">{waitingNote(t.blockedReason)}</div>}
               </td>
               <td className="col-status">
                 <StatusSelect value={t.status} compact onChange={(status) => api.update(t, { status })} />

@@ -93,12 +93,28 @@ export default function App() {
 
   // Before 3.0 is live, the test copy (/next/) has no account function to
   // sign in with yet: it keeps the old team-code sign-in until then.
-  const [passwordsLive, setPasswordsLive] = useState(true);
+  // Until that check answers, keep the loading screen up (it used to flash
+  // the sign-in screen first).
+  const probe = !!(NEXT && !isDemo && store?.account && member && member.via !== 'password');
+  // The last answer is remembered, so opening the app doesn't wait on it again.
+  const [probed, setProbed] = useState(() => (localStorage.getItem('passwords-live') === 'no' ? false : null)); // null: still asking
   useEffect(() => {
-    if (!NEXT || isDemo || !store?.account || !member || member.via === 'password') return;
-    store.account({ action: 'status' }).catch((e) => /not-found|internal|unavailable/.test(e?.code || '') && setPasswordsLive(false));
-  }, [store, member]);
-  const signedIn = member && (member.via === 'password' || !passwordsLive);
+    if (!probe) return;
+    const got = (live) => {
+      setProbed(live);
+      try {
+        localStorage.setItem('passwords-live', live ? 'yes' : 'no');
+      } catch {
+        /* private browsing */
+      }
+    };
+    store.account({ action: 'status' }).then(
+      () => got(true),
+      (e) => got(!/not-found|internal|unavailable/.test(e?.code || '')),
+    );
+  }, [probe, store]);
+  const passwordsLive = probe ? probed : true;
+  const signedIn = member && (member.via === 'password' || passwordsLive === false);
   const actor = useMemo(
     () => (user && signedIn ? { uid: user.uid, name: rename(member.name), admin: member.admin } : null),
     [user, member, signedIn, rename],
@@ -122,7 +138,8 @@ export default function App() {
 
   if (install) return <InstallScreen {...install} />;
   if (error) return <LoadingScreen error={error} />;
-  if (!store || !user || member === undefined) return <LoadingScreen step={!store ? 1 : !user ? 2 : 3} />;
+  if (!store || !user || member === undefined || (!signedIn && passwordsLive === null))
+    return <LoadingScreen step={!store ? 1 : !user ? 2 : 3} />;
   if (!actor)
     return (
       <SignInScreen

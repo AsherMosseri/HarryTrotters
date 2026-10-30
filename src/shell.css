@@ -816,3 +816,7 @@ html.kb-bar .composer { padding-bottom: calc(10px + var(--kb-bar, 0px)); }
 .avatar-stack { align-items: center; }
 .avatar-stack > * + * { margin-left: -6px; }
 .avatar-stack > .avatar.more { margin-left: -6px; font-weight: 700; letter-spacing: -0.02em; }
+
+/* Board columns run the full height, so a card can be dropped anywhere in one. */
+.shell .board .column { height: calc(var(--vvh, 100dvh) - 190px); }
+.shell .board .column-body { flex: 1; }

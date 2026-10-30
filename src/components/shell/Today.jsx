@@ -70,7 +70,7 @@ export default function Today({
     .sort((a, b) => (a.dueDate || '9999').localeCompare(b.dueDate || '9999') || (RANK[a.status] ?? 9) - (RANK[b.status] ?? 9));
   const overdue = mine.filter((t) => t.dueDate && t.dueDate < today).length;
   const soon = all
-    .filter((t) => t.status !== 'done' && t.dueDate && daysBetween(today, t.dueDate) <= 7 && !(t.assignees || []).includes(actor.name))
+    .filter((t) => t.status !== 'done' && t.dueDate && daysBetween(today, t.dueDate) >= 0 && daysBetween(today, t.dueDate) <= 7 && !(t.assignees || []).includes(actor.name))
     .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
     .slice(0, 6);
   const atLab = shifts.filter((s) => !s.end && s.person).sort((a, b) => a.start - b.start);

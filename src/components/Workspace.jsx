@@ -1315,11 +1315,13 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
     [tasks, filters, actor.name, view],
   );
 
+  // The table's status buttons: counts under every filter except the
+  // statuses themselves (those buttons are what pick the statuses).
   const counts = useMemo(() => {
     const c = Object.fromEntries(STATUSES.map((s) => [s.id, 0]));
-    for (const t of tasks || []) c[t.status] = (c[t.status] || 0) + 1;
+    for (const t of tasks || []) if (matchesFilters(t, filters, actor.name, 'board')) c[t.status] = (c[t.status] || 0) + 1;
     return c;
-  }, [tasks]);
+  }, [tasks, filters, actor.name]);
 
   const openTask = tasks?.find((t) => t.id === openId) || null;
 

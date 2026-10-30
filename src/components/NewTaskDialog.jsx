@@ -8,11 +8,11 @@ export default function NewTaskDialog({ initial, roster, milestones = [], me, on
   const [form, setForm] = useState({
     title: initial.title || '',
     status: initial.status || 'todo',
-    assignees: [],
+    assignees: initial.assignees || [],
     subteam: initial.subteam || '',
     milestoneId: initial.milestoneId || '',
-    priority: 'medium',
-    dueDate: '',
+    priority: initial.priority || 'medium',
+    dueDate: initial.dueDate || '',
     description: initial.description || '',
   });
   const set = (patch) => setForm((f) => ({ ...f, ...patch }));
