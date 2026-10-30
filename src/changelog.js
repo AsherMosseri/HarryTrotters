@@ -4,6 +4,15 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '2.75',
+    date: '2026-10-30',
+    title: 'Delete several messages',
+    items: [
+      'Tap a message, then ☑︎ to select it. Tap more messages to add them, then Delete to remove them all at once.',
+      'Team management can remove messages completely, so no “Message deleted” note is left behind.',
+    ],
+  },
+  {
     version: '2.74',
     date: '2026-10-28',
     title: 'Fixes and improvements',
