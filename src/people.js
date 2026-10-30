@@ -43,3 +43,38 @@ export function activeStatus(profile, now = Date.now()) {
 
 export const ONLINE_MS = 150000;
 export const TYPING_MS = 6000;
+
+// A chat message under people's current names (author, @mentions, and the
+// message it replies to), so a rename on the Roster shows on every message
+// right away. Unchanged messages are returned as they are.
+export function renameMessage(m, rename) {
+  const by = m.by && rename(m.by);
+  const mentions = m.mentions?.some((n) => rename(n) !== n) ? [...new Set(m.mentions.map(rename))] : m.mentions;
+  const replyBy = m.replyTo?.by && rename(m.replyTo.by);
+  const votes = m.votes && renameVotes(m.votes, rename);
+  // "@Old Name" typed in the text reads "@New Name".
+  let text = m.text;
+  for (const n of m.mentions || []) if (text && rename(n) !== n) text = text.split(`@${n}`).join(`@${rename(n)}`);
+  if (by === m.by && mentions === m.mentions && replyBy === m.replyTo?.by && votes === m.votes && text === m.text) return m;
+  return { ...m, by, mentions, votes, text, ...(m.replyTo && { replyTo: { ...m.replyTo, by: replyBy } }) };
+}
+
+// Poll votes are kept per person id ({ [option]: { [personId]: name } }, and
+// text: { [personId]: { name, … } }): re-key them by current names so your
+// old votes still count as yours after a rename.
+function renameVotes(votes, rename) {
+  let changed = false;
+  const out = {};
+  for (const [opt, who] of Object.entries(votes)) {
+    const next = {};
+    for (const [key, v] of Object.entries(who || {})) {
+      const name = typeof v === 'string' ? v : v?.name;
+      const now = name ? rename(name) : name;
+      const id = now ? personId(now) : key;
+      if (id !== key || now !== name) changed = true;
+      next[id] = typeof v === 'string' ? now : v && { ...v, name: now };
+    }
+    out[opt] = next;
+  }
+  return changed ? out : votes;
+}

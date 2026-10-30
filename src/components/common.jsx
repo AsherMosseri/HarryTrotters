@@ -41,8 +41,10 @@ function GifAvatar({ src, name, size }) {
   );
 }
 
-export function Avatar({ name, size = 26, photo, showOnline = false, decoration, decorationCustom }) {
+export function Avatar({ name: saved, size = 26, photo, showOnline = false, decoration, decorationCustom }) {
   const people = usePeople();
+  // The current name, even for something saved before a rename.
+  const name = people?.rename ? people.rename(saved || '') : saved;
   const src = photo || people?.photoOf(name);
   const deco = decoration ?? people?.profileOf(name)?.decoration ?? '';
   let pic = src ? (
@@ -130,8 +132,9 @@ export function Overlay({ children }) {
   return typeof document === 'undefined' ? children : createPortal(children, document.body);
 }
 
-export function DisplayName({ name, className = '', as: Tag = 'span', ...rest }) {
+export function DisplayName({ name: saved, className = '', as: Tag = 'span', ...rest }) {
   const people = usePeople();
+  const name = people?.rename ? people.rename(saved || '') : saved;
   return (
     <Tag {...nameProps(people?.profileOf(name), people?.infoOf(name)?.color, name, className)} {...rest}>
       {name}

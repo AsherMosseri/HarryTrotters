@@ -621,6 +621,44 @@ export const reminders = onSchedule({ schedule: 'every 1 minutes', timeZone: TIM
   await batch.commit();
 });
 
+// A rename on the Roster (settings/names): move what's stored under the old
+// name's id to the new one right away (notifications, password, a reset
+// request), so the person keeps them. Everything shown by name already
+// follows the rename in the app.
+export const onRename = onDocumentWritten('settings/names', async (event) => {
+  const before = event.data?.before?.get('renames') || {};
+  const after = event.data?.after?.get('renames') || {};
+  const moved = Object.entries(after).filter(([from, to]) => to && before[from] !== to && personId(from) !== personId(to));
+  if (!moved.length) return;
+  const rename = await renamer();
+  for (const [from] of moved) {
+    const to = rename(from);
+    const oldId = personId(from);
+    const newId = personId(to);
+    if (!oldId || oldId === newId) continue;
+    const items = await db.collection(`inbox/${oldId}/items`).get();
+    for (let i = 0; i < items.docs.length; i += 200) {
+      const batch = db.batch();
+      for (const d of items.docs.slice(i, i + 200)) {
+        batch.set(db.doc(`inbox/${newId}/items/${d.id}`), d.data());
+        batch.delete(d.ref);
+      }
+      await batch.commit();
+    }
+    const acc = await db.doc(`accounts/${oldId}`).get();
+    if (acc.exists && acc.get('hash') && !(await db.doc(`accounts/${newId}`).get()).get('hash')) {
+      await db.doc(`accounts/${newId}`).set({ ...acc.data(), name: to });
+      await acc.ref.delete();
+    }
+    const ask = await db.doc(`resetRequests/${oldId}`).get();
+    if (ask.exists) {
+      await db.doc(`resetRequests/${newId}`).set({ ...ask.data(), name: to });
+      await ask.ref.delete();
+    }
+    logger.info('moved to new name', from, '→', to, items.size, 'notifications');
+  }
+});
+
 // ---------- accounts: everyone signs in with their own password ----------
 // accounts/{personId}: { name, salt, hash, setAt, lastSignIn, fails, lockedUntil }
 // (phones can't read or write it). A device counts as signed in once this
@@ -666,8 +704,28 @@ export const account = onCall({ maxInstances: 5, invoker: 'public' }, async (req
   }
   const password = String(req.data?.password || '');
   const now = Date.now();
+  // Renamed on the Roster: a password (and a pending reset request) saved
+  // under an old name moves to the new one.
+  const follow = async (n) => {
+    if (!n || (await accountRef(n).get()).get('hash')) return;
+    for (const alias of rename.aliases(n)) {
+      if (alias === n) continue;
+      const old = await accountRef(alias).get();
+      if (!old.get('hash')) continue;
+      await accountRef(n).set({ ...old.data(), name: n });
+      await old.ref.delete();
+      const ask = await db.doc(`resetRequests/${personId(alias)}`).get();
+      if (ask.exists) {
+        await db.doc(`resetRequests/${personId(n)}`).set({ ...ask.data(), name: n });
+        await ask.ref.delete();
+      }
+      return;
+    }
+  };
+  await follow(name);
   const memberSnap = await db.doc(`members/${uid}`).get();
   const me = memberSnap.exists ? rename(memberSnap.get('name') || '') : '';
+  if (me !== name) await follow(me);
   const signedIn = memberSnap.exists && memberSnap.get('via') === 'password';
   const fail = (message) => ({ error: message });
 

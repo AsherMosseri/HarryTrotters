@@ -13,7 +13,7 @@ import {
   TEAM_STARTED,
   PASSWORD_MIN,
 } from '../config.js';
-import { ONLINE_MS, TYPING_MS, activeStatus, buildPeopleInfo, buildProfiles } from '../people.js';
+import { ONLINE_MS, TYPING_MS, activeStatus, buildPeopleInfo, buildProfiles, renameMessage } from '../people.js';
 import { PALETTES, presetTheme } from '../nitro.js';
 import { daysBetween, mondayOf, parseDay, todayISO } from '../milestones.js';
 import { newTaskDefaults, personId } from '../data/diff.js';
@@ -451,7 +451,12 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
   const [checklists, setChecklists] = useState([]);
   const [runs, setRuns] = useState([]);
   const [robot, setRobot] = useState({ versions: [], pins: [], layouts: [] });
-  const [chat, setChat] = useState({}); // { [channelId]: newest messages }
+  const [rawChat, setChat] = useState({}); // { [channelId]: newest messages }
+  // Under everyone's current names (a Roster rename shows on old messages at once).
+  const chat = useMemo(
+    () => Object.fromEntries(Object.entries(rawChat).map(([k, list]) => [k, list.map((m) => renameMessage(m, rename))])),
+    [rawChat, rename],
+  );
   const [chatChannel, setChatChannel] = useLocalStorage('chat-channel', 'general');
   // Calm chat (off by default, per device): when on, animations in chat wait
   // for hover or tap. A new key, so the old saved "on" doesn't stick.
@@ -889,13 +894,15 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
   );
   const peopleCtx = useMemo(
     () => ({
-      photoOf: (name) => shownProfiles.get(name)?.photo?.url || '',
-      profileOf: (name) => shownProfiles.get(name),
-      isOnline: (name) => online.has(name),
-      infoOf: (name) => peopleInfo.get(name) || { subteams: [], responsibilities: [], title: '', color: '' },
+      // Every lookup takes old names too (anything saved before a rename).
+      photoOf: (name) => shownProfiles.get(rename(name))?.photo?.url || '',
+      profileOf: (name) => shownProfiles.get(rename(name)),
+      isOnline: (name) => online.has(rename(name)),
+      infoOf: (name) => peopleInfo.get(rename(name)) || { subteams: [], responsibilities: [], title: '', color: '' },
+      rename,
       roster,
     }),
-    [shownProfiles, online, peopleInfo, roster],
+    [shownProfiles, online, peopleInfo, roster, rename],
   );
   const openPerson = useCallback((name) => setProfileFor(name), []);
   // Going back: a pop-up opened from another pop-up returns to it when it's
@@ -1370,7 +1377,12 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
   );
   // The lab log (labLog.js): the last 30 days of logs, and the form (opened
   // when you end a shift, to edit one, or for a shift that ended without one).
-  const [labLogs, setLabLogs] = useState(null);
+  const [rawLabLogs, setLabLogs] = useState(null);
+  // Under current names (a log saved before a rename still counts as yours).
+  const labLogs = useMemo(
+    () => rawLabLogs && rawLabLogs.map((l) => (l.person && rename(l.person) !== l.person ? { ...l, person: rename(l.person) } : l)),
+    [rawLabLogs, rename],
+  );
   useEffect(() => store.subscribeLabLogs(dayOf(Date.now() - 30 * 86400000), setLabLogs, loadFail('the lab log')), [store, loadFail]);
   const [labLog, setLabLog] = useState(null); // { mode: 'end' | 'edit', day, person, shift? }
   const namedShifts = useMemo(() => shifts.map((s) => (s.person ? { ...s, person: rename(s.person) } : s)), [shifts, rename]);

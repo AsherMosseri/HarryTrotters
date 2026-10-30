@@ -1,3 +1,4 @@
+import { renameMessage } from '../people.js';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { SUBTEAMS, SUBTEAM_COLORS } from '../config.js';
 import { useControls } from '../controls.js';
@@ -167,7 +168,12 @@ export default function ChatView({
     setEditing(null);
     setUseCmd(null);
   }
-  const all = useMemo(() => [...(older[conv.key] || []), ...(messages[conv.key] || [])], [older, messages, conv.key]);
+  const renameNow = usePeople()?.rename;
+  // Older pages load here, so they get people's current names here too.
+  const all = useMemo(
+    () => [...(older[conv.key] || []), ...(messages[conv.key] || [])].map((m) => (renameNow ? renameMessage(m, renameNow) : m)),
+    [older, messages, conv.key, renameNow],
+  );
   const ads = useAds();
   const adSpots = chatAdSpots(ads, all.length);
   const taskById = useMemo(() => Object.fromEntries(tasks.map((t) => [t.id, t])), [tasks]);
