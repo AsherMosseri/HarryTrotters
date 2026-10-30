@@ -86,15 +86,15 @@ const EXPANSION_HUB = hubFromPhoto(
   }),
 );
 
-// type → how it looks and its ports. Device ports have no x/y: they sit on
+// type → how it looks (icon: a line icon's name, shell/icons.jsx) and its ports. Device ports have no x/y: they sit on
 // the device's chosen side (see portPos).
 export const PART_TYPES = {
   controlHub: { name: 'Control Hub', hub: true, ...CONTROL_HUB },
   expansionHub: { name: 'Expansion Hub', hub: true, ...EXPANSION_HUB },
-  battery: { name: 'Battery', icon: '🔋', photo: batteryPhoto, ports: [{ id: 'out', kind: 'power', label: '' }] },
+  battery: { name: 'Battery', icon: 'battery', photo: batteryPhoto, ports: [{ id: 'out', kind: 'power', label: '' }] },
   switch: {
     name: 'Power switch',
-    icon: '🔘',
+    icon: 'power',
     ports: [
       { id: 'in', kind: 'power', label: 'in', fixedSide: 'left' },
       { id: 'out', kind: 'power', label: 'out', fixedSide: 'right' },
@@ -102,20 +102,20 @@ export const PART_TYPES = {
   },
   motor: {
     name: 'Motor',
-    icon: '⚙️',
+    icon: 'gear',
     photo: motorPhoto,
     ports: [
       { id: 'pwr', kind: 'motor', label: '' },
       { id: 'enc', kind: 'encoder', label: 'enc' },
     ],
   },
-  servo: { name: 'Servo', icon: '🦾', photo: servoPhoto, ports: [{ id: 'sig', kind: 'servo', label: '' }] },
-  i2cSensor: { name: 'I²C sensor', icon: '📡', hint: 'Distance, color, IMU', ports: [{ id: 'i2c', kind: 'i2c', label: '' }] },
-  digitalSensor: { name: 'Digital sensor', icon: '👆', hint: 'Touch, limit switch', ports: [{ id: 'dig', kind: 'digital', label: '' }] },
-  analogSensor: { name: 'Analog sensor', icon: '🎚️', hint: 'Potentiometer', ports: [{ id: 'ana', kind: 'analog', label: '' }] },
-  odometry: { name: 'Odometry pod', icon: '🛞', ports: [{ id: 'enc', kind: 'encoder', label: '' }] },
-  camera: { name: 'Camera', icon: '📷', ports: [{ id: 'usb', kind: 'usb', label: '' }] },
-  led: { name: 'LED / other', icon: '💡', ports: [{ id: 'sig', kind: 'servo', label: '' }] },
+  servo: { name: 'Servo', icon: 'servo', photo: servoPhoto, ports: [{ id: 'sig', kind: 'servo', label: '' }] },
+  i2cSensor: { name: 'I²C sensor', icon: 'signal', hint: 'Distance, color, IMU', ports: [{ id: 'i2c', kind: 'i2c', label: '' }] },
+  digitalSensor: { name: 'Digital sensor', icon: 'touch', hint: 'Touch, limit switch', ports: [{ id: 'dig', kind: 'digital', label: '' }] },
+  analogSensor: { name: 'Analog sensor', icon: 'sliders', hint: 'Potentiometer', ports: [{ id: 'ana', kind: 'analog', label: '' }] },
+  odometry: { name: 'Odometry pod', icon: 'wheel', ports: [{ id: 'enc', kind: 'encoder', label: '' }] },
+  camera: { name: 'Camera', icon: 'camera', ports: [{ id: 'usb', kind: 'usb', label: '' }] },
+  led: { name: 'LED / other', icon: 'bulb', ports: [{ id: 'sig', kind: 'servo', label: '' }] },
   text: { name: 'Text', ports: [] },
 };
 export const ADDABLE = [

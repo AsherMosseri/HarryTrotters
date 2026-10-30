@@ -17,6 +17,7 @@ import {
 import { itemId } from '../data/diff.js';
 import { fullTime } from '../util.js';
 import { CloseIcon, MinusIcon, Overlay, PlusIcon } from './common.jsx';
+import { Icon } from './shell/icons.jsx';
 
 const SNAP = 10;
 const snap = (v) => Math.round(v / SNAP) * SNAP;
@@ -83,9 +84,10 @@ function Device({ part, selected, dim }) {
       {t.photo ? (
         <image href={t.photo} x="5" y="4" width="34" height={DEV_H - 8} preserveAspectRatio="xMidYMid meet" />
       ) : (
-        <text x="10" y={DEV_H / 2 + 8} fontSize="22">
-          {t.icon}
-        </text>
+        // A line icon (also drawn into Save PNG, so its color is set right here).
+        <g transform={`translate(9 ${DEV_H / 2 - 11})`} color="#475569">
+          <Icon name={t.icon || 'chip'} size={22} />
+        </g>
       )}
       {lines.map((l, i) => (
         <text key={i} x="40" y={DEV_H / 2 + 5 + (i - (lines.length - 1) / 2) * 15} fontSize="12.5" fontWeight="650" fill="#111827">
@@ -675,7 +677,7 @@ export default function ElectricalEditor({ remote, canEdit, actor, onSave, onClo
           <div className="dg-add">
             {ADDABLE.map((type) => (
               <button key={type} className="dg-add-btn" onClick={() => add(type)} title={PART_TYPES[type].hint || ''}>
-                <span aria-hidden="true">{PART_TYPES[type].icon || (PART_TYPES[type].hub ? '🟧' : '🅣')}</span>
+                <Icon name={PART_TYPES[type].icon || 'chip'} size={18} />
                 {PART_TYPES[type].name}
               </button>
             ))}
@@ -847,7 +849,7 @@ export default function ElectricalEditor({ remote, canEdit, actor, onSave, onClo
                 {canEdit && (
                   <div className="row gap">
                     <button className="btn" onClick={duplicate}>
-                      ⧉ Duplicate
+                      <Icon name="copy" size={16} /> Duplicate
                     </button>
                     <button className="btn danger-btn" onClick={removeSelected}>
                       Delete
