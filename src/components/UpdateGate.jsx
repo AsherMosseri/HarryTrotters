@@ -1,6 +1,7 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { VersionLogDialog } from './VersionLog.jsx';
 import { Overlay } from './common.jsx';
+import { NEXT } from '../next.js';
 
 const CHECK_EVERY = 60 * 1000;
 
@@ -58,6 +59,9 @@ export default function UpdateGate({ children }) {
   const [info, setInfo] = useState(null); // { release, changelog } of the new version
   const [plain, setPlain] = useState(false); // a plain update: just an Update button
   const [showLog, setShowLog] = useState(false);
+  // The test copy (/next/): newer code shows a Refresh button right away
+  // instead of waiting for the app to go to the background.
+  const [codeReady, setCodeReady] = useState(null);
   const quiet = useSyncExternalStore(subscribeQuiet, () => quietScreens > 0);
 
   useEffect(() => {
@@ -75,7 +79,10 @@ export default function UpdateGate({ children }) {
     const show = (data) => {
       if (stopped || !data?.version) return;
       if (data.version === __BUILD_ID__) {
-        if (data.code && data.code !== __CODE_ID__) quiet = data.code;
+        if (data.code && data.code !== __CODE_ID__) {
+          quiet = data.code;
+          if (NEXT) setCodeReady(data.code);
+        }
         return;
       }
       setNewVersion(data.version);
@@ -108,6 +115,15 @@ export default function UpdateGate({ children }) {
   return (
     <>
       {children}
+      {codeReady && !newVersion && (
+        <Overlay>
+          <button className="code-ready" onClick={() => loadNewVersion(codeReady)}>
+            <span className="code-ready-dot" aria-hidden="true" />
+            New update
+            <b>Refresh</b>
+          </button>
+        </Overlay>
+      )}
       {newVersion && quiet && (
         <Overlay>
           <div className="update-gate" role="alertdialog" aria-labelledby="update-title">

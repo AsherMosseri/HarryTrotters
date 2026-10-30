@@ -538,11 +538,18 @@ button.sb-head-row { width: 100%; border: 0; background: none; color: var(--mute
 .splash-bar { position: relative; width: 180px; height: 4px; margin-top: 28px; border-radius: 2px; background: color-mix(in srgb, var(--accent) 15%, transparent); overflow: hidden; }
 /* Fills as the app starts (Gate.jsx steps), with a sheen running across so it never looks stuck. */
 .splash-bar span { position: absolute; top: 0; bottom: 0; left: 0; border-radius: 2px; background: var(--accent); overflow: hidden; transition: width 0.5s ease; }
-.splash-bar span::after { content: ''; position: absolute; inset: 0; width: 60%; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent); animation: splash-sheen 1.2s ease-in-out infinite; }
-@keyframes splash-sheen { from { transform: translateX(-100%); } to { transform: translateX(260%); } }
+.splash-bar span::after {
+  /* A sheen that repeats every 240px and slides at a steady pace, so the loop
+     never visibly restarts and the fill growing doesn't move it. Every copy
+     of the screen runs it on the page's clock (syncSheen, Gate.jsx). */
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent 0, transparent 30%, rgb(255 255 255 / 55%) 50%, transparent 70%, transparent 100%) 0 0 / 240px 100% repeat-x;
+  animation: splash-sheen 1.6s linear infinite;
+}
+@keyframes splash-sheen { from { background-position-x: 0; } to { background-position-x: 240px; } }
 .splash-step { margin-top: 12px !important; font-size: 14px !important; font-weight: 500 !important; letter-spacing: 0 !important; }
 .splash-slow { text-wrap: balance; display: flex; flex-direction: column; align-items: center; gap: 10px; margin-top: 18px; color: var(--muted); font-size: 14px; max-width: 320px; }
-@media (prefers-reduced-motion: reduce) { :root:not([data-motion='on']) .splash-bar span::after { animation-duration: 2.4s; } }
+@media (prefers-reduced-motion: reduce) { :root:not([data-motion='on']) .splash-bar span::after { animation: none; } }
 .splash-error { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-top: 26px; max-width: 420px; }
 .splash-error b { font-size: 18px; }
 .splash-error span { color: var(--muted); }
@@ -716,7 +723,7 @@ button.sb-head-row { width: 100%; border: 0; background: none; color: var(--mute
 :root[data-theme='dark'] .btn.primary { background: #2a4f8f; border-color: #2a4f8f; }
 
 /* Animations set to Off (Appearance): the same as the device's Reduce Motion. */
- :root[data-motion='off'] .splash-bar span::after { animation-duration: 2.4s; } 
+ :root[data-motion='off'] .splash-bar span::after { animation: none; } 
   :root[data-motion='off'] .reaction.super { animation: none; }
   :root[data-motion='off'] .super-fx-spark, :root[data-motion='off'] .super-fx-mini, :root[data-motion='off'] .super-fx-wave { display: none; }
   :root[data-motion='off'] .super-fx-big { animation-duration: 1.2s; }
@@ -1138,3 +1145,15 @@ button, [role='button'] { -webkit-user-select: none; user-select: none; -webkit-
 /* Denser lists. */
 .shell .card { padding: 9px 11px 8px; }
 .shell .column-body { gap: 8px; }
+
+/* /next/: a new deploy is up. */
+.code-ready {
+  position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 24px); transform: translateX(-50%); z-index: 2147483000;
+  display: inline-flex; align-items: center; gap: 9px; height: 42px; padding: 0 8px 0 16px; border-radius: 999px; border: 0;
+  background: #14284b; color: #fff; font: inherit; font-size: 14.5px; font-weight: 600; box-shadow: 0 10px 30px rgb(14 26 46 / 35%);
+  animation: code-ready-in 0.3s ease-out;
+}
+.code-ready b { background: #fff; color: #14284b; border-radius: 999px; padding: 6px 13px; font-weight: 700; }
+.code-ready-dot { width: 8px; height: 8px; border-radius: 50%; background: #3ddc84; }
+.phone-shell ~ .code-ready, body:has(.phone-shell) .code-ready { bottom: calc(env(safe-area-inset-bottom) + 76px); }
+@keyframes code-ready-in { from { opacity: 0; transform: translate(-50%, 12px); } }

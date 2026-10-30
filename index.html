@@ -53,6 +53,14 @@
           <h1>Harry Trotters</h1>
           <p>FTC 32313</p>
           <div class="splash-bar" aria-hidden="true"><span style="width: 12%"></span></div>
+          <script>
+            // The sheen runs on the page's clock (like the app's copy of this screen, Gate.jsx).
+            requestAnimationFrame(function () {
+              try {
+                document.querySelector('.splash-bar span').getAnimations({ subtree: true }).forEach(function (a) { a.startTime = 0; });
+              } catch (e) {}
+            });
+          </script>
           <p class="splash-step">Opening…</p>
         </div>
       </div>

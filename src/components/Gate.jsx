@@ -44,7 +44,7 @@ export function LoadingScreen({ error, step = 1 }) {
         ) : (
           <>
             <div className="splash-bar" aria-hidden="true">
-              <span style={{ width: `${[12, 35, 65, 88][step] ?? 88}%` }} />
+              <span ref={syncSheen} style={{ width: `${[12, 35, 65, 88][step] ?? 88}%` }} />
             </div>
             <p className="splash-step">{STEPS[step]}…</p>
             {slow && (
@@ -60,6 +60,16 @@ export function LoadingScreen({ error, step = 1 }) {
       </div>
     </div>
   );
+}
+
+// Every copy of the loading screen (the page's own, then the app's) runs the
+// sheen on the page's clock, so swapping one for the next doesn't restart it.
+function syncSheen(el) {
+  try {
+    el?.getAnimations({ subtree: true }).forEach((a) => (a.startTime = 0));
+  } catch {
+    /* older browsers: it just restarts */
+  }
 }
 
 function ShareIcon() {

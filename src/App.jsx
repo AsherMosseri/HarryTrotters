@@ -93,11 +93,11 @@ export default function App() {
 
   // Before 3.0 is live, the test copy (/next/) has no account function to
   // sign in with yet: it keeps the old team-code sign-in until then.
-  // Until that check answers, keep the loading screen up (it used to flash
-  // the sign-in screen first).
+  // Nothing waits on that check (on an iPad it sometimes never answered, and
+  // the app sat on the loading screen): until it says otherwise, assume the
+  // last answer, or not live yet. The answer is remembered for next time.
   const probe = !!(NEXT && !isDemo && store?.account && member && member.via !== 'password');
-  // The last answer is remembered, so opening the app doesn't wait on it again.
-  const [probed, setProbed] = useState(() => (localStorage.getItem('passwords-live') === 'no' ? false : null)); // null: still asking
+  const [probed, setProbed] = useState(() => localStorage.getItem('passwords-live') === 'yes');
   useEffect(() => {
     if (!probe) return;
     const got = (live) => {
@@ -108,9 +108,10 @@ export default function App() {
         /* private browsing */
       }
     };
+    // Only an answer from the account function means it's live.
     store.account({ action: 'status' }).then(
       () => got(true),
-      (e) => got(!/not-found|internal|unavailable/.test(e?.code || '')),
+      () => got(false),
     );
   }, [probe, store]);
   const passwordsLive = probe ? probed : true;
@@ -138,8 +139,7 @@ export default function App() {
 
   if (install) return <InstallScreen {...install} />;
   if (error) return <LoadingScreen error={error} />;
-  if (!store || !user || member === undefined || (!signedIn && passwordsLive === null))
-    return <LoadingScreen step={!store ? 1 : !user ? 2 : 3} />;
+  if (!store || !user || member === undefined) return <LoadingScreen step={!store ? 1 : !user ? 2 : 3} />;
   if (!actor)
     return (
       <SignInScreen
