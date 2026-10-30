@@ -220,7 +220,7 @@ export default function ProfilePage({
                         rows={2}
                         maxLength={500}
                         value={note}
-                        placeholder="Only you can see this. Click to add a note…"
+                        placeholder="Only you can see this. Tap to add a note…"
                         onChange={(e) => setNote(e.target.value)}
                         onBlur={() => note !== (notes[name] || '') && api.saveNote(name, note.trim())}
                         aria-label={`Your note about ${name}`}

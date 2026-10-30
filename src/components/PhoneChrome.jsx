@@ -19,7 +19,8 @@ export const TAB_ICONS = {
   team: 'team',
 };
 // The tab bar's names where the page has a plainer one.
-const TAB_LABELS = { board: 'Tasks', team: 'Roster', runs: 'Match log' };
+// (Table is a Tasks layout; it's its own tab only when Board is switched off.)
+const TAB_LABELS = { board: 'Tasks', table: 'Tasks', team: 'Roster', runs: 'Match log' };
 const tabLabel = (id, label) => TAB_LABELS[id] || label;
 
 export function Sheet({ title, onClose, children, className = '' }) {
@@ -128,6 +129,8 @@ export function BottomNav({ views, view, setView, badges = {}, onMore, moreOn })
   // Five or fewer all fit, so there's no More then.
   const main = views.length <= PHONE_MAIN_COUNT + 1 ? views : views.slice(0, PHONE_MAIN_COUNT);
   const inMore = !main.some(([id]) => id === view);
+  // Unread chat under More still shows: a count on More itself.
+  const moreBadge = views.filter((v) => !main.includes(v)).reduce((n, [id]) => n + (badges[id] || 0), 0);
   return (
     <nav className="bottom-nav" aria-label="Tabs">
       {main.map(([id, label]) => (
@@ -143,6 +146,7 @@ export function BottomNav({ views, view, setView, badges = {}, onMore, moreOn })
         <button className={inMore || moreOn ? 'on' : ''} onClick={onMore}>
           <span className="bn-icon" aria-hidden="true">
             <Icon name="more" size={24} />
+            {moreBadge ? <span className="bn-badge">{moreBadge > 99 ? '99+' : moreBadge}</span> : null}
           </span>
           <span className="bn-label">More</span>
         </button>
@@ -151,7 +155,7 @@ export function BottomNav({ views, view, setView, badges = {}, onMore, moreOn })
   );
 }
 
-export function MoreSheet({ views, view, setView, onClose }) {
+export function MoreSheet({ views, view, setView, badges = {}, onClose }) {
   return (
     <Sheet title="More" onClose={onClose}>
       <div className="more-list">
@@ -166,6 +170,7 @@ export function MoreSheet({ views, view, setView, onClose }) {
           >
             <Icon name={TAB_ICONS[id]} size={22} />
             <span className="grow">{tabLabel(id, label)}</span>
+            {badges[id] ? <span className="more-badge">{badges[id] > 99 ? '99+' : badges[id]}</span> : null}
             <Icon name="chevron" size={16} className="more-chev" />
           </button>
         ))}

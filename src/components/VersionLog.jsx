@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { CHANGELOG } from '../changelog.js';
 import { CloseIcon, Overlay } from './common.jsx';
 import { RequestBox } from './Requests.jsx';
@@ -81,6 +81,9 @@ export function VersionLogDialog({ log = CHANGELOG, current, currentLabel = 'Cur
 export function WhatsNew({ versions, onClose, onFullLog, onRequest }) {
   useEscape(onClose);
   const latest = versions[0];
+  // Focus Got it (Enter closes) without scrolling the list to the bottom.
+  const gotIt = useRef(null);
+  useEffect(() => gotIt.current?.focus({ preventScroll: true }), []);
   return (
     <Overlay>
       <div className="panel-backdrop center" onClick={onClose}>
@@ -113,7 +116,7 @@ export function WhatsNew({ versions, onClose, onFullLog, onRequest }) {
               Full version log
             </button>
             <span className="spacer" />
-            <button className="btn primary" onClick={onClose} autoFocus>
+            <button className="btn primary" onClick={onClose} ref={gotIt}>
               Got it
             </button>
           </div>

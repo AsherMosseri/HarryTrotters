@@ -1758,7 +1758,6 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
         ...ads.notes.map((n) => ({
           id: n.id,
           type: 'ad',
-          icon: n.coupon ? '🎟️' : n.emoji,
           title: n.title,
           body: n.body,
           at: n.at,
@@ -1850,6 +1849,34 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
       </div>
     );
   const tasksBoth = views.some(([id]) => id === 'board') && views.some(([id]) => id === 'table');
+  // Phones: Table is a layout of the Tasks tab (switched in the toolbar), not a tab of its own.
+  const phoneTabs = tasksBoth ? views.filter(([id]) => id !== 'table') : views;
+  const phoneTab = tasksBoth && view === 'table' ? 'board' : view;
+  const openPhoneTab = (id) => (tasksBoth && id === 'board' ? openPage('tasks') : setView(id));
+  const layoutSeg = (small) => (
+    <div className={`seg${small ? ' seg-icons' : ''}`} role="tablist" aria-label="Layout">
+      {[
+        ['board', 'Board'],
+        ['table', 'Table'],
+      ].map(([id, label]) => (
+        <button
+          key={id}
+          role="tab"
+          aria-selected={view === id}
+          aria-label={small ? label : undefined}
+          title={small ? label : undefined}
+          className={view === id ? 'on' : ''}
+          onClick={() => {
+            setTasksMode(id);
+            setView(id);
+          }}
+        >
+          <Icon name={id} size={16} />
+          {!small && label}
+        </button>
+      ))}
+    </div>
+  );
   const pageTitle = taskView ? 'Tasks' : view === 'team' ? 'Roster' : views.find(([id]) => id === view)?.[1];
   // Pages with their own title (.ms-header) keep it; it's styled as the page title.
   const pageHead =
@@ -1863,28 +1890,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
           </p>
         )}
         <span className="spacer" />
-        {taskView && tasksBoth && (
-          <div className="seg" role="tablist" aria-label="Layout">
-            {[
-              ['board', 'Board'],
-              ['table', 'Table'],
-            ].map(([id, label]) => (
-              <button
-                key={id}
-                role="tab"
-                aria-selected={view === id}
-                className={view === id ? 'on' : ''}
-                onClick={() => {
-                  setTasksMode(id);
-                  setView(id);
-                }}
-              >
-                <Icon name={id} size={16} />
-                {label}
-              </button>
-            ))}
-          </div>
-        )}
+        {taskView && tasksBoth && layoutSeg(false)}
         {taskView && (
           <button className="btn primary" onClick={() => setNewTask({ status: 'todo' })}>
             <Icon name="plus" size={16} /> New task
@@ -2061,7 +2067,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
                       aria-label="Dismiss"
                       onClick={() => setChatRead({ ...chatRead, announcements: announcement.at })}
                     >
-                      ✕
+                      <CloseIcon />
                     </button>
                   </div>
                 )}
@@ -2071,7 +2077,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
                     <input
                       className="search"
                       type="search"
-                      placeholder="Search tasks…"
+                      placeholder={phone ? 'Search' : 'Search tasks…'}
                       value={filters.q}
                       onChange={(e) => setF({ q: e.target.value })}
                     />
@@ -2083,9 +2089,12 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
                         My tasks
                       </button>
                       {phone ? (
-                        <button className={`chip${filterCount ? ' on' : ''}`} onClick={() => setPhoneSheet('filters')}>
-                          Filters{filterCount ? ` · ${filterCount}` : ''}
-                        </button>
+                        <>
+                          <button className={`chip${filterCount ? ' on' : ''}`} onClick={() => setPhoneSheet('filters')}>
+                            Filters{filterCount ? ` · ${filterCount}` : ''}
+                          </button>
+                          {tasksBoth && layoutSeg(true)}
+                        </>
                       ) : (
                         <span className="filters-wrap">
                           <button
@@ -2779,6 +2788,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
               onCommands={() => setCommandsPage(true)}
               onAds={() => setAdsPage(true)}
               account={(data) => store.account(data)}
+              me={actor.name}
               onClose={() => {
                 setControlsPage(false);
                 goBack('controls');
@@ -2836,17 +2846,19 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
           {phone && (
             <>
               <BottomNav
-                views={views}
-                view={view}
+                views={phoneTabs}
+                view={phoneTab}
                 setView={(v) => {
                   setPhoneSheet(null);
-                  setView(v);
+                  openPhoneTab(v);
                 }}
                 badges={{ chat: unreadTotal }}
                 moreOn={phoneSheet === 'more'}
                 onMore={() => setPhoneSheet(phoneSheet === 'more' ? null : 'more')}
               />
-              {phoneSheet === 'more' && <MoreSheet views={views} view={view} setView={setView} onClose={closeSheet} />}
+              {phoneSheet === 'more' && (
+                <MoreSheet views={phoneTabs} view={phoneTab} setView={openPhoneTab} badges={{ chat: unreadTotal }} onClose={closeSheet} />
+              )}
               {phoneSheet === 'filters' && (
                 <Sheet title="Filters" onClose={closeSheet}>
                   <div className="sheet-filters">{filterControls}</div>

@@ -68,6 +68,8 @@ export default function TabsEditor({ all, order, hidden, canHide, onSave, onClos
     setDragging(null);
   };
   const shown = list.filter((id) => !off.has(id));
+  // Phones show Table inside the Tasks tab (when Board is on), not as a tab.
+  const phoneTabs = shown.filter((id) => id !== 'table' || !shown.includes('board'));
   return (
     <Overlay>
       <div className="panel-backdrop center" onClick={onClose}>
@@ -113,7 +115,7 @@ export default function TabsEditor({ all, order, hidden, canHide, onSave, onClos
                 </span>
                 <span className="grow">
                   {label[id]}
-                  {!off.has(id) && (shown.length <= 5 || shown.indexOf(id) < 4) && <span className="tabs-phone">phone tab bar</span>}
+                  {phoneTabs.includes(id) && (phoneTabs.length <= 5 || phoneTabs.indexOf(id) < 4) && <span className="tabs-phone">phone tab bar</span>}
                 </span>
                 {canHide && (
                   <label className="switch" title={off.has(id) ? 'Off for everyone' : 'On for everyone'}>

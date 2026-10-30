@@ -346,7 +346,7 @@ export function ProfileCard({ name, actor, tasks, onClose, onMessage, onEdit, on
           <CardBody name={name} actor={actor} tasks={tasks}>
             {onFull && (
               <button className="link-btn small pc-full" onClick={onFull}>
-                View full profile →
+                View full profile <Icon name="chevron" size={14} />
               </button>
             )}
             <div className="row gap profile-actions">

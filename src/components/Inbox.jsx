@@ -15,6 +15,8 @@ const ICONS = {
   shutdown: 'lock',
   shift: 'shifts',
   checkin: 'flag',
+  // Ads and coupons get a tag, not the product's emoji.
+  ad: 'tag',
 };
 
 function BellIcon() {

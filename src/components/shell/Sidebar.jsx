@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Icon } from './icons.jsx';
 import { Avatar } from '../common.jsx';
 import { TEAM_NAME, TEAM_NICKNAME } from '../../config.js';
@@ -42,6 +42,77 @@ function Row({ icon, label, active, count, strong, onClick, extra }) {
   );
 }
 
+// How many recent DMs the sidebar lists before "Show all" (unread ones and
+// the one on screen always show).
+const DMS_SHOWN = 8;
+
+// The folded sidebar's chat button: every channel and DM in a small list
+// beside it, so you can switch conversations without unfolding.
+function ConvPop({ anchor, convs, currentConv, page, unread, actor, dmsOn, onOpenConv, onNewDm, onClose }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const away = (e) => !ref.current?.contains(e.target) && !anchor.el.contains(e.target) && onClose();
+    const esc = (e) => e.key === 'Escape' && onClose();
+    document.addEventListener('pointerdown', away);
+    window.addEventListener('keydown', esc);
+    return () => {
+      document.removeEventListener('pointerdown', away);
+      window.removeEventListener('keydown', esc);
+    };
+  }, [anchor, onClose]);
+  // Opens down from the button in the top half of the screen, up from it lower down.
+  const r = anchor.el.getBoundingClientRect();
+  const h = window.innerHeight;
+  const place = r.top < h / 2 ? { top: r.top - 4, maxHeight: h - r.top - 8 } : { bottom: h - r.bottom - 4, maxHeight: r.bottom - 8 };
+  const row = (c, icon, label, n, strong) => (
+    <button
+      key={c.key}
+      className={`cp-row${page === 'chat' && currentConv?.key === c.key ? ' on' : ''}${strong ? ' strong' : ''}`}
+      onClick={() => {
+        onOpenConv(c.key);
+        onClose();
+      }}
+    >
+      {icon}
+      <span className="sb-label">{label}</span>
+      {n > 0 && <span className={`cp-count${strong ? ' strong' : ''}`}>{n > 99 ? '99+' : n}</span>}
+    </button>
+  );
+  return (
+    <div ref={ref} className="sb-conv-pop" role="dialog" aria-label="Conversations" style={{ left: r.right + 8, ...place }}>
+      <h3 className="cp-head">Channels</h3>
+      {convs.channels.map((c) => {
+        const u = unread[c.key];
+        return row(c, <Icon name={c.announce ? 'announce' : 'hash'} />, c.name, u && !u.muted ? u.count : u?.mentions || 0, !!u?.mentions);
+      })}
+      {dmsOn && (
+        <>
+          <div className="cp-head-row">
+            <h3 className="cp-head">Messages</h3>
+            <button
+              className="sb-add"
+              onClick={() => {
+                onNewDm();
+                onClose();
+              }}
+              aria-label="New message"
+              title="New message"
+            >
+              <Icon name="plus" size={16} />
+            </button>
+          </div>
+          {convs.dms.map((c) => {
+            const others = c.people.filter((n) => n !== actor.name);
+            const n = unread[c.key]?.count || 0;
+            return row(c, others.length === 1 ? <Avatar name={others[0]} size={24} /> : <Icon name="team" />, c.short, n, n > 0);
+          })}
+          {!convs.dms.length && <p className="sb-hint">No messages yet.</p>}
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function Sidebar({
   on, // page ids that are switched on
   page, // the page on screen: a page id, or 'chat'
@@ -65,8 +136,17 @@ export default function Sidebar({
 }) {
   const show = (id) => on.includes(id);
   const chatOn = show('chat');
-  const dms = convs.dms.slice(0, 8);
+  const [allDms, setAllDms] = useState(false);
+  const dmOn = (c) => page === 'chat' && currentConv?.key === c.key;
+  const dms = allDms ? convs.dms : convs.dms.filter((c, i) => i < DMS_SHOWN || unread[c.key]?.count > 0 || dmOn(c));
   const [teamDmsOpen, setTeamDmsOpen] = useState(false);
+  const [convPop, setConvPop] = useState(null); // { el }: the rail's chat button
+  // Keep the page or conversation on screen visible in the list (say, after
+  // opening a channel from a notification).
+  const navRef = useRef(null);
+  useEffect(() => {
+    navRef.current?.querySelector('.active')?.scrollIntoView({ block: 'nearest' });
+  }, [page, currentConv?.key, rail]);
   if (rail) {
     const chatCount = Object.values(unread).reduce((n, u) => n + (u.muted ? u.mentions : u.count), 0);
     const pages = GROUPS.flatMap(([, ids]) => ids).filter(show);
@@ -81,7 +161,7 @@ export default function Sidebar({
           {shiftRow}
           {topRight}
         </div>
-        <nav className="sb-scroll" aria-label="Pages">
+        <nav className="sb-scroll" aria-label="Pages" ref={navRef}>
           {pages.map((id) => (
             <button
               key={id}
@@ -95,9 +175,10 @@ export default function Sidebar({
           ))}
           {chatOn && currentConv && (
             <button
-              className={`sb-rail-btn${page === 'chat' ? ' active' : ''}`}
-              onClick={() => onOpenConv(currentConv.key)}
+              className={`sb-rail-btn${page === 'chat' ? ' active' : ''}${convPop ? ' open' : ''}`}
+              onClick={(e) => setConvPop(convPop ? null : { el: e.currentTarget })}
               aria-label="Chat"
+              aria-expanded={!!convPop}
               title="Chat"
             >
               <Icon name="chat" size={20} />
@@ -105,6 +186,20 @@ export default function Sidebar({
             </button>
           )}
         </nav>
+        {convPop && (
+          <ConvPop
+            anchor={convPop}
+            convs={convs}
+            currentConv={currentConv}
+            page={page}
+            unread={unread}
+            actor={actor}
+            dmsOn={dmsOn}
+            onOpenConv={onOpenConv}
+            onNewDm={onNewDm}
+            onClose={() => setConvPop(null)}
+          />
+        )}
         <div className="sb-foot">{me}</div>
       </aside>
     );
@@ -121,9 +216,11 @@ export default function Sidebar({
           </span>
         </button>
         <span className="sb-top-tools">{topRight}</span>
-        {shiftRow && <div className="sb-shift-row">{shiftRow}</div>}
       </div>
-      <nav className="sb-scroll" aria-label="Pages">
+      {/* Under the top band, so the band stays the chat header's height and
+          their dividing lines meet. */}
+      {shiftRow && <div className="sb-shift-row">{shiftRow}</div>}
+      <nav className="sb-scroll" aria-label="Pages" ref={navRef}>
         {GROUPS.map(([title, ids]) => {
           const shown = ids.filter(show);
           if (!shown.length) return null;
@@ -195,7 +292,7 @@ export default function Sidebar({
                       key={c.key}
                       icon={others.length === 1 ? <Avatar name={others[0]} size={24} showOnline /> : <Icon name="team" />}
                       label={c.short}
-                      active={page === 'chat' && currentConv?.key === c.key}
+                      active={dmOn(c)}
                       count={u?.count || 0}
                       strong={u?.count > 0}
                       onClick={() => onOpenConv(c.key)}
@@ -203,6 +300,11 @@ export default function Sidebar({
                   );
                 })}
                 {!dms.length && <p className="sb-hint">No messages yet.</p>}
+                {(allDms ? convs.dms.length > DMS_SHOWN : dms.length < convs.dms.length) && (
+                  <button className="sb-more" onClick={() => setAllDms(!allDms)} aria-expanded={allDms}>
+                    {allDms ? 'Show fewer' : `Show all ${convs.dms.length}`}
+                  </button>
+                )}
               </>
             )}
             {isManager && convs.teamDms.length > 0 && (

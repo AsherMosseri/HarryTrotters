@@ -182,9 +182,14 @@ export function SignInScreen({ rename, account, saveTicket, current, onSignedIn 
   const [err, setErr] = useState('');
 
   // Which step: sign in, or make a first password (once a name is picked).
+  // A new name starts with empty boxes: the password typed for someone else
+  // isn't theirs.
   useEffect(() => {
     setStep(null);
     setErr('');
+    setPassword('');
+    setAgain('');
+    setCode('');
     if (!name || (picked === OTHER && name.length < 3)) return;
     let alive = true;
     const t = setTimeout(

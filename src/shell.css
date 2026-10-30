@@ -500,7 +500,7 @@ button.sb-head-row { width: 100%; border: 0; background: none; color: var(--mute
    the left edge. */
 .sb-top { flex-wrap: wrap; }
 .sb-team { flex: 1 1 auto; }
-.sb-shift-row { flex: 1 0 100%; padding: 4px 2px 2px; }
+.sb-shift-row { flex: none; padding: 8px 8px 0; }
 .sb-shift-row .shift-wrap { display: block; }
 .sb-shift-row .shift-pill { width: 100%; justify-content: flex-start; padding: 7px 12px; font-size: 14px; border-radius: 9px; }
 .sidebar .shift-pop { left: 0; right: auto; }
@@ -730,7 +730,6 @@ button.sb-head-row { width: 100%; border: 0; background: none; color: var(--mute
   box-sizing: border-box; min-height: var(--top-h); padding-top: var(--top-pad); padding-bottom: 0;
   border-bottom: 1px solid rgb(255 255 255 / 10%); align-content: center;
 }
-.sb-top:has(.sb-shift-row) { padding-bottom: 8px; }
 .shell .chat-head { box-sizing: border-box; min-height: var(--top-h); padding-top: var(--top-pad); padding-bottom: 0; }
 /* The chat header keeps the regular font, so the name, its picture or #, and
    the topic sit on one even line; the condensed font is for page titles. */
@@ -831,3 +830,60 @@ html.kb-bar .composer { padding-bottom: calc(10px + var(--kb-bar, 0px)); }
 /* iPad: a press or a small drag on a button's label selected the text
    instead of tapping the button. */
 button, [role='button'] { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+
+/* Folded sidebar: the chat button lists every channel and DM beside it. */
+.sb-conv-pop {
+  position: fixed; z-index: 45; width: 260px; overflow-y: auto; overscroll-behavior: contain; padding: 6px;
+  background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow-lg);
+  display: flex; flex-direction: column; animation: fade 0.12s ease;
+}
+.cp-head { margin: 0; padding: 6px 8px 4px; font-size: 13px; font-weight: 600; color: var(--muted); }
+.cp-head-row { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; padding-right: 2px; }
+.sb-conv-pop .sb-add, .sb-conv-pop .sb-hint { color: var(--muted); }
+.sb-conv-pop .sb-add:hover { background: color-mix(in srgb, var(--text) 8%, transparent); color: var(--text); }
+.cp-row {
+  display: flex; align-items: center; gap: 10px; min-height: 36px; padding: 0 8px; border: 0; border-radius: 7px;
+  background: none; color: var(--text); font-size: 15px; text-align: left; flex: none;
+}
+.cp-row .icon { color: var(--muted); flex: none; }
+.cp-row .avatar-wrap, .cp-row .deco { flex: none; }
+.cp-row:hover { background: color-mix(in srgb, var(--text) 6%, transparent); }
+.cp-row.on { background: color-mix(in srgb, var(--accent) 13%, transparent); color: var(--accent); font-weight: 600; }
+.cp-row.on .icon { color: var(--accent); }
+.cp-row.strong .sb-label { font-weight: 650; }
+.cp-count { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.cp-count.strong { color: var(--danger); font-weight: 700; }
+.sb-rail-btn.open { background: rgb(255 255 255 / 14%); color: #fff; }
+/* "Show all" under the DMs, when there are more than fit. */
+.sb-more { align-self: flex-start; border: 0; background: none; padding: 6px 8px; margin-top: 1px; border-radius: 7px; font-size: 13px; font-weight: 600; color: var(--sb-muted); }
+.sb-more:hover { color: #fff; background: rgb(255 255 255 / 8%); }
+/* Controls > Accounts: the reset question gets its own line instead of
+   squeezing the row's details into a sliver. */
+.acct-row { flex-wrap: wrap; row-gap: 6px; }
+.acct-row > .grow { flex: 1 1 200px; min-width: 0; }
+.acct-confirm { flex: 1 0 100%; display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px; text-align: right; }
+/* Buttons stretched to fill a row (Change password, Message on a profile)
+   keep their words centered. */
+.password-dialog > .btn, .btn.grow { justify-content: center; }
+.pc-full { display: inline-flex; align-items: center; gap: 2px; }
+/* Phones: the full profile's own colors run to the bottom edge (the space
+   for the home bar is inside it, not a plain strip under it). */
+@media (max-width: 760px) {
+  .panel-backdrop.center > .dialog.profile-page { padding-bottom: 0; }
+  .dialog.profile-page .pp { padding-bottom: env(safe-area-inset-bottom); }
+}
+/* Appearance fits an iPad screen without scrolling: four themes a row. */
+.dialog.appearance { width: min(500px, 100%); }
+.dialog.appearance .tt-pic { height: 46px; }
+
+/* iPad and computer: the strip under the status bar (see the .status-bar-band
+   note in styles.css) lets the sidebar and the page show through, instead of
+   a page-colored strip across the top of the navy sidebar. */
+body:has(.shell:not(.phone-shell)) .status-bar-band { background: transparent; }
+/* Phones: unread chat on its row in More (the More tab shows the total). */
+.more-badge {
+  min-width: 22px; height: 22px; padding: 0 6px; border-radius: 999px; background: var(--danger); color: #fff;
+  font-size: 12.5px; font-weight: 700; display: grid; place-items: center; font-variant-numeric: tabular-nums;
+}
+/* Phones: Board or Table, as two icons beside the filters. */
+.seg.seg-icons button { padding: 6px 9px; }
