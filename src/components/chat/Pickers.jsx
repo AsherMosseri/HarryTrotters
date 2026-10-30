@@ -361,16 +361,25 @@ export function GifPicker({ onPick, onUpload, onClose }) {
 }
 
 // Create a poll: a question, 2–10 options, one or several choices.
-export function PollDialog({ onCreate, onClose, canRequire = false, initialQuestion = '' }) {
-  const [question, setQuestion] = useState(initialQuestion);
+// New poll, or editing one (editing: the posted poll; its choices keep their
+// ids so votes stay with them, and new ones get the next free id).
+export function PollDialog({ onCreate, onClose, canRequire = false, initialQuestion = '', editing = null }) {
+  const [question, setQuestion] = useState(editing?.question ?? initialQuestion);
   // 'choices': pick from options; 'text': everyone writes their own answer.
-  const [kind, setKind] = useState('choices');
-  const [options, setOptions] = useState(['', '']);
-  const [multi, setMulti] = useState(false);
-  const [required, setRequired] = useState(false);
+  const [kind, setKind] = useState(editing?.kind === 'text' ? 'text' : 'choices');
+  const [options, setOptions] = useState(editing?.options?.length ? editing.options.map((o) => ({ ...o })) : [{ text: '' }, { text: '' }]);
+  const [multi, setMulti] = useState(!!editing?.multi);
+  // Choices, plus a box to write your own answer (or both).
+  const [write, setWrite] = useState(!!editing?.write);
+  const [required, setRequired] = useState(!!editing?.required);
   useEscape(onClose);
-  const filled = options.map((o) => o.trim()).filter(Boolean);
-  const ok = question.trim() && (kind === 'text' || filled.length >= 2);
+  const filled = options.filter((o) => o.text.trim());
+  const ok = question.trim() && (kind === 'text' || filled.length >= 2 || (write && filled.length >= 1));
+  const nextId = () => {
+    const used = new Set(options.map((o) => o.id).filter(Boolean));
+    for (let i = 0; i < 26; i++) if (!used.has(String.fromCharCode(97 + i))) return String.fromCharCode(97 + i);
+    return `o${Date.now().toString(36)}`;
+  };
   return (
     <Overlay>
       <div className="panel-backdrop center" onClick={onClose}>
@@ -380,20 +389,23 @@ export function PollDialog({ onCreate, onClose, canRequire = false, initialQuest
           onSubmit={(e) => {
             e.preventDefault();
             if (!ok) return;
+            const used = new Set();
+            const ids = filled.slice(0, 10).map((o) => {
+              let id = o.id;
+              for (let i = 0; !id || used.has(id); i++) id = String.fromCharCode(97 + i);
+              used.add(id);
+              return { id, text: o.text.trim().slice(0, 200) };
+            });
             onCreate({
+              ...(editing || {}),
               question: question.trim().slice(0, 500),
-              ...(required ? { required: true } : {}),
-              ...(kind === 'text'
-                ? { kind: 'text', multi: false, options: [] }
-                : {
-                    multi,
-                    options: filled.slice(0, 10).map((text, i) => ({ id: String.fromCharCode(97 + i), text: text.slice(0, 200) })),
-                  }),
+              required,
+              ...(kind === 'text' ? { kind: 'text', multi: false, write: false, options: [] } : { kind: 'choices', multi, write, options: ids }),
             });
           }}
         >
           <div className="panel-head">
-            <h2>New poll</h2>
+            <h2>{editing ? 'Edit poll' : 'New poll'}</h2>
             <span className="spacer" />
             <button type="button" className="icon-btn" onClick={onClose} aria-label="Close">
               <CloseIcon />
@@ -411,6 +423,7 @@ export function PollDialog({ onCreate, onClose, canRequire = false, initialQuest
                 aria-checked={kind === id}
                 className={`plain-seg${kind === id ? ' on' : ''}`}
                 onClick={() => setKind(id)}
+                disabled={!!editing && editing.kind !== id && (id === 'text' || editing.kind === 'text')}
               >
                 {label}
               </button>
@@ -427,15 +440,15 @@ export function PollDialog({ onCreate, onClose, canRequire = false, initialQuest
           {kind === 'text' && <p className="muted small poll-kind-hint">Everyone types their own answer. Answers show under the poll.</p>}
           {kind === 'choices' &&
             options.map((o, i) => (
-              <div key={i} className="row gap">
+              <div key={o.id || `new${i}`} className="row gap">
                 <AutoTextarea
                   className="input grow"
-                  value={o}
-                  onChange={(e) => setOptions(options.map((x, j) => (j === i ? e.target.value : x)))}
+                  value={o.text}
+                  onChange={(e) => setOptions(options.map((x, j) => (j === i ? { ...x, text: e.target.value } : x)))}
                   placeholder={`Option ${i + 1}`}
                   maxLength={200}
                 />
-                {options.length > 2 && (
+                {options.length > (write ? 1 : 2) && (
                   <button
                     type="button"
                     className="icon-btn small"
@@ -448,13 +461,18 @@ export function PollDialog({ onCreate, onClose, canRequire = false, initialQuest
               </div>
             ))}
           {kind === 'choices' && options.length < 10 && (
-            <button type="button" className="link-btn" onClick={() => setOptions([...options, ''])}>
+            <button type="button" className="link-btn" onClick={() => setOptions([...options, { id: editing ? nextId() : undefined, text: '' }])}>
               ＋ Add option
             </button>
           )}
           {kind === 'choices' && (
             <label className="row gap small">
               <input type="checkbox" checked={multi} onChange={(e) => setMulti(e.target.checked)} /> Allow picking more than one
+            </label>
+          )}
+          {kind === 'choices' && (
+            <label className="row gap small">
+              <input type="checkbox" checked={write} onChange={(e) => setWrite(e.target.checked)} /> Also let people write their own answer
             </label>
           )}
           {canRequire && (
@@ -467,7 +485,7 @@ export function PollDialog({ onCreate, onClose, canRequire = false, initialQuest
             </label>
           )}
           <button className="btn primary big-btn" disabled={!ok}>
-            Post poll
+            {editing ? 'Save poll' : 'Post poll'}
           </button>
         </form>
       </div>

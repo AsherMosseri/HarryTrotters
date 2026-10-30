@@ -332,6 +332,8 @@ export function PollGate({ msg, rename, onVote, onAnswer, onSkip }) {
   const [picked, setPicked] = useState([]);
   const [answer, setAnswer] = useState('');
   const written = msg.poll.kind === 'text';
+  // A choice poll that also takes written answers: pick, write, or both.
+  const both = !written && !!msg.poll.write;
   const [busy, setBusy] = useState(false);
   const { poll } = msg;
   const toggle = (id) => setPicked(poll.multi ? (picked.includes(id) ? picked.filter((x) => x !== id) : [...picked, id]) : [id]);
@@ -343,7 +345,8 @@ export function PollGate({ msg, rename, onVote, onAnswer, onSkip }) {
           <h1 id="pollgate-title">{poll.question}</h1>
           <p className="muted">
             Poll from {firstName(rename(msg.by || ''))} in #announcements.{' '}
-            {written ? 'Write your answer' : poll.multi ? 'Pick one or more' : 'Pick one'} to keep going.
+            {written ? 'Write your answer' : `${poll.multi ? 'Pick one or more' : 'Pick one'}${both ? ', or write your own' : ''}`} to keep
+            going.
           </p>
           {written && (
             <AutoTextarea
@@ -368,12 +371,25 @@ export function PollGate({ msg, rename, onVote, onAnswer, onSkip }) {
               </button>
             ))}
           </div>
+          {both && (
+            <AutoTextarea
+              className="input"
+              value={answer}
+              onChange={(e) => setAnswer(e.target.value)}
+              placeholder="Or write your own answer"
+              maxLength={1000}
+            />
+          )}
           <button
             className="btn primary big-btn"
-            disabled={(written ? !answer.trim() : !picked.length) || busy}
+            disabled={(written ? !answer.trim() : !picked.length && !(both && answer.trim())) || busy}
             onClick={async () => {
               setBusy(true);
-              await (written ? onAnswer(answer) : onVote(picked));
+              if (written) await onAnswer(answer);
+              else {
+                if (picked.length) await onVote(picked);
+                if (both && answer.trim()) await onAnswer(answer.trim());
+              }
               setBusy(false);
             }}
           >

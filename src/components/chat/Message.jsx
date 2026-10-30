@@ -5,7 +5,7 @@ import { CommandCard, Trotbot } from './Commands.jsx';
 import { AutoTextarea, Avatar, DisplayName, Overlay, StatusDot, usePeople } from '../common.jsx';
 import { borderProps } from '../../borders.js';
 import { isJumbo, renderRich } from './format.jsx';
-import { EmojiPicker, QUICK_MAX } from './Pickers.jsx';
+import { EmojiPicker, PollDialog, QUICK_MAX } from './Pickers.jsx';
 import { CUSTOM_RE } from './emoji.js';
 import { isCoinCommand, useControls } from '../../controls.js';
 
@@ -119,12 +119,29 @@ function LinkPreview({ p, canHide, onHide }) {
 
 // A written-answer poll: everyone types their own answer (votes.text).
 function TextPoll({ m, actor, onAnswer, onEnd, onReopen, canEnd }) {
+  const answers = Object.keys(m.votes?.text || {}).length;
+  const closed = !!m.poll.closed;
+  return (
+    <div className="poll poll-text" onClick={(e) => e.stopPropagation()}>
+      <div className="poll-q">{m.poll.question}</div>
+      <div className="muted tiny">
+        {closed ? 'Poll ended' : 'Write your answer'} · {answers} {answers === 1 ? 'answer' : 'answers'}
+        {m.poll.required && !closed && <span className="poll-required"> · Everyone has to answer</span>}
+      </div>
+      <WrittenAnswers m={m} actor={actor} onAnswer={onAnswer} closed={closed} />
+      {canEnd && <PollControls closed={closed} onEnd={onEnd} onReopen={onReopen} />}
+    </div>
+  );
+}
+
+// The written answers under a poll (a written-answer poll, or a choice poll
+// that also takes written answers), with a box to write or edit yours.
+function WrittenAnswers({ m, actor, onAnswer, closed, optional }) {
   const me = personId(actor.name);
   const answers = Object.entries(m.votes?.text || {})
     .map(([id, a]) => ({ id, ...a }))
     .sort((a, b) => (a.at || 0) - (b.at || 0));
   const mine = m.votes?.text?.[me];
-  const closed = !!m.poll.closed;
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
   const [all, setAll] = useState(false);
@@ -134,19 +151,15 @@ function TextPoll({ m, actor, onAnswer, onEnd, onReopen, canEnd }) {
     setEditing(false);
   };
   return (
-    <div className="poll poll-text" onClick={(e) => e.stopPropagation()}>
-      <div className="poll-q">{m.poll.question}</div>
-      <div className="muted tiny">
-        {closed ? 'Poll ended' : 'Write your answer'} · {answers.length} {answers.length === 1 ? 'answer' : 'answers'}
-        {m.poll.required && !closed && <span className="poll-required"> · Everyone has to answer</span>}
-      </div>
+    <div className={optional ? 'poll-write' : undefined}>
+      {optional && <div className="muted tiny poll-write-head">{closed ? 'Written answers' : 'Or write your own'}</div>}
       {!closed && (!mine || editing) && (
         <div className="poll-answer-box">
           <AutoTextarea
             className="input"
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            placeholder="Your answer"
+            placeholder={optional ? 'Your own answer' : 'Your answer'}
             maxLength={1000}
             aria-label="Your answer"
           />
@@ -191,7 +204,6 @@ function TextPoll({ m, actor, onAnswer, onEnd, onReopen, canEnd }) {
           {all ? 'Show fewer' : `Show all ${answers.length} answers`}
         </button>
       )}
-      {canEnd && <PollControls closed={closed} onEnd={onEnd} onReopen={onReopen} />}
     </div>
   );
 }
@@ -233,10 +245,10 @@ function PollControls({ closed, onEnd, onReopen }) {
 
 function Poll({ m, actor, onVote, onEnd, onReopen, canEnd, onAnswer }) {
   if (m.poll.kind === 'text') return <TextPoll m={m} actor={actor} onAnswer={onAnswer} onEnd={onEnd} onReopen={onReopen} canEnd={canEnd} />;
-  return <ChoicePoll m={m} actor={actor} onVote={onVote} onEnd={onEnd} onReopen={onReopen} canEnd={canEnd} />;
+  return <ChoicePoll m={m} actor={actor} onVote={onVote} onEnd={onEnd} onReopen={onReopen} canEnd={canEnd} onAnswer={onAnswer} />;
 }
 
-function ChoicePoll({ m, actor, onVote, onEnd, onReopen, canEnd }) {
+function ChoicePoll({ m, actor, onVote, onEnd, onReopen, canEnd, onAnswer }) {
   const me = personId(actor.name);
   const votes = m.votes || {};
   const counts = m.poll.options.map((o) => Object.keys(votes[o.id] || {}).length);
@@ -247,7 +259,8 @@ function ChoicePoll({ m, actor, onVote, onEnd, onReopen, canEnd }) {
     <div className="poll" onClick={(e) => e.stopPropagation()}>
       <div className="poll-q">{m.poll.question}</div>
       <div className="muted tiny">
-        {closed ? 'Poll ended' : m.poll.multi ? 'Pick one or more' : 'Pick one'} · {voters.size} {voters.size === 1 ? 'vote' : 'votes'}
+        {closed ? 'Poll ended' : `${m.poll.multi ? 'Pick one or more' : 'Pick one'}${m.poll.write ? ' or write your own' : ''}`} · {voters.size}{' '}
+        {voters.size === 1 ? 'vote' : 'votes'}
         {m.poll.required && !closed && <span className="poll-required"> · Everyone has to answer</span>}
       </div>
       {m.poll.options.map((o, i) => {
@@ -273,6 +286,7 @@ function ChoicePoll({ m, actor, onVote, onEnd, onReopen, canEnd }) {
           </button>
         );
       })}
+      {m.poll.write && <WrittenAnswers m={m} actor={actor} onAnswer={onAnswer} closed={closed} optional />}
       {canEnd && <PollControls closed={closed} onEnd={onEnd} onReopen={onReopen} />}
     </div>
   );
@@ -408,6 +422,7 @@ export default function Message({
 }) {
   const [picker, setPicker] = useState(false);
   const [removing, setRemoving] = useState(false);
+  const [editPoll, setEditPoll] = useState(false);
   const actionsRef = useRef(null);
   const quick = quickOf(usePeople()?.profileOf(actor.name));
   const feat = useControls().isOn;
@@ -657,6 +672,11 @@ export default function Message({
               <Icon name="tasks" size={18} /> Task
             </button>
           )}
+          {m.poll && feat('polls') && (mine || isManager) && (
+            <button onClick={() => setEditPoll(true)} title="Edit poll: question, choices, written answers" aria-label="Edit poll">
+              <Icon name="edit" size={18} />
+            </button>
+          )}
           {mine && feat('editing') && !m.poll && !m.cmd && (
             <button onClick={() => onEdit(m)} title="Edit" aria-label="Edit">
               <Icon name="edit" size={18} />
@@ -704,6 +724,16 @@ export default function Message({
             </FloatingPicker>
           )}
         </div>
+      )}
+      {editPoll && (
+        <PollDialog
+          editing={m.poll}
+          onClose={() => setEditPoll(false)}
+          onCreate={async (poll) => {
+            await api.editMessage(conv, m.id, { poll });
+            setEditPoll(false);
+          }}
+        />
       )}
     </div>
   );
