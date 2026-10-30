@@ -11,14 +11,20 @@ self.addEventListener('push', (event) => {
     payload = { data: { title: event.data?.text() || 'FTC 32313' } };
   }
   const d = { ...(payload.notification || {}), ...(payload.data || {}) };
+  // The Home Screen icon's number: unread notifications, counted by the server.
+  const count = Number(d.badge);
+  const badge = Number.isFinite(count) && self.navigator.setAppBadge ? self.navigator.setAppBadge(count).catch(() => {}) : null;
   event.waitUntil(
-    self.registration.showNotification(d.title || 'FTC 32313 Tasks', {
-      body: d.body || '',
-      tag: d.tag || undefined,
-      icon: 'icon-192.png',
-      badge: 'icon-192.png',
-      data: { open: d.open || '' },
-    }),
+    Promise.all([
+      badge,
+      self.registration.showNotification(d.title || 'FTC 32313 Tasks', {
+        body: d.body || '',
+        tag: d.tag || undefined,
+        icon: 'icon-192.png',
+        badge: 'icon-192.png',
+        data: { open: d.open || '' },
+      }),
+    ]),
   );
 });
 

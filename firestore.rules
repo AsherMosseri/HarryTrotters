@@ -279,6 +279,12 @@ service cloud.firestore {
     // Private notes about teammates: only the person who wrote them can read
     // or change them (notes/{their id}).
     function myId() { return myName().lower().replace('[^a-z0-9]+', '-').replace('^-|-$', ''); }
+    // How far you've read each conversation (so every device agrees). Only yours.
+    match /chatReads/{id} {
+      allow read: if isMember() && id == myId();
+      allow create, update: if isMember() && id == myId() && request.resource.data.owner == myName()
+        && request.resource.data.reads is map && request.resource.data.reads.size() <= 400;
+    }
     match /notes/{id} {
       allow read: if isMember() && id == myId();
       allow create, update: if isMember() && id == myId() && request.resource.data.owner == myName()

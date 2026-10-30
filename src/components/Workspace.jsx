@@ -310,7 +310,37 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
   useEffect(() => {
     document.documentElement.classList.toggle('calm-chat', calm !== false);
   }, [calm]);
-  const [chatRead, setChatRead] = useLocalStorage('chat-read', null); // { [channelId]: ms read up to }
+  // How far you've read each conversation ({ [conv key]: ms }): saved with your
+  // account so every device agrees, and on this device so it shows at once.
+  // Each conversation keeps the furthest point read anywhere.
+  const [localRead, setLocalRead] = useLocalStorage('chat-read', null);
+  const [cloudRead, setCloudRead] = useState(undefined); // undefined until it loads
+  useEffect(
+    () =>
+      store.subscribeChatReads(actor.name, setCloudRead, (e) => {
+        console.warn('chat reads', e);
+        setCloudRead((prev) => prev ?? {});
+      }),
+    [store, actor.name],
+  );
+  const chatRead = useMemo(() => {
+    if (cloudRead === undefined) return localRead; // this device's copy until the account's loads
+    if (!localRead && !Object.keys(cloudRead).length) return null; // first use anywhere
+    const out = { ...(localRead || {}) };
+    for (const [k, v] of Object.entries(cloudRead)) if (!(out[k] >= v)) out[k] = v;
+    return out;
+  }, [localRead, cloudRead]);
+  const cloudReadNow = useRef(cloudRead);
+  cloudReadNow.current = cloudRead;
+  const setChatRead = useCallback(
+    (next) => {
+      setLocalRead(next);
+      const have = cloudReadNow.current || {};
+      const ahead = Object.fromEntries(Object.entries(next).filter(([k, v]) => typeof v === 'number' && !(have[k] >= v)));
+      if (Object.keys(ahead).length) store.saveChatReads(actor.name, ahead).catch((e) => console.warn('chat reads', e));
+    },
+    [setLocalRead, store, actor.name],
+  );
   const [settings, setSettings] = useState({});
   const [cat, setCat] = useState(false);
   const [welcomed, setWelcomed] = useLocalStorage('welcome-seen-v1', false);
@@ -791,17 +821,19 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
     if (missing.length) store.mergeRenames(Object.fromEntries(missing)).catch((e) => console.warn('renames', e));
   }, [actor.admin, renames, store]);
 
-  // Unread chat: other people's messages newer than what this device has read.
-  // On first use everything already there counts as read.
+  // Unread chat: other people's messages newer than what you've read (on any
+  // device). On first use everything already there counts as read.
   useEffect(() => {
     // First use, or a channel added since: start it as "read up to now". A new
-    // DM starts unread, so its first message shows up.
+    // DM starts unread, so its first message shows up. Not before your
+    // account's copy has loaded (a new device would mark everything read).
+    if (cloudRead === undefined) return;
     const keys = [...convs.channels, ...convs.dms];
     if (chatRead === null) setChatRead(Object.fromEntries(keys.map((c) => [c.key, c.kind === 'dm' ? (c.createdAt || 1) - 1 : Date.now()])));
     else if (keys.some((c) => !(c.key in chatRead))) {
       setChatRead({ ...Object.fromEntries(keys.map((c) => [c.key, c.kind === 'dm' ? (c.createdAt || 1) - 1 : Date.now()])), ...chatRead });
     }
-  }, [chatRead, setChatRead, convs]);
+  }, [chatRead, setChatRead, convs, cloudRead]);
   const unread = useMemo(() => {
     const out = {};
     const myRoles = peopleInfo.get(actor.name)?.subteams || [];
@@ -1132,7 +1164,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
     const out = [];
     if (openId) out.push(`task:${openId}`);
     if (shownConv) out.push(`chat:${shownConv.key}`);
-    if (view === 'board') out.push('view:board');
+    if (view === 'board' || view === 'table') out.push('view:board');
     if (showRequests) out.push(...requests.map((r) => `requests:${r.id}`));
     if (view === 'shifts') out.push('view:shifts');
     if (shiftPanel) out.push('shift:end');
@@ -1148,6 +1180,21 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
       .then((list) => list?.forEach((n) => seenTarget.includes(n.data?.open) && n.close()))
       .catch(() => {});
   }, [seenTarget, inbox, store, actor.name]);
+  // Read anywhere (on another device, or in the bell list): take its phone
+  // notification off this device's lock screen too.
+  const readOpens = useMemo(() => {
+    const unreadOpen = new Set(inbox.filter((n) => !n.read).map((n) => n.open));
+    return [...new Set(inbox.filter((n) => n.read && n.open && !unreadOpen.has(n.open)).map((n) => n.open))].join('|');
+  }, [inbox]);
+  useEffect(() => {
+    if (!readOpens) return;
+    const done = new Set(readOpens.split('|'));
+    navigator.serviceWorker
+      ?.getRegistration?.()
+      .then((reg) => reg?.getNotifications?.())
+      .then((list) => list?.forEach((n) => done.has(n.data?.open) && n.close()))
+      .catch(() => {});
+  }, [readOpens]);
 
   // This person's running shift, and starting one (with Undo for mis-taps).
   const myShift = useMemo(() => shifts.find((s) => !s.end && rename(s.person || '') === actor.name) || null, [shifts, rename, actor.name]);

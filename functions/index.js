@@ -121,14 +121,34 @@ async function notify(notes) {
     const person = rename(name);
     byPerson.set(person, [...(byPerson.get(person) || []), t.id]);
   }
+  // How many unread notifications each person has now, for the number on the
+  // app's Home Screen icon (the service worker sets it when the push arrives).
+  const unreadOf = new Map();
+  const unreadFor = async (person) => {
+    if (!unreadOf.has(person))
+      unreadOf.set(
+        person,
+        await db
+          .collection('inbox')
+          .doc(personId(person))
+          .collection('items')
+          .where('read', '==', false)
+          .count()
+          .get()
+          .then((c) => c.data().count)
+          .catch(() => 0),
+      );
+    return unreadOf.get(person);
+  };
   for (const n of notes) {
     if (n.quiet) continue; // inbox only (no buzz at night)
     const list = byPerson.get(rename(n.to)) || [];
     if (!list.length) continue;
+    const badge = String(await unreadFor(rename(n.to)));
     // Data-only, so the site's service worker decides how to show it.
     const res = await getMessaging().sendEachForMulticast({
       tokens: list,
-      data: { title: n.title, body: n.body || '', open: n.open || '', tag: n.tag || n.open || n.type },
+      data: { title: n.title, body: n.body || '', open: n.open || '', tag: n.tag || n.open || n.type, badge },
       webpush: { headers: { Urgency: 'high', TTL: String(24 * 3600) } },
     });
     res.responses.forEach((r, i) => {

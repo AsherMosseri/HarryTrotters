@@ -1163,6 +1163,13 @@ export const demoStore = {
     state.resources = (state.resources || []).filter((r) => r.id !== id);
     commit();
   },
+  subscribeChatReads(owner, cb) {
+    return listen(() => cb({ ...(state.chatReads || {}) }));
+  },
+  async saveChatReads(owner, reads) {
+    state.chatReads = { ...(state.chatReads || {}), ...reads };
+    commit();
+  },
   subscribeNotes(owner, cb) {
     return listen(() => cb({ ...(state.notes || {}) }));
   },

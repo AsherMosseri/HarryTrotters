@@ -581,6 +581,14 @@ export const firebaseStore = {
     return deleteDoc(doc(resourcesCol, id));
   },
   // Private notes you keep about teammates: notes/{your id} = { owner, notes: { [name]: text } }.
+  // How far each person has read each conversation ({ [conv key]: ms }), so
+  // reading on the iPad marks it read on the phone too. Only yours.
+  subscribeChatReads(owner, cb, onError) {
+    return onSnapshot(doc(db, 'chatReads', personId(owner)), (snap) => cb(snap.exists() ? snap.data().reads || {} : {}), onError);
+  },
+  saveChatReads(owner, reads) {
+    return setDoc(doc(db, 'chatReads', personId(owner)), { owner, reads }, { merge: true });
+  },
   subscribeNotes(owner, cb, onError) {
     return onSnapshot(doc(notesCol, personId(owner)), (snap) => cb(snap.exists() ? snap.data().notes || {} : {}), onError);
   },
