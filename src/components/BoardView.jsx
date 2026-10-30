@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   DndContext,
   pointerWithin,
@@ -201,6 +201,32 @@ export default function BoardView({ tasks, milestones = [], api, onOpen, onAdd, 
     return map;
   }, [tasks, milestones]);
 
+  // Where the finger or mouse really is while dragging. The board only scrolls
+  // sideways with it right at an edge: dnd-kit sometimes judged a pointer in the
+  // middle to be at the edge, and the board slid away mid-drag.
+  const pointer = useRef(null);
+  useEffect(() => {
+    if (!activeId) return;
+    const move = (e) => {
+      const t = e.touches?.[0] || e;
+      pointer.current = { x: t.clientX, y: t.clientY };
+    };
+    window.addEventListener('pointermove', move, true);
+    window.addEventListener('touchmove', move, true);
+    return () => {
+      window.removeEventListener('pointermove', move, true);
+      window.removeEventListener('touchmove', move, true);
+      pointer.current = null;
+    };
+  }, [activeId]);
+  const canScroll = useCallback((el) => {
+    if (!el.classList?.contains('board')) return true;
+    const at = pointer.current;
+    if (!at) return false;
+    const r = el.getBoundingClientRect();
+    return at.x < r.left + 56 || at.x > r.right - 56;
+  }, []);
+
   // The column's copy, so the drag preview keeps its milestone name.
   const active = activeId ? Object.values(columns).flat().find((t) => t.id === activeId) : null;
   if (phone) return <PhoneBoard columns={columns} onOpen={onOpen} onAdd={onAdd} />;
@@ -209,6 +235,7 @@ export default function BoardView({ tasks, milestones = [], api, onOpen, onAdd, 
     <DndContext
       sensors={sensors}
       collisionDetection={collision}
+      autoScroll={{ threshold: { x: 0.08, y: 0.1 }, acceleration: 6, canScroll }}
       onDragStart={(e) => setActiveId(e.active.id)}
       onDragCancel={() => setActiveId(null)}
       onDragEnd={(e) => {
