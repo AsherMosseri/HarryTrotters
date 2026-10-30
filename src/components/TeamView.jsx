@@ -5,6 +5,9 @@ import {
   GRADES,
   gradeLabel,
   isManagerName,
+  cleanName,
+  knownName,
+  sameName,
   ORG_DEFAULTS,
   ORG_GROUPS,
   SUBTEAM_COLORS,
@@ -31,9 +34,9 @@ function PersonDialog({ person, taken, onClose, onSave, onRemove, onPerson }) {
   const [name, setName] = useState(person.name || '');
   const canRename = !person.isNew && !isManagerName(person.name);
   const nameChanged = person.isNew || name.trim() !== person.name;
-  const nameTaken = nameChanged && taken.some((n) => n !== person.name && n.toLowerCase() === name.trim().toLowerCase());
+  const nameTaken = nameChanged && taken.some((n) => n !== person.name && sameName(n, name));
   const managerName = nameChanged && isManagerName(name);
-  const nameError = nameTaken ? `${name.trim()} is already on the team.` : managerName ? 'That name belongs to a team manager.' : '';
+  const nameError = nameTaken ? `${knownName(name, taken)} is already on the team.` : managerName ? 'That name belongs to a team manager.' : '';
   const [title, setTitle] = useState(person.title || '');
   const [subteams, setSubteams] = useState(person.subteams || []);
   const [resp, setResp] = useState((person.responsibilities || []).join('\n'));
@@ -50,7 +53,7 @@ function PersonDialog({ person, taken, onClose, onSave, onRemove, onPerson }) {
             e.preventDefault();
             if (!name.trim() || nameError) return;
             onSave({
-              name: person.isNew || canRename ? name.trim() : person.name,
+              name: person.isNew || canRename ? cleanName(name) : person.name,
               removed: false,
               title: title.trim(),
               grade,

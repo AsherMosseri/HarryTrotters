@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { TEAM_NAME, TEAM_NICKNAME, ROSTER, PASSWORD_MIN } from '../config.js';
+import { TEAM_NAME, TEAM_NICKNAME, ROSTER, PASSWORD_MIN, cleanName, sameName } from '../config.js';
 import { Avatar } from './common.jsx';
 
 function Shell({ children }) {
@@ -170,7 +170,10 @@ export function SignInScreen({ rename, account, saveTicket, current, onSignedIn 
   const names = [...new Set(ROSTER.map(rename))];
   const [picked, setPicked] = useState(current && names.includes(current) ? current : current ? OTHER : '');
   const [other, setOther] = useState(current && !names.includes(current) ? current : '');
-  const name = (picked === OTHER ? other : picked).trim();
+  // "Someone else" can't be a second copy of someone on the team: a name that
+  // matches one (any capitals, spaces, or dots) is that person.
+  const sameAs = picked === OTHER ? names.find((n) => sameName(n, other)) : null;
+  const name = sameAs || (picked === OTHER ? cleanName(other) : picked);
   const [step, setStep] = useState(null); // null | { hasPassword, thisDevice }
   const [password, setPassword] = useState('');
   const [again, setAgain] = useState('');
@@ -252,6 +255,7 @@ export function SignInScreen({ rename, account, saveTicket, current, onSignedIn 
             autoFocus
           />
         )}
+        {sameAs && <p className="small muted">{sameAs} is already on the team, so that’s who you’d sign in as.</p>}
         {name && step && (
           <>
             {creating && <p className="small muted">{name.split(' ')[0]} doesn’t have a password yet. Make one (at least {PASSWORD_MIN} characters).</p>}

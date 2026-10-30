@@ -15,7 +15,7 @@ export const TEAM_NICKNAME = 'Harry Trotters';
 // Team managers. Joining under one of these names also needs that person's
 // manager code (checked by firestore.rules), and unlocks editing the org chart,
 // adding and removing people, deleting milestones, and changing the competition date.
-export { MANAGER_NAMES, isManagerName, PASSWORD_MIN } from '../functions/shared/team.js';
+export { MANAGER_NAMES, isManagerName, PASSWORD_MIN, cleanName, knownName, sameName } from '../functions/shared/team.js';
 import { MANAGER_NAMES } from '../functions/shared/team.js';
 // Old spellings still stored on devices or tasks, mapped to the right name.
 // Renames made on the Team tab are stored in the database (settings/names).

@@ -16,7 +16,7 @@ import { coinSettings, coinsByName, giftEntry, prizeEntry, wallet } from './shar
 import * as casino from './shared/casino.js';
 import * as arcade from './shared/arcade.js';
 import { blocked, serverGroup } from './shared/commandRules.js';
-import { PASSWORD_MIN, isManagerName } from './shared/team.js';
+import { MANAGER_NAMES, PASSWORD_MIN, cleanName, isManagerName, knownName } from './shared/team.js';
 
 // Functions run next to the database. The deploy workflow writes location.json
 // from the database's location; nam5 (the US multi-region) pairs with us-central1.
@@ -644,7 +644,26 @@ export const account = onCall({ maxInstances: 5, invoker: 'public' }, async (req
   if (!uid) throw new HttpsError('unauthenticated', 'Sign in first.');
   const rename = await renamer();
   const { action } = req.data || {};
-  const name = rename(String(req.data?.name || '').trim()).slice(0, 60);
+  // Everyone already on the team, so a typed name that matches one (any
+  // capitals, spaces, dots) is that person, never a second copy.
+  const typed = cleanName(req.data?.name).slice(0, 60);
+  let name = '';
+  if (typed) {
+    const [people, roles, accounts] = await Promise.all([
+      db.collection('people').get(),
+      db.collection('roles').get(),
+      db.collection('accounts').get(),
+    ]);
+    const names = [
+      ...MANAGER_NAMES,
+      ...accounts.docs.map((d) => d.get('name')),
+      ...people.docs.map((d) => d.get('name')),
+      ...roles.docs.map((d) => d.get('name')),
+    ]
+      .filter(Boolean)
+      .map(rename);
+    name = rename(knownName(rename(typed), names));
+  }
   const password = String(req.data?.password || '');
   const now = Date.now();
   const memberSnap = await db.doc(`members/${uid}`).get();
