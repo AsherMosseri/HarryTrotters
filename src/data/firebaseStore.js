@@ -130,6 +130,13 @@ function readDoc(snap) {
   return out;
 }
 
+// A deleted message's pictures and files.
+async function deleteMessageFiles(msg) {
+  if (msg.photo) await deletePhotoFiles(msg.photo);
+  for (const f of msg.files || []) await deleteObject(fileRef(storage, f.path)).catch(() => {});
+  if (msg.gif?.path) await deleteObject(fileRef(storage, msg.gif.path)).catch(() => {});
+}
+
 // Uploads a full-size and thumbnail JPEG under folder/; returns where they live.
 async function uploadPhoto(folder, { full, thumb }) {
   const id = itemId();
@@ -744,9 +751,21 @@ export const firebaseStore = {
       files: [],
       pinned: false,
     });
-    if (msg.photo) await deletePhotoFiles(msg.photo);
-    for (const f of msg.files || []) await deleteObject(fileRef(storage, f.path)).catch(() => {});
-    if (msg.gif?.path) await deleteObject(fileRef(storage, msg.gif.path)).catch(() => {});
+    await deleteMessageFiles(msg);
+  },
+  // Several at once (selected in chat). hard: gone for good, with no "Message
+  // deleted" note (team management only; the rules allow deleting for them).
+  async deleteMessages(conv, msgs, hard) {
+    if (!hard) {
+      for (const m of msgs) if (!m.deleted) await this.deleteMessage(conv, m);
+      return;
+    }
+    for (let i = 0; i < msgs.length; i += 400) {
+      const batch = writeBatch(db);
+      for (const m of msgs.slice(i, i + 400)) batch.delete(doc(convCol(conv), m.id));
+      await batch.commit();
+    }
+    for (const m of msgs) await deleteMessageFiles(m);
   },
 
   // reactions: { [emoji]: { [uid]: name } }, updated per person so taps don't collide.

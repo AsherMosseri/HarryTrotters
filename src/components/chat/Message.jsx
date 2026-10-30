@@ -419,6 +419,11 @@ export default function Message({
   onPhoto,
   onJump,
   onPerson,
+  picking, // choosing messages to delete: a tap checks this one (if it can be deleted)
+  picked,
+  onPick,
+  onStartPick,
+  onAskDelete,
 }) {
   const [picker, setPicker] = useState(false);
   const [removing, setRemoving] = useState(false);
@@ -460,13 +465,25 @@ export default function Message({
 
   return (
     <div
-      className={`msg${first ? ' first' : ''}${selected || picker ? ' selected' : ''}${mentionsMe ? ' mentions-me' : ''}${m.pinned && feat('pins') ? ' pinned' : ''}`}
+      className={`msg${first ? ' first' : ''}${(selected || picker) && !picking ? ' selected' : ''}${mentionsMe ? ' mentions-me' : ''}${m.pinned && feat('pins') ? ' pinned' : ''}${picking ? ' picking' : ''}${picked ? ' picked' : ''}`}
       id={`msg-${m.id}`}
+      onClickCapture={(e) => {
+        // Choosing messages: a tap anywhere on one checks or unchecks it.
+        if (!picking) return;
+        e.preventDefault();
+        e.stopPropagation();
+        if (mine || isManager) onPick(m);
+      }}
       onClick={(e) => {
         if (e.target.closest('a,button,input,.emoji-picker,.spoiler:not(.shown)')) return;
         onSelect(selected ? null : m.id);
       }}
     >
+      {picking && (mine || isManager) && (
+        <span className={`msg-pick${picked ? ' on' : ''}`} aria-hidden="true">
+          {picked ? '✓' : ''}
+        </span>
+      )}
       <div className="msg-gutter">
         {first && m.bot ? (
           <span className="cmd-bot big" aria-hidden="true">
@@ -630,7 +647,7 @@ export default function Message({
           </div>
         )}
       </div>
-      {!m.deleted && (
+      {!m.deleted && !picking && (
         <div className="msg-actions" ref={actionsRef} onClick={(e) => e.stopPropagation()}>
           {feat('reactions') && (
             <>
@@ -688,12 +705,12 @@ export default function Message({
             </button>
           )}
           {(mine || isManager) && (
-            <button
-              className="danger-text"
-              onClick={() => confirm('Delete this message?') && api.deleteMessage(conv, m)}
-              title="Delete"
-              aria-label="Delete"
-            >
+            <button onClick={() => onStartPick(m)} title="Select messages (to delete several)" aria-label="Select messages">
+              <Icon name="select" size={18} />
+            </button>
+          )}
+          {(mine || isManager) && (
+            <button className="danger-text" onClick={() => onAskDelete([m])} title="Delete" aria-label="Delete">
               <Icon name="trash" size={18} />
             </button>
           )}

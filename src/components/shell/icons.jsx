@@ -182,6 +182,13 @@ const PATHS = {
     </>
   ),
   chevron: <path d="m7.5 4.5 5.5 5.5-5.5 5.5" />,
+  // Select (several messages): a checked circle.
+  select: (
+    <>
+      <circle cx="10" cy="10" r="7" />
+      <path d="m7 10.2 2.1 2.1 4-4.3" />
+    </>
+  ),
   // Super reaction: a burst (not an emoji, so it doesn't read as one).
   superReact: (
     <>

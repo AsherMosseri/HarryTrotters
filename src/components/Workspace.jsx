@@ -1296,6 +1296,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
       editMessage: (channel, id, patch) => store.editMessage(channel, id, patch).catch(fail),
       uploadChatGif: (channel, file) => store.uploadChatGif(channel, file).catch((e) => (fail(e), null)),
       deleteMessage: (channel, m) => store.deleteMessage(channel, m).catch(fail),
+      deleteMessages: (channel, msgs, hard) => store.deleteMessages(channel, msgs, hard).catch(fail),
       react: (channel, id, emoji, on) => store.react(channel, id, emoji, actor, on).catch(fail),
       removeReaction: (channel, id, emoji) => store.removeReaction(channel, id, emoji).catch(fail),
       loadOlderMessages: (channel, beforeAt) =>

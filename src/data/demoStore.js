@@ -1320,6 +1320,15 @@ export const demoStore = {
   async editMessage(conv, id, patch) {
     updateMsg(conv, id, (m) => ({ ...m, ...patch, editedAt: Date.now() }));
   },
+  async deleteMessages(conv, msgs, hard) {
+    if (!hard) {
+      for (const m of msgs) if (!m.deleted) await this.deleteMessage(conv, m);
+      return;
+    }
+    const gone = new Set(msgs.map((m) => m.id));
+    state.chat = { ...state.chat, [conv]: ((state.chat || {})[conv] || []).filter((m) => !gone.has(m.id)) };
+    commit();
+  },
   async deleteMessage(conv, msg) {
     updateMsg(conv, msg.id, (m) => ({
       ...m,

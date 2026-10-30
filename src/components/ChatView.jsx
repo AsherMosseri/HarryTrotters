@@ -2,7 +2,7 @@ import { renameMessage } from '../people.js';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { SUBTEAMS, SUBTEAM_COLORS } from '../config.js';
 import { useControls } from '../controls.js';
-import { Avatar, Nameplate, PlusIcon, usePeople } from './common.jsx';
+import { Avatar, Nameplate, Overlay, PlusIcon, usePeople } from './common.jsx';
 import PhotoViewer from './PhotoViewer.jsx';
 import Composer from './chat/Composer.jsx';
 import Message, { messageShows } from './chat/Message.jsx';
@@ -115,6 +115,9 @@ export default function ChatView({
   const teamEmoji = feat('teamEmoji') ? allTeamEmoji : [];
   const people = usePeople();
   const [selected, setSelected] = useState(null);
+  // Choosing messages to delete (Select on a message): their ids, or null.
+  const [picks, setPicks] = useState(null);
+  const [deleteAsk, setDeleteAsk] = useState(null); // the messages to delete, waiting for OK
   // A tapped message's buttons go away when you tap anything else: the text
   // box, a name or picture, another message, the sidebar. Tapping the message
   // itself again still toggles them (its own click does that).
@@ -237,6 +240,7 @@ export default function ChatView({
 
   useLayoutEffect(() => {
     setSelected(null);
+    setPicks(null);
     setNewBelow(false);
     setNotifyOpen(false);
     lastCount.current = all.length;
@@ -587,6 +591,24 @@ export default function ChatView({
                   taskById={taskById}
                   selected={selected === m.id}
                   onSelect={setSelected}
+                  picking={!!picks}
+                  picked={!!picks?.has(m.id)}
+                  onPick={(msg) =>
+                    setPicks((cur) => {
+                      const next = new Map(cur);
+                      if (next.has(msg.id)) next.delete(msg.id);
+                      else next.set(msg.id, msg);
+                      return next;
+                    })
+                  }
+                  onStartPick={(msg) => {
+                    setSelected(null);
+                    setPicks(new Map([[msg.id, msg]]));
+                  }}
+                  onAskDelete={(list) => {
+                    setSelected(null);
+                    setDeleteAsk(list);
+                  }}
                   api={api}
                   teamEmoji={teamEmoji}
                   onManageEmoji={() => setDialog({ type: 'emoji' })}
@@ -639,7 +661,32 @@ export default function ChatView({
           </button>
         )}
         <TypingLine names={typing} />
-        {!canPost ? (
+        {deleteAsk && (
+          <DeleteMessages
+            msgs={deleteAsk}
+            canErase={isManager}
+            onClose={() => setDeleteAsk(null)}
+            onDelete={async (hard) => {
+              await api.deleteMessages(conv.key, deleteAsk, hard);
+              setDeleteAsk(null);
+              setPicks(null);
+            }}
+          />
+        )}
+        {picks ? (
+          <div className="composer pick-bar">
+            <b>
+              {picks.size} selected
+            </b>
+            <span className="muted small grow">Tap messages to add or remove them.</span>
+            <button className="btn" onClick={() => setPicks(null)}>
+              Cancel
+            </button>
+            <button className="btn danger" disabled={!picks.size} onClick={() => setDeleteAsk([...picks.values()])}>
+              <Icon name="trash" size={16} /> Delete
+            </button>
+          </div>
+        ) : !canPost ? (
           <div className="composer read-only">
             {conv.kind === 'dm'
               ? 'You can read this DM because you’re on team management.'
@@ -735,5 +782,44 @@ export default function ChatView({
         />
       )}
     </main>
+  );
+}
+
+// Deleting one or more messages. Team management can remove them completely,
+// with no "Message deleted" note left behind.
+function DeleteMessages({ msgs, canErase, onClose, onDelete }) {
+  const [erase, setErase] = useState(canErase);
+  const [busy, setBusy] = useState(false);
+  const n = msgs.length;
+  return (
+    <Overlay>
+      <div className="panel-backdrop center" onClick={onClose}>
+        <div className="dialog delete-msgs" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Delete messages">
+          <h2>{n === 1 ? 'Delete this message?' : `Delete ${n} messages?`}</h2>
+          <p className="muted">{erase ? 'They’ll be gone for everyone, with nothing left in their place.' : 'Each one leaves a “Message deleted” note.'}</p>
+          {canErase && (
+            <label className="row gap small">
+              <input type="checkbox" checked={erase} onChange={(e) => setErase(e.target.checked)} /> Remove completely (no “Message deleted” note)
+            </label>
+          )}
+          <div className="row gap">
+            <span className="spacer" />
+            <button className="btn" onClick={onClose}>
+              Cancel
+            </button>
+            <button
+              className="btn danger"
+              disabled={busy}
+              onClick={async () => {
+                setBusy(true);
+                await onDelete(erase);
+              }}
+            >
+              {busy ? 'Deleting…' : 'Delete'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Overlay>
   );
 }
