@@ -721,3 +721,18 @@ button.sb-head-row { width: 100%; border: 0; background: none; color: var(--mute
 
 .appearance-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding-top: 12px; border-top: 1px solid var(--border); }
 .appearance-row > div:first-child { display: flex; flex-direction: column; gap: 2px; }
+
+/* One top band across the app on iPad: the sidebar's team block and the chat
+   header are the same height and share one dividing line, so the two halves
+   line up. */
+.shell { --top-pad: max(12px, env(safe-area-inset-top)); --top-h: calc(var(--top-pad) + 52px); }
+.sb-top, .sidebar.rail .sb-top {
+  box-sizing: border-box; min-height: var(--top-h); padding-top: var(--top-pad); padding-bottom: 0;
+  border-bottom: 1px solid rgb(255 255 255 / 10%); align-content: center;
+}
+.sb-top:has(.sb-shift-row) { padding-bottom: 8px; }
+.shell .chat-head { box-sizing: border-box; min-height: var(--top-h); padding-top: var(--top-pad); padding-bottom: 0; }
+/* The chat header keeps the regular font, so the name, its picture or #, and
+   the topic sit on one even line; the condensed font is for page titles. */
+.shell .chat-head h2 { font-family: inherit; font-size: 20px; font-weight: 700; letter-spacing: -0.01em; }
+.chat-title h2 .hash { font-weight: 500; color: var(--muted); font-size: 22px; }

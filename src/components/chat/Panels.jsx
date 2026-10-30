@@ -352,7 +352,7 @@ export function NewDmDialog({ roster, actor, onStart, onClose }) {
 export function ChannelIcon({ conv }) {
   if (conv.kind === 'dm') return null;
   return (
-    <span className="hash" style={{ color: SUBTEAM_COLORS[conv.subteam] || 'var(--accent)' }}>
+    <span className="hash" style={{ color: SUBTEAM_COLORS[conv.subteam] || 'var(--muted)' }}>
       {conv.announce ? <Icon name="announce" size={20} /> : '#'}
     </span>
   );
