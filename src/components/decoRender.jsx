@@ -70,8 +70,14 @@ export const maxStickerDist = (size = 0.38) => Math.max(0, Math.min(0.75, STICKE
 function Badge({ b }) {
   const rad = ((b.angle ?? 45) * Math.PI) / 180;
   const d = Math.min(b.dist ?? 0.5, maxStickerDist(b.size ?? 0.38));
-  const at = { left: `${50 + Math.sin(rad) * d * 100}%`, top: `${50 - Math.cos(rad) * d * 100}%` };
-  const vars = { '--r': `${b.rotate || 0}deg`, '--bs': b.size ?? 0.38, '--spd': `${b.speed || 3}s` };
+  // The tilt sits on the outer span, so the animations' keyframes use no
+  // variables (iPad Safari only runs those smoothly).
+  const at = {
+    left: `${50 + Math.sin(rad) * d * 100}%`,
+    top: `${50 - Math.cos(rad) * d * 100}%`,
+    transform: `translate(-50%, -50%) rotate(${b.rotate || 0}deg)`,
+  };
+  const vars = { '--bs': b.size ?? 0.38, '--spd': `${b.speed || 3}s` };
   const dir = b.dir === 'ccw' ? ' ccw' : '';
   const placed = (
     <span className="deco-b-at" style={at}>
@@ -143,28 +149,37 @@ function jagged(seed) {
 }
 const BOLTS = [jagged(7), jagged(31), jagged(97)];
 
-export function AnimatedDecoration({ id }) {
+export function AnimatedDecoration({ id, small }) {
+  // Pieces that only turn are drawn as their own layers (`layers`, or `spin`
+  // for the whole drawing) and turned as a whole: iPad Safari runs that on the
+  // graphics chip, where turning shapes inside a drawing stalled whenever the
+  // app was busy.
   let body = null;
+  let layers = null;
+  let spin = null;
   if (id === 'comets') {
-    body = (
-      <>
-        <circle cx="50" cy="50" r="57" fill="none" stroke="rgba(255,255,255,0.18)" strokeWidth="1.2" />
-        {[
-          ['#a5f3fc', 3.2, ''],
-          ['#f0abfc', 5.4, ' ccw'],
-          ['#fde68a', 7.8, ''],
-        ].map(([c, spd, dir], k) => (
-          <g key={k} className={`ad-spin${dir}`} style={{ '--spd': `${spd}s`, '--d': `${-k * 1.1}s` }}>
+    layers = [
+      { body: <circle cx="50" cy="50" r="57" fill="none" stroke="rgba(255,255,255,0.18)" strokeWidth="1.2" /> },
+      ...[
+        ['#a5f3fc', 3.2, false],
+        ['#f0abfc', 5.4, true],
+        ['#fde68a', 7.8, false],
+      ].map(([c, spd, ccw], k) => ({
+        spin: `${spd}s`,
+        ccw,
+        delay: `${-k * 1.1}s`,
+        body: (
+          <>
             {Array.from({ length: 9 }, (_, i) => {
               // The tail trails behind, whichever way it spins.
-              const a = ((-90 + (dir ? 1 : -1) * i * 7) * Math.PI) / 180;
+              const a = ((-90 + (ccw ? 1 : -1) * i * 7) * Math.PI) / 180;
               return <circle key={i} cx={50 + Math.cos(a) * 57} cy={50 + Math.sin(a) * 57} r={4 - i * 0.38} fill={c} opacity={1 - i / 9} />;
             })}
             <circle className="ad-glow" cx="50" cy="-7" r="4.5" fill="#fff" style={{ '--c': c }} />
-          </g>
-        ))}
-      </>
-    );
+          </>
+        ),
+      })),
+    ];
   } else if (id === 'flamering') {
     body = (
       <>
@@ -184,8 +199,9 @@ export function AnimatedDecoration({ id }) {
       </>
     );
   } else if (id === 'electric') {
+    spin = '9s';
     body = (
-      <g className="ad-spin" style={{ '--spd': '9s' }}>
+      <g>
         {BOLTS.map((d, i) => (
           <path
             key={i}
@@ -259,8 +275,9 @@ export function AnimatedDecoration({ id }) {
       </g>
     );
   } else if (id === 'petals') {
+    spin = '14s';
     body = (
-      <g className="ad-spin" style={{ '--spd': '14s' }}>
+      <g>
         {Array.from({ length: 7 }, (_, i) => {
           const a = (i / 7) * Math.PI * 2;
           return (
@@ -409,12 +426,23 @@ export function AnimatedDecoration({ id }) {
       </>
     );
   }
-  if (!body) return null;
-  return (
-    <svg className={`adeco adeco-${id}`} viewBox="-30 -30 160 160" aria-hidden="true">
-      {body}
+  // Small avatars (lists, the sidebar) skip the glow blurs: they're barely
+  // visible that size and are the most expensive part to draw.
+  const cls = `adeco adeco-${id}${small ? ' small' : ''}`;
+  const layer = (l, k) => (
+    <svg
+      key={k}
+      className={`${cls}${l.spin ? ` adeco-spin${l.ccw ? ' ccw' : ''}` : ''}`}
+      style={l.spin ? { '--spd': l.spin, '--d': l.delay || '0s' } : undefined}
+      viewBox="-30 -30 160 160"
+      aria-hidden="true"
+    >
+      {l.body}
     </svg>
   );
+  if (layers) return <>{layers.map(layer)}</>;
+  if (!body) return null;
+  return layer({ body, spin });
 }
 
 // Wings sit behind the avatar.

@@ -1157,3 +1157,44 @@ button, [role='button'] { -webkit-user-select: none; user-select: none; -webkit-
 .code-ready-dot { width: 8px; height: 8px; border-radius: 50%; background: #3ddc84; }
 .phone-shell ~ .code-ready, body:has(.phone-shell) .code-ready { bottom: calc(env(safe-area-inset-bottom) + 76px); }
 @keyframes code-ready-in { from { opacity: 0; transform: translate(-50%, 12px); } }
+
+/* ---------- Smooth avatar decorations on iPad ----------
+   iPad Safari runs an animation on the graphics chip only when it moves or
+   fades something with fixed values; anything else (shadows, filters,
+   variables in keyframes, shapes inside a drawing) is redrawn on the main
+   thread and stalls or freezes whenever the app is busy. */
+/* Layers of an animated decoration that turn as a whole. */
+.adeco.adeco-spin { transform-origin: 50% 50%; animation: deco-spin var(--spd, 4s) linear infinite; animation-delay: var(--d, 0s); will-change: transform; }
+.adeco.adeco-spin.ccw { animation-direction: reverse; }
+/* One soft glow instead of two, and none on small avatars. */
+.adeco .ad-glow { filter: drop-shadow(0 0 4px var(--c, #fff)); }
+.adeco .ad-bolt { filter: drop-shadow(0 0 3px var(--c)); }
+.adeco.small .ad-glow, .adeco.small .ad-bolt { filter: none; }
+/* Spinning rings and orbits get their own layer. */
+.deco-ring.spin, .deco-orbit, .deco-rainbow::before, .deco-flame::before, .deco-stars::before { will-change: transform; }
+/* Stickers: the tilt is on the outer span (decoRender.jsx), so these keyframes are plain. */
+.deco-b { transform: none; will-change: transform; }
+@keyframes deco-b-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes deco-b-bob { 50% { transform: translateY(-18%); } }
+@keyframes deco-b-pulse { 50% { transform: scale(1.25); } }
+@keyframes deco-b-wiggle { 25% { transform: rotate(-16deg); } 75% { transform: rotate(16deg); } }
+@keyframes deco-b-float { 33% { transform: translate(12%, -14%); } 66% { transform: translate(-12%, 8%); } }
+/* Glows fade a drawn glow in and out instead of redrawing a shadow every frame. */
+.deco-ring.ring-glow { animation: none; }
+.deco-ring.ring-glow.spin { animation: deco-spin var(--spd, 4s) linear infinite; }
+.deco-ring.ring-glow::after {
+  content: ''; position: absolute; inset: 0; border-radius: 50%; pointer-events: none;
+  box-shadow: 0 0 calc(var(--s) * 0.32) calc(var(--s) * 0.04) var(--glow); opacity: 0;
+  animation: deco-glow-fade 0.9s ease-in-out infinite alternate; will-change: opacity;
+}
+@keyframes deco-glow-fade { to { opacity: 1; } }
+.deco-neon::before { animation: none; }
+.deco-neon::after {
+  content: ''; position: absolute; inset: calc(var(--s) * -0.06); border-radius: 50%; pointer-events: none; z-index: 0;
+  box-shadow: 0 0 calc(var(--s) * 0.25) calc(var(--s) * 0.06) var(--accent); opacity: 0;
+  animation: deco-glow-fade 0.9s ease-in-out infinite alternate; will-change: opacity;
+}
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion='on']) :is(.adeco.adeco-spin, .deco-ring.ring-glow::after, .deco-neon::after) { animation: none !important; }
+}
+:root[data-motion='off'] :is(.adeco.adeco-spin, .deco-ring.ring-glow::after, .deco-neon::after) { animation: none !important; }

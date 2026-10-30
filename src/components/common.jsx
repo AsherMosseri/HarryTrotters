@@ -72,7 +72,7 @@ export function Avatar({ name: saved, size = 26, photo, showOnline = false, deco
       <span className={`deco deco-anim deco-${deco}`} style={{ width: size, height: size, '--s': `${size}px` }}>
         {size >= 24 && <DecorationBehind id={deco} />}
         {pic}
-        {size >= 24 && <AnimatedDecoration id={deco} />}
+        {size >= 24 && <AnimatedDecoration id={deco} small={size < 56} />}
       </span>
     );
   } else if (deco && deco !== 'custom' && decorationById[deco]) {
