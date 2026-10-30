@@ -3,6 +3,7 @@ import { lunchOf } from '../config.js';
 import { addDays, parseDay, todayISO } from '../milestones.js';
 import { firstName } from '../util.js';
 import { AutoTextarea, Avatar, CloseIcon, Overlay } from './common.jsx';
+import { sameName } from '../../functions/shared/team.js';
 
 export const SLOTS = [
   { id: 'lunch', label: 'Lunch', icon: '' },
@@ -16,8 +17,23 @@ const dayLabel = (iso) =>
       ? 'Tomorrow'
       : parseDay(iso).toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
 
-// Someone's answer, also under a name they had before a rename.
-export const answerOf = (checkin, name, rename) => Object.entries(checkin.answers || {}).find(([k]) => rename(k) === name)?.[1] || null;
+// Someone's answer, also under a name they had before a rename, or saved with
+// a slightly different spelling (an extra space, other capitals).
+export const answerOf = (checkin, name, rename) =>
+  Object.entries(checkin.answers || {}).find(([k]) => sameName(rename(k), name))?.[1] || null;
+
+// Everyone's answers by person: through renames, and look-alike spellings
+// matched to the roster's name, so nobody shows up twice. An answer saved
+// under the exact name wins over a look-alike.
+function answersByPerson(checkin, rename, roster) {
+  const out = new Map();
+  for (const [k, v] of Object.entries(checkin.answers || {})) {
+    const saved = rename(k);
+    const name = roster.find((n) => sameName(n, saved)) || saved;
+    if (!out.has(name) || saved === name) out.set(name, v);
+  }
+  return out;
+}
 
 // Yes / No for each time of day; onDone gets { lunch: true, after: false }.
 function AnswerForm({ checkin, initial, submitLabel, onDone }) {
@@ -109,7 +125,7 @@ function Names({ names }) {
 // school lunch), who isn't, and who hasn't answered.
 export function CheckinCard({ checkin, roster, gradeOf, me, isManager, rename, onAnswer, onDelete }) {
   const [changing, setChanging] = useState(false);
-  const answers = new Map(Object.entries(checkin.answers || {}).map(([k, v]) => [rename(k), v]));
+  const answers = answersByPerson(checkin, rename, roster);
   const mine = answers.get(me);
   const yes = (slot) => [...answers].filter(([, a]) => a[slot]).map(([n]) => n);
   const no = [...answers].filter(([, a]) => (checkin.slots || []).every((s) => !a[s])).map(([n]) => n);
@@ -118,7 +134,11 @@ export function CheckinCard({ checkin, roster, gradeOf, me, isManager, rename, o
     <section className="chart-card checkin-results">
       <div className="shift-sec-head">
         <h2>
-          {checkin.question || 'Lab check-in'} <span className="muted small">· {dayLabel(checkin.date)}</span>
+          {checkin.question || 'Lab check-in'}
+          {/* "Who's going to the lab today?" already says when. */}
+          {!(dayLabel(checkin.date) === 'Today' && /\btoday\b/i.test(checkin.question || '')) && (
+            <span className="muted small"> · {dayLabel(checkin.date)}</span>
+          )}
         </h2>
         <span className="spacer" />
         {mine && !changing && (
