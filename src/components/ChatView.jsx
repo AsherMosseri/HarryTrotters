@@ -114,6 +114,21 @@ export default function ChatView({
   const teamEmoji = feat('teamEmoji') ? allTeamEmoji : [];
   const people = usePeople();
   const [selected, setSelected] = useState(null);
+  // A tapped message's buttons go away when you tap anything else: the text
+  // box, a name or picture, another message, the sidebar. Tapping the message
+  // itself again still toggles them (its own click does that).
+  useEffect(() => {
+    if (!selected) return;
+    const away = (e) => {
+      const t = e.target;
+      if (!(t instanceof Element) || t.closest('.msg-actions, .floating-picker, .picker-scrim')) return;
+      const inMsg = t.closest('.msg.selected');
+      if (inMsg && !t.closest('button, a, .avatar, .avatar-wrap, .msg-name, [role="button"]')) return;
+      setSelected(null);
+    };
+    document.addEventListener('pointerdown', away, true);
+    return () => document.removeEventListener('pointerdown', away, true);
+  }, [selected]);
   const [replyTo, setReplyTo] = useState(null);
   const [editing, setEditing] = useState(null);
   // Slash-command notes only you see, per conversation (gone on reload).

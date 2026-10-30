@@ -1482,13 +1482,6 @@ h3.md-h { font-size: 16.5px; }
 /* app color themes */
 :root[data-palette] { --accent-soft: color-mix(in srgb, var(--accent) 16%, var(--surface)); }
 :root[data-palette] body { background: var(--theme-grad, linear-gradient(160deg, color-mix(in srgb, var(--p1) var(--tint, 16%), var(--bg)), color-mix(in srgb, var(--p2) var(--tint, 16%), var(--bg)))) fixed; }
-:root[data-palette='midnight'] { --accent: #6366f1; --p1: #6366f1; --p2: #0ea5e9; }
-:root[data-palette='sunset'] { --accent: #f97316; --p1: #f97316; --p2: #db2777; }
-:root[data-palette='ocean'] { --accent: #0891b2; --p1: #0891b2; --p2: #2563eb; }
-:root[data-palette='forest'] { --accent: #16a34a; --p1: #16a34a; --p2: #0d9488; }
-:root[data-palette='candy'] { --accent: #ec4899; --p1: #ec4899; --p2: #8b5cf6; }
-:root[data-palette='crimson'] { --accent: #e11d48; --p1: #dc2626; --p2: #9f1239; }
-:root[data-palette='chroma'] { --accent: #06b6d4; --p1: #f43f5e; --p2: #22d3ee; }
 
 @media (max-width: 760px) {
   .editor-grid { grid-template-columns: minmax(0, 1fr); }

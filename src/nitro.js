@@ -86,16 +86,22 @@ export const SWATCHES = [
 ];
 
 // App color themes (per device), on top of light/dark.
+// App color themes. Each recolors the whole app: the sidebar (a deep version
+// of its colors), the pages (tinted with them), and buttons and highlights
+// (accent). The first is the team's own navy and white.
 export const PALETTES = [
-  { id: '', label: 'Classic', colors: ['#4f46e5', '#4f46e5'] },
-  { id: 'midnight', label: 'Midnight', colors: ['#6366f1', '#0ea5e9'] },
-  { id: 'sunset', label: 'Sunset', colors: ['#f97316', '#db2777'] },
-  { id: 'ocean', label: 'Ocean', colors: ['#0891b2', '#2563eb'] },
-  { id: 'forest', label: 'Forest', colors: ['#16a34a', '#0d9488'] },
-  { id: 'candy', label: 'Cotton candy', colors: ['#ec4899', '#8b5cf6'] },
-  { id: 'crimson', label: 'Crimson', colors: ['#dc2626', '#9f1239'] },
-  { id: 'chroma', label: 'Chroma', colors: ['#f43f5e', '#22d3ee'] },
+  { id: '', label: 'Team navy', accent: '#14284b', colors: ['#14284b', '#14284b'], sidebar: ['#14284b', '#14284b'], tint: 0 },
+  { id: 'steel', label: 'Steel', accent: '#334155', colors: ['#64748b', '#94a3b8'], sidebar: ['#1f2937', '#334155'], tint: 12 },
+  { id: 'midnight', label: 'Midnight', accent: '#4f46e5', colors: ['#6366f1', '#0ea5e9'], sidebar: ['#1e1b4b', '#0c4a6e'], tint: 16 },
+  { id: 'ocean', label: 'Ocean', accent: '#0e7490', colors: ['#0891b2', '#2563eb'], sidebar: ['#083344', '#1e3a8a'], tint: 16 },
+  { id: 'forest', label: 'Forest', accent: '#15803d', colors: ['#16a34a', '#0d9488'], sidebar: ['#052e16', '#134e4a'], tint: 16 },
+  { id: 'sunset', label: 'Sunset', accent: '#ea580c', colors: ['#f97316', '#db2777'], sidebar: ['#7c2d12', '#831843'], tint: 16 },
+  { id: 'crimson', label: 'Crimson', accent: '#dc2626', colors: ['#dc2626', '#9f1239'], sidebar: ['#450a0a', '#881337'], tint: 14 },
+  { id: 'candy', label: 'Cotton candy', accent: '#db2777', colors: ['#ec4899', '#8b5cf6'], sidebar: ['#831843', '#4c1d95'], tint: 18 },
+  { id: 'chroma', label: 'Chroma', accent: '#0891b2', colors: ['#f43f5e', '#22d3ee'], sidebar: ['#881337', '#155e75'], tint: 18 },
 ];
+// A preset as a theme object (the same shape as a custom theme).
+export const presetTheme = (p) => ({ accent: p.accent, colors: p.colors, sidebar: p.sidebar, tint: p.tint, motion: '', bg: null, show: 30, fx: null });
 
 // Gradient color stops for 2–3 colors. Each color holds for part of its
 // stretch before blending (sharp: 0 blends the whole way, 1 is hard bands),

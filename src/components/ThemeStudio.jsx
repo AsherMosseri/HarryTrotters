@@ -3,7 +3,7 @@ import { SWATCHES, gradientStops } from '../nitro.js';
 import GradientColors from './GradientColors.jsx';
 import { preparePhoto } from '../util.js';
 import { EmojiPicker, GifPicker } from './chat/Pickers.jsx';
-import { CloseIcon, Overlay } from './common.jsx';
+import { CloseIcon, Overlay, PlusIcon } from './common.jsx';
 import { CustomEffect, ProfileEffect } from './People.jsx';
 import { FX } from '../fx/effects.js';
 
@@ -43,14 +43,21 @@ const emojiTile = (emoji) =>
     `<svg xmlns='http://www.w3.org/2000/svg' width='76' height='76'><text x='38' y='44' font-size='30' text-anchor='middle' dominant-baseline='middle' transform='rotate(-12 38 38)'>${emoji}</text></svg>`,
   )}")`;
 
-// The theme's colors, as CSS variables on <html> (read by styles.css).
+// The theme's colors, as CSS variables on <html> (read by styles.css and
+// shell.css): the accent, the page tint, and the sidebar (its own colors, or
+// deep versions of the theme's).
+const THEME_VARS = ['--accent', '--accent-base', '--p1', '--p2', '--tint', '--theme-grad', '--theme-grad-shift', '--sb1', '--sb2'];
 export function applyThemeVars(t) {
   const root = document.documentElement.style;
   if (!t) {
-    for (const k of ['--accent', '--p1', '--p2', '--tint', '--theme-grad', '--theme-grad-shift']) root.removeProperty(k);
+    for (const k of THEME_VARS) root.removeProperty(k);
     return;
   }
-  root.setProperty('--accent', t.accent);
+  root.removeProperty('--accent');
+  root.setProperty('--accent-base', t.accent);
+  const [s1, s2] = t.sidebar || [t.colors[0], t.colors[t.colors.length - 1] || t.colors[0]].map((c) => `color-mix(in srgb, ${c} 55%, #0b1020)`);
+  root.setProperty('--sb1', s1);
+  root.setProperty('--sb2', s2 || s1);
   root.setProperty('--p1', t.colors[0]);
   root.setProperty('--p2', t.colors[1]);
   root.setProperty('--tint', `${t.tint}%`);
@@ -95,7 +102,7 @@ function ColorPick({ value, onChange, label }) {
         />
       ))}
       <label className={`swatch custom${SWATCHES.includes(value) ? '' : ' on'}`} title="Any color" style={{ background: value }}>
-        🎨
+        <PlusIcon size={14} />
         <input type="color" value={value} onChange={(e) => onChange(e.target.value)} aria-label={`${label}: any color`} />
       </label>
     </div>
@@ -160,7 +167,7 @@ export default function ThemeStudio({ value, onChange, profile, profileColor, up
       <div className="panel-backdrop center studio-backdrop" onClick={onClose}>
         <div className="dialog theme-studio" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Custom theme">
           <div className="panel-head">
-            <h2>🎨 Custom theme</h2>
+            <h2>Custom theme</h2>
             <span className="spacer" />
             <button className="icon-btn" onClick={onClose} aria-label="Close">
               <CloseIcon />
@@ -169,10 +176,10 @@ export default function ThemeStudio({ value, onChange, profile, profileColor, up
           <p className="muted small">Changes show in the app as you make them. Only on this device.</p>
           <div className="row gap wrap">
             <button className="btn" onClick={() => onChange(themeFromProfile(profile, profileColor))}>
-              🪞 Start from my profile
+              Start from my profile
             </button>
             <button className="btn" onClick={surprise}>
-              🎲 Surprise me
+              Surprise me
             </button>
             <button className="link-btn small" onClick={() => onChange(CUSTOM_DEFAULT)}>
               Reset
@@ -193,7 +200,7 @@ export default function ThemeStudio({ value, onChange, profile, profileColor, up
             <b>{t.tint}%</b>
           </label>
           <label className="studio-check">
-            <input type="checkbox" checked={t.motion === 'shift'} onChange={(e) => set({ motion: e.target.checked ? 'shift' : '' })} /> 🌊
+            <input type="checkbox" checked={t.motion === 'shift'} onChange={(e) => set({ motion: e.target.checked ? 'shift' : '' })} />
             Make the colors move
           </label>
 
@@ -203,13 +210,13 @@ export default function ThemeStudio({ value, onChange, profile, profileColor, up
               None
             </button>
             <button className="btn" onClick={() => file.current?.click()} disabled={busy}>
-              {busy ? 'Uploading…' : '🖼 Picture'}
+              {busy ? 'Uploading…' : 'Picture'}
             </button>
             <button className="btn" onClick={() => setPanel(panel === 'gif' ? null : 'gif')}>
               GIF
             </button>
             <button className="btn" onClick={() => setPanel(panel === 'emoji' ? null : 'emoji')}>
-              😊 Emoji pattern
+              Emoji pattern
             </button>
             {t.bg?.value && (
               <span className="studio-bg-now" title="Current background">

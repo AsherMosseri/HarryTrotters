@@ -736,3 +736,38 @@ button.sb-head-row { width: 100%; border: 0; background: none; color: var(--mute
    the topic sit on one even line; the condensed font is for page titles. */
 .shell .chat-head h2 { font-family: inherit; font-size: 20px; font-weight: 700; letter-spacing: -0.01em; }
 .chat-title h2 .hash { font-weight: 500; color: var(--muted); font-size: 22px; }
+
+/* ---------- color themes: each recolors the whole app ---------- */
+:root[data-palette] { --accent: var(--accent-base, #14284b); --sidebar: linear-gradient(175deg, var(--sb1, #14284b), var(--sb2, #14284b)); }
+@media (prefers-color-scheme: dark) {
+  :root[data-palette]:not([data-theme='light']) {
+    --accent: color-mix(in srgb, var(--accent-base, #14284b) 62%, #fff);
+    --sidebar: linear-gradient(175deg, color-mix(in srgb, var(--sb1, #14284b) 72%, #03050a), color-mix(in srgb, var(--sb2, #14284b) 72%, #03050a));
+  }
+  :root[data-palette]:not([data-theme='light']) .btn.primary { background: color-mix(in srgb, var(--accent-base, #14284b) 85%, #000); border-color: transparent; }
+}
+:root[data-palette][data-theme='dark'] {
+  --accent: color-mix(in srgb, var(--accent-base, #14284b) 62%, #fff);
+  --sidebar: linear-gradient(175deg, color-mix(in srgb, var(--sb1, #14284b) 72%, #03050a), color-mix(in srgb, var(--sb2, #14284b) 72%, #03050a));
+}
+:root[data-palette][data-theme='dark'] .btn.primary { background: color-mix(in srgb, var(--accent-base, #14284b) 85%, #000); border-color: transparent; }
+/* Pages show the theme's tint (and a custom theme's picture or floating things). */
+:root[data-palette] .shell-main { background: transparent; }
+:root[data-palette] .phone-top, :root[data-palette] .bottom-nav { background: color-mix(in srgb, var(--surface) 82%, transparent); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+
+.theme-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; }
+.theme-tile { display: flex; flex-direction: column; gap: 6px; padding: 6px; border: 1.5px solid var(--border); border-radius: 10px; background: var(--surface); text-align: left; color: var(--text); }
+.theme-tile.on { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent); }
+.tt-pic { display: flex; height: 54px; border-radius: 6px; overflow: hidden; border: 1px solid var(--hairline); }
+.tt-pic i { display: block; }
+.tt-side { width: 30%; }
+.tt-page { flex: 1; position: relative; padding: 8px 7px; display: flex; flex-direction: column; gap: 4px; }
+.tt-line { height: 4px; width: 80%; border-radius: 2px; background: color-mix(in srgb, var(--text) 22%, transparent); }
+.tt-line.short { width: 50%; }
+.tt-btn { position: absolute; right: 7px; bottom: 7px; width: 22px; height: 9px; border-radius: 3px; }
+.tt-label { font-size: 13px; font-weight: 600; padding: 0 2px; }
+.swatch.custom { display: grid; place-items: center; }
+.swatch.custom:not(.on) { background: conic-gradient(#ef4444, #eab308, #22c55e, #06b6d4, #6366f1, #d946ef, #ef4444) !important; }
+.swatch.custom svg { color: #fff; filter: drop-shadow(0 0 1px rgb(0 0 0 / 70%)); }
+.swatch.custom.on { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--text); }
+:root[data-palette] .chat-main { background: transparent; }

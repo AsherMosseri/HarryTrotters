@@ -1,6 +1,7 @@
 import { SWATCHES } from '../nitro.js';
+import { PlusIcon } from './common.jsx';
 
-// One color: the swatches, or 🎨 for any color.
+// One color: the swatches, or the rainbow one for any color.
 export function ColorChoice({ value, onChange, label }) {
   return (
     <div className="swatches" role="group" aria-label={label}>
@@ -14,7 +15,7 @@ export function ColorChoice({ value, onChange, label }) {
         />
       ))}
       <label className={`swatch custom${SWATCHES.includes(value) ? '' : ' on'}`} title="Any color" style={{ background: value }}>
-        🎨
+        <PlusIcon size={14} />
         <input type="color" value={value || '#8b5cf6'} onChange={(e) => onChange(e.target.value)} aria-label={`${label}: any color`} />
       </label>
     </div>

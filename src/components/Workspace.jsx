@@ -13,7 +13,7 @@ import {
   TEAM_STARTED,
 } from '../config.js';
 import { ONLINE_MS, TYPING_MS, activeStatus, buildPeopleInfo, buildProfiles } from '../people.js';
-import { PALETTES } from '../nitro.js';
+import { PALETTES, presetTheme } from '../nitro.js';
 import { daysBetween, mondayOf, parseDay, todayISO } from '../milestones.js';
 import { newTaskDefaults, personId } from '../data/diff.js';
 import { preparePhoto, useEscape, useLocalStorage, useMedia } from '../util.js';
@@ -99,6 +99,32 @@ try {
 }
 
 // Light / dark / automatic, plus the app color themes.
+// A theme as a tiny picture of the app: its sidebar, a tinted page, and a
+// button in its accent.
+function ThemeTile({ label, on, onClick, t, edit }) {
+  const deep = (c) => `color-mix(in srgb, ${c} 55%, #0b1020)`;
+  const [s1, s2] = t.sidebar || [deep(t.colors[0]), deep(t.colors[t.colors.length - 1])];
+  const page = t.tint
+    ? `linear-gradient(160deg, ${t.colors.map((c) => `color-mix(in srgb, ${c} ${t.tint}%, var(--bg))`).join(', ')})`
+    : 'var(--bg)';
+  return (
+    <button className={`theme-tile${on ? ' on' : ''}`} onClick={onClick} aria-pressed={on}>
+      <span className="tt-pic" aria-hidden="true">
+        <i className="tt-side" style={{ background: `linear-gradient(175deg, ${s1}, ${s2})` }} />
+        <i className="tt-page" style={{ background: page }}>
+          <i className="tt-line" />
+          <i className="tt-line short" />
+          <i className="tt-btn" style={{ background: t.accent }} />
+        </i>
+      </span>
+      <span className="tt-label">
+        {label}
+        {edit && <span className="muted"> · Edit</span>}
+      </span>
+    </button>
+  );
+}
+
 function ThemeMenu({
   colorsOn = true,
   theme,
@@ -139,21 +165,17 @@ function ThemeMenu({
       {colorsOn && (
         <>
           <h4>Color theme</h4>
-          <div className="palette-grid">
+          <div className="theme-tiles">
             {PALETTES.map((p) => (
-              <button key={p.id} className={`palette${palette === p.id ? ' on' : ''}`} onClick={() => setPalette(p.id)}>
-                <span className="palette-dot" style={{ background: `linear-gradient(135deg, ${p.colors[0]}, ${p.colors[1]})` }} />
-                {p.label}
-              </button>
+              <ThemeTile key={p.id} label={p.label} on={palette === p.id} onClick={() => setPalette(p.id)} t={p} />
             ))}
-            <button className={`palette${palette === 'profile' ? ' on' : ''}`} onClick={() => setPalette('profile')}>
-              <span className="palette-dot" style={{ background: `linear-gradient(135deg, ${profileColors[0]}, ${profileColors[1]})` }} />
-              My profile
-            </button>
-            <button className={`palette${palette === 'custom' ? ' on' : ''}`} onClick={onCustom}>
-              <span className="palette-dot" style={{ background: `linear-gradient(135deg, ${customColors[0]}, ${customColors[1]})` }} />
-              Custom…
-            </button>
+            <ThemeTile
+              label="My profile"
+              on={palette === 'profile'}
+              onClick={() => setPalette('profile')}
+              t={{ accent: profileColors[0], colors: profileColors, tint: 22 }}
+            />
+            <ThemeTile label="Custom" on={palette === 'custom'} onClick={onCustom} t={{ accent: customColors[0], colors: customColors, tint: 22 }} edit />
           </div>
         </>
       )}
@@ -603,9 +625,9 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
   const [customTheme, setCustomTheme] = useLocalStorage('custom-theme', CUSTOM_DEFAULT);
   const [studio, setStudio] = useState(false);
   useEffect(() => {
-    if (palette) document.documentElement.setAttribute('data-palette', palette);
+    if (palette && controls.isOn('themes')) document.documentElement.setAttribute('data-palette', palette);
     else document.documentElement.removeAttribute('data-palette');
-  }, [palette]);
+  }, [palette, controls]);
 
   useEffect(() => {
     if (!toast) return;
@@ -796,7 +818,9 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
       ? { ...CUSTOM_DEFAULT, ...customTheme }
       : palette === 'profile'
         ? profileTheme
-        : null;
+        : PALETTES.find((p) => p.id && p.id === palette)
+          ? presetTheme(PALETTES.find((p) => p.id === palette))
+          : null;
   const themeKey = JSON.stringify(activeTheme);
   useEffect(() => {
     applyThemeVars(themeKey === 'null' ? null : JSON.parse(themeKey));
