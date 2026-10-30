@@ -879,7 +879,7 @@ export default function ShiftsView({
                           .filter((id) => tasksById.has(id))
                           .map((id) => (
                             <button key={id} className="link-btn small" onClick={() => onOpenTask(id)}>
-                              📋 {tasksById.get(id).title}
+                              {tasksById.get(id).title}
                             </button>
                           ))}
                       </div>

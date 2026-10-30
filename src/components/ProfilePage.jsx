@@ -120,7 +120,7 @@ export default function ProfilePage({
               <div className="pp-actions">
                 {!me && (
                   <button className="btn primary" onClick={onMessage}>
-                    ✉️ Message
+                    Message
                   </button>
                 )}
                 {(me || actor.admin) && (
@@ -158,7 +158,7 @@ export default function ProfilePage({
                 {onShift && (
                   <span className="pp-onshift">
                     {' '}
-                    · ⏱ At the lab since {new Date(onShift.start).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                    · At the lab since {new Date(onShift.start).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
                   </span>
                 )}
               </p>
@@ -291,7 +291,7 @@ export default function ProfilePage({
                         {done.slice(0, 5).map((t) => (
                           <li key={t.id}>
                             <button className="link-btn" onClick={() => onOpenTask(t.id)}>
-                              ✅ {t.title}
+                              {t.title}
                             </button>
                             {t.completedAt && <span className="muted tiny"> · {relTime(t.completedAt)}</span>}
                           </li>

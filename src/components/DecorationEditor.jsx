@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { SWATCHES } from '../nitro.js';
 import { EmojiPicker, GifPicker } from './chat/Pickers.jsx';
-import { Avatar } from './common.jsx';
+import { Avatar, PlusIcon } from './common.jsx';
 import GradientColors from './GradientColors.jsx';
 import { BADGE_ANIMS, DEFAULT_DECO, RING_STYLES, maxStickerDist } from './decoRender.jsx';
 import { shrinkParticle } from './People.jsx';
@@ -30,7 +30,7 @@ function Colors({ value, onChange, label }) {
         />
       ))}
       <label className={`swatch custom${SWATCHES.includes(value) ? '' : ' on'}`} title="Any color" style={{ background: value }}>
-        🎨
+        <PlusIcon size={14} />
         <input type="color" value={value} onChange={(e) => onChange(e.target.value)} aria-label={`${label}: any color`} />
       </label>
     </div>
@@ -172,7 +172,7 @@ export default function DecorationEditor({ name, value, onChange, upload }) {
             {b ? 'Tap or drag on the picture to place the selected sticker.' : 'Add a sticker, or just style the ring.'}
           </p>
           <button className="btn" onClick={surprise}>
-            🎲 Surprise me
+            Surprise me
           </button>
         </div>
       </div>
@@ -220,13 +220,13 @@ export default function DecorationEditor({ name, value, onChange, upload }) {
         <div className="deco-sticker">
           <div className="row gap wrap">
             <button className="btn" onClick={() => setPanel(panel === 'emoji' ? null : 'emoji')}>
-              😊 Emoji
+              Emoji
             </button>
             <button className="btn" onClick={() => setPanel(panel === 'gif' ? null : 'gif')}>
               GIF
             </button>
             <button className="btn" onClick={() => file.current?.click()} disabled={busy}>
-              {busy ? 'Uploading…' : '🖼 Picture'}
+              {busy ? 'Uploading…' : 'Picture'}
             </button>
             <span className="spacer" />
             <button

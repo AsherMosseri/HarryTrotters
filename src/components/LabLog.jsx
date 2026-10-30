@@ -234,7 +234,7 @@ export function LabDay({ c, onPerson }) {
               <Avatar name={l.person} size={28} />
             </button>
             <DisplayName as="button" name={l.person} className="name-btn" onClick={onPerson ? (e) => onPerson(l.person, e) : undefined} />
-            {hours[l.person] ? <span className="chip lablog-hours">⏱ {hours[l.person]} h</span> : null}
+            {hours[l.person] ? <span className="chip lablog-hours">{hours[l.person]} h</span> : null}
             <span className="spacer" />
             {(l.person === ctx.me || ctx.isManager) && (
               <button className="link-btn small" onClick={() => ctx.edit(l)}>

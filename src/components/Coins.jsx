@@ -196,8 +196,8 @@ export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onClose 
               <>
                 <div className="segmented coins-range">
                   {[
-                    ['coins', '💰 Most coins'],
-                    ['earned', '🛠️ Earned by working'],
+                    ['coins', 'Most coins'],
+                    ['earned', 'Earned by working'],
                   ].map(([id, label]) => (
                     <button
                       key={id}
@@ -229,7 +229,7 @@ export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onClose 
                 <ol className="coins-board">
                   {board.map((r, i) => (
                     <li key={r.name} className={r.name === actor.name ? 'me' : ''}>
-                      <span className="coins-rank">{['🥇', '🥈', '🥉'][i] || i + 1}</span>
+                      <span className={`coins-rank${i < 3 ? ` top top-${i + 1}` : ''}`}>{i + 1}</span>
                       <Avatar name={r.name} size={28} />
                       <span className="grow">{r.name}</span>
                       <Coins n={r.coins} />
@@ -336,7 +336,7 @@ export function CoinsAdmin({ cfg, setCfg, roster, balances, onGrant, ledger, onU
         <ul className="coins-history">
           {grants.slice(0, 20).map((g) => (
             <li key={g.id}>
-              <span className="coins-icon">{g.amount >= 0 ? '⭐' : '⚠️'}</span>
+              <span className={`coins-icon${g.amount >= 0 ? '' : ' minus'}`}>{g.amount >= 0 ? '+' : '−'}</span>
               <span className="grow">
                 <span className="coins-label">
                   {g.to}

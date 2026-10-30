@@ -125,7 +125,7 @@ function TaskPhotos({ task, api }) {
       <div className="row">
         <label className="field-label grow">Photos{photos.length ? ` · ${photos.length}` : ''}</label>
         <button className="btn" onClick={() => input.current?.click()}>
-          📷 Add photos
+          Add photos
         </button>
         <input ref={input} type="file" accept="image/*" multiple hidden onChange={onFiles} />
       </div>
@@ -440,7 +440,7 @@ export default function TaskPanel({ task, api, roster, milestones = [], parts = 
               {(task.links || []).map((url, i) => (
                 <li key={url + i}>
                   <a href={url} target="_blank" rel="noreferrer">
-                    🔗 {hostOf(url)}
+                    {hostOf(url)}
                   </a>
                   <button
                     className="link-btn"

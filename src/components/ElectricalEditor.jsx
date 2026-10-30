@@ -644,14 +644,14 @@ export default function ElectricalEditor({ remote, canEdit, actor, onSave, onClo
               </button>
               {sel && (
                 <button className="btn danger-btn" onClick={removeSelected}>
-                  🗑 Delete
+                  Delete
                 </button>
               )}
               <button
                 className={`btn${panel === 'history' ? ' on-btn' : ''}`}
                 onClick={() => setPanel(panel === 'history' ? null : 'history')}
               >
-                🕘 Versions
+                Versions
               </button>
             </div>
           ) : (
@@ -660,7 +660,7 @@ export default function ElectricalEditor({ remote, canEdit, actor, onSave, onClo
           <span className="spacer" />
           <span className="muted small dg-saving">{saving}</span>
           <button className={`btn${panel === 'ports' ? ' on-btn' : ''}`} onClick={() => setPanel(panel === 'ports' ? null : 'ports')}>
-            🔌 Port list
+            Port list
           </button>
           <button className="btn" onClick={exportPng}>
             ⬇ PNG
@@ -848,7 +848,7 @@ export default function ElectricalEditor({ remote, canEdit, actor, onSave, onClo
                       ⧉ Duplicate
                     </button>
                     <button className="btn danger-btn" onClick={removeSelected}>
-                      🗑 Delete
+                      Delete
                     </button>
                   </div>
                 )}
@@ -883,7 +883,7 @@ export default function ElectricalEditor({ remote, canEdit, actor, onSave, onClo
                       ))}
                     </div>
                     <button className="btn danger-btn" onClick={removeSelected}>
-                      🗑 Unplug
+                      Unplug
                     </button>
                   </>
                 )}
@@ -898,7 +898,7 @@ export default function ElectricalEditor({ remote, canEdit, actor, onSave, onClo
                       <li>To wire: tap a port, then the port to plug it into (or drag from one to the other).</li>
                       <li>Tap a part to rename it or pick which side its wires come out of.</li>
                       <li>Drag the background (or scroll) to move around; pinch to zoom, or use ＋ and −.</li>
-                      <li>Changes save on their own. 🕘 Versions brings back older ones.</li>
+                      <li>Changes save on their own. Versions brings back older ones.</li>
                     </>
                   ) : (
                     <>

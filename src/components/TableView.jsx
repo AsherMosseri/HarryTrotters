@@ -1,3 +1,4 @@
+import { Icon } from './shell/icons.jsx';
 import { useMemo, useState } from 'react';
 import { STATUSES, SUBTEAMS, priorityById } from '../config.js';
 import { relTime, fullTime, useLocalStorage } from '../util.js';
@@ -72,7 +73,7 @@ export default function TableView({ tasks, api, onOpen, total }) {
                   <DraftInput value={t.title} onSave={(title) => title && api.update(t, { title })} placeholder="Untitled" />
                   {t.photos?.length > 0 && (
                     <span className="meta-count" title="Photos">
-                      📷 {t.photos.length}
+                      <Icon name="camera" size={14} /> {t.photos.length}
                     </span>
                   )}
                   {t.checklist?.length > 0 && (

@@ -22,12 +22,12 @@ export const RING_STYLES = [
 ];
 export const BADGE_ANIMS = [
   { id: 'none', label: 'Still' },
-  { id: 'orbit', label: '🪐 Orbit' },
-  { id: 'spin', label: '🌀 Spin' },
+  { id: 'orbit', label: 'Orbit' },
+  { id: 'spin', label: 'Spin' },
   { id: 'bob', label: '↕ Bob' },
-  { id: 'pulse', label: '💓 Pulse' },
+  { id: 'pulse', label: 'Pulse' },
   { id: 'wiggle', label: '〰 Wiggle' },
-  { id: 'float', label: '🎈 Float' },
+  { id: 'float', label: 'Float' },
 ];
 export const DEFAULT_DECO = {
   ring: { style: 'gradient', colors: ['#8b5cf6', '#06b6d4'], width: 9, spin: 'cw', speed: 4 },

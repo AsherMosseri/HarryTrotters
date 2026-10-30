@@ -1,3 +1,4 @@
+import { Icon } from './shell/icons.jsx';
 import { useMemo, useState } from 'react';
 import { SUBTEAMS, SUBTEAM_COLORS, STATUSES } from '../config.js';
 import {
@@ -77,7 +78,7 @@ function Timeline({ items, competitionDate, onOpen }) {
               return (
                 <div key={d} className={cls} style={{ gridColumn: i + 1 }} title={shortDate(d)}>
                   <span>{'SMTWTFS'[dow]}</span>
-                  <b>{d === comp ? '🏁' : parseDay(d).getDate()}</b>
+                  <b>{d === comp ? <Icon name="flag" size={14} /> : parseDay(d).getDate()}</b>
                 </div>
               );
             })}

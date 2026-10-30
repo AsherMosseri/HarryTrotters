@@ -1441,7 +1441,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
       ) : null}
       {trash.length > 0 && (
         <button className="chip trash-chip" onClick={() => setShowTrash(true)}>
-          🗑 Recently deleted ({trash.length})
+          Recently deleted ({trash.length})
         </button>
       )}
     </>
@@ -1889,7 +1889,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
               {isOwner && shutdown?.on && (
                 <div className="shutdown-banner" role="status">
                   <span>
-                    🛑 Shut down for{' '}
+                    Shut down for{' '}
                     {shutdown.people?.length
                       ? shutdown.people.length <= 3
                         ? shutdown.people.map((n) => n.split(' ')[0]).join(', ')
