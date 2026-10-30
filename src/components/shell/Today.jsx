@@ -226,8 +226,13 @@ export default function Today({
               <button className="ms-row" onClick={() => onPage('milestones')}>
                 <span className="ms-title">{nextMs.title}</span>
                 <span className="ms-sub">
-                  {nextMs.subteam} · ends {parseDay(nextMs.end).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                  {msProgress.total > 0 && ` · ${msProgress.done} of ${msProgress.total} tasks done`}
+                  {[
+                    nextMs.subteam,
+                    `ends ${parseDay(nextMs.end).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`,
+                    msProgress.total > 0 && `${msProgress.done} of ${msProgress.total} tasks done`,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
                 </span>
                 {msProgress.total > 0 && (
                   <span className="ms-bar">

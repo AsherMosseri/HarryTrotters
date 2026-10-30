@@ -1191,11 +1191,10 @@ export const demoStore = {
     return listen(() => cb((state.checklists || []).map((c) => ({ ...c, items: { ...c.items } }))));
   },
   async createChecklist(data, actor) {
-    state.checklists = [
-      ...(state.checklists || []),
-      { id: uid(), title: '', items: {}, ...data, createdAt: Date.now(), createdBy: actor.name },
-    ];
+    const id = uid();
+    state.checklists = [...(state.checklists || []), { id, title: '', items: {}, ...data, createdAt: Date.now(), createdBy: actor.name }];
     commit();
+    return id;
   },
   async renameChecklist(id, title) {
     state.checklists = state.checklists.map((c) => (c.id === id ? { ...c, title } : c));

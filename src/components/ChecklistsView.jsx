@@ -1,11 +1,18 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { STARTER_CHECKLISTS, starterItems } from '../checklists.js';
 import { itemId } from '../data/diff.js';
 import { fullTime } from '../util.js';
 import { DraftInput, PlusIcon } from './common.jsx';
 
-function ChecklistCard({ list, api, isManager }) {
+function ChecklistCard({ list, api, isManager, fresh }) {
   const [text, setText] = useState('');
+  // Just made: bring it into view with the cursor in its name.
+  const box = useRef(null);
+  useEffect(() => {
+    if (!fresh || !box.current) return;
+    box.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    box.current.querySelector('.checklist-title')?.focus();
+  }, [fresh]);
   const items = Object.values(list.items || {}).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   const done = items.filter((i) => i.done).length;
 
@@ -19,7 +26,7 @@ function ChecklistCard({ list, api, isManager }) {
   };
 
   return (
-    <section className="checklist-card">
+    <section className={`checklist-card${fresh ? ' fresh' : ''}`} ref={box}>
       <header>
         <DraftInput
           value={list.title}
@@ -73,6 +80,12 @@ function ChecklistCard({ list, api, isManager }) {
 }
 
 export default function ChecklistsView({ checklists, api, isManager }) {
+  // The one just made with New checklist (it opens at the end of the list).
+  const [fresh, setFresh] = useState(null);
+  const newList = async () => {
+    const id = await api.createChecklist({ title: '', items: {} });
+    if (id) setFresh(id);
+  };
   const sorted = [...checklists].sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
   const missingStarters = STARTER_CHECKLISTS.filter((s) => !checklists.some((c) => c.title === s.title));
   const addStarters = () => missingStarters.forEach((s) => api.createChecklist({ title: s.title, items: starterItems(s) }));
@@ -84,7 +97,7 @@ export default function ChecklistsView({ checklists, api, isManager }) {
           <h1>Competition checklists</h1>
         </div>
         <span className="spacer" />
-        <button className="btn primary" onClick={() => api.createChecklist({ title: 'New checklist', items: {} })}>
+        <button className="btn primary" onClick={newList}>
           <PlusIcon /> New checklist
         </button>
       </div>
@@ -93,7 +106,7 @@ export default function ChecklistsView({ checklists, api, isManager }) {
         <>
           <div className="checklist-grid">
             {sorted.map((c) => (
-              <ChecklistCard key={c.id} list={c} api={api} isManager={isManager} />
+              <ChecklistCard key={c.id} list={c} api={api} isManager={isManager} fresh={fresh === c.id} />
             ))}
           </div>
           {missingStarters.length > 0 && (
@@ -116,7 +129,7 @@ export default function ChecklistsView({ checklists, api, isManager }) {
             <button className="btn primary" onClick={addStarters}>
               Add starter checklists
             </button>
-            <button className="btn" onClick={() => api.createChecklist({ title: 'New checklist', items: {} })}>
+            <button className="btn" onClick={newList}>
               Start blank
             </button>
           </div>

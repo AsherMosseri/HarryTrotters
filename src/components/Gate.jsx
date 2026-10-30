@@ -30,9 +30,7 @@ export function LoadingScreen({ error, step = 1 }) {
   return (
     <div className="gate splash" role={error ? 'alert' : 'status'} aria-label={error ? undefined : 'Loading'}>
       <div className="splash-mark">
-        <span className="splash-ht" aria-hidden="true">
-          HT
-        </span>
+        <img className="splash-logo" src="horse.webp" alt="" aria-hidden="true" />
         <h1>{TEAM_NICKNAME}</h1>
         <p>{TEAM_NAME}</p>
         {error ? (

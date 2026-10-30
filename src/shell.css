@@ -774,3 +774,9 @@ button.sb-head-row { width: 100%; border: 0; background: none; color: var(--mute
 .coins-rank.top { font-weight: 800; color: #fff; background: var(--accent); border-radius: 50%; width: 22px; height: 22px; display: inline-grid; place-items: center; font-size: 12px; }
 .coins-icon.minus { color: var(--danger); }
 .coins-icon { font-weight: 800; }
+/* The team logo (for now, the Stallion Robotics horse without its lettering). */
+.sb-logo { width: 54px; height: auto; flex: none; filter: drop-shadow(0 1px 1px rgb(0 0 0 / 35%)); }
+.splash-logo { width: 190px; height: auto; margin-bottom: 14px; }
+@media (max-width: 760px) { .splash-logo { width: 150px; } }
+.checklist-card.fresh { animation: fresh-glow 1.6s ease-out; }
+@keyframes fresh-glow { 0% { box-shadow: 0 0 0 3px var(--accent); } 100% { box-shadow: 0 0 0 3px transparent; } }

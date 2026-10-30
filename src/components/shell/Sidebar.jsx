@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Icon } from './icons.jsx';
 import { Avatar } from '../common.jsx';
 import { TEAM_NAME, TEAM_NICKNAME } from '../../config.js';
+import horse from '../../assets/horse.webp';
 
 // The app's left side on iPads and computers (phones keep the bottom tab bar):
 // the team, then every page in a few groups, with chat channels listed right
@@ -112,9 +113,8 @@ export default function Sidebar({
     <aside className="sidebar">
       <div className="sb-top">
         <button className="sb-team" onClick={onLogo}>
-          <span className="sb-mark" aria-hidden="true">
-            HT
-          </span>
+          {/* The Stallion Robotics horse, until the Harry Trotters logo is ready. */}
+          <img className="sb-logo" src={horse} alt="" aria-hidden="true" />
           <span className="sb-team-name">
             <b>{TEAM_NICKNAME}</b>
             <small>{TEAM_NAME}</small>

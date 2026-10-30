@@ -610,8 +610,11 @@ export const firebaseStore = {
     return onSnapshot(checklistsCol, (snap) => cb(snap.docs.map(readDoc)), onError);
   },
 
-  createChecklist(data, actor) {
-    return setDoc(doc(checklistsCol), { title: '', items: {}, ...data, createdAt: serverTimestamp(), createdBy: actor.name });
+  // Returns the new checklist's id.
+  async createChecklist(data, actor) {
+    const ref = doc(checklistsCol);
+    await setDoc(ref, { title: '', items: {}, ...data, createdAt: serverTimestamp(), createdBy: actor.name });
+    return ref.id;
   },
 
   renameChecklist(id, title) {

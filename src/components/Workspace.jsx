@@ -38,7 +38,9 @@ import Sidebar from './shell/Sidebar.jsx';
 import Today from './shell/Today.jsx';
 import { Icon } from './shell/icons.jsx';
 // The 3D viewer pulls in three.js, so it loads only when the Robot tab opens.
-const RobotView = lazy(() => import('./RobotView.jsx'));
+import { loadEmoji } from './chat/emoji.js';
+const loadRobotView = () => import('./RobotView.jsx');
+const RobotView = lazy(loadRobotView);
 import { HelpDialog, WelcomeCard } from './Help.jsx';
 import { VersionLogDialog, WhatsNew } from './VersionLog.jsx';
 import { RequestsDialog } from './Requests.jsx';
@@ -551,6 +553,19 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
   const [showRequests, setShowRequests] = useState(null);
   useEffect(() => store.subscribeRequests(setRequests, quiet('requests')), [store, quiet]);
   const newRequests = actor.name === REQUESTS_TO ? requests.filter((r) => r.status === 'new').length : 0;
+  // Pages and data the app downloads only when first needed (the 3D robot
+  // viewer, the emoji list): fetch them quietly once the app has settled, so
+  // a new version published while the app is open can't leave them missing
+  // (which made opening Robot reload the whole app).
+  useEffect(() => {
+    const warm = () => {
+      if (views.some(([id]) => id === 'robot')) loadRobotView().catch(() => {});
+      loadEmoji().catch(() => {});
+    };
+    const t = setTimeout(() => (window.requestIdleCallback ? window.requestIdleCallback(warm, { timeout: 4000 }) : warm()), 5000);
+    return () => clearTimeout(t);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Shifts (clock in/out) and the planned schedule.
   const [shifts, setShifts] = useState([]);
   const [shiftPlans, setShiftPlans] = useState([]);
