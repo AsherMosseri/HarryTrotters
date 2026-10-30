@@ -780,3 +780,6 @@ button.sb-head-row { width: 100%; border: 0; background: none; color: var(--mute
 @media (max-width: 760px) { .splash-logo { width: 150px; } }
 .checklist-card.fresh { animation: fresh-glow 1.6s ease-out; }
 @keyframes fresh-glow { 0% { box-shadow: 0 0 0 3px var(--accent); } 100% { box-shadow: 0 0 0 3px transparent; } }
+.sb-team { flex: 1 1 0; min-width: 0; }
+.sb-top-tools { flex: none; }
+.sb-logo { width: 46px; }
