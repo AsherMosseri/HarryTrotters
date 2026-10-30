@@ -2,6 +2,7 @@
 // (labLogs/<day>_<person-id>). Ending a shift asks for it; #lab-log shows a
 // Trotbot post per day with everyone's logs (made by the onLabLog function).
 import { personId } from './data/diff.js';
+import { hoursOf, msByPerson } from '../functions/shared/hours.js';
 
 export const LAB_LOG_CHANNEL = 'lab-log';
 // Shifts shorter than this (a mis-tap, a quick stop) don't need a log.
@@ -21,13 +22,8 @@ export const dayLabel = (day) =>
 
 // Hours each person spent at the lab on a day (shifts that started that day).
 export function hoursOn(day, shifts, now = Date.now()) {
-  const out = {};
-  for (const s of shifts || []) {
-    if (!s.start || dayOf(s.start) !== day) continue;
-    const ms = (s.end || now) - s.start;
-    if (ms > 0) out[s.person] = (out[s.person] || 0) + ms;
-  }
-  return Object.fromEntries(Object.entries(out).map(([n, ms]) => [n, Math.round((ms / 3600000) * 10) / 10]));
+  const by = msByPerson(shifts || [], now, (s) => dayOf(s.start) === day);
+  return Object.fromEntries([...by].filter(([, ms]) => ms > 0).map(([n, ms]) => [n, hoursOf(ms)]));
 }
 
 // The first day this person still owes a log for: a shift of theirs that

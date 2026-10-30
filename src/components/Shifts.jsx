@@ -4,6 +4,7 @@ import { addDays, mondayOf, parseDay, toISO, todayISO } from '../milestones.js';
 import { firstName } from '../util.js';
 import { Avatar, AvatarStack, CloseIcon, Overlay, PlusIcon } from './common.jsx';
 import { CheckinCard, CheckinDialog, scheduleText } from './Checkin.jsx';
+import { hoursLabel, hoursOf, msByPerson, msOf } from '../../functions/shared/hours.js';
 
 const MIN = 60000;
 const HOUR = 60 * MIN;
@@ -21,10 +22,7 @@ export function useNow(every = 30000) {
 }
 
 const timer = (ms) => `${Math.floor(Math.max(0, ms) / HOUR)}:${String(Math.floor((Math.max(0, ms) % HOUR) / MIN)).padStart(2, '0')}`;
-const hoursText = (ms) => {
-  const h = ms / HOUR;
-  return h < 10 ? `${h.toFixed(1)} h` : `${Math.round(h)} h`;
-};
+const hoursText = hoursLabel;
 const clock = (ms) => new Date(ms).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
 const dayLabel = (iso) => {
   const today = todayISO();
@@ -39,10 +37,12 @@ const toInput = (ms) => {
   const d = new Date(ms);
   return `${toISO(d)}T${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 };
-// A time picked for "I started at": today, or yesterday if that's still ahead.
+// A time picked for "I started at": today; a few minutes ahead (a clock a
+// little off) means now; well ahead means last night (11 PM picked at 1 AM).
 const startFromTime = (hhmm, now) => {
   const t = planMs(todayISO(), hhmm);
-  return t > now ? t - 24 * HOUR : t;
+  if (t <= now) return t;
+  return t - now <= 2 * HOUR ? now : t - 24 * HOUR;
 };
 
 function TaskPicks({ tasks, value, onChange }) {
@@ -347,7 +347,23 @@ function ShiftDialog({ shift, roster, tasks, isManager, onSave, onDelete, onClos
   const set = (patch) => setS({ ...s, ...patch });
   const start = new Date(s.start).getTime();
   const end = s.end ? new Date(s.end).getTime() : null;
-  const ok = s.person && start && (!isManager || !s.end || end > start);
+  // A missed shift needs its end (without one it would count as still
+  // running, from back then until now); a running one can stay open. Over 16
+  // hours is almost always a typo in the date.
+  const problem = !isManager
+    ? ''
+    : !start
+      ? 'Pick when it started.'
+      : isNew && !end
+        ? 'Pick when it ended.'
+        : end && end <= start
+          ? 'It has to end after it starts.'
+          : end && end - start > 16 * HOUR
+            ? `That’s ${hoursLabel(end - start)}. Check the dates.`
+            : start > Date.now() + 5 * MIN
+              ? 'That’s in the future.'
+              : '';
+  const ok = s.person && start && !problem;
   const theirTasks = tasks.filter((t) => (t.assignees || []).includes(s.person) || s.taskIds.includes(t.id));
   return (
     <Dialog title={isNew ? 'Add a missed shift' : 'Edit shift'} onClose={onClose}>
@@ -371,6 +387,10 @@ function ShiftDialog({ shift, roster, tasks, isManager, onSave, onDelete, onClos
               End
             </label>
             <input id="sh-end" type="datetime-local" className="input" value={s.end} onChange={(e) => set({ end: e.target.value })} />
+            <span />
+            <span className={`small${problem ? ' danger' : ' muted'}`}>
+              {problem || (end ? `${hoursLabel(end - start)}` : 'Still running')}
+            </span>
           </>
         )}
         <label className="field-label" htmlFor="sh-sub">
@@ -500,18 +520,18 @@ export default function ShiftsView({
   const upcoming = plans.filter((p) => planMs(p.date, p.end) > now).sort((a, b) => planMs(a.date, a.start) - planMs(b.date, b.start));
   const shownPlans = more ? upcoming : upcoming.slice(0, 6);
 
+  // Overlapping shifts for one person count once (shared/hours.js), here and
+  // in the tiles, profiles, and coins.
   const totals = useMemo(() => {
-    const m = new Map();
-    for (const s of all)
-      if (inPeriod(s, hoursPeriod === 'all' ? 'all' : 'week')) m.set(s.person, (m.get(s.person) || 0) + lengthOf(s, now));
+    const m = msByPerson(all, now, (s) => inPeriod(s, hoursPeriod === 'all' ? 'all' : 'week'));
     if (!m.has(me)) m.set(me, 0);
     return [...m].sort((a, b) => b[1] - a[1]);
   }, [all, hoursPeriod, now, me]);
   const goalMs = (Number(goal) || 0) * HOUR;
   const barMax = hoursPeriod === 'all' && goalMs ? goalMs : Math.max(...totals.map(([, v]) => v), HOUR);
-  const myAll = all.filter((s) => s.person === me).reduce((n, s) => n + lengthOf(s, now), 0);
-  const myWeek = all.filter((s) => s.person === me && inPeriod(s, 'week')).reduce((n, s) => n + lengthOf(s, now), 0);
-  const teamWeek = all.filter((s) => inPeriod(s, 'week')).reduce((n, s) => n + lengthOf(s, now), 0);
+  const myAll = msOf(me, all, now);
+  const myWeek = msOf(me, all, now, (s) => inPeriod(s, 'week'));
+  const teamWeek = [...msByPerson(all, now, (s) => inPeriod(s, 'week')).values()].reduce((n, ms) => n + ms, 0);
 
   const log = all
     .filter((s) => inPeriod(s, period) && (!who || s.person === who) && (!sub || s.subteam === sub))
@@ -594,18 +614,18 @@ export default function ShiftsView({
         </div>
         <div className="stat">
           <span>Your hours this week</span>
-          <b>{(myWeek / HOUR).toFixed(1)}</b>
+          <b>{hoursOf(myWeek).toFixed(1)}</b>
         </div>
         <div className="stat">
           <span>Your hours, season</span>
           <b>
-            {(myAll / HOUR).toFixed(1)}
+            {hoursOf(myAll).toFixed(1)}
             {goal ? <small> of {goal}</small> : null}
           </b>
         </div>
         <div className="stat">
           <span>Team hours this week</span>
-          <b>{(teamWeek / HOUR).toFixed(1)}</b>
+          <b>{hoursOf(teamWeek).toFixed(1)}</b>
         </div>
       </div>
 
