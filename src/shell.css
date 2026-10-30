@@ -876,10 +876,6 @@ button, [role='button'] { -webkit-user-select: none; user-select: none; -webkit-
 .dialog.appearance { width: min(500px, 100%); }
 .dialog.appearance .tt-pic { height: 46px; }
 
-/* iPad and computer: the strip under the status bar (see the .status-bar-band
-   note in styles.css) lets the sidebar and the page show through, instead of
-   a page-colored strip across the top of the navy sidebar. */
-body:has(.shell:not(.phone-shell)) .status-bar-band { background: transparent; }
 /* Phones: unread chat on its row in More (the More tab shows the total). */
 .more-badge {
   min-width: 22px; height: 22px; padding: 0 6px; border-radius: 999px; background: var(--danger); color: #fff;
