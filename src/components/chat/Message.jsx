@@ -1,15 +1,59 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Icon } from '../shell/icons.jsx';
 import { personId } from '../../data/diff.js';
 import { CommandCard, Trotbot } from './Commands.jsx';
-import { AutoTextarea, Avatar, DisplayName, StatusDot, usePeople } from '../common.jsx';
+import { AutoTextarea, Avatar, DisplayName, Overlay, StatusDot, usePeople } from '../common.jsx';
 import { borderProps } from '../../borders.js';
 import { isJumbo, renderRich } from './format.jsx';
-import { EmojiPicker } from './Pickers.jsx';
+import { EmojiPicker, QUICK_MAX } from './Pickers.jsx';
 import { CUSTOM_RE } from './emoji.js';
 import { isCoinCommand, useControls } from '../../controls.js';
 
 export const QUICK_REACTIONS = ['👍', '✅', '😂', '❤️', '🔥', '👀'];
+// Your quick reactions (the picker's Edit, saved on your profile), or the first three.
+const quickOf = (profile) => (Array.isArray(profile?.quickReactions) ? profile.quickReactions.slice(0, QUICK_MAX) : QUICK_REACTIONS.slice(0, 3));
+
+// A picker that floats next to the message's buttons, above them when there's
+// no room below, and always fully on screen (no scrolling the chat to reach
+// it). Phones pin it near the top (CSS). A tap outside closes it.
+function FloatingPicker({ anchor, onClose, children }) {
+  const box = useRef(null);
+  const [pos, setPos] = useState(null);
+  useLayoutEffect(() => {
+    const place = () => {
+      const a = anchor.current?.getBoundingClientRect();
+      const el = box.current;
+      // The buttons can be hidden for a moment (the pointer left the message
+      // when the picker opened): keep the last spot.
+      if (!a || !el || (!a.width && !a.height)) return;
+      if (window.innerWidth <= 760) return setPos({});
+      const h = el.offsetHeight;
+      const w = el.offsetWidth;
+      const vh = window.visualViewport?.height || window.innerHeight;
+      const below = a.bottom + 6;
+      const above = a.top - 6 - h;
+      const top = below + h <= vh - 8 ? below : above >= 8 ? above : Math.max(8, vh - 8 - h);
+      const left = Math.min(Math.max(8, a.right - w), window.innerWidth - w - 8);
+      setPos({ top, left });
+    };
+    place();
+    const ro = new ResizeObserver(place);
+    if (box.current) ro.observe(box.current);
+    window.addEventListener('resize', place);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', place);
+    };
+  }, [anchor]);
+  return (
+    <Overlay>
+      <div className="picker-scrim" onClick={onClose} />
+      <div ref={box} className="floating-picker" style={pos ? pos : { visibility: 'hidden' }} onClick={(e) => e.stopPropagation()}>
+        {children}
+      </div>
+    </Overlay>
+  );
+}
 
 // Whether a message still has something to show with some features switched
 // off (Controls): a GIF-only message disappears when GIFs are off.
@@ -261,33 +305,60 @@ function Attachment({ f }) {
   );
 }
 
-// A super reaction: bursts when someone adds one.
+// The big moment when a super reaction lands: the emoji blows up over the
+// chat from the reaction, with a shockwave and a spray of little copies and
+// sparks, then shrinks back into place.
+function SuperBurst({ from, emoji, teamEmoji }) {
+  const r = from.current?.getBoundingClientRect();
+  if (!r) return null;
+  return (
+    <Overlay>
+      <div className="super-fx" style={{ left: r.left + r.width / 2, top: r.top + r.height / 2 }} aria-hidden="true">
+        <span className="super-fx-wave" />
+        <span className="super-fx-wave late" />
+        {Array.from({ length: 14 }, (_, i) => (
+          <i key={i} className="super-fx-spark" style={{ '--a': `${i * (360 / 14)}deg`, '--d': `${90 + (i % 3) * 40}px` }} />
+        ))}
+        {Array.from({ length: 6 }, (_, i) => (
+          <span key={i} className="super-fx-mini" style={{ '--a': `${i * 60 + 30}deg` }}>
+            <ReactionGlyph emoji={emoji} teamEmoji={teamEmoji} />
+          </span>
+        ))}
+        <span className="super-fx-big">
+          <ReactionGlyph emoji={emoji} teamEmoji={teamEmoji} />
+        </span>
+      </div>
+    </Overlay>
+  );
+}
+
+// A super reaction: bursts when someone adds one (and again when you point at
+// it, like replaying it).
 function SuperChip({ emoji, who, mine, teamEmoji, onClick, fresh }) {
   const count = Object.keys(who).length;
   const last = useRef(count);
+  const chip = useRef(null);
   // A chip that appears after the message was already showing (someone just
   // added it) starts with a burst too.
   const [burst, setBurst] = useState(fresh);
   useEffect(() => {
-    if (!fresh) return;
-    const t = setTimeout(() => setBurst(false), 1300);
+    if (!burst) return;
+    const t = setTimeout(() => setBurst(false), 1600);
     return () => clearTimeout(t);
-  }, [fresh]);
+  }, [burst]);
   useEffect(() => {
-    if (count > last.current) {
-      setBurst(true);
-      const t = setTimeout(() => setBurst(false), 1300);
-      last.current = count;
-      return () => clearTimeout(t);
-    }
+    if (count > last.current) setBurst(true);
     last.current = count;
   }, [count]);
   return (
     <button
+      ref={chip}
       className={`reaction super${mine ? ' mine' : ''}${burst ? ' burst' : ''}`}
       title={`Super reaction: ${Object.values(who).join(', ')}`}
       onClick={onClick}
+      onPointerEnter={(e) => e.pointerType === 'mouse' && !burst && setBurst(true)}
     >
+      {burst && <SuperBurst from={chip} emoji={emoji} teamEmoji={teamEmoji} />}
       <span className="super-glyph">
         <ReactionGlyph emoji={emoji} teamEmoji={teamEmoji} />
         {burst && (
@@ -337,6 +408,8 @@ export default function Message({
 }) {
   const [picker, setPicker] = useState(false);
   const [removing, setRemoving] = useState(false);
+  const actionsRef = useRef(null);
+  const quick = quickOf(usePeople()?.profileOf(actor.name));
   const feat = useControls().isOn;
   const mine = m.byUid === actor.uid;
   // The author's message border (Edit profile → Style → Borders).
@@ -372,7 +445,7 @@ export default function Message({
 
   return (
     <div
-      className={`msg${first ? ' first' : ''}${selected ? ' selected' : ''}${mentionsMe ? ' mentions-me' : ''}${m.pinned && feat('pins') ? ' pinned' : ''}`}
+      className={`msg${first ? ' first' : ''}${selected || picker ? ' selected' : ''}${mentionsMe ? ' mentions-me' : ''}${m.pinned && feat('pins') ? ' pinned' : ''}`}
       id={`msg-${m.id}`}
       onClick={(e) => {
         if (e.target.closest('a,button,input,.emoji-picker,.spoiler:not(.shown)')) return;
@@ -510,7 +583,11 @@ export default function Message({
               <div key={`${sup ? 's' : 'r'}-${emoji}`}>
                 <span className="reacted-glyph">
                   <ReactionGlyph emoji={emoji} teamEmoji={teamEmoji} />
-                  {sup && <span className="reacted-super">✨</span>}
+                  {sup && (
+                    <span className="reacted-super" title="Super reaction">
+                      <Icon name="superReact" size={12} />
+                    </span>
+                  )}
                 </span>
                 <span>{Object.values(who).join(', ')}</span>
               </div>
@@ -539,12 +616,12 @@ export default function Message({
         )}
       </div>
       {!m.deleted && (
-        <div className="msg-actions" onClick={(e) => e.stopPropagation()}>
+        <div className="msg-actions" ref={actionsRef} onClick={(e) => e.stopPropagation()}>
           {feat('reactions') && (
             <>
-              {QUICK_REACTIONS.slice(0, 3).map((e) => (
+              {quick.map((e) => (
                 <button key={e} onClick={() => react(e)} aria-label={`React ${e}`}>
-                  {e}
+                  <ReactionGlyph emoji={e} teamEmoji={teamEmoji} />
                 </button>
               ))}
               <button onClick={() => setPicker((p) => !p)} aria-label="More reactions" title="More reactions">
@@ -554,8 +631,9 @@ export default function Message({
                 onClick={() => setPicker((p) => (p === 'super' ? false : 'super'))}
                 aria-label="Super reaction"
                 title="Super reaction (animated)"
+                className={picker === 'super' ? 'on' : ''}
               >
-                ✨
+                <Icon name="superReact" size={18} />
               </button>
             </>
           )}
@@ -600,18 +678,30 @@ export default function Message({
             </button>
           )}
           {picker && feat('reactions') && (
-            <EmojiPicker
-              title={picker === 'super' ? '✨ Super reaction' : ''}
-              onPick={react}
-              onClose={() => setPicker(false)}
-              teamEmoji={teamEmoji}
-              canManage={isManager}
-              onManage={() => {
-                setPicker(false);
-                onManageEmoji();
-              }}
-              className="reaction-picker"
-            />
+            <FloatingPicker anchor={actionsRef} onClose={() => setPicker(false)}>
+              <EmojiPicker
+                title={
+                  picker === 'super' ? (
+                    <span className="super-title">
+                      <Icon name="superReact" size={16} /> Super reaction
+                    </span>
+                  ) : (
+                    ''
+                  )
+                }
+                onPick={react}
+                onClose={() => setPicker(false)}
+                teamEmoji={teamEmoji}
+                canManage={isManager}
+                onManage={() => {
+                  setPicker(false);
+                  onManageEmoji();
+                }}
+                quick={picker === 'super' ? null : quick}
+                onSaveQuick={(list) => api.saveProfile(actor.name, { quickReactions: list })}
+                className="reaction-picker"
+              />
+            </FloatingPicker>
           )}
         </div>
       )}

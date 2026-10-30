@@ -182,6 +182,13 @@ const PATHS = {
     </>
   ),
   chevron: <path d="m7.5 4.5 5.5 5.5-5.5 5.5" />,
+  // Super reaction: a burst (not an emoji, so it doesn't read as one).
+  superReact: (
+    <>
+      <path d="M9 3.5c.6 3.2 1.8 4.4 5 5-3.2.6-4.4 1.8-5 5-.6-3.2-1.8-4.4-5-5 3.2-.6 4.4-1.8 5-5z" />
+      <path d="M15.5 12.5v4M13.5 14.5h4M15.5 2.5v2M14.5 3.5h2" />
+    </>
+  ),
   sidebar: (
     <>
       <rect x="2.5" y="3.5" width="15" height="13" rx="2" />

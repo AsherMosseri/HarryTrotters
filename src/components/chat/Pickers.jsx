@@ -14,7 +14,11 @@ function useEscape(onClose) {
 
 // Every emoji, searchable, plus the team's own (:name:). onPick gets the emoji
 // character, or ':name:' for a team emoji.
-export function EmojiPicker({ onPick, onClose, teamEmoji = [], canManage, onManage, className = '', title = '' }) {
+// quick / onSaveQuick (reactions only): your quick reactions, shown under the
+// grid with an Edit mode where picks add to them (up to QUICK_MAX).
+export const QUICK_MAX = 5;
+export function EmojiPicker({ onPick, onClose, teamEmoji = [], canManage, onManage, className = '', title = '', quick, onSaveQuick }) {
+  const [editing, setEditing] = useState(null); // your quick reactions while editing them
   const [ready, setReady] = useState(!!emojiList());
   const [q, setQ] = useState('');
   const [group, setGroup] = useState(-1); // -1 = recent + team
@@ -26,6 +30,10 @@ export function EmojiPicker({ onPick, onClose, teamEmoji = [], canManage, onMana
   useEffect(() => grid.current?.scrollTo(0, 0), [group, q]);
 
   const pick = (e) => {
+    if (editing) {
+      if (!editing.includes(e) && editing.length < QUICK_MAX) setEditing([...editing, e]);
+      return;
+    }
     rememberEmoji(e);
     onPick(e);
   };
@@ -43,6 +51,38 @@ export function EmojiPicker({ onPick, onClose, teamEmoji = [], canManage, onMana
   return (
     <div className={`emoji-picker big ${className}`} onClick={(e) => e.stopPropagation()}>
       {title && <div className="picker-title">{title}</div>}
+      {editing && (
+        <div className="quick-edit">
+          <b>Quick reactions</b>
+          <span className="muted small">
+            Pick up to {QUICK_MAX} below. Tap one here to take it off. ({editing.length}/{QUICK_MAX})
+          </span>
+          <div className="quick-row">
+            {editing.map((e) => (
+              <button key={e} className="quick-chip" onClick={() => setEditing(editing.filter((x) => x !== e))} aria-label={`Remove ${e}`}>
+                <QuickGlyph emoji={e} teamEmoji={teamEmoji} />
+                <span className="quick-x" aria-hidden="true">
+                  ×
+                </span>
+              </button>
+            ))}
+            {!editing.length && <span className="muted small">None yet</span>}
+            <span className="spacer" />
+            <button className="link-btn" onClick={() => setEditing(null)}>
+              Cancel
+            </button>
+            <button
+              className="btn primary small-btn"
+              onClick={() => {
+                onSaveQuick(editing);
+                setEditing(null);
+              }}
+            >
+              Save
+            </button>
+          </div>
+        </div>
+      )}
       <div className="row gap-sm">
         <input
           className="input grow"
@@ -115,9 +155,28 @@ export function EmojiPicker({ onPick, onClose, teamEmoji = [], canManage, onMana
           <p className="muted small">Emoji you use will show up here. Pick a category above.</p>
         )}
       </div>
+      {quick && onSaveQuick && !editing && (
+        <div className="quick-foot">
+          <span className="muted small">Quick reactions</span>
+          {quick.map((e) => (
+            <span key={e} className="quick-glyph">
+              <QuickGlyph emoji={e} teamEmoji={teamEmoji} />
+            </span>
+          ))}
+          <span className="spacer" />
+          <button className="link-btn" onClick={() => setEditing([...quick])}>
+            Edit
+          </button>
+        </div>
+      )}
     </div>
   );
 }
+
+const QuickGlyph = ({ emoji, teamEmoji }) => {
+  const team = emoji.startsWith(':') && teamEmoji.find((t) => `:${t.name}:` === emoji);
+  return team ? <img className="custom-emoji" src={team.url} alt={emoji} /> : emoji;
+};
 
 // Team management: add and remove :team_emoji:.
 export function EmojiManager({ teamEmoji, api, onClose }) {
