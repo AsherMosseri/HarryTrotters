@@ -142,13 +142,15 @@ export function DisplayName({ name: saved, className = '', as: Tag = 'span', ...
   );
 }
 
+// Plain pictures, no profile decorations: rings and glows of different sizes
+// made each stack overlap differently.
 export function AvatarStack({ names = [], max = 3, size = 24 }) {
   if (!names.length) return <span className="muted small">Unassigned</span>;
   const shown = names.slice(0, max);
   return (
     <span className="avatar-stack" title={names.join(', ')}>
       {shown.map((n) => (
-        <Avatar key={n} name={n} size={size} />
+        <Avatar key={n} name={n} size={size} decoration="" />
       ))}
       {names.length > max && (
         <span className="avatar more" style={{ width: size, height: size }}>

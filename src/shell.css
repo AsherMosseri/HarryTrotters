@@ -811,3 +811,8 @@ html.kb-bar .composer { padding-bottom: calc(10px + var(--kb-bar, 0px)); }
 .composer.pick-bar { flex-direction: row; align-items: center; gap: 10px; padding: 12px 16px; }
 .dialog.delete-msgs { width: min(440px, calc(100vw - 32px)); gap: 12px; }
 .btn.danger { background: var(--danger); border-color: var(--danger); color: #fff; }
+
+/* Avatar stacks: same size, same overlap, a clean outline between faces. */
+.avatar-stack { align-items: center; }
+.avatar-stack > * + * { margin-left: -6px; }
+.avatar-stack > .avatar.more { margin-left: -6px; font-weight: 700; letter-spacing: -0.02em; }
