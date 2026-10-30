@@ -16,6 +16,11 @@
         if (theme === 'light' || theme === 'dark') document.documentElement.setAttribute('data-theme', theme);
       } catch (e) {}
       if (/[?&]demo(=|&|$)/.test(location.search)) document.documentElement.setAttribute('data-demo', '');
+      // Animations (Appearance): on, off, or follow the device's Reduce Motion.
+      try {
+        var motion = JSON.parse(localStorage.getItem('motion'));
+        if (motion === 'on' || motion === 'off') document.documentElement.setAttribute('data-motion', motion);
+      } catch (e) {}
     </script>
     <!-- Display name fonts (Edit profile → Style). Each font file loads only when someone uses it, and the
          list loads without holding up the first paint (media="print" until it arrives). -->

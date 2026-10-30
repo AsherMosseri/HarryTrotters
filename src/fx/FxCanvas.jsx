@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { FX } from './effects.js';
+import { reducedMotion } from '../util.js';
 
 const INTRO_S = 1.8;
 
@@ -40,7 +41,7 @@ export default function FxCanvas({ id, className = '', fps = 60, density = 1, in
       frame(ctx, dt, t, Math.max(0, 1 - t / INTRO_S));
     };
     if (!setup()) return;
-    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+    if (reducedMotion()) {
       // One calm still frame, a few seconds in.
       t = INTRO_S;
       for (let i = 0; i < 90; i++) {

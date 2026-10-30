@@ -640,8 +640,8 @@ div.org-member { cursor: default; }
   100% { transform: translateY(-110vh) rotate(20deg); opacity: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .cat-party *, .cat-party { animation-duration: 2s !important; }
-  .cat-lights, .bot-route, .bot { animation: none; }
+  :root:not([data-motion='on']) .cat-party *, :root:not([data-motion='on']) .cat-party { animation-duration: 2s !important; }
+  :root:not([data-motion='on']) .cat-lights, :root:not([data-motion='on']) .bot-route, :root:not([data-motion='on']) .bot { animation: none; }
 }
 
 
@@ -1382,7 +1382,7 @@ h3.md-h { font-size: 16.5px; }
 .deco-robot .deco-badge { bottom: calc(var(--s) * -0.12); right: calc(var(--s) * -0.14); animation: deco-bob 1.4s ease-in-out infinite; }
 .deco-stars .deco-badge { top: calc(var(--s) * -0.14); right: calc(var(--s) * -0.14); }
 .deco-cat .deco-badge { top: calc(var(--s) * -0.2); left: calc(var(--s) * -0.14); transform: rotate(-15deg); }
-@media (prefers-reduced-motion: reduce) { .deco::before, .deco-badge { animation: none !important; } }
+@media (prefers-reduced-motion: reduce) { :root:not([data-motion='on']) .deco::before, :root:not([data-motion='on']) .deco-badge { animation: none !important; } }
 
 /* profile card */
 .profile-body { position: relative; display: flex; flex-direction: column; padding: 0 20px 18px; }
@@ -1401,7 +1401,7 @@ h3.md-h { font-size: 16.5px; }
 @keyframes fx-fall { to { transform: translateY(560px) rotate(240deg); } }
 @keyframes fx-rise { to { transform: translateY(-560px) scale(0.6); opacity: 0; } }
 @keyframes fx-twinkle { 0%, 100% { opacity: 0; transform: scale(0.4); } 50% { opacity: 1; transform: scale(1.1); } }
-@media (prefers-reduced-motion: reduce) { .profile-effect { display: none; } }
+@media (prefers-reduced-motion: reduce) { :root:not([data-motion='on']) .profile-effect { display: none; } }
 
 /* profile editor */
 .dialog.profile-editor { width: min(820px, calc(100vw - 32px)); max-height: calc(var(--vvh, 100dvh) - 6vh - 16px); overflow-y: auto; }
@@ -1589,7 +1589,7 @@ h3.md-h { font-size: 16.5px; }
 .shift-pill.active { box-shadow: inset 0 0 0 2px var(--st-done); }
 .shift-live { width: 8px; height: 8px; border-radius: 50%; background: var(--st-done); animation: shift-blink 2s ease-in-out infinite; }
 @keyframes shift-blink { 50% { opacity: 0.35; } }
-@media (prefers-reduced-motion: reduce) { .shift-live { animation: none; } }
+@media (prefers-reduced-motion: reduce) { :root:not([data-motion='on']) .shift-live { animation: none; } }
 .shift-pop {
   position: absolute; right: -8px; top: calc(100% + 6px); z-index: 40; width: min(340px, calc(100vw - 24px));
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-lg);
@@ -1703,7 +1703,7 @@ h3.md-h { font-size: 16.5px; }
 .app-fx .profile-effect { opacity: 0.7; }
 .app-fx .profile-effect span { font-size: 26px; animation-duration: calc(var(--d) * 2.5); }
 .app-fx .profile-effect img { width: 40px; height: 40px; }
-@media (prefers-reduced-motion: reduce) { .app-backdrop.shift { animation: none; } }
+@media (prefers-reduced-motion: reduce) { :root:not([data-motion='on']) .app-backdrop.shift { animation: none; } }
 .dialog.theme-studio { width: min(560px, calc(100vw - 32px)); max-height: calc(var(--vvh, 100dvh) - 6vh - 16px); overflow-y: auto; }
 .dialog.theme-studio > .panel-head { position: sticky; top: 0; z-index: 5; background: var(--surface); }
 .studio-backdrop { background: rgb(10 12 20 / 12%); }
@@ -1742,7 +1742,7 @@ h3.md-h { font-size: 16.5px; }
 @keyframes deco-b-pulse { 50% { transform: scale(1.25) rotate(var(--r)); } }
 @keyframes deco-b-wiggle { 25% { transform: rotate(calc(var(--r) - 16deg)); } 75% { transform: rotate(calc(var(--r) + 16deg)); } }
 @keyframes deco-b-float { 33% { transform: translate(12%, -14%) rotate(var(--r)); } 66% { transform: translate(-12%, 8%) rotate(var(--r)); } }
-@media (prefers-reduced-motion: reduce) { .deco-ring, .deco-orbit, .deco-b { animation: none !important; } }
+@media (prefers-reduced-motion: reduce) { :root:not([data-motion='on']) .deco-ring, :root:not([data-motion='on']) .deco-orbit, :root:not([data-motion='on']) .deco-b { animation: none !important; } }
 .deco-editor { display: flex; flex-direction: column; gap: 10px; padding: 12px; border: 1px dashed var(--border); border-radius: 12px; }
 .deco-top { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
 .deco-stage { width: 190px; height: 190px; display: grid; place-items: center; border-radius: 16px; background: var(--surface-2); touch-action: none; cursor: crosshair; user-select: none; -webkit-user-select: none; }
@@ -1761,7 +1761,7 @@ h3.md-h { font-size: 16.5px; }
 @keyframes cb-shimmer { 0%, 100% { background-position: 0 0, 0% 50%; } 50% { background-position: 0 0, 100% 50%; } }
 .custom-border.cb-pulse { animation: cb-pulse 1.8s ease-in-out infinite; }
 @keyframes cb-pulse { 50% { box-shadow: 0 0 18px 2px var(--cb-glow); } }
-@media (prefers-reduced-motion: reduce) { .custom-border { animation: none !important; } }
+@media (prefers-reduced-motion: reduce) { :root:not([data-motion='on']) .custom-border { animation: none !important; } }
 .msg-text.custom-border { display: inline-block; max-width: 100%; padding: 4px 10px; margin: 2px 0; }
 .gradient-colors { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
 .border-editor { display: flex; flex-direction: column; gap: 10px; padding: 12px; border: 1px dashed var(--border); border-radius: 12px; }
@@ -2066,7 +2066,7 @@ body:has(.bottom-nav):has(.composer) .toast { bottom: calc(150px + env(safe-area
   90% { clip-path: inset(4% 0 70% 0); transform: translate(-2px, -1px); }
   93% { clip-path: inset(70% 0 2% 0); transform: translate(2px, 0); }
 }
-@media (prefers-reduced-motion: reduce) { .ne, .ne::before, .ne::after { animation: none !important; } }
+@media (prefers-reduced-motion: reduce) { :root:not([data-motion='on']) .ne, :root:not([data-motion='on']) .ne::before, :root:not([data-motion='on']) .ne::after { animation: none !important; } }
 .ne-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; }
 .ne-choice { border: 2px solid var(--border); background: var(--surface); border-radius: 12px; padding: 8px 6px 6px; display: flex; flex-direction: column; align-items: center; gap: 2px; color: var(--text); }
 .ne-choice.on { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
@@ -2098,7 +2098,7 @@ body:has(.bottom-nav):has(.composer) .toast { bottom: calc(150px + env(safe-area
 @keyframes ad-march { to { stroke-dashoffset: -16; } }
 .adeco .ad-pulse { animation: ad-pulse 2.2s linear infinite; }
 @keyframes ad-pulse { to { stroke-dashoffset: -346; } }
-@media (prefers-reduced-motion: reduce) { .adeco, .adeco * { animation: none !important; } }
+@media (prefers-reduced-motion: reduce) { :root:not([data-motion='on']) .adeco, :root:not([data-motion='on']) .adeco * { animation: none !important; } }
 /* Small avatars: a ring in the decoration's colors instead. */
 .deco-anim::before { inset: calc(var(--s) * -0.08); }
 .deco-comets::before { background: conic-gradient(#a5f3fc, #f0abfc, #fde68a, #a5f3fc); }
@@ -2158,7 +2158,7 @@ body:has(.bottom-nav):has(.composer) .toast { bottom: calc(150px + env(safe-area
   animation: np-slide 2.4s linear infinite, np-rgb 1.2s ease-in-out infinite alternate; opacity: 0.65;
 }
 @keyframes np-rgb { to { filter: brightness(1.3) saturate(1.6); } }
-@media (prefers-reduced-motion: reduce) { .nameplate { animation: none; } }
+@media (prefers-reduced-motion: reduce) { :root:not([data-motion='on']) .nameplate { animation: none; } }
 /* The editor's preview row. */
 .np-preview { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 10px; background: var(--surface-2); }
 .np-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
@@ -2231,7 +2231,7 @@ body:has(.bottom-nav):has(.composer) .toast { bottom: calc(150px + env(safe-area
 .gif-av { position: relative; overflow: hidden; display: inline-block; flex: none; border-radius: 50%; }
 .gif-av > canvas, .gif-av > img { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 50%; object-fit: cover; display: block; }
 .gif-av > canvas { visibility: hidden; }
-@media (prefers-reduced-motion: reduce) { .gif-av > img { visibility: hidden; } .gif-av > canvas { visibility: visible; } }
+@media (prefers-reduced-motion: reduce) { :root:not([data-motion='on']) .gif-av > img { visibility: hidden; } :root:not([data-motion='on']) .gif-av > canvas { visibility: visible; } }
 
 /* ---------- Calm chat ----------
    In chat, people's decorations, name effects, message frames, nameplates,
@@ -2540,8 +2540,8 @@ body:has(.bottom-nav):has(.composer) .toast { bottom: calc(150px + env(safe-area
 @keyframes ad-chaos-hue { to { filter: hue-rotate(360deg); } }
 @keyframes ad-chaos-jolt { 0%, 90%, 100% { transform: none; } 92% { transform: translate(-3px, 1px) rotate(-0.6deg); } 94% { transform: translate(3px, -1px) rotate(0.6deg); } 96% { transform: translate(-2px, 0); } }
 @media (prefers-reduced-motion: reduce) {
-  .ad, .ad *, .ad *::after { animation: none !important; }
-  .ad-spark, .ad-confetti { display: none; }
+  :root:not([data-motion='on']) .ad, :root:not([data-motion='on']) .ad *, :root:not([data-motion='on']) .ad *::after { animation: none !important; }
+  :root:not([data-motion='on']) .ad-spark, :root:not([data-motion='on']) .ad-confetti { display: none; }
 }
 
 /* Remove ads (pretend checkout) */
@@ -2751,7 +2751,7 @@ body:has(.bottom-nav):has(.composer) .toast { bottom: calc(150px + env(safe-area
 .ad-block h2 { margin: 0; }
 .ad-block-icon { font-size: 54px; }
 .ad-block.shake { animation: ad-shake 0.4s ease-in-out 2; }
-@media (prefers-reduced-motion: reduce) { .wheel { transition-duration: 0.01s; } .vs-zoom, .vs-slide, .ad-block.shake { animation: none; } }
+@media (prefers-reduced-motion: reduce) { :root:not([data-motion='on']) .wheel { transition-duration: 0.01s; } :root:not([data-motion='on']) .vs-zoom, :root:not([data-motion='on']) .vs-slide, :root:not([data-motion='on']) .ad-block.shake { animation: none; } }
 
 /* Takeover day, brand bots, coupons, ad pictures */
 .takeover-strip { flex: none; display: flex; align-items: center; gap: 10px; margin: 0 12px 6px; padding: 6px 12px; border-radius: 12px; min-height: 46px; }
@@ -2877,8 +2877,8 @@ body:has(.bottom-nav):has(.composer) .toast { bottom: calc(150px + env(safe-area
 .ad-orders-status { font-size: 12px; color: var(--muted); text-align: right; max-width: 40%; }
 .ad-orders-status.on { color: var(--accent); font-weight: 700; }
 @media (prefers-reduced-motion: reduce) {
-  .ad-trackbar-truck, .ad-box, .ad-box.shake-1, .ad-box.shake-2, .ad-bubble.typing span { animation: none; }
-  .ad-rain { display: none; }
+  :root:not([data-motion='on']) .ad-trackbar-truck, :root:not([data-motion='on']) .ad-box, :root:not([data-motion='on']) .ad-box.shake-1, :root:not([data-motion='on']) .ad-box.shake-2, :root:not([data-motion='on']) .ad-bubble.typing span { animation: none; }
+  :root:not([data-motion='on']) .ad-rain { display: none; }
 }
 
 /* Each ad's own flow (AdFlow.jsx): the fields, and the interactive scenes */
@@ -2928,9 +2928,9 @@ body:has(.bottom-nav):has(.composer) .toast { bottom: calc(150px + env(safe-area
 .scene-options { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
 .scene-result h3 { margin: 0; }
 @media (prefers-reduced-motion: reduce) {
-  .scene-emoji, .scene-emoji.hot, .flow-note { animation: none; }
-  .scene-catch-item { animation-duration: 6s; }
-  .scene-card > span { transition: none; }
+  :root:not([data-motion='on']) .scene-emoji, :root:not([data-motion='on']) .scene-emoji.hot, :root:not([data-motion='on']) .flow-note { animation: none; }
+  :root:not([data-motion='on']) .scene-catch-item { animation-duration: 6s; }
+  :root:not([data-motion='on']) .scene-card > span { transition: none; }
 }
 
 /* Ad center: collapsible groups of ads */
@@ -2971,7 +2971,7 @@ body:has(.bottom-nav):has(.composer) .toast { bottom: calc(150px + env(safe-area
   mask: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'><circle cx='20' cy='20' r='15.5' fill='none' stroke='%23000' stroke-width='5' stroke-dasharray='4.058 4.058'/><circle cx='20' cy='20' r='10' fill='none' stroke='%23000' stroke-width='7'/><circle cx='20' cy='20' r='2.6'/></svg>") center / contain no-repeat;
   animation: np-gear 4s linear infinite;
 }
-@media (prefers-reduced-motion: reduce) { .np-gear::before, .np-gear::after { animation: none; } }
+@media (prefers-reduced-motion: reduce) { :root:not([data-motion='on']) .np-gear::before, :root:not([data-motion='on']) .np-gear::after { animation: none; } }
 
 /* ---------- on-screen keyboard (keyboard.js) ----------
    While it's open, only the part of the screen above it counts: the app and
@@ -3092,7 +3092,7 @@ html.kb-open .toast { bottom: auto; top: calc(var(--vvt) + var(--vvh) - 64px); }
 .cmd-help-row:hover { background: var(--surface); }
 .cmd-help-row code { font-weight: 800; color: var(--accent); }
 @media (prefers-reduced-motion: reduce) {
-  .cmd-card *, .cmd-card { animation: none !important; }
+  :root:not([data-motion='on']) .cmd-card *, :root:not([data-motion='on']) .cmd-card { animation: none !important; }
 }
 
 /* ---------- Jackson coins casino and economy (chat/Casino.jsx) ---------- */
@@ -3150,7 +3150,7 @@ html.kb-open .toast { bottom: auto; top: calc(var(--vvt) + var(--vvh) - 64px); }
 .cmd-leaders li { display: flex; align-items: center; gap: 8px; }
 .cmd-medal { width: 24px; text-align: center; }
 @media (prefers-reduced-motion: reduce) {
-  .slot-strip.spin, .roulette-wheel.spin, .casino-reveal { animation: none !important; }
+  :root:not([data-motion='on']) .slot-strip.spin, :root:not([data-motion='on']) .roulette-wheel.spin, :root:not([data-motion='on']) .casino-reveal { animation: none !important; }
 }
 
 /* ---------- Multiplayer games in #arcade (chat/Arcade.jsx) ---------- */
@@ -3239,7 +3239,7 @@ html.kb-open .toast { bottom: auto; top: calc(var(--vvt) + var(--vvh) - 64px); }
   .ttt-grid { grid-template-columns: repeat(3, 58px); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .c4-cell.last, .rps-reveal > span, .duel-sky.draw { animation: none !important; }
+  :root:not([data-motion='on']) .c4-cell.last, :root:not([data-motion='on']) .rps-reveal > span, :root:not([data-motion='on']) .duel-sky.draw { animation: none !important; }
 }
 
 /* ---------- Team commands (chat/Commands.jsx) ---------- */
@@ -3380,3 +3380,25 @@ html.kb-open .toast { bottom: auto; top: calc(var(--vvt) + var(--vvh) - 64px); }
 .sd-people { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; font-weight: 400; }
 .preview-strip-space { flex: none; visibility: hidden; }
 .preview-strip.on-top { position: fixed; top: 0; left: 0; right: 0; z-index: 2147483000; }
+
+/* Animations set to Off (Appearance): the same as the device's Reduce Motion. */
+
+  :root[data-motion='off'] .cat-party *, :root[data-motion='off'] .cat-party { animation-duration: 2s !important; }
+  :root[data-motion='off'] .cat-lights, :root[data-motion='off'] .bot-route, :root[data-motion='off'] .bot { animation: none; }
+ :root[data-motion='off'] .deco::before, :root[data-motion='off'] .deco-badge { animation: none !important; }  :root[data-motion='off'] .profile-effect { display: none; }  :root[data-motion='off'] .shift-live { animation: none; }  :root[data-motion='off'] .app-backdrop.shift { animation: none; }  :root[data-motion='off'] .deco-ring, :root[data-motion='off'] .deco-orbit, :root[data-motion='off'] .deco-b { animation: none !important; }  :root[data-motion='off'] .custom-border { animation: none !important; }  :root[data-motion='off'] .ne, :root[data-motion='off'] .ne::before, :root[data-motion='off'] .ne::after { animation: none !important; }  :root[data-motion='off'] .adeco, :root[data-motion='off'] .adeco * { animation: none !important; }  :root[data-motion='off'] .nameplate { animation: none; }  :root[data-motion='off'] .gif-av > img { visibility: hidden; } :root[data-motion='off'] .gif-av > canvas { visibility: visible; } 
+  :root[data-motion='off'] .ad, :root[data-motion='off'] .ad *, :root[data-motion='off'] .ad *::after { animation: none !important; }
+  :root[data-motion='off'] .ad-spark, :root[data-motion='off'] .ad-confetti { display: none; }
+ :root[data-motion='off'] .wheel { transition-duration: 0.01s; } :root[data-motion='off'] .vs-zoom, :root[data-motion='off'] .vs-slide, :root[data-motion='off'] .ad-block.shake { animation: none; } 
+  :root[data-motion='off'] .ad-trackbar-truck, :root[data-motion='off'] .ad-box, :root[data-motion='off'] .ad-box.shake-1, :root[data-motion='off'] .ad-box.shake-2, :root[data-motion='off'] .ad-bubble.typing span { animation: none; }
+  :root[data-motion='off'] .ad-rain { display: none; }
+
+  :root[data-motion='off'] .scene-emoji, :root[data-motion='off'] .scene-emoji.hot, :root[data-motion='off'] .flow-note { animation: none; }
+  :root[data-motion='off'] .scene-catch-item { animation-duration: 6s; }
+  :root[data-motion='off'] .scene-card > span { transition: none; }
+ :root[data-motion='off'] .np-gear::before, :root[data-motion='off'] .np-gear::after { animation: none; } 
+  :root[data-motion='off'] .cmd-card *, :root[data-motion='off'] .cmd-card { animation: none !important; }
+
+  :root[data-motion='off'] .slot-strip.spin, :root[data-motion='off'] .roulette-wheel.spin, :root[data-motion='off'] .casino-reveal { animation: none !important; }
+
+  :root[data-motion='off'] .c4-cell.last, :root[data-motion='off'] .rps-reveal > span, :root[data-motion='off'] .duel-sky.draw { animation: none !important; }
+

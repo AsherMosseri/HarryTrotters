@@ -540,7 +540,7 @@ button.sb-head-row { width: 100%; border: 0; background: none; color: var(--mute
 @keyframes splash-sheen { from { transform: translateX(-100%); } to { transform: translateX(260%); } }
 .splash-step { margin-top: 12px !important; font-size: 14px !important; font-weight: 500 !important; letter-spacing: 0 !important; }
 .splash-slow { text-wrap: balance; display: flex; flex-direction: column; align-items: center; gap: 10px; margin-top: 18px; color: var(--muted); font-size: 14px; max-width: 320px; }
-@media (prefers-reduced-motion: reduce) { .splash-bar span::after { animation-duration: 2.4s; } }
+@media (prefers-reduced-motion: reduce) { :root:not([data-motion='on']) .splash-bar span::after { animation-duration: 2.4s; } }
 .splash-error { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-top: 26px; max-width: 420px; }
 .splash-error b { font-size: 18px; }
 .splash-error span { color: var(--muted); }
@@ -613,9 +613,9 @@ button.sb-head-row { width: 100%; border: 0; background: none; color: var(--mute
   100% { transform: translate(-50%, -50%) rotate(var(--a)) translateY(-130px) rotate(calc(var(--a) * -1)) scale(1); opacity: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .reaction.super { animation: none; }
-  .super-fx-spark, .super-fx-mini, .super-fx-wave { display: none; }
-  .super-fx-big { animation-duration: 1.2s; }
+  :root:not([data-motion='on']) .reaction.super { animation: none; }
+  :root:not([data-motion='on']) .super-fx-spark, :root:not([data-motion='on']) .super-fx-mini, :root:not([data-motion='on']) .super-fx-wave { display: none; }
+  :root:not([data-motion='on']) .super-fx-big { animation-duration: 1.2s; }
 }
 
 /* ==========================================================================
@@ -712,3 +712,12 @@ button.sb-head-row { width: 100%; border: 0; background: none; color: var(--mute
    buttons get a deeper navy to keep white text readable. */
 @media (prefers-color-scheme: dark) { :root:not([data-theme='light']) .btn.primary { background: #2a4f8f; border-color: #2a4f8f; } }
 :root[data-theme='dark'] .btn.primary { background: #2a4f8f; border-color: #2a4f8f; }
+
+/* Animations set to Off (Appearance): the same as the device's Reduce Motion. */
+ :root[data-motion='off'] .splash-bar span::after { animation-duration: 2.4s; } 
+  :root[data-motion='off'] .reaction.super { animation: none; }
+  :root[data-motion='off'] .super-fx-spark, :root[data-motion='off'] .super-fx-mini, :root[data-motion='off'] .super-fx-wave { display: none; }
+  :root[data-motion='off'] .super-fx-big { animation-duration: 1.2s; }
+
+.appearance-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding-top: 12px; border-top: 1px solid var(--border); }
+.appearance-row > div:first-child { display: flex; flex-direction: column; gap: 2px; }

@@ -11,7 +11,7 @@ import { answerText, defaults, fill, flowFor, summaryOf, templateVars } from '..
 import { FlowFields } from './AdFlow.jsx';
 import { SUBTEAMS } from '../config.js';
 import { Coin, Coins, CoinsAdmin } from './Coins.jsx';
-import { useEscape } from '../util.js';
+import { reducedMotion, useEscape } from '../util.js';
 import { CloseIcon, Overlay } from './common.jsx';
 
 // Pretend ads (see ads.js). Asher controls everything on the 📺 Ads page; the
@@ -584,7 +584,6 @@ function Countdown() {
 
 // How fast the flying ✕ goes, in pixels a second.
 export const FLY_SPEEDS = { slow: 70, medium: 150, fast: 300, insane: 550, ludicrous: 900 };
-const reducedMotion = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 // The ✕. Normal; sneaky (it jumps somewhere else in the ad for the first few
 // taps); or flying (it bounces around the ad nonstop and has to be caught).

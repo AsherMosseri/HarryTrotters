@@ -171,8 +171,20 @@ function ThemeMenu({
 }
 
 // Light, dark, or automatic; the color theme; and Calm chat (from your menu).
+const MOTION = [
+  ['auto', 'Match device'],
+  ['on', 'On'],
+  ['off', 'Off'],
+];
 function AppearanceDialog({ themeMenuProps, onClose }) {
   useEscape(onClose);
+  // Animations: name effects, decorations, profile effects, borders… "On"
+  // plays them even when the iPad's Reduce Motion is on.
+  const [motion, setMotion] = useLocalStorage('motion', 'auto');
+  useEffect(() => {
+    if (motion === 'auto') delete document.documentElement.dataset.motion;
+    else document.documentElement.dataset.motion = motion;
+  }, [motion]);
   return (
     <Overlay>
       <div className="panel-backdrop center" onClick={onClose}>
@@ -185,6 +197,21 @@ function AppearanceDialog({ themeMenuProps, onClose }) {
             </button>
           </div>
           <ThemeMenu {...themeMenuProps} inline onClose={() => {}} />
+          <div className="appearance-row">
+            <div>
+              <b>Animations</b>
+              <span className="muted small">
+                {motion === 'auto' ? 'Follows Reduce Motion in your device’s settings.' : motion === 'on' ? 'Always on.' : 'Always off.'}
+              </span>
+            </div>
+            <div className="seg" role="radiogroup" aria-label="Animations">
+              {MOTION.map(([id, label]) => (
+                <button key={id} role="radio" aria-checked={motion === id} className={motion === id ? 'on' : ''} onClick={() => setMotion(id)}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     </Overlay>

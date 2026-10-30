@@ -134,3 +134,13 @@ export function useMedia(query) {
   }, [query]);
   return on;
 }
+
+// Animations (Appearance → Animations): 'on' plays them even when the device
+// has Reduce Motion on, 'off' stops them, 'auto' follows the device. The
+// choice is on <html data-motion> (index.html sets it before the first paint).
+export function reducedMotion() {
+  const m = document.documentElement.dataset.motion;
+  if (m === 'on') return false;
+  if (m === 'off') return true;
+  return typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
