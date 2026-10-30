@@ -588,7 +588,13 @@ button.sb-head-row { width: 100%; border: 0; background: none; color: var(--mute
 .quick-edit { display: flex; flex-direction: column; gap: 4px; padding: 8px; border-radius: 10px; background: var(--accent-soft); }
 .quick-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 2px; }
 .quick-chip { position: relative; border: 1px solid var(--border); background: var(--surface); border-radius: 10px; width: 38px; height: 36px; font-size: 20px; padding: 0; }
-.quick-x { position: absolute; top: -6px; right: -6px; width: 16px; height: 16px; border-radius: 50%; background: var(--text); color: var(--surface); font-size: 12px; line-height: 16px; }
+.quick-x { position: absolute; top: -6px; right: -6px; width: 16px; height: 16px; border-radius: 50%; background: var(--text); color: var(--surface); display: grid; place-items: center; }
+.quick-x svg { width: 10px; height: 10px; }
+/* Save and Cancel together on their own row, at the right. */
+.quick-actions { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-top: 6px; }
+.quick-note { font-size: 13px; color: var(--danger); }
+.quick-chip.flash { animation: quick-flash 0.5s ease-out; border-color: var(--accent); }
+@keyframes quick-flash { 30% { transform: scale(1.18); } }
 .reacted-super { display: inline-flex; color: #a78bfa; }
 
 /* A super reaction looks alive even at rest: its rainbow edge slowly runs. */

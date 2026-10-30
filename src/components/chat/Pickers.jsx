@@ -23,6 +23,7 @@ function useEscape(onClose) {
 export const QUICK_MAX = 5;
 export function EmojiPicker({ onPick, onClose, teamEmoji = [], canManage, onManage, className = '', title = '', quick, onSaveQuick }) {
   const [editing, setEditing] = useState(null); // your quick reactions while editing them
+  const [flash, setFlash] = useState(null); // { emoji } already in the list, or { full: true }
   const [ready, setReady] = useState(!!emojiList());
   const [q, setQ] = useState('');
   const [group, setGroup] = useState(-1); // -1 = recent + team
@@ -35,7 +36,13 @@ export function EmojiPicker({ onPick, onClose, teamEmoji = [], canManage, onMana
 
   const pick = (e) => {
     if (editing) {
-      if (!editing.includes(e) && editing.length < QUICK_MAX) setEditing([...editing, e]);
+      // Every pick answers: added, already there (it pulses), or the list is full.
+      if (editing.includes(e)) setFlash({ emoji: e, at: Date.now() });
+      else if (editing.length >= QUICK_MAX) setFlash({ full: true, at: Date.now() });
+      else {
+        setEditing([...editing, e]);
+        setFlash(null);
+      }
       return;
     }
     rememberEmoji(e);
@@ -63,16 +70,32 @@ export function EmojiPicker({ onPick, onClose, teamEmoji = [], canManage, onMana
           </span>
           <div className="quick-row">
             {editing.map((e) => (
-              <button key={e} className="quick-chip" onClick={() => setEditing(editing.filter((x) => x !== e))} aria-label={`Remove ${e}`}>
+              <button
+                key={flash?.emoji === e ? `${e}-${flash.at}` : e}
+                className={`quick-chip${flash?.emoji === e ? ' flash' : ''}`}
+                onClick={() => {
+                  setEditing(editing.filter((x) => x !== e));
+                  setFlash(null);
+                }}
+                aria-label={`Remove ${e}`}
+              >
                 <QuickGlyph emoji={e} teamEmoji={teamEmoji} />
                 <span className="quick-x" aria-hidden="true">
-                  ×
+                  <CloseIcon />
                 </span>
               </button>
             ))}
             {!editing.length && <span className="muted small">None yet</span>}
-            <span className="spacer" />
-            <button className="link-btn" onClick={() => setEditing(null)}>
+          </div>
+          {flash?.full && <span className="quick-note">You have {QUICK_MAX}. Tap one above to take it off first.</span>}
+          <div className="quick-actions">
+            <button
+              className="btn ghost small-btn"
+              onClick={() => {
+                setEditing(null);
+                setFlash(null);
+              }}
+            >
               Cancel
             </button>
             <button
@@ -80,6 +103,7 @@ export function EmojiPicker({ onPick, onClose, teamEmoji = [], canManage, onMana
               onClick={() => {
                 onSaveQuick(editing);
                 setEditing(null);
+                setFlash(null);
               }}
             >
               Save
@@ -94,11 +118,31 @@ export function EmojiPicker({ onPick, onClose, teamEmoji = [], canManage, onMana
           value={q}
           onChange={(e) => {
             // Typed an actual emoji (emoji keyboard, Globe + E): that's the pick.
+            // While a keyboard is still composing (the iPad emoji keyboard's
+            // search), wait for it to finish (onCompositionEnd).
+            if (e.nativeEvent.isComposing) return setQ(e.target.value);
             const typed = firstEmoji(e.target.value);
             if (typed) {
               setQ('');
               pick(typed);
             } else setQ(e.target.value);
+          }}
+          onCompositionEnd={(e) => {
+            const typed = firstEmoji(e.currentTarget.value);
+            if (typed) {
+              setQ('');
+              pick(typed);
+            }
+          }}
+          onKeyDown={(e) => {
+            // Enter picks the first result.
+            if (e.key !== 'Enter' || e.nativeEvent.isComposing) return;
+            const first = team[0] ? `:${team[0].name}:` : list[0];
+            if (q.trim() && first) {
+              e.preventDefault();
+              setQ('');
+              pick(first);
+            }
           }}
           placeholder="Search, or type an emoji"
         />
