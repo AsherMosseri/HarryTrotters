@@ -356,13 +356,13 @@ export default function Composer({
         // AFK: you're back once you talk; and anyone you @ who's away gets mentioned.
         if (people?.profileOf(actor.name)?.afk) {
           api.saveProfile(actor.name, { afk: null });
-          onNote({ title: '👋 Welcome back!', body: 'I removed your AFK.' });
+          onNote({ title: 'Welcome back', body: 'I removed your AFK.' });
         }
         for (const n of named) {
           const afk = n !== actor.name && people?.profileOf(n)?.afk;
           if (afk)
             onNote({
-              title: `💤 ${n.split(' ')[0]} is AFK: ${afk.reason}`,
+              title: `${n.split(' ')[0]} is AFK: ${afk.reason}`,
               body: `Since ${relTime(afk.since)}. They’ll see it when they’re back.`,
             });
         }
@@ -383,7 +383,7 @@ export default function Composer({
             <span>Editing your message</span>
           ) : (
             <span>
-              ↩ Replying to <b>{replyTo.by.split(' ')[0]}</b>: {replyTo.text?.slice(0, 80) || 'a photo'}
+              <Icon name="reply" size={15} className="reply-ic" /> Replying to <b>{replyTo.by.split(' ')[0]}</b>: {replyTo.text?.slice(0, 80) || 'a photo'}
             </span>
           )}
           <button className="icon-btn small" onClick={reset} aria-label="Cancel">

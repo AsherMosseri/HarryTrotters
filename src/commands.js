@@ -482,11 +482,11 @@ export async function runCommand({ cmd, args }, ctx) {
       const mine = (ctx.tasks || [])
         .filter((t) => t.status !== 'done' && (t.assignees || []).includes(me))
         .sort((a, b) => (a.dueDate || '9999').localeCompare(b.dueDate || '9999'));
-      if (!mine.length) return { note: { title: '🎉 No open tasks', body: 'Nothing assigned to you right now. Try /task to make one.' } };
+      if (!mine.length) return { note: { title: 'No open tasks', body: 'Nothing assigned to you right now. Try /task to make one.' } };
       const late = mine.filter((t) => t.dueDate && t.dueDate < today).length;
       return {
         note: {
-          title: `📋 Your ${mine.length} open task${mine.length > 1 ? 's' : ''}${late ? ` (${late} late)` : ''}`,
+          title: `Your ${mine.length} open task${mine.length > 1 ? 's' : ''}${late ? ` (${late} late)` : ''}`,
           taskIds: mine.slice(0, 15).map((t) => t.id),
           body: mine.length > 15 ? `Showing 15 of ${mine.length}. The rest are on the Board.` : '',
         },
@@ -501,7 +501,7 @@ export async function runCommand({ cmd, args }, ctx) {
       const mine = ctx.myShift();
       if (mine) {
         ctx.endShift();
-        return { note: { title: '⏱ Wrapping up your shift', body: 'Fill in what you worked on and tap End shift.' } };
+        return { note: { title: 'Wrapping up your shift', body: 'Fill in what you worked on and tap End shift.' } };
       }
       await ctx.startShift();
       return card({ in: true, at: Date.now(), others: ctx.onShift().filter((p) => p.name !== me) });
@@ -553,7 +553,7 @@ export async function runCommand({ cmd, args }, ctx) {
         };
       if (!r.what) return { note: { title: 'Remind you about what?', body: `Try: /remind ${args} charge the batteries` } };
       await ctx.addReminder(r.at, r.what.slice(0, 200));
-      return { note: { title: `⏰ Got it. I’ll remind you ${whenText(r.at)}`, body: r.what } };
+      return { note: { title: `Got it. I’ll remind you ${whenText(r.at)}`, body: r.what } };
     }
     case 'poll':
       return { poll: args };

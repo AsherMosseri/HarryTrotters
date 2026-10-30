@@ -40,9 +40,9 @@ export const EFFECTS = [
 
 // How a custom effect moves.
 export const MOTIONS = [
-  { id: 'fall', label: '⬇ Fall' },
-  { id: 'rise', label: '⬆ Rise' },
-  { id: 'twinkle', label: '✨ Float' },
+  { id: 'fall', label: 'Fall' },
+  { id: 'rise', label: 'Rise' },
+  { id: 'twinkle', label: 'Float' },
 ];
 export const effectById = Object.fromEntries(EFFECTS.map((e) => [e.id, e]));
 
@@ -140,19 +140,19 @@ export const NAMEPLATES = [
 // Display name effects, like Discord's display name styles.
 export const NAME_EFFECTS = [
   { id: '', label: 'None' },
-  { id: 'shimmer', label: '✨ Shimmer' },
-  { id: 'neon', label: '💡 Neon' },
-  { id: 'outline', label: '✏️ Outline' },
-  { id: 'pop', label: '🧱 3D pop' },
-  { id: 'glitch', label: '📺 Glitch' },
-  { id: 'rainbow', label: '🌈 Rainbow' },
-  { id: 'fire', label: '🔥 Fire' },
-  { id: 'ice', label: '🧊 Ice' },
-  { id: 'gold', label: '🏆 Gold' },
-  { id: 'toon', label: '💥 Toon' },
-  { id: 'sparkle', label: '✨ Glitter' },
-  { id: 'pulse', label: '💓 Pulse' },
-  { id: 'gear', label: '⚙️ Gear' },
+  { id: 'shimmer', label: 'Shimmer' },
+  { id: 'neon', label: 'Neon' },
+  { id: 'outline', label: 'Outline' },
+  { id: 'pop', label: '3D pop' },
+  { id: 'glitch', label: 'Glitch' },
+  { id: 'rainbow', label: 'Rainbow' },
+  { id: 'fire', label: 'Fire' },
+  { id: 'ice', label: 'Ice' },
+  { id: 'gold', label: 'Gold' },
+  { id: 'toon', label: 'Toon' },
+  { id: 'sparkle', label: 'Glitter' },
+  { id: 'pulse', label: 'Pulse' },
+  { id: 'gear', label: 'Gear' },
 ];
 const RAINBOW = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#06b6d4', '#6366f1', '#d946ef', '#ef4444'];
 

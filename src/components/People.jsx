@@ -21,7 +21,7 @@ import BorderEditor from './BorderEditor.jsx';
 import { EmojiPicker, GifPicker } from './chat/Pickers.jsx';
 import { activeStatus } from '../people.js';
 import { profileView, useControls } from '../controls.js';
-import { Avatar, CloseIcon, Nameplate, Overlay, usePeople } from './common.jsx';
+import { Avatar, CloseIcon, Nameplate, Overlay, PlusIcon, usePeople } from './common.jsx';
 import DecorationEditor from './DecorationEditor.jsx';
 import { DEFAULT_DECO } from './decoRender.jsx';
 import { PopupAds } from './Ads.jsx';
@@ -123,13 +123,13 @@ export function CustomEffect({ value, onChange, upload }) {
           {v.value ? v.kind === 'image' ? <img src={v.value} alt="" /> : v.value : '?'}
         </span>
         <button className="btn" onClick={() => setPanel(panel === 'emoji' ? null : 'emoji')}>
-          😊 Emoji
+          Emoji
         </button>
         <button className="btn" onClick={() => setPanel(panel === 'gif' ? null : 'gif')}>
           GIF
         </button>
         <button className="btn" onClick={() => input.current?.click()} disabled={busy}>
-          {busy ? 'Uploading…' : '🖼 Picture'}
+          {busy ? 'Uploading…' : 'Picture'}
         </button>
         <input
           ref={input}
@@ -350,7 +350,7 @@ export function ProfileCard({ name, actor, tasks, onClose, onMessage, onEdit, on
               ) : (
                 <>
                   <button className="btn primary grow" onClick={onMessage}>
-                    ✉️ Message
+                    Message
                   </button>
                   {actor.admin && (
                     <button className="btn" onClick={onEdit}>
@@ -483,7 +483,7 @@ function ColorRow({ value, onChange, allowNone = true }) {
       ))}
       <label className="swatch custom" title="Any color">
         <input type="color" value={value || '#6366f1'} onChange={(e) => onChange(e.target.value)} />
-        🎨
+        <PlusIcon size={14} />
       </label>
     </div>
   );
@@ -513,7 +513,7 @@ function StyleRequest({ kind, setKind, onSend }) {
   };
   return (
     <div className="style-request" id="style-request">
-      <h3 className="field-label">💡 Want something new?</h3>
+      <h3 className="field-label">Want something new?</h3>
       <p className="muted tiny">Ask for a font, effect, decoration, or anything else. It goes straight to Asher.</p>
       <div className="row gap wrap">
         <select className="input" value={kind} onChange={(e) => setKind(e.target.value)} aria-label="What kind">

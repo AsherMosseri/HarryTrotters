@@ -4,11 +4,11 @@ import { firstName, relTime } from '../util.js';
 import { Avatar, CloseIcon, DisplayName, Overlay } from './common.jsx';
 
 export const REQUEST_STATUSES = [
-  { id: 'new', label: 'New', icon: '🆕' },
-  { id: 'planned', label: 'Planned', icon: '🗓' },
-  { id: 'working', label: 'In progress', icon: '🔧' },
-  { id: 'done', label: 'Added', icon: '✅' },
-  { id: 'declined', label: 'Not now', icon: '💤' },
+  { id: 'new', label: 'New', icon: '' },
+  { id: 'planned', label: 'Planned', icon: '' },
+  { id: 'working', label: 'In progress', icon: '' },
+  { id: 'done', label: 'Added', icon: '' },
+  { id: 'declined', label: 'Not now', icon: '' },
 ];
 const statusOf = (id) => REQUEST_STATUSES.find((s) => s.id === id) || REQUEST_STATUSES[0];
 

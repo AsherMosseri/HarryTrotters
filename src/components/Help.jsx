@@ -143,7 +143,7 @@ const MANAGER_TIPS = [
   'Roster: Edit anyone’s role, subteams, responsibilities, and name. Add or remove people.',
   'Milestones: Change the competition date, and delete milestones.',
   'Delete checklists, and permanently delete tasks from Recently deleted.',
-  'Chat: post in #announcements (everyone gets a notification), use @everyone, delete any message, and remove reactions (🚫☺ on a message).',
+  'Chat: post in #announcements (everyone gets a notification), use @everyone, delete any message, and remove reactions (the crossed-out face on a message).',
   'Channels: ＋ next to Channels adds one; ⋯ on a channel in the sidebar (⚙ in Chat on a phone) renames it, sets its topic and subteam color, moves it up or down, or deletes it.',
   'Team emoji: open the emoji picker and tap ＋ under Team emoji to add your own (:name:), or remove them. Stickers: open stickers and tap ＋.',
   'Lab log: ending your shift asks what you did (a note, the tasks you worked on, photos, blockers, and next time). It’s required, and it shows up in #lab-log, where Trotbot keeps one post per lab day with everyone’s logs and hours. Edit yours from that post. If a shift ends without a log (you forgot to clock out), the app asks the next time you open it.',
@@ -231,7 +231,7 @@ export function UpdateCheck() {
   return (
     <div className="update-check">
       <button className="btn" onClick={run} disabled={state === 'checking'}>
-        {state === 'checking' ? 'Checking…' : '↻ Check for updates'}
+        {state === 'checking' ? 'Checking…' : 'Check for updates'}
       </button>
       <span className="muted small" role="status">
         {state?.status === 'latest' && `You’re on the newest version (${state.release || VERSION}).`}

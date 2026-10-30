@@ -637,10 +637,10 @@ export default function ElectricalEditor({ remote, canEdit, actor, onSave, onClo
                 ＋ Add
               </button>
               <button className="btn" onClick={undo} disabled={!past.length} title="Undo (⌘Z)">
-                ↶ Undo
+                Undo
               </button>
               <button className="btn" onClick={redo} disabled={!future.length} title="Redo (⇧⌘Z)">
-                ↷ Redo
+                Redo
               </button>
               {sel && (
                 <button className="btn danger-btn" onClick={removeSelected}>
@@ -663,7 +663,7 @@ export default function ElectricalEditor({ remote, canEdit, actor, onSave, onClo
             Port list
           </button>
           <button className="btn" onClick={exportPng}>
-            ⬇ PNG
+            Save PNG
           </button>
           <button className="icon-btn" onClick={onClose} aria-label="Close">
             <CloseIcon />
@@ -758,7 +758,7 @@ export default function ElectricalEditor({ remote, canEdit, actor, onSave, onClo
                 )}
                 {canEdit && (
                   <button className="btn" onClick={() => change(defaultDiagram())}>
-                    ↺ Start over from our drawing
+                    Start over from our drawing
                   </button>
                 )}
               </>

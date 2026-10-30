@@ -233,8 +233,8 @@ export default function CommandsPage({ cfg = {}, channels, bank, lottery, onSave
                 </p>
                 <div className="cmd-house-lists">
                   {[
-                    ['🏆 Biggest winners', h.winners.filter((p) => p.result > 0)],
-                    ['💸 Biggest losers', h.losers.filter((p) => p.result < 0)],
+                    ['Biggest winners', h.winners.filter((p) => p.result > 0)],
+                    ['Biggest losers', h.losers.filter((p) => p.result < 0)],
                   ].map(([title, list]) => (
                     <div key={title}>
                       <h4>{title}</h4>

@@ -101,9 +101,9 @@ export const CHANNELS = [
   { id: 'parts', subteam: '' },
   ...SUBTEAMS.map((s) => ({ id: s.toLowerCase().replace(/[^a-z0-9]+/g, '-'), subteam: s })),
   // The Jackson coins casino (/slots, /blackjack…). Trotbot runs the house.
-  { id: 'arcade', subteam: '', topic: '🎰 Casino and games. Trotbot runs the house. Type / to play.' },
+  { id: 'arcade', subteam: '', topic: 'Casino and games. Trotbot runs the house. Type / to play.' },
   // The lab log: Trotbot's post for each day fills in as people end their shifts.
-  { id: 'lab-log', subteam: '', topic: '🧪 What we did at the lab, every day. Fills in as people end their shifts.' },
+  { id: 'lab-log', subteam: '', topic: 'What we did at the lab, every day. Fills in as people end their shifts.' },
 ];
 // Where the Cloud Functions run (next to the database, nam5 → us-central1).
 export const FUNCTIONS_REGION = 'us-central1';

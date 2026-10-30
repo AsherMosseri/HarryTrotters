@@ -193,8 +193,8 @@ export default function DecorationEditor({ name, value, onChange, upload }) {
             label="Ring motion"
             options={[
               { id: '', label: 'Still' },
-              { id: 'cw', label: '↻ Spin' },
-              { id: 'ccw', label: '↺ Spin' },
+              { id: 'cw', label: 'Spin' },
+              { id: 'ccw', label: 'Spin back' },
             ]}
             value={d.ring.spin || ''}
             onChange={(spin) => setRing({ spin })}
@@ -305,8 +305,8 @@ export default function DecorationEditor({ name, value, onChange, upload }) {
                 <Chips
                   label="Direction"
                   options={[
-                    { id: 'cw', label: '↻ Clockwise' },
-                    { id: 'ccw', label: '↺ Counterclockwise' },
+                    { id: 'cw', label: 'Clockwise' },
+                    { id: 'ccw', label: 'Counterclockwise' },
                   ]}
                   value={b.dir || 'cw'}
                   onChange={(dir) => setBadge({ dir })}

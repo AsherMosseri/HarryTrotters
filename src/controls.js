@@ -26,7 +26,7 @@ export const FEATURE_GROUPS = [
       ['formatting', 'Text formatting', 'Bold, italics, and the rest (messages show as plain text)'],
       ['mentions', '@mentions', 'Mentioning people and subteams'],
       ['everyone', '@everyone', 'Notifying the whole team'],
-      ['makeTask', 'Make a task from a message', 'The 📋 button on messages'],
+      ['makeTask', 'Make a task from a message', 'The Task button on messages'],
     ],
   ],
   [

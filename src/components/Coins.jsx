@@ -116,8 +116,8 @@ export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onClose 
             {tab === 'send' &&
               (sent ? (
                 <div className="coins-sent">
-                  <div className="ad-pop" aria-hidden="true">
-                    🎁
+                  <div className="ad-pop coins-sent-ic" aria-hidden="true">
+                    ✓
                   </div>
                   <h3>
                     Sent <Coins n={sent.amount} /> to {WHO(sent.to)}

@@ -24,7 +24,7 @@ export const BADGE_ANIMS = [
   { id: 'none', label: 'Still' },
   { id: 'orbit', label: 'Orbit' },
   { id: 'spin', label: 'Spin' },
-  { id: 'bob', label: '↕ Bob' },
+  { id: 'bob', label: 'Bob' },
   { id: 'pulse', label: 'Pulse' },
   { id: 'wiggle', label: '〰 Wiggle' },
   { id: 'float', label: 'Float' },
