@@ -3369,3 +3369,12 @@ html.kb-open .toast { bottom: auto; top: calc(var(--vvt) + var(--vvh) - 64px); }
 .sd-people { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; font-weight: 400; }
 .preview-strip-space { flex: none; visibility: hidden; }
 .preview-strip.on-top { position: fixed; top: 0; left: 0; right: 0; z-index: 2147483000; }
+
+/* Choosing messages to delete */
+.msg.picking { cursor: pointer; padding-left: 36px; }
+.msg.picked { background: color-mix(in srgb, var(--danger) 9%, transparent); }
+.msg-pick { position: absolute; left: 8px; top: 12px; width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--border); display: grid; place-items: center; font-size: 12px; font-weight: 800; color: #fff; background: var(--surface); z-index: 2; }
+.msg-pick.on { background: var(--danger); border-color: var(--danger); }
+.composer.pick-bar { flex-direction: row; align-items: center; gap: 10px; padding: 12px 16px; }
+.dialog.delete-msgs { width: min(440px, calc(100vw - 32px)); gap: 12px; }
+.btn.danger { background: var(--danger); border-color: var(--danger); color: #fff; }
