@@ -783,3 +783,7 @@ button.sb-head-row { width: 100%; border: 0; background: none; color: var(--mute
 .sb-team { flex: 1 1 0; min-width: 0; }
 .sb-top-tools { flex: none; }
 .sb-logo { width: 46px; }
+.sb-logo { width: 42px; }
+.sb-team { gap: 8px; }
+.sb-team-name b { font-size: 17.5px; }
+.sb-top-tools .icon-btn { width: 32px; height: 32px; }
