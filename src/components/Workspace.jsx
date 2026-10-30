@@ -449,7 +449,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
   const [roles, setRoles] = useState([]);
   const [parts, setParts] = useState([]);
   const [checklists, setChecklists] = useState([]);
-  const [runs, setRuns] = useState([]);
+  const [rawRuns, setRuns] = useState([]);
   const [robot, setRobot] = useState({ versions: [], pins: [], layouts: [] });
   const [rawChat, setChat] = useState({}); // { [channelId]: newest messages }
   // Under everyone's current names (a Roster rename shows on old messages at once).
@@ -784,6 +784,11 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
   const milestones = useMemo(
     () => rawMilestones.map((m) => (m.owners?.some((n) => rename(n) !== n) ? { ...m, owners: [...new Set(m.owners.map(rename))] } : m)),
     [rawMilestones, rename],
+  );
+  // Drivers under current names, so a renamed driver still shows as picked.
+  const runs = useMemo(
+    () => rawRuns.map((r) => (r.drivers?.some((n) => rename(n) !== n) ? { ...r, drivers: [...new Set(r.drivers.map(rename))] } : r)),
+    [rawRuns, rename],
   );
 
   // Default roster + people the manager added + anyone who joined under their
@@ -1279,7 +1284,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
       addCheckin: (data) => store.addCheckin(data, actor).catch(fail),
       answerCheckin: (id, answer) => store.answerCheckin(id, actor.name, answer).catch(fail),
       deleteCheckin: (id) => store.deleteCheckin(id).catch(fail),
-      rsvpShiftPlan: (id, answer) => store.rsvpShiftPlan(id, actor.name, answer).catch(fail),
+      rsvpShiftPlan: (id, answer, oldKeys) => store.rsvpShiftPlan(id, actor.name, answer, oldKeys).catch(fail),
       deleteShiftPlans: (ids) => store.deleteShiftPlans(ids).catch(fail),
       addRequest: (text, kind) =>
         store.addRequest(text, actor, kind).then(

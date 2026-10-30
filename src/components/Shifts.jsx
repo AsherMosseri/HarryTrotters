@@ -350,14 +350,14 @@ function ShiftDialog({ shift, roster, tasks, isManager, onSave, onDelete, onClos
   const set = (patch) => setS({ ...s, ...patch });
   const start = new Date(s.start).getTime();
   const end = s.end ? new Date(s.end).getTime() : null;
-  // A missed shift needs its end (without one it would count as still
-  // running, from back then until now); a running one can stay open. Over 16
-  // hours is almost always a typo in the date.
+  // A missed or finished shift needs its end (without one it would count as
+  // still running, from back then until now); only a shift that is still
+  // running can stay open. Over 16 hours is almost always a typo in the date.
   const problem = !isManager
     ? ''
     : !start
       ? 'Pick when it started.'
-      : isNew && !end
+      : (isNew || shift.end) && !end
         ? 'Pick when it ended.'
         : end && end <= start
           ? 'It has to end after it starts.'
@@ -442,6 +442,17 @@ function ShiftDialog({ shift, roster, tasks, isManager, onSave, onDelete, onClos
       </div>
     </Dialog>
   );
+}
+
+// Shift RSVPs under current names. They're saved by name, so after a rename
+// an old key still counts as that person; one saved under the current name wins.
+function answersByName(people, rename) {
+  const out = new Map();
+  for (const [k, v] of Object.entries(people || {})) {
+    const name = rename(k);
+    if (k === name || !out.has(name)) out.set(name, v);
+  }
+  return out;
 }
 
 function downloadCsv(rows, tasksById) {
@@ -658,7 +669,14 @@ export default function ShiftsView({
                     </button>
                   ) : (
                     isManager && (
-                      <button className="btn small-btn" onClick={() => api.updateShift(s.id, { end: Date.now() })}>
+                      <button
+                        className="btn small-btn"
+                        // Ending it for them skips the lab log they'd fill in when ending it themselves.
+                        onClick={() =>
+                          confirm(`End ${s.person.split(' ')[0]}’s shift now? They won’t get to fill in their lab log first.`) &&
+                          api.updateShift(s.id, { end: Date.now() })
+                        }
+                      >
                         End
                       </button>
                     )
@@ -684,11 +702,13 @@ export default function ShiftsView({
           {shownPlans.length ? (
             <ul className="shift-plans">
               {shownPlans.map((p) => {
-                const answer = p.people?.[me] || '';
-                const going = Object.entries(p.people || {})
-                  .filter(([, v]) => v === 'in')
-                  .map(([n]) => rename(n));
-                const out = Object.values(p.people || {}).filter((v) => v === 'out').length;
+                const answers = answersByName(p.people, rename);
+                const answer = answers.get(me) || '';
+                const going = [...answers].filter(([, v]) => v === 'in').map(([n]) => n);
+                const out = [...answers.values()].filter((v) => v === 'out').length;
+                // Answers saved under an old name of mine get replaced by this one.
+                const oldKeys = Object.keys(p.people || {}).filter((k) => k !== me && rename(k) === me);
+                const rsvp = (a) => api.rsvpShiftPlan(p.id, a, oldKeys);
                 const live = now >= planMs(p.date, p.start) - 15 * MIN && now < planMs(p.date, p.end);
                 return (
                   <li key={p.id} className={live ? 'live' : ''}>
@@ -717,13 +737,13 @@ export default function ShiftsView({
                         <div className="segmented">
                           <button
                             className={`plain-seg${answer === 'in' ? ' on' : ''}`}
-                            onClick={() => api.rsvpShiftPlan(p.id, answer === 'in' ? null : 'in')}
+                            onClick={() => rsvp(answer === 'in' ? null : 'in')}
                           >
                             I’m in
                           </button>
                           <button
                             className={`plain-seg${answer === 'out' ? ' on' : ''}`}
-                            onClick={() => api.rsvpShiftPlan(p.id, answer === 'out' ? null : 'out')}
+                            onClick={() => rsvp(answer === 'out' ? null : 'out')}
                           >
                             Can’t
                           </button>
@@ -784,6 +804,8 @@ export default function ShiftsView({
                 min="0"
                 max="1000"
                 className="input"
+                // Remounts when the goal changes elsewhere, so the box shows it.
+                key={goal || 0}
                 defaultValue={goal || ''}
                 placeholder="—"
                 onBlur={(e) =>

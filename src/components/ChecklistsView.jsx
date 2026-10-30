@@ -2,16 +2,16 @@ import { useEffect, useRef, useState } from 'react';
 import { STARTER_CHECKLISTS, starterItems } from '../checklists.js';
 import { itemId } from '../data/diff.js';
 import { fullTime } from '../util.js';
-import { DraftInput, PlusIcon } from './common.jsx';
+import { CloseIcon, DraftInput, PlusIcon } from './common.jsx';
 
 function ChecklistCard({ list, api, isManager, fresh }) {
   const [text, setText] = useState('');
-  // Just made: bring it into view with the cursor in its name.
+  // Just made: bring it into view with the cursor in its first item.
   const box = useRef(null);
   useEffect(() => {
     if (!fresh || !box.current) return;
     box.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    box.current.querySelector('.checklist-title')?.focus();
+    box.current.querySelector('.check-add input')?.focus({ preventScroll: true });
   }, [fresh]);
   const items = Object.values(list.items || {}).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   const done = items.filter((i) => i.done).length;
@@ -54,7 +54,7 @@ function ChecklistCard({ list, api, isManager, fresh }) {
               </span>
             )}
             <button className="check-remove" aria-label={`Remove ${i.text}`} onClick={() => api.removeChecklistItem(list, i)}>
-              ×
+              <CloseIcon />
             </button>
           </li>
         ))}
@@ -79,13 +79,56 @@ function ChecklistCard({ list, api, isManager, fresh }) {
   );
 }
 
+// New checklist asks for the name first: one made blank and left without a
+// name stayed behind, and only team management can delete it.
+function NewChecklistCard({ onCreate, onCancel }) {
+  const [name, setName] = useState('');
+  const box = useRef(null);
+  useEffect(() => {
+    box.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    box.current?.querySelector('input')?.focus({ preventScroll: true });
+  }, []);
+  const submit = (e) => {
+    e.preventDefault();
+    if (name.trim()) onCreate(name.trim());
+  };
+  return (
+    <form className="checklist-card new-checklist" ref={box} onSubmit={submit}>
+      <header>
+        <input
+          className="input checklist-name"
+          value={name}
+          maxLength={80}
+          placeholder="Checklist name"
+          aria-label="Checklist name"
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => e.key === 'Escape' && onCancel()}
+        />
+      </header>
+      <footer className="row gap">
+        <span className="spacer" />
+        <button type="button" className="btn" onClick={onCancel}>
+          Cancel
+        </button>
+        <button className="btn primary" disabled={!name.trim()}>
+          Create
+        </button>
+      </footer>
+    </form>
+  );
+}
+
 export default function ChecklistsView({ checklists, api, isManager }) {
   // The one just made with New checklist (it opens at the end of the list).
   const [fresh, setFresh] = useState(null);
-  const newList = async () => {
-    const id = await api.createChecklist({ title: '', items: {} });
+  const [naming, setNaming] = useState(false);
+  const newList = () => setNaming(true);
+  const create = async (title) => {
+    setNaming(false);
+    const id = await api.createChecklist({ title, items: {} });
     if (id) setFresh(id);
   };
+  const namingCard = naming && <NewChecklistCard onCreate={create} onCancel={() => setNaming(false)} />;
   const sorted = [...checklists].sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
   const missingStarters = STARTER_CHECKLISTS.filter((s) => !checklists.some((c) => c.title === s.title));
   const addStarters = () => missingStarters.forEach((s) => api.createChecklist({ title: s.title, items: starterItems(s) }));
@@ -102,12 +145,13 @@ export default function ChecklistsView({ checklists, api, isManager }) {
         </button>
       </div>
 
-      {sorted.length ? (
+      {sorted.length || naming ? (
         <>
           <div className="checklist-grid">
             {sorted.map((c) => (
               <ChecklistCard key={c.id} list={c} api={api} isManager={isManager} fresh={fresh === c.id} />
             ))}
+            {namingCard}
           </div>
           {missingStarters.length > 0 && (
             <p className="muted small starter-hint">

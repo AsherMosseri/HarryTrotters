@@ -1106,8 +1106,20 @@ export const firebaseStore = {
   updateShiftPlan(id, patch, actor) {
     return updateDoc(doc(shiftPlansCol, id), { ...patch, updatedBy: actor.name });
   },
-  rsvpShiftPlan(id, name, answer) {
-    return updateDoc(doc(shiftPlansCol, id), new FieldPath('people', name), answer || deleteField());
+  // oldKeys: answers saved under this person's old names, replaced by this one.
+  // The rules only let people touch their first and current names, so if
+  // clearing an older one is refused, just save the answer.
+  async rsvpShiftPlan(id, name, answer, oldKeys = []) {
+    const ref = doc(shiftPlansCol, id);
+    const value = answer || deleteField();
+    if (oldKeys.length) {
+      try {
+        return await updateDoc(ref, new FieldPath('people', name), value, ...oldKeys.flatMap((k) => [new FieldPath('people', k), deleteField()]));
+      } catch (e) {
+        if (e?.code !== 'permission-denied') throw e;
+      }
+    }
+    return updateDoc(ref, new FieldPath('people', name), value);
   },
   deleteShiftPlans(ids) {
     const batch = writeBatch(db);
