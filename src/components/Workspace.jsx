@@ -76,6 +76,7 @@ import { OrderTracker, OrdersDialog, orderActive } from './AdOrders.jsx';
 import { setServerSkew } from '../serverTime.js';
 import { AdBlockWall, GameDialog, PrizeWheel, VideoAd } from './AdGames.jsx';
 import { coinSettings, coinsByName, wallet } from '../coins.js';
+import { hoursOf, mergedMs } from '../../functions/shared/hours.js';
 
 // Versions were renumbered once (2.0 became 1.9, 2.1 became 2.0, and so
 // on). Move this device's "last seen" version along so What's new doesn't
@@ -1420,8 +1421,8 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
         .sort((a, b) => b.coins - a.coins)
         .slice(0, 10),
     whois: (name) => {
-      const mine = shifts.filter((x) => x.person === name);
-      const hours = (list) => Math.round(list.reduce((t, x) => t + ((x.end || Date.now()) - x.start), 0) / 360000) / 10;
+      const mine = namedShifts.filter((x) => x.person === name);
+      const hours = (list) => hoursOf(mergedMs(list));
       const monday = parseDay(mondayOf(todayISO())).getTime();
       const theirs = (tasks || []).filter((t) => (t.assignees || []).includes(name));
       const st = activeStatus(profiles.get(name));
@@ -1479,14 +1480,14 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
     const today = todayISO();
     const monday = parseDay(mondayOf(today)).getTime();
     const mine = (tasks || []).filter((t) => (t.assignees || []).includes(name));
-    const myShifts = shifts.filter((x) => x.person === name);
+    const myShifts = namedShifts.filter((x) => x.person === name);
     const ended = myShifts.filter((x) => x.end).sort((a, b) => b.end - a.end)[0];
     const latest = [...myShifts].sort((a, b) => b.start - a.start)[0];
     const endHour = ended ? new Date(ended.end).getHours() : -1;
     return {
       name,
       first: name.split(' ')[0],
-      hoursWeek: Math.round(myShifts.filter((x) => x.start >= monday).reduce((h, x) => h + ((x.end || now) - x.start), 0) / 360000) / 10,
+      hoursWeek: hoursOf(mergedMs(myShifts.filter((x) => x.start >= monday), now)),
       overdue: mine.filter((t) => t.status !== 'done' && t.dueDate && t.dueDate < today).length,
       open: mine.filter((t) => t.status !== 'done').length,
       doneWeek: mine.filter((t) => t.status === 'done' && (t.completedAt || 0) >= monday).length,
@@ -1498,7 +1499,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
       daysToComp: daysBetween(today, competitionDate),
       subteams: peopleInfo.get(name)?.subteams || [],
     };
-  }, [actor.name, tasks, shifts, myWallet.balance, competitionDate, peopleInfo]);
+  }, [actor.name, tasks, namedShifts, myWallet.balance, competitionDate, peopleInfo]);
   const trackOrder = trackId ? adOrders.find((o) => o.id === trackId) : null;
   const activeOrders = useMemo(() => adOrders.filter((o) => orderActive(o, Date.now())).length, [adOrders]);
   // Ads switched off (Controls): as if they were paused.
@@ -2342,7 +2343,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
                     name={fullProfileFor}
                     actor={actor}
                     tasks={tasks || []}
-                    shifts={shifts}
+                    shifts={namedShifts}
                     joinedAt={TEAM_STARTED}
                     lastSeen={lastSeenOf(fullProfileFor)}
                     notes={notes}

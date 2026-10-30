@@ -8,6 +8,8 @@
 // time at the lab, at most dayCap hours a day. Everything since `start`.
 // Asher also earns the ad money, as the app's owner.
 
+import { mergedMs } from './hours.js';
+
 export const COIN_DEFAULTS = {
   perTask: 15,
   perHour: 5,
@@ -62,18 +64,16 @@ export function earnedItems(name, { tasks = [], shifts = [], adStats, owner = fa
     if (at < from) continue;
     items.push({ kind: 'task', at, amount: cfg.perTask, icon: '✅', label: t.title || 'A task' });
   }
-  // Lab time, added up per day and capped.
-  const days = new Map();
+  // Lab time, added up per day (overlapping shifts count once) and capped.
+  const byDay = new Map();
   for (const s of shifts) {
     if (s.person !== name || !s.start || s.start < from) continue;
-    const end = s.end || now;
-    if (end <= s.start) continue;
     const key = teamDay(s.start);
-    const d = days.get(key) || { minutes: 0, at: s.start };
-    d.minutes += (end - s.start) / 60000;
-    d.at = Math.max(d.at, end);
-    days.set(key, d);
+    byDay.set(key, [...(byDay.get(key) || []), s]);
   }
+  const days = new Map(
+    [...byDay].map(([key, list]) => [key, { minutes: mergedMs(list, now) / 60000, at: Math.max(...list.map((s) => s.end || now)) }]),
+  );
   for (const [key, d] of days) {
     const minutes = Math.min(d.minutes, cfg.dayCap * 60);
     const amount = Math.floor((minutes * cfg.perHour) / 60);

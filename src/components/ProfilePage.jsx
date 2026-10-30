@@ -7,10 +7,10 @@ import { borderProps } from '../borders.js';
 import { fullTime, relTime, useEscape, useMedia } from '../util.js';
 import { Avatar, CloseIcon, DisplayName, Overlay, StatusDot, usePeople } from './common.jsx';
 import { BADGE_ICONS, ProfileEffect } from './People.jsx';
+import { hoursOf, mergedMs } from '../../functions/shared/hours.js';
 
-const HOUR = 3600000;
-const hoursOf = (shifts) => shifts.reduce((t, s) => t + ((s.end || Date.now()) - s.start), 0) / HOUR;
-const fmtHours = (h) => (h >= 10 ? Math.round(h) : Math.round(h * 10) / 10);
+// Hours are added up the same way as the Shifts page (shared/hours.js).
+const fmtHours = (ms) => hoursOf(ms).toFixed(1);
 
 // The full profile, like Discord's: a big banner, the person's look, and
 // tabs for About, Activity, and Team. Opened from the profile card.
@@ -47,8 +47,8 @@ export default function ProfilePage({
   const mine = useMemo(() => shifts.filter((s) => s.person === name), [shifts, name]);
   const onShift = mine.find((s) => !s.end);
   const monday = parseDay(mondayOf(todayISO())).getTime();
-  const weekHours = hoursOf(mine.filter((s) => s.start >= monday));
-  const seasonHours = hoursOf(mine);
+  const weekHours = mergedMs(mine.filter((s) => s.start >= monday));
+  const seasonHours = mergedMs(mine);
   const open = tasks.filter((t) => t.status !== 'done' && (t.assignees || []).includes(name));
   const done = tasks
     .filter((t) => t.status === 'done' && (t.assignees || []).includes(name))
@@ -264,7 +264,7 @@ export default function ProfilePage({
                       {onShift
                         ? `On shift now${onShift.note ? `: ${onShift.note}` : ''}`
                         : lastShift
-                          ? `Last shift ${relTime(lastShift.start)} (${fmtHours(((lastShift.end || Date.now()) - lastShift.start) / HOUR)} h)`
+                          ? `Last shift ${relTime(lastShift.start)} (${fmtHours((lastShift.end || Date.now()) - lastShift.start)} h)`
                           : 'No shifts yet'}
                     </p>
                   </section>
