@@ -14,7 +14,7 @@ import { matchId, matchLabel } from '../../functions/shared/matches.js';
 import { REQUESTS_TO } from '../config.js';
 import { deliver } from '../adOrders.js';
 import * as casino from '../../functions/shared/casino.js';
-import { dayOf } from '../labLog.js';
+import { dayOf, logFields, taskArea } from '../labLog.js';
 import * as arcade from '../../functions/shared/arcade.js';
 import { blocked, serverGroup } from '../../functions/shared/commandRules.js';
 import { giftEntry, prizeEntry, teamDay } from '../../functions/shared/coins.js';
@@ -78,6 +78,30 @@ function seed() {
       subteam: 'Assembly',
       priority: 'medium',
       dueDate: iso(6),
+    }),
+    t('Fix drivetrain drift in TeleOp', {
+      status: 'in_progress',
+      assignees: ['Asher Mosseri', 'Katarina Jurasic'],
+      subteam: 'Programming',
+      priority: 'high',
+    }),
+    t('Replace left drivetrain bearings', {
+      status: 'in_progress',
+      assignees: ['Cooper Mlezcko'],
+      subteam: 'Mechanical',
+      priority: 'high',
+    }),
+    t('Cable-manage the shooter wiring', {
+      status: 'todo',
+      assignees: ['Jackson Lucks'],
+      subteam: 'Electrical',
+      priority: 'medium',
+    }),
+    t('Mount the new shooter on the robot', {
+      status: 'todo',
+      assignees: ['Sebastian Tolbert', 'Cooper Mlezcko'],
+      subteam: 'Assembly',
+      priority: 'medium',
     }),
   ];
   const activity = {};
@@ -289,6 +313,8 @@ function seed() {
     runs,
     chat: { ...chat, 'lab-log': lab.posts },
     labLogs: lab.logs,
+    // How often the team taps each lab log chip (labChips/counts for real).
+    labChips: { 'coding-test': 6, 'mech-fixed': 4, 'elec-cables': 3, 'gen-helped': 2 },
     robot,
     inbox,
     dms,
@@ -343,6 +369,35 @@ function demoLabLog(shifts, tasks) {
     'Jackson Lucks': { blockers: 'Waiting on the new Anderson connectors to arrive.' },
     'Cooper Mlezcko': { next: 'Check the motor temperatures after a full match run.' },
   };
+  // Logged with taps (person|n: their nth most recent log).
+  const TAPPED = {
+    'Asher Mosseri|0': {
+      areas: ['coding'],
+      tasks: [
+        ['Tune autonomous path for left start', 'progress'],
+        ['Fix drivetrain drift in TeleOp', 'started'],
+      ],
+      note: 'Tuned auto, tested on the robot. Left start hits the backdrop 4 out of 5 times.',
+      chips: ['coding-auto', 'coding-test'],
+    },
+    'Sebastian Tolbert|0': {
+      areas: ['assembly', 'mechanical'],
+      tasks: [['Mount the new shooter on the robot', 'progress']],
+      note: 'Mounted parts on the robot, tightened / replaced screws',
+      chips: ['asm-mounted', 'asm-screws'],
+      with: ['Jackson Lucks'],
+    },
+    'Jackson Lucks|0': {
+      areas: ['electrical', 'assembly'],
+      tasks: [
+        ['Cable-manage the shooter wiring', 'progress'],
+        ['Mount the new shooter on the robot', 'stuck', 'Waiting on the new Anderson connectors'],
+      ],
+      note: 'Wired, cable managed',
+      chips: ['elec-wired', 'elec-cables'],
+      with: ['Sebastian Tolbert'],
+    },
+  };
   const logs = [];
   const used = {};
   for (const sh of shifts.filter((x) => x.end)) {
@@ -352,6 +407,23 @@ function demoLabLog(shifts, tasks) {
     const i = (used[sh.person] = (used[sh.person] ?? -1) + 1);
     const notes = NOTES[sh.person] || ['Helped out around the lab.'];
     const mine = tasks.filter((t) => (t.assignees || []).includes(sh.person)).slice(0, 1);
+    const tapped = TAPPED[`${sh.person}|${i}`];
+    if (tapped) {
+      const picks = tapped.tasks.map(([title, outcome, blocker = '']) => {
+        const t = tasks.find((x) => x.title === title);
+        return { id: t?.id || null, title, area: t ? taskArea(t) : tapped.areas[0], outcome, blocker };
+      });
+      logs.push({
+        id,
+        day,
+        person: sh.person,
+        uid: 'demo',
+        ...logFields({ areas: tapped.areas, picks, note: tapped.note, chips: tapped.chips || [], photos: [], voice: null, workedWith: tapped.with || [] }),
+        shiftIds: [sh.id],
+        at: sh.end,
+      });
+      continue;
+    }
     logs.push({
       id,
       day,
@@ -407,6 +479,7 @@ function demoShifts(now) {
   });
   return [
     s('Cooper Mlezcko', now - 1.4 * h, null, { subteam: 'Mechanical' }),
+    s('Jackson Lucks', now - 2.5 * h, 1.5, { subteam: 'Electrical' }),
     s('Asher Mosseri', day(1, 15), 3, { subteam: 'Programming', note: 'Tuned the autonomous path' }),
     s('Sebastian Tolbert', day(1, 15), 2.5, { subteam: 'Assembly', note: 'Shooter mount' }),
     s('Jackson Lucks', day(1, 16), 2),

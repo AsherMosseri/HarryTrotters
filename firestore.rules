@@ -210,22 +210,52 @@ service cloud.firestore {
     // The lab log (labLog.js): one log per person per day, id <day>_<person>.
     // Everyone on the team reads them; you write your own (it's required
     // when you end a shift); team management can fix anyone's. The onLabLog
-    // function keeps #lab-log's daily post in sync.
+    // function keeps #lab-log's daily card in sync. Since 3.0 a log is
+    // mostly taps (areas, tasks and how they went); logs from before need a
+    // note, newer ones need at least one area.
     match /labLogs/{id} {
       function validLog(d) {
-        return d.keys().hasOnly(['day', 'person', 'uid', 'note', 'taskIds', 'doneTaskIds', 'photos', 'blockers', 'next', 'at', 'updatedAt', 'updatedBy'])
+        return d.keys().hasOnly(['day', 'person', 'uid', 'note', 'taskIds', 'doneTaskIds', 'photos', 'blockers', 'next', 'at', 'updatedAt', 'updatedBy',
+            'v', 'areas', 'tasks', 'chips', 'voice', 'workedWith', 'shiftIds'])
           && d.day is string && d.day.matches('[0-9]{4}-[0-9]{2}-[0-9]{2}')
-          && d.person is string && d.note is string && d.note.size() > 0 && d.note.size() <= 4000
+          && d.person is string && d.note is string && d.note.size() <= 4000
+          && (d.note.size() > 0 || (d.get('areas', []) is list && d.get('areas', []).size() > 0))
           && d.get('blockers', '') is string && d.get('blockers', '').size() <= 2000
           && d.get('next', '') is string && d.get('next', '').size() <= 2000
           && d.get('photos', []) is list && d.get('photos', []).size() <= 4
           && d.get('taskIds', []) is list && d.get('taskIds', []).size() <= 30
-          && d.get('doneTaskIds', []) is list && d.get('doneTaskIds', []).size() <= 30;
+          && d.get('doneTaskIds', []) is list && d.get('doneTaskIds', []).size() <= 30
+          && d.get('areas', []) is list && d.get('areas', []).size() <= 7
+          && d.get('tasks', []) is list && d.get('tasks', []).size() <= 30
+          && d.get('chips', []) is list && d.get('chips', []).size() <= 30
+          && d.get('workedWith', []) is list && d.get('workedWith', []).size() <= 20
+          && d.get('shiftIds', []) is list && d.get('shiftIds', []).size() <= 10
+          && (d.get('voice', null) == null || (d.voice is map && d.voice.url is string && d.voice.url.size() <= 2000));
       }
       allow read: if isMember();
       allow create: if isMember() && !labLogOff() && validLog(request.resource.data) && (isMe(request.resource.data.person) || isManager());
       allow update: if isMember() && !labLogOff() && validLog(request.resource.data) && request.resource.data.person == resource.data.person
         && (isMe(resource.data.person) || isManager());
+      allow delete: if isManager();
+    }
+    // How often the team taps each lab log suggestion chip, so the common
+    // ones come first: one small doc of counts anyone on the team bumps.
+    match /labChips/{id} {
+      allow read: if isMember();
+      allow create, update: if isMember() && id == 'counts'
+        && request.resource.data.keys().hasOnly(['counts', 'updatedAt'])
+        && request.resource.data.counts is map && request.resource.data.counts.size() <= 200;
+    }
+    // Tasks you opened, moved or commented on today (the lab log picks them
+    // for you), id <day>_<person>. Yours only; team management can read them
+    // when fixing your log.
+    match /labTouches/{id} {
+      allow read: if isMember() && (isMe(resource.data.person) || isManager());
+      allow create, update: if isMember() && isMe(request.resource.data.person)
+        && (resource == null || resource.data.person == request.resource.data.person)
+        && request.resource.data.keys().hasOnly(['day', 'person', 'taskIds', 'at'])
+        && request.resource.data.day is string && id.matches(request.resource.data.day + '_.+')
+        && request.resource.data.taskIds is list && request.resource.data.taskIds.size() <= 200;
       allow delete: if isManager();
     }
 

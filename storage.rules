@@ -99,6 +99,15 @@ service firebase.storage {
       allow delete: if isManager();
     }
 
+    // Lab log voice notes (up to 30 seconds), named <person-id>-<random>.
+    // iPad and iPhone record audio/mp4; other browsers WebM or Ogg.
+    match /voice/{file} {
+      allow get: if isMember();
+      allow delete: if isManager() || (isMember() && file.matches(myPersonId() + '-.*'));
+      allow create: if isMember()
+        && request.resource.contentType.matches('audio/(mp4|x-m4a|aac|mpeg|webm|ogg)') && request.resource.size < 3 * 1024 * 1024;
+    }
+
     match /tasks/{taskId}/{file} {
       allow read, delete: if isMember();
       allow create: if isMember()

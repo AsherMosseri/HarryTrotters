@@ -1406,3 +1406,190 @@ button.pm-row:hover { background: color-mix(in srgb, var(--text) 4%, transparent
 }
 :root[data-motion='off'] :is(.qt-num, .qc-box .icon, .sp-saved) { animation: none !important; }
 :root[data-motion='off'] :is(.sp-key, .qt-btn, .qc-item):active { transform: none; }
+
+/* ---------- Lab log, step by step (LabLog.jsx) ----------
+   One step per screen: progress and title on top, big tap targets in the
+   middle, and Back / Done / Next always at the bottom. Full screen on
+   phones; a tall card on iPad and computers. */
+.panel-backdrop.center.ll-backdrop { align-items: center; padding: 4vh 16px; }
+.panel-backdrop.center > .dialog.ll-sheet {
+  width: min(640px, 100%); height: min(760px, calc(var(--vvh, 100dvh) - 8vh)); max-height: none; overflow: hidden;
+  padding: 0; gap: 0; display: flex; flex-direction: column;
+}
+.panel-backdrop.center > .dialog.ll-sheet > .ll-body { flex: 1 1 auto; min-height: 0; }
+.ll-head { padding: 14px 16px 12px 20px; border-bottom: 1px solid var(--hairline); }
+.ll-progress { display: flex; gap: 4px; margin: 0 4px 12px 0; }
+.ll-progress span { flex: 1; height: 4px; border-radius: 2px; background: var(--surface-2); }
+.ll-progress span.on { background: var(--accent); }
+.ll-head-row { display: flex; align-items: flex-start; gap: 8px; }
+.ll-titles { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.ll-kicker { font-size: 12.5px; font-weight: 650; color: var(--muted); }
+.ll-titles h2 { margin: 0; font-size: 23px; font-weight: 780; letter-spacing: -0.025em; line-height: 1.15; }
+.ll-head .icon-btn { margin: -4px -4px 0 0; flex: none; }
+.ll-body { overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; padding: 16px 20px 20px; display: flex; flex-direction: column; gap: 14px; }
+.ll-foot {
+  display: flex; align-items: center; gap: 10px; padding: 12px 16px; padding-bottom: max(12px, env(safe-area-inset-bottom));
+  border-top: 1px solid var(--hairline); background: var(--surface);
+}
+.ll-foot .btn { min-height: 52px; border-radius: 12px; font-size: 16.5px; justify-content: center; }
+.ll-done { flex: 1; }
+.ll-next { flex: 1.4; }
+.ll-done.primary { flex: 2; }
+.ll-back { width: 52px; padding: 0; flex: none; }
+.ll-back-icon { transform: rotate(180deg); }
+.ll-skip { flex: none; }
+.ll-hint { margin: 0; text-align: center; }
+.ll-label { display: flex; align-items: center; gap: 6px; margin: 0 0 8px; font-size: 12.5px; font-weight: 750; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+.ll-sublabel { font-size: 12px; font-weight: 650; color: var(--muted); margin: 6px 0 0; }
+.ll-group { display: flex; flex-direction: column; }
+/* A round check in each toggle: empty when off, filled when on. */
+.ll-tick { width: 22px; height: 22px; flex: none; border-radius: 50%; display: inline-grid; place-items: center; border: 1.6px solid var(--border); color: #fff; }
+.on > .ll-tick { background: var(--accent); border-color: var(--accent); }
+.ll-else:not(.on) > .ll-tick { color: var(--muted); }
+
+/* Step 1: the areas. */
+.ll-areas { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+.ll-area {
+  position: relative; display: flex; align-items: center; gap: 10px; min-height: 64px; padding: 0 14px; border-radius: 14px;
+  border: 1.5px solid var(--border); background: var(--surface); color: var(--text); font: inherit; font-size: 17px; font-weight: 680; text-align: left;
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+}
+.ll-area > span:nth-child(2) { flex: 1; min-width: 0; }
+.ll-area > .icon { color: var(--muted); flex: none; }
+.ll-area.on { border-color: var(--accent); background: var(--accent-soft); }
+.ll-area.on > .icon { color: var(--accent); }
+.ll-same {
+  display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 14px; text-align: left; font: inherit; color: var(--text);
+  border: 1.5px dashed color-mix(in srgb, var(--accent) 45%, var(--border)); background: color-mix(in srgb, var(--accent) 5%, transparent);
+}
+.ll-same > .icon { color: var(--accent); flex: none; }
+.ll-same span { display: flex; flex-direction: column; min-width: 0; }
+.ll-same b { font-size: 16px; }
+.ll-same small { font-size: 13px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ll-same.on { border-style: solid; }
+
+/* Step 2: tasks, and who you worked with. */
+.ll-faces { display: flex; gap: 10px; overflow-x: auto; padding: 4px 4px 4px; margin: 0 -4px; scrollbar-width: none; }
+.ll-face { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 64px; flex: none; border: 0; background: none; padding: 2px 0; color: var(--text); font: inherit; font-size: 12.5px; font-weight: 600; }
+.ll-face > :first-child { border-radius: 50%; outline: 2.5px solid transparent; outline-offset: 2px; }
+.ll-face.on > :first-child { outline-color: var(--accent); }
+.ll-face.on > span:last-child { color: var(--accent); font-weight: 750; }
+.ll-face > span:last-child { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ll-tasks { display: flex; flex-direction: column; gap: 8px; }
+.ll-task {
+  display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 8px 12px; border-radius: 12px; text-align: left;
+  border: 1.5px solid var(--border); background: var(--surface); color: var(--text); font: inherit; font-size: 15.5px; font-weight: 600;
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+}
+.ll-task.on { border-color: var(--accent); background: var(--accent-soft); }
+.ll-task-title { flex: 1; min-width: 0; overflow-wrap: anywhere; line-height: 1.3; }
+.ll-with { flex: none; font-size: 12px; font-weight: 650; color: var(--muted); padding: 2px 8px; border-radius: 999px; background: var(--surface-2); }
+.ll-else { border-style: dashed; color: var(--muted); }
+.ll-else.on { color: var(--text); }
+.ll-more { align-self: flex-start; border: 0; background: none; color: var(--accent); font: inherit; font-size: 14.5px; font-weight: 650; padding: 4px 2px; }
+.ll-short { min-height: 46px; font-size: 16px; }
+
+/* Step 3: how each task went. */
+.ll-how { display: flex; flex-direction: column; gap: 10px; padding: 12px; border-radius: 14px; border: 1px solid var(--border); background: var(--surface); }
+.ll-how-title { display: flex; align-items: flex-start; gap: 8px; font-weight: 700; font-size: 16px; line-height: 1.3; }
+.ll-how-title > span:first-child { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.ll-area-tag { display: inline-flex; align-items: center; gap: 4px; flex: none; font-size: 12px; font-weight: 650; color: var(--muted); padding: 2px 8px; border-radius: 999px; background: var(--surface-2); }
+.ll-outcomes { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.ll-outcome {
+  --o: var(--accent); display: flex; align-items: center; justify-content: center; gap: 7px; min-height: 50px; padding: 0 8px; border-radius: 12px;
+  border: 1.5px solid var(--border); background: var(--surface); color: var(--text); font: inherit; font-size: 15px; font-weight: 650;
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+}
+.ll-outcome .icon { color: var(--o); }
+.ll-outcome.o-done { --o: var(--st-done); }
+.ll-outcome.o-progress { --o: var(--st-todo); }
+.ll-outcome.o-stuck { --o: var(--st-blocked); }
+.ll-outcome.o-started { --o: var(--st-progress); }
+.ll-outcome.on { border-color: var(--o); background: color-mix(in srgb, var(--o) 14%, var(--surface)); }
+.ll-offer {
+  display: flex; align-items: center; gap: 10px; min-height: 46px; padding: 0 12px; border-radius: 12px; font: inherit; font-size: 15px; font-weight: 650;
+  border: 1.5px dashed var(--border); background: var(--surface-2); color: var(--text); text-align: left;
+}
+.ll-offer.on { border-style: solid; border-color: var(--accent); background: var(--accent-soft); }
+.ll-stuck { display: flex; flex-direction: column; gap: 8px; }
+
+/* Step 4: a line, chips, photo and voice. */
+.ll-note { font-size: 16px; min-height: 52px; }
+.ll-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip.ll-chip { min-height: 40px; padding: 0 14px; font-size: 14.5px; font-weight: 600; display: inline-flex; align-items: center; gap: 5px; color: var(--text); }
+.chip.ll-chip.on { color: var(--accent); }
+.ll-extras { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+.ll-extra {
+  position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 60px; padding: 0 12px;
+  border-radius: 14px; border: 1.5px solid var(--border); background: var(--surface-2); color: var(--text); font: inherit; font-size: 15.5px; font-weight: 650;
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+}
+.ll-mic { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: none; }
+.ll-mic > span, .ll-mic > .icon { position: relative; z-index: 1; }
+.ll-mic.recording { border-color: var(--danger); color: var(--danger); background: color-mix(in srgb, var(--danger) 10%, var(--surface)); }
+.ll-mic-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 4px; background: var(--danger); transform-origin: left; }
+.ll-attached { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.ll-voice-row { display: inline-flex; align-items: center; gap: 2px; }
+.ll-voice { display: inline-flex; align-items: center; gap: 8px; min-width: 180px; max-width: 280px; padding: 4px 12px 4px 4px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--border); }
+.ll-voice-play { width: 34px; height: 34px; flex: none; border-radius: 50%; border: 0; display: inline-grid; place-items: center; background: var(--accent); color: #fff; padding: 0; }
+.ll-voice-track { flex: 1; height: 4px; border-radius: 2px; background: color-mix(in srgb, var(--muted) 30%, transparent); overflow: hidden; }
+.ll-voice-track i { display: block; height: 100%; background: var(--accent); transform-origin: left; transform: scaleX(0); }
+.ll-voice-len { font-size: 12.5px; color: var(--muted); }
+
+/* Quick visit (shift under 15 minutes) and the payoff after you log. */
+.panel-backdrop.center > .dialog.ll-quick { height: auto; padding: 24px 20px 20px; gap: 18px; width: min(440px, 100%); }
+.ll-quick-body { display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; }
+.ll-quick-body h2 { margin: 6px 0 0; font-size: 23px; font-weight: 780; letter-spacing: -0.025em; }
+.ll-quick-body p { margin: 0; }
+.ll-quick-icon, .ll-payoff-check { width: 56px; height: 56px; border-radius: 50%; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); }
+.ll-quick-actions { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.ll-big { width: 100%; min-height: 56px; border-radius: 14px; font-size: 17px; justify-content: center; white-space: normal; }
+.dialog.ll-payoff { width: min(420px, 100%); align-items: center; text-align: center; padding: 26px 20px 20px; gap: 12px; }
+.ll-payoff h2 { margin: 4px 0 0; font-size: 23px; font-weight: 780; letter-spacing: -0.025em; }
+.ll-payoff p { margin: -6px 0 0; }
+.ll-payoff-check { background: color-mix(in srgb, var(--st-done) 16%, var(--surface)); color: var(--st-done); }
+.ll-payoff-lines { list-style: none; margin: 4px 0 6px; padding: 0; width: 100%; display: flex; flex-direction: column; gap: 6px; text-align: left; }
+.ll-payoff-lines li { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; background: var(--surface-2); font-size: 15px; }
+.ll-payoff-lines .icon { color: var(--muted); flex: none; }
+.ll-payoff-lines b { font-size: 19px; font-weight: 700; }
+:root:not([data-motion='off']) .ll-payoff-check { animation: ll-pop 0.35s ease-out; }
+:root:not([data-motion='off']) .ll-payoff-lines li { animation: ll-rise 0.3s ease-out both; }
+:root:not([data-motion='off']) .ll-payoff-lines li:nth-child(2) { animation-delay: 0.06s; }
+:root:not([data-motion='off']) .ll-payoff-lines li:nth-child(3) { animation-delay: 0.12s; }
+:root:not([data-motion='off']) .ll-payoff-lines li:nth-child(4) { animation-delay: 0.18s; }
+@keyframes ll-pop { from { transform: scale(0.6); opacity: 0; } }
+@keyframes ll-rise { from { transform: translateY(6px); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion='on']) .ll-payoff-check, :root:not([data-motion='on']) .ll-payoff-lines li { animation: none; }
+}
+
+/* #lab-log's card: areas, tasks with how they went, voice notes. */
+.ll-entry-areas { display: flex; flex-wrap: wrap; gap: 6px; }
+.ll-entry-tasks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 14.5px; }
+.ll-entry-tasks li { display: flex; align-items: flex-start; gap: 7px; line-height: 1.35; }
+.ll-entry-tasks li > .icon { flex: none; margin-top: 2px; color: var(--muted); }
+.ll-entry-tasks li > span { min-width: 0; overflow-wrap: anywhere; }
+.ll-entry-tasks li.o-done > .icon { color: var(--st-done); }
+.ll-entry-tasks li.o-progress > .icon { color: var(--st-todo); }
+.ll-entry-tasks li.o-stuck > .icon { color: var(--st-blocked); }
+.ll-entry-tasks li.o-started > .icon { color: var(--st-progress); }
+.ll-entry-outcome { color: var(--muted); }
+.ll-entry-blocker { color: var(--danger); }
+.lablog-entry .ll-voice { align-self: flex-start; }
+
+/* iPad and wider: more per row. */
+@media (min-width: 700px) {
+  .ll-areas { grid-template-columns: repeat(3, 1fr); }
+  .ll-outcomes { grid-template-columns: repeat(4, 1fr); }
+  .ll-outcome { flex-direction: column; gap: 3px; min-height: 64px; font-size: 14px; }
+}
+/* Phones: the whole screen, clear of the notch and the home bar. */
+@media (max-width: 600px) {
+  .panel-backdrop.center.ll-backdrop { padding: 0; align-items: stretch; }
+  .panel-backdrop.center > .dialog.ll-sheet:not(.ll-quick) { width: 100%; height: var(--vvh, 100dvh); border-radius: 0; box-shadow: none; }
+  .ll-sheet:not(.ll-quick) .ll-head { padding-top: max(14px, env(safe-area-inset-top)); }
+  .panel-backdrop.center.ll-backdrop:has(.ll-quick), .panel-backdrop.center.ll-backdrop:has(.ll-payoff) { align-items: flex-end; padding: 0; }
+  .panel-backdrop.center > .dialog.ll-quick, .panel-backdrop.center > .dialog.ll-payoff { width: 100%; border-radius: 20px 20px 0 0; padding-bottom: max(20px, env(safe-area-inset-bottom)); }
+  .ll-body { padding: 14px 16px 18px; }
+  .ll-titles h2 { font-size: 22px; }
+}
