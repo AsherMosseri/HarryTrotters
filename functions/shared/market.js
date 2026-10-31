@@ -88,7 +88,7 @@ export function cleanPerk(p) {
 // The purchases that still count against stock and limits (not declined).
 const counts = (x) => x.status !== 'declined';
 // The Monday this week started, team time.
-const weekFrom = (now) => teamMidnight(weekStart(teamDay(now)));
+export const weekFrom = (now) => teamMidnight(weekStart(teamDay(now)));
 
 // What buying `item` costs and writes, or { error }. item: 'pet:<id>',
 // 'perk:<id>' or 'extra:<id>'.
@@ -202,20 +202,32 @@ export function decideCheck(purchase, status) {
   return { status, refund: status === 'declined' };
 }
 
-// Active chat extras by person: { glow: Set(names), mega: Set(names), banners: [purchase] }.
-// rename: purchases keep the name they were bought under.
+// Chat extras running now: glow (name → { at, until }: their messages sent
+// in that time glow), mega (names whose super reactions burst bigger) and
+// banners (Today's shout-outs). rename: purchases keep the name they were
+// bought under.
 export function activeExtras(purchases = [], now = Date.now(), rename = (n) => n) {
-  const out = { glow: new Set(), mega: new Set(), banners: [] };
+  const out = { glow: new Map(), mega: new Set(), banners: [] };
   for (const p of purchases) {
     if (p.kind !== 'extra' || p.status !== 'active' || !(p.until > now)) continue;
     const id = p.item.slice('extra:'.length);
     const who = rename(p.person);
     if (id === 'banner') out.banners.push({ ...p, person: who });
-    else if (out[id]) out[id].add(who);
+    else if (id === 'glow') out.glow.set(who, { at: p.at, until: p.until });
+    else if (id === 'mega') out.mega.add(who);
   }
   out.banners.sort((a, b) => a.at - b.at);
   return out;
 }
+// Does this chat message glow (its author bought glowing messages, and sent
+// it while they were on)?
+export const glows = (extras, m) => {
+  const g = extras?.glow.get(m.by);
+  return !!g && m.at >= g.at && m.at <= g.until;
+};
+// What the market's Play button types in #arcade for a tournament (the game
+// command reads it to play that tournament's seed).
+export const playLine = (t) => `/${TOURNAMENT_GAMES[t.game]?.cmd || t.game} tournament ${t.id}`;
 
 // ---------- tournaments ----------
 // tournaments/{id}: { game, title, entry, pot, seed, status: 'open'|'done',

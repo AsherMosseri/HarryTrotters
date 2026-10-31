@@ -63,6 +63,41 @@ const PATHS = {
       <path d="M13 4.6a2.8 2.8 0 0 1 0 4.8M14.5 11.8a5 5 0 0 1 3 4.7" />
     </>
   ),
+  // The market: a shopping bag; its shelves: a paw (pets), a ticket (perks),
+  // a sparkle (chat extras) and a controller (game entries).
+  market: (
+    <>
+      <path d="M4.5 6.5h11l-.8 10a1 1 0 0 1-1 .9H6.3a1 1 0 0 1-1-.9z" />
+      <path d="M7.5 8.5V6a2.5 2.5 0 0 1 5 0v2.5" />
+    </>
+  ),
+  paw: (
+    <>
+      <path d="M10 10.5c-2.4 0-4.5 2.4-4.5 4.4 0 1.3 1 1.9 2.2 1.9.9 0 1.5-.5 2.3-.5s1.4.5 2.3.5c1.2 0 2.2-.6 2.2-1.9 0-2-2.1-4.4-4.5-4.4z" />
+      <ellipse cx="4.6" cy="8.6" rx="1.4" ry="1.8" />
+      <ellipse cx="8" cy="5.2" rx="1.4" ry="1.9" />
+      <ellipse cx="12" cy="5.2" rx="1.4" ry="1.9" />
+      <ellipse cx="15.4" cy="8.6" rx="1.4" ry="1.8" />
+    </>
+  ),
+  ticket: (
+    <>
+      <path d="M3 6.5a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v2a1.5 1.5 0 0 0 0 3v2a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-2a1.5 1.5 0 0 0 0-3z" />
+      <path d="M12 5.5v9" strokeDasharray="1.5 1.8" />
+    </>
+  ),
+  sparkle: (
+    <>
+      <path d="M9 3.5 10.4 8 15 9.5l-4.6 1.4L9 15.5l-1.4-4.6L3 9.5 7.6 8z" />
+      <path d="M15.5 3v3M14 4.5h3M15 14.5v2.5M13.75 15.75h2.5" />
+    </>
+  ),
+  game: (
+    <>
+      <path d="M6.5 6.5h7a4 4 0 0 1 3.9 4.8l-.6 3a1.8 1.8 0 0 1-3.2.7L12 13.5H8l-1.6 1.5a1.8 1.8 0 0 1-3.2-.7l-.6-3A4 4 0 0 1 6.5 6.5z" />
+      <path d="M6.5 9v2.5M5.25 10.25h2.5M12.5 10h.01M14.5 11h.01" />
+    </>
+  ),
   hash: <path d="M8 3 6.5 17M13.5 3 12 17M4 7.5h13M3 12.5h13" />,
   announce: (
     <>

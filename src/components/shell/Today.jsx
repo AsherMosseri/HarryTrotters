@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useContext, useRef } from 'react';
 import { Avatar, usePeople } from '../common.jsx';
 import robot from '../../assets/robot-dance.webp';
 import { Icon } from './icons.jsx';
@@ -13,6 +13,9 @@ import { hoursOf } from '../../../functions/shared/hours.js';
 import { seasonStats } from '../../../functions/shared/stats.js';
 import { useFlip } from '../../motion.js';
 import CountUp from '../CountUp.jsx';
+import { MascotCard } from '../Pet.jsx';
+import { ShoutOuts } from '../Market.jsx';
+import { LabLogContext } from '../LabLog.jsx';
 
 // The first page, like a pit board: the countdown and the robot up top with a
 // few plain lines on what needs you, then your tasks, what's due, who's at the
@@ -108,7 +111,7 @@ export default function Today({
     );
   return (
     <UsualToday
-      {...{ actor, tasks, milestones, competition, shifts, runs, myShift, convs, unread, chat, on, onOpenTask, onOpenConv, onPage, onNewTask }}
+      {...{ actor, tasks, milestones, competition, shifts, runs, myShift, convs, unread, chat, on, onOpenTask, onOpenConv, onPage, onNewTask, roster }}
       {...{ onStartShift, onOpenShift, onPerson, onEditProfile, people, today }}
       pitButton={
         compOn ? (
@@ -148,7 +151,9 @@ function UsualToday({
   people,
   today,
   pitButton,
+  roster = [],
 }) {
+  const lab = useContext(LabLogContext);
   const all = tasks || [];
   // Rows ease in and out and slide into place as tasks change (Moving things).
   const gridRef = useRef(null);
@@ -271,6 +276,8 @@ function UsualToday({
         <img className="pit-robot" src={robot} alt="" aria-hidden="true" />
       </header>
 
+      <ShoutOuts actor={actor} />
+
       {noPhoto && (
         <button className="photo-nudge" onClick={onEditProfile}>
           <Avatar name={actor.name} size={32} />
@@ -327,6 +334,8 @@ function UsualToday({
         </div>
 
         <div className="today-col side">
+          {/* The team's robot: its mood is the whole team's last seven days. */}
+          <MascotCard shifts={shifts} tasks={all} logs={lab?.logs || []} roster={roster} />
           {on.includes('shifts') && (
             <section className="today-sec">
               <div className="sec-head">

@@ -19,6 +19,9 @@ import * as arcade from '../../functions/shared/arcade.js';
 import { blocked, serverGroup } from '../../functions/shared/commandRules.js';
 import { giftEntry, prizeEntry, teamDay, teamMidnight } from '../../functions/shared/coins.js';
 import { asksOn } from '../../functions/shared/checkin.js';
+import * as market from '../../functions/shared/market.js';
+import { PERK_IDEAS } from '../../functions/shared/market.js';
+import { START_NEED, isSpecies } from '../../functions/shared/pets.js';
 
 const KEY = 'ftc32313-demo-v13';
 const listeners = new Set();
@@ -601,6 +604,85 @@ try {
 } catch {
   state = seed();
 }
+if (!state.marketSeeded) seedMarket();
+
+// The market and pets in the demo: a few perks, Asher's dog, a shout-out, a
+// perk waiting for approval and an open tournament (the real ones are made
+// by team management and functions/market.js).
+function seedMarket() {
+  const now = Date.now();
+  const day = 86400000;
+  const idea = (i, extra = {}) => ({ id: `perk${i}`, ...PERK_IDEAS[i], stock: null, limit: null, per: 'season', approval: true, active: true, by: 'Asher Mosseri', at: now - 9 * day, ...extra });
+  state.perks = [idea(0, { limit: 1, per: 'week' }), idea(1), idea(3, { stock: 3 }), idea(6, { approval: false, price: 30 })];
+  state.purchases = [];
+  state.coins = state.coins || [];
+  const buy = (person, item, name, price, at, extra = {}) => {
+    const id = uid();
+    state.purchases.push({ id, item, kind: item.split(':')[0], name, price, person, at, ...extra });
+    state.coins.push({ id: `c${id}`, ...market.spendEntry(person, item, price, name, at) });
+  };
+  buy('Cooper Mlezcko', 'perk:perk1', PERK_IDEAS[1].name, PERK_IDEAS[1].price, now - 3 * 3600000, { status: 'pending' });
+  buy('Jackson Lucks', 'perk:perk0', PERK_IDEAS[0].name, PERK_IDEAS[0].price, now - 2 * day, { status: 'approved', decidedBy: 'Asher Mosseri', decidedAt: now - day });
+  buy('Sophia Bermudez', 'extra:banner', 'Shout-out on Today', 40, now - 2 * 3600000, {
+    status: 'active',
+    until: now + 22 * 3600000,
+    text: 'Huge thanks to the CAD crew for the new intake! 🎉',
+  });
+  buy('Jackson Lucks', 'extra:glow', 'Glowing messages', 25, now - 5 * 3600000, { status: 'active', until: now + 19 * 3600000 });
+  state.pets = [
+    {
+      id: 'asher-mosseri',
+      person: 'Asher Mosseri',
+      species: 'dog',
+      name: 'Bolt',
+      adoptedAt: now - 20 * day,
+      food: { v: 70, at: now - 6 * 3600000 },
+      fun: { v: 45, at: now - day },
+      inChat: true,
+      cared: 6,
+    },
+    {
+      id: 'jackson-lucks',
+      person: 'Jackson Lucks',
+      species: 'owl',
+      name: 'Hoot',
+      adoptedAt: now - 12 * day,
+      food: { v: 60, at: now - day },
+      fun: { v: 80, at: now - day },
+      inChat: true,
+      cared: 3,
+    },
+  ];
+  const players = {
+    'Jackson Lucks': { joinedAt: now - day, best: 4200, at: now - 20 * 3600000 },
+    'Sophia Bermudez': { joinedAt: now - 20 * 3600000, best: 3100, at: now - 10 * 3600000 },
+    'Sebastian Tolbert': { joinedAt: now - 3 * 3600000, best: null, at: null },
+  };
+  state.tournaments = [
+    { id: 'tour1', game: 'tetris', title: 'Friday Tetris', entry: 15, pot: 45, seed: 'demo1', better: 'high', status: 'open', opensAt: now - day, endsAt: now + 2 * day, players, winners: [], by: 'Asher Mosseri', at: now - day },
+  ];
+  for (const [name, p] of Object.entries(players))
+    state.coins.push({ id: `c${uid()}`, type: 'spend', person: name, amount: 15, what: 'tournament', item: 'tour:tour1', label: 'Tournament entry: Friday Tetris', at: p.joinedAt });
+  state.marketSeeded = 1;
+}
+// Tournaments that ended get paid, the way payTournaments does it.
+function settleDemoTournaments(now = Date.now()) {
+  let changed = false;
+  for (const t of state.tournaments || []) {
+    if (t.status !== 'open' || t.endsAt > now) continue;
+    settleDemoTournament(t, now, false);
+    changed = true;
+  }
+  return changed;
+}
+function settleDemoTournament(t, now, cancel, by = '') {
+  const r = cancel ? { winners: [], pays: [], refunds: Object.keys(t.players || {}).map((name) => ({ name, amount: t.entry })) } : market.payoutOf(t);
+  state.coins = state.coins || [];
+  for (const p of r.pays)
+    state.coins.push({ id: `c${uid()}`, type: 'prize', person: p.name, amount: p.amount, what: 'tournament', label: market.prizeLabel(t), item: `tour:${t.id}`, at: now });
+  for (const p of r.refunds) state.coins.push({ id: `c${uid()}`, ...market.refundEntry(p.name, p.amount, t.title, `tour:${t.id}`, now) });
+  Object.assign(t, { status: 'done', winners: r.winners, paid: r.pays, paidAt: now, ...(cancel && { cancelled: true, cancelledBy: by }) });
+}
 
 function commit() {
   try {
@@ -938,6 +1020,159 @@ export const demoStore = {
   async deleteCoinTx(id) {
     state.coins = (state.coins || []).filter((x) => x.id !== id);
     commit();
+  },
+  // The market and pets, run here the way functions/market.js runs them,
+  // with the same checks (shared/market.js, shared/pets.js).
+  subscribePerks(cb) {
+    return listen(() => cb([...(state.perks || [])]));
+  },
+  async savePerk(id, data, actor) {
+    const now = Date.now();
+    state.perks = id
+      ? (state.perks || []).map((p) => (p.id === id ? { ...p, ...data, by: actor.name, updatedAt: now } : p))
+      : [...(state.perks || []), { id: `perk${uid()}`, ...data, by: actor.name, at: now }];
+    commit();
+  },
+  async deletePerk(id) {
+    state.perks = (state.perks || []).filter((p) => p.id !== id);
+    commit();
+  },
+  subscribePurchases(cb) {
+    return listen(() => cb([...(state.purchases || [])]));
+  },
+  subscribePets(cb) {
+    return listen(() => cb([...(state.pets || [])]));
+  },
+  subscribeTournaments(cb) {
+    const tick = () => settleDemoTournaments() && commit();
+    tick();
+    const t = setInterval(tick, 15000);
+    const off = listen(() => cb((state.tournaments || []).map((x) => ({ ...x }))));
+    return () => {
+      clearInterval(t);
+      off();
+    };
+  },
+  // fn: 'buy' | 'joinTournament' | 'marketManage' | 'pet'. balanceOf: the
+  // person's coins from the app's wallet (the server reads them fresh).
+  async market(fn, data = {}, actor, { balanceOf, coinsOff = false }) {
+    const me = actor.name;
+    const now = Date.now();
+    const note = (title, body = '') => ({ note: { title, body } });
+    const done = (r) => (commit(), r);
+    const myPet = () => (state.pets || []).find((p) => p.person === me);
+    if (coinsOff && (fn === 'buy' || fn === 'joinTournament')) return note('🪙 Jackson coins are off right now.');
+
+    if (fn === 'buy') {
+      const item = String(data.item || '');
+      const [kind, id] = item.split(/:(.*)/s);
+      const r = market.buyCheck(item, {
+        me,
+        balance: balanceOf(me),
+        now,
+        pet: kind === 'pet' ? myPet() || null : null,
+        perk: kind === 'perk' ? (state.perks || []).find((p) => p.id === id) || null : null,
+        purchases: (state.purchases || []).filter((p) => p.item === item),
+        text: data.text,
+      });
+      if (r.error) return note(r.error, r.body);
+      state.coins = [...(state.coins || []), { id: `c${uid()}`, ...market.spendEntry(me, item, r.price, r.label, now) }];
+      let purchase = null;
+      if (r.purchase) {
+        purchase = { id: uid(), ...r.purchase };
+        state.purchases = [...(state.purchases || []), purchase];
+        // The demo's one inbox stands in for team management's.
+        if (purchase.kind === 'perk' && !actor.admin)
+          state.inbox = [
+            {
+              id: uid(),
+              type: 'market',
+              icon: '🛍️',
+              title: `${me.split(' ')[0]} bought “${purchase.name}”`,
+              body: purchase.status === 'pending' ? 'Approve or decline it in the Market.' : 'Mark it done in the Market once it happens.',
+              open: 'view:market',
+              at: now,
+              read: false,
+            },
+            ...(state.inbox || []),
+          ];
+      }
+      if (r.pet) state.pets = state.pets.map((p) => (p.person === me ? { ...p, ...r.pet, cared: (p.cared || 0) + 1, caredAt: now } : p));
+      return done({ ok: true, price: r.price, purchase, pet: r.pet || null });
+    }
+
+    if (fn === 'joinTournament') {
+      const t = (state.tournaments || []).find((x) => x.id === data.id);
+      const r = market.joinCheck(t, { me, balance: balanceOf(me), now });
+      if (r.error) return note(r.error);
+      state.coins = [
+        ...(state.coins || []),
+        { id: `c${uid()}`, type: 'spend', person: me, amount: t.entry, what: 'tournament', item: `tour:${t.id}`, label: `Tournament entry: ${t.title}`.slice(0, 80), at: now },
+      ];
+      t.pot = r.pot;
+      t.players = { ...(t.players || {}), [me]: r.player };
+      return done({ ok: true, pot: r.pot });
+    }
+
+    if (fn === 'marketManage') {
+      if (!actor.admin) return note('Team management only.');
+      const { action, id } = data;
+      if (action === 'decide') {
+        const p = (state.purchases || []).find((x) => x.id === id);
+        const d = market.decideCheck(p, data.status);
+        if (d.error) return note(d.error);
+        Object.assign(p, { status: d.status, decidedBy: me, decidedAt: now });
+        if (d.refund) state.coins = [...(state.coins || []), { id: `c${uid()}`, ...market.refundEntry(p.person, p.price, p.name, p.item, now) }];
+        return done({ ok: true, status: d.status });
+      }
+      if (action === 'removeBanner') {
+        const p = (state.purchases || []).find((x) => x.id === id && x.item === 'extra:banner');
+        if (!p) return note('That shout-out is gone.');
+        Object.assign(p, { status: 'removed', removedBy: me, removedAt: now });
+        return done({ ok: true });
+      }
+      if (action === 'createTournament') {
+        const t = market.newTournament(data, { by: me, now, seed: uid() });
+        if (t.error) return note(t.error);
+        const tid = `tour${uid()}`;
+        state.tournaments = [...(state.tournaments || []), { id: tid, ...t }];
+        return done({ ok: true, id: tid });
+      }
+      if (action === 'cancelTournament') {
+        const t = (state.tournaments || []).find((x) => x.id === id);
+        if (!t || t.status !== 'open') return note('That tournament is already over.');
+        settleDemoTournament(t, now, true, me);
+        return done({ ok: true });
+      }
+      return note('Unknown action.');
+    }
+
+    if (fn === 'pet') {
+      const pet = myPet();
+      const name = String(data.name ?? '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 24);
+      if (data.action === 'adopt') {
+        if (pet) return note('You already have a pet.', 'Rehome it first to adopt another.');
+        if (!isSpecies(data.species)) return note('Pick a pet.');
+        if (!name) return note('Give your pet a name.');
+        state.pets = [
+          ...(state.pets || []),
+          { id: personId(me), person: me, species: data.species, name, adoptedAt: now, food: { v: START_NEED, at: now }, fun: { v: START_NEED, at: now }, inChat: true, cared: 0 },
+        ];
+        return done({ ok: true });
+      }
+      if (!pet) return note('You don’t have a pet.');
+      if (data.action === 'rename') {
+        if (!name) return note('Give your pet a name.');
+        state.pets = state.pets.map((p) => (p === pet ? { ...p, name } : p));
+      } else if (data.action === 'inChat') state.pets = state.pets.map((p) => (p === pet ? { ...p, inChat: data.on === true } : p));
+      else if (data.action === 'release') state.pets = state.pets.filter((p) => p !== pet);
+      else return note('Unknown action.');
+      return done({ ok: true });
+    }
+    return note('Unknown action.');
   },
   subscribeAdSubmissions(cb) {
     return listen(() => cb([...(state.adSubmissions || [])]));

@@ -527,6 +527,48 @@ export const firebaseStore = {
   deleteCoinTx(id) {
     return deleteDoc(doc(db, 'coins', id));
   },
+  // The market and pets (functions/market.js). Perks are team management's to
+  // add and change; buying, tournaments and pets go through the server:
+  // market('buy' | 'joinTournament' | 'marketManage' | 'pet', data) → { ok } or { note }.
+  subscribePerks(cb) {
+    return onSnapshot(
+      collection(db, 'perks'),
+      (snap) => cb(snap.docs.map(readDoc)),
+      (e) => console.warn('perks', e),
+    );
+  },
+  savePerk(id, data, actor) {
+    const ref = id ? doc(db, 'perks', id) : doc(collection(db, 'perks'));
+    return setDoc(ref, { ...data, by: actor.name, ...(id ? { updatedAt: Date.now() } : { at: Date.now() }) }, { merge: true });
+  },
+  deletePerk(id) {
+    return deleteDoc(doc(db, 'perks', id));
+  },
+  subscribePurchases(cb) {
+    return onSnapshot(
+      collection(db, 'purchases'),
+      (snap) => cb(snap.docs.map(readDoc)),
+      (e) => console.warn('purchases', e),
+    );
+  },
+  subscribePets(cb) {
+    return onSnapshot(
+      collection(db, 'pets'),
+      (snap) => cb(snap.docs.map(readDoc)),
+      (e) => console.warn('pets', e),
+    );
+  },
+  subscribeTournaments(cb) {
+    return onSnapshot(
+      collection(db, 'tournaments'),
+      (snap) => cb(snap.docs.map(readDoc)),
+      (e) => console.warn('tournaments', e),
+    );
+  },
+  async market(fn, data) {
+    const call = httpsCallable(getFunctions(app, FUNCTIONS_REGION), fn);
+    return (await call(data)).data;
+  },
   // What happens after an ad's booking / order (see adOrders.js); only yours.
   subscribeAdOrders(name, cb) {
     return onSnapshot(

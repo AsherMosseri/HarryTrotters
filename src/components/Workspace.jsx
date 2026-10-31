@@ -73,6 +73,9 @@ import ControlsPage from './ControlsPage.jsx';
 import { PreviewBar } from './Preview.jsx';
 import { ControlsContext, commandCfgFor, makeControls, profileView } from '../controls.js';
 import { CoinsDialog, Coins } from './Coins.jsx';
+import MarketView from './Market.jsx';
+import { MarketContext, useMarketData } from '../market.js';
+import { playLine } from '../../functions/shared/market.js';
 import { LabLogContext, LabLogDialog, LabPayoff } from './LabLog.jsx';
 import { LotteryContext } from './chat/Casino.jsx';
 import { addLocalTouch, dayOf, hoursOn, localTouches, logId, missingLogDay, payoffLines, touchedOn } from '../labLog.js';
@@ -454,6 +457,7 @@ const VIEWS = [
   ['robot', 'Robot'],
   ['resources', 'Resources'],
   ['team', 'Roster'],
+  ['market', 'Market'],
 ];
 
 function matchesFilters(t, filters, me, view) {
@@ -476,12 +480,14 @@ const CHAT_PAGE = 60;
 const EMPTY_FILTERS = { q: '', person: '', subteam: '', priority: '', statuses: [], hideDone: false };
 
 // What components deep in the app read: people (profiles, who's online) and the lab log.
-function Contexts({ people, lab, lottery, controls, children }) {
+function Contexts({ people, lab, lottery, controls, market, children }) {
   return (
     <ControlsContext.Provider value={controls}>
       <PeopleContext.Provider value={people}>
         <LabLogContext.Provider value={lab}>
-          <LotteryContext.Provider value={lottery}>{children}</LotteryContext.Provider>
+          <LotteryContext.Provider value={lottery}>
+            <MarketContext.Provider value={market}>{children}</MarketContext.Provider>
+          </LotteryContext.Provider>
         </LabLogContext.Provider>
       </PeopleContext.Provider>
     </ControlsContext.Provider>
@@ -586,7 +592,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
   const controls = useMemo(() => makeControls(controlsDoc, exempt, settings.hiddenTabs), [controlsDoc, exempt, settings.hiddenTabs]);
   // Tabs: Asher turns tabs off for everyone else (controls.tabsOff, and the
   // older settings.hiddenTabs); each person orders their own (profile.tabOrder).
-  const allViews = showRobot ? VIEWS : VIEWS.filter(([id]) => id !== 'robot');
+  const allViews = VIEWS.filter(([id]) => (id !== 'robot' || showRobot) && (id !== 'market' || controls.isOn('coins')));
   const hiddenTabs = [...new Set([...(controlsDoc.tabsOff || []), ...(settings.hiddenTabs || [])])];
   // Tabs Asher hid before Controls (settings.hiddenTabs) move into Controls,
   // so Controls and Edit tabs show and change the same list.
@@ -1802,6 +1808,15 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
   );
   const walletOf = useCallback((name) => wallet(name, coinData), [coinData]);
   const myWallet = useMemo(() => walletOf(actor.name), [walletOf, actor.name]);
+  // The market and pets (market.js): perks, purchases, pets, tournaments.
+  const market = useMarketData(store, {
+    actor,
+    rename,
+    shifts: namedShifts,
+    balanceOf: (n) => walletOf(n).balance,
+    coinsOn: controls.isOn('coins'),
+    onToast: (text) => setToast({ text }),
+  });
   cmdData.current = {
     roster,
     lottery,
@@ -2171,7 +2186,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
     </div>
   );
   return (
-    <Contexts people={peopleCtx} lab={labCtx} lottery={lottery} controls={controls}>
+    <Contexts people={peopleCtx} lab={labCtx} lottery={lottery} controls={controls} market={market}>
       <AdsProvider value={ads.value}>
         <div
           className={`app${view === 'chat' || view === 'robot' ? ' chat-mode' : ''}${preview ? ' previewing' : ''}`}
@@ -2522,6 +2537,24 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
                     isManager={actor.admin}
                     canEditDiagram={actor.admin || (peopleInfo.get(actor.name)?.subteams || []).includes('Electrical')}
                     api={api}
+                  />
+                ) : view === 'market' ? (
+                  <MarketView
+                    actor={actor}
+                    balance={myWallet.balance}
+                    onToast={(text) => setToast({ text })}
+                    onOpenCoins={() => setCoinsOpen(true)}
+                    onPlay={(t) => {
+                      // The game command in #arcade, ready to send (the
+                      // composer picks up the draft when it opens).
+                      try {
+                        const drafts = JSON.parse(localStorage.getItem('chat-drafts') || '{}');
+                        localStorage.setItem('chat-drafts', JSON.stringify({ ...drafts, arcade: playLine(t) }));
+                      } catch {
+                        /* storage unavailable */
+                      }
+                      openConv('arcade');
+                    }}
                   />
                 ) : view === 'runs' ? (
                   <RunsView runs={runs} roster={roster} api={api} />
@@ -2900,6 +2933,14 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
               data={coinData}
               cfg={coinCfg}
               onGift={(g) => api.play({ action: 'gift', ...g })}
+              onMarket={
+                views.some(([id]) => id === 'market')
+                  ? () => {
+                      setCoinsOpen(false);
+                      setView('market');
+                    }
+                  : null
+              }
               onClose={() => {
                 setCoinsOpen(false);
                 goBack('coins');
