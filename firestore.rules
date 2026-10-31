@@ -248,10 +248,6 @@ service cloud.firestore {
     match /funSecrets/{id} {
       allow read, write: if false;
     }
-    // Tournaments: the team reads them; scores come from submitTournamentScore.
-    match /tournaments/{id} {
-      allow read: if isMember();
-    }
     // A live race's picture of each player's board (shown small to the other
     // player). Only for showing: the result comes from the replayed moves.
     // One doc per player's device, id <race>_<uid>.

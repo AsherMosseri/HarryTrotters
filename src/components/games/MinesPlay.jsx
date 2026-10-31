@@ -25,8 +25,8 @@ export function MiniMines({ text, w, h, cell = 5, label, sub }) {
     const ctx = cv.getContext('2d');
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     const css = getComputedStyle(cv);
-    const hidden = css.getPropertyValue('--ms-hidden').trim() || '#8a94a6';
-    const open = css.getPropertyValue('--ms-open').trim() || '#e8ecf2';
+    const hidden = css.getPropertyValue('--mw-hidden').trim() || '#8a94a6';
+    const open = css.getPropertyValue('--mw-open').trim() || '#e8ecf2';
     for (let i = 0; i < w * h; i++) {
       const c = text[i];
       ctx.fillStyle = c === 'o' ? open : c === 'f' ? '#e2373c' : c === 'x' ? '#111' : hidden;
@@ -68,7 +68,8 @@ export default function MinesPlay({ opts, bot, other, onChange, onEnd }) {
       const vertical = g.w > g.h && r.width < r.height * 0.9;
       const cols = vertical ? g.h : g.w;
       const rows = vertical ? g.w : g.h;
-      const cell = Math.max(18, Math.min(44, Math.floor(Math.min(r.width / cols, Math.max(r.height, 200) / rows))));
+      // Each cell plus its 1px gap, and the 1px padding around the grid.
+      const cell = Math.max(18, Math.min(44, Math.floor(Math.min((r.width - 2) / cols - 1, (Math.max(r.height, 200) - 2) / rows - 1))));
       setLayout({ cell, vertical });
     };
     fit();
@@ -160,22 +161,22 @@ export default function MinesPlay({ opts, bot, other, onChange, onEnd }) {
 
   return (
     <div className="ms">
-      <div className="ms-bar">
-        <span className="ms-stat" title="Mines left">
+      <div className="mw-bar">
+        <span className="mw-stat" title="Mines left">
           <Icon name="mine" /> <b className="mono">{left}</b>
         </span>
-        <span className="ms-stat" title="Time">
+        <span className="mw-stat" title="Time">
           <Icon name="clock" /> <b className="mono">{M.clockText(ms)}</b>
         </span>
-        <button className={`btn ms-flag${flagMode ? ' on' : ''}`} onClick={() => setFlagMode((f) => !f)} aria-pressed={flagMode}>
+        <button className={`btn mw-flag${flagMode ? ' on' : ''}`} onClick={() => setFlagMode((f) => !f)} aria-pressed={flagMode}>
           <Icon name="flag" /> {flagMode ? 'Flagging' : 'Flag'}
         </button>
       </div>
-      <div className="ms-body">
-        <div className="ms-wrap" ref={wrapRef}>
+      <div className="mw-body">
+        <div className="mw-wrap" ref={wrapRef}>
           <div
             ref={gridRef}
-            className={`ms-grid${done ? ' done' : ''}${g.lost ? ' lost' : ''}`}
+            className={`mw-grid${done ? ' done' : ''}${g.lost ? ' lost' : ''}`}
             style={{ gridTemplateColumns: `repeat(${cols}, ${cell}px)`, '--cell': `${cell}px` }}
             onPointerDown={onDown}
             onPointerMove={onMove}
@@ -205,7 +206,7 @@ export default function MinesPlay({ opts, bot, other, onChange, onEnd }) {
                       : 'mine'
                     : '';
               return (
-                <span key={i} data-i={i} className={`ms-cell ${cls}${i === g.start && !open ? ' start' : ''}`} role="gridcell">
+                <span key={i} data-i={i} className={`mw-cell ${cls}${i === g.start && !open ? ' start' : ''}`} role="gridcell">
                   {open && n > 0 ? (
                     n
                   ) : i === g.boom || (show && !g.won && !flag) ? (
@@ -219,7 +220,7 @@ export default function MinesPlay({ opts, bot, other, onChange, onEnd }) {
           </div>
         </div>
         {(bot || other) && (
-          <div className="ms-side">
+          <div className="mw-side">
             {bot && (
               <MiniMines
                 text={minesText(bot.game)}
@@ -249,7 +250,7 @@ export default function MinesPlay({ opts, bot, other, onChange, onEnd }) {
           </div>
         )}
       </div>
-      <div className="ms-foot muted tiny">
+      <div className="mw-foot muted tiny">
         <span className="mono">{pct}%</span> cleared · Long-press to flag · Tap a number to open around it
       </div>
     </div>

@@ -8,6 +8,7 @@ import CountUp from '../CountUp.jsx';
 import { celebrate } from '../../motion.js';
 import { promptDialog } from '../Dialogs.jsx';
 import AutoPlanner from './AutoPlanner.jsx';
+import { openGame } from '../games/launch.js';
 import { CodeFix, CodeView, GearVisual, HubPuzzle, PartCard, PersonChoice, RuleCard, SpotScene, Timeline, WhoCard, Citation, isTrueFalse } from './Visuals.jsx';
 
 export const GAMES = [
@@ -452,6 +453,24 @@ export default function LearnView({ api, isManager, onOpenDaily, dailyToday }) {
             </button>
           );
         })}
+      </div>
+      {/* Tetris and Minesweeper (games/GameHost.jsx); also /tetris and /minesweep in #arcade. */}
+      <div className="sec-head lq-sec">
+        <h2>Just for fun</h2>
+      </div>
+      <div className="lq-cards">
+        {[
+          ['tetris', 'blocks', 'Tetris', 'Play alone, race Trotbot or a teammate, or a tournament.'],
+          ['minesweep', 'mine', 'Minesweeper', 'Three board sizes, Trotbot races and tournaments.'],
+        ].map(([key, icon, name, blurb]) => (
+          <button key={key} className={`lq-card g-${key}`} onClick={() => openGame({ game: key, conv: 'arcade' })}>
+            <span className="lq-card-ic">
+              <Icon name={icon} size={22} />
+            </span>
+            <span className="lq-card-name">{name}</span>
+            <span className="lq-card-blurb">{blurb}</span>
+          </button>
+        ))}
       </div>
       {isManager && <Reports api={api} />}
     </main>
