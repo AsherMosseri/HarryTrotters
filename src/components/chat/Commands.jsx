@@ -5,6 +5,7 @@ import { CASINO_CARDS, CasinoBody, ECONOMY_CARDS } from './Casino.jsx';
 import { ARCADE_CARDS, ArcadeBody } from './Arcade.jsx';
 import { Die } from './Die.jsx';
 import { LabDay } from '../LabLog.jsx';
+import { RecapBody } from '../Life.jsx';
 import { priorityById } from '../../config.js';
 import { daysBetween, todayISO } from '../../teamCommands.js';
 
@@ -28,7 +29,7 @@ const Name = ({ name, onPerson }) => (
   <DisplayName as="button" name={name} className="name-btn cmd-name" onClick={onPerson ? (e) => onPerson(name, e) : undefined} />
 );
 
-const TEAM_CARDS = ['task', 'overdue', 'shift', 'match', 'standup', 'labday'];
+const TEAM_CARDS = ['task', 'overdue', 'shift', 'match', 'standup', 'labday', 'recap'];
 const dayText = (iso) => {
   const d = daysBetween(todayISO(), iso);
   if (d === 0) return 'today';
@@ -61,6 +62,8 @@ function TeamBody({ c, by, onPerson }) {
   switch (c.name) {
     case 'labday':
       return <LabDay c={c} onPerson={onPerson} />;
+    case 'recap':
+      return <RecapBody c={c} onPerson={onPerson} />;
     case 'task':
       return (
         <div>

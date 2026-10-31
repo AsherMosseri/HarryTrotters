@@ -770,6 +770,24 @@ export const firebaseStore = {
   setChecklistQueue(id, queue) {
     return updateDoc(doc(checklistsCol, id), { queue });
   },
+  // Team life (functions/life.js): lab bingo ({} → your card, paying any
+  // finished lines), score predictions ({ action: 'open' | 'guess' | 'lock' |
+  // 'cancel', … }) and the weekly recap (team management: { action:
+  // 'preview' | 'post' | 'skip' | 'unskip' }).
+  async claimBingo(req) {
+    return (await httpsCallable(getFunctions(app, FUNCTIONS_REGION), 'claimBingo')(req || {})).data;
+  },
+  async predict(req) {
+    return (await httpsCallable(getFunctions(app, FUNCTIONS_REGION), 'predict')(req)).data;
+  },
+  async recap(req) {
+    return (await httpsCallable(getFunctions(app, FUNCTIONS_REGION), 'recap')(req)).data;
+  },
+  // Prediction rounds from the last two weeks (only the server writes them).
+  subscribePredictions(cb, onError) {
+    const since = Date.now() - 14 * 86400000;
+    return onSnapshot(query(collection(db, 'predictions'), where('openedAt', '>=', since)), (snap) => cb(snap.docs.map(readDoc)), onError);
+  },
   // FTC Events API (functions/index.js ftcEvents): { action: 'events' } or
   // { action: 'sync', event }. Team management only.
   async ftcEvents(req) {

@@ -3,6 +3,8 @@ import { shortDate, todayISO } from '../milestones.js';
 import { Avatar, CloseIcon, Overlay, PlusIcon } from './common.jsx';
 import { useEscape } from '../util.js';
 import { confirmDialog } from './Dialogs.jsx';
+import { GuessCard } from './Life.jsx';
+import { winnerLine } from '../../functions/shared/predict.js';
 
 const PERIODS = [
   { key: 'auto', label: 'Auto' },
@@ -335,8 +337,10 @@ function RunDialog({ run, roster, onClose, onSave, onDelete }) {
   );
 }
 
-export default function RunsView({ runs, roster, api }) {
+export default function RunsView({ runs, roster, api, actor, predictions = [], matches = [] }) {
   const [filter, setFilter] = useState('');
+  // Score guesses, by the run that settled them (shown under its total).
+  const guessOf = useMemo(() => new Map(predictions.filter((p) => p.status === 'done' && p.runId).map((p) => [p.runId, p])), [predictions]);
   const [editing, setEditing] = useState(null);
 
   const shown = useMemo(() => runs.filter((r) => !filter || r.type === filter).sort(byTime), [runs, filter]);
@@ -366,6 +370,8 @@ export default function RunsView({ runs, roster, api }) {
           <PlusIcon /> Log a run
         </button>
       </div>
+
+      {actor && <GuessCard predictions={predictions} matches={matches} actor={actor} api={api} />}
 
       {runs.length ? (
         <>
@@ -443,6 +449,9 @@ export default function RunsView({ runs, roster, api }) {
                     <td className="num">
                       <b>{total(r)}</b>
                       {r.penalties > 0 && <div className="muted tiny">{r.penalties} pen.</div>}
+                      {guessOf.get(r.id)?.winners?.length > 0 && (
+                        <div className="muted tiny run-guess">{winnerLine(guessOf.get(r.id))}</div>
+                      )}
                     </td>
                     <td className={r.issues ? 'issue-cell' : 'muted'}>{r.issues || '—'}</td>
                   </tr>

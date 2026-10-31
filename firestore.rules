@@ -415,7 +415,7 @@ service cloud.firestore {
     function serverCommand(m) {
       return 'cmd' in m && m.cmd is map && m.cmd.get('name', '') in
         ['slots', 'dice', 'coinflip', 'roulette', 'blackjack', 'crash', 'mines', 'highlow', 'lottery', 'daily', 'work', 'beg', 'rob',
-         'rps', 'tictactoe', 'connect4', 'duel', 'trivia', 'hangman', 'typerace', 'heist', 'labday'];
+         'rps', 'tictactoe', 'connect4', 'duel', 'trivia', 'hangman', 'typerace', 'heist', 'labday', 'recap'];
     }
     // ...or change one afterwards (team management can still edit/delete).
     function keepsCmd() {
@@ -658,6 +658,19 @@ service cloud.firestore {
     // Practice and match log: anyone on the team.
     match /runs/{id} {
       allow read, write: if isMember();
+    }
+
+    // Score predictions (functions/life.js predict): the team sees each round,
+    // who guessed and, once it locks, the guesses. Only the server writes them;
+    // guesses wait in predictions/{id}/secret, which nobody reads.
+    match /predictions/{id} {
+      allow read: if isMember();
+      allow write: if false;
+    }
+    // The weekly recap's state per week (posted or skipped): the server only.
+    match /recaps/{week} {
+      allow read: if isMember();
+      allow write: if false;
     }
 
     // Competition matches (Today's pit screen). Team management types in the

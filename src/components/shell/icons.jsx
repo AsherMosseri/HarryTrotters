@@ -388,6 +388,29 @@ const PATHS = {
     </>
   ),
   repeat: <path d="M4 9V7.5A2.5 2.5 0 0 1 6.5 5H16m-2.5-2.5L16 5l-2.5 2.5M16 11v1.5a2.5 2.5 0 0 1-2.5 2.5H4m2.5 2.5L4 15l2.5-2.5" />,
+  // Team life: lab bingo, the weekly recap, score guesses, streaks.
+  grid: (
+    <>
+      <rect x="3" y="3" width="14" height="14" rx="2" />
+      <path d="M3 7.7h14M3 12.3h14M7.7 3v14M12.3 3v14" />
+    </>
+  ),
+  news: (
+    <>
+      <path d="M4.5 4h9a1 1 0 0 1 1 1v10.5a1.5 1.5 0 0 0 1.5-1.5V7.5h-1.5" />
+      <path d="M4.5 4v11a1.5 1.5 0 0 0 1.5 1.5h10M7 7.5h5M7 10.5h5M7 13.5h3" />
+    </>
+  ),
+  target: (
+    <>
+      <circle cx="10" cy="10" r="7" />
+      <circle cx="10" cy="10" r="3.8" />
+      <path d="M10 9.6v.8" />
+    </>
+  ),
+  flame: (
+    <path d="M10 17.5c-3 0-5-2.1-5-4.8 0-3.2 2.6-4.4 3.3-8.2 2.5 1.6 3.4 3.6 3.2 5.6.8-.4 1.4-1.2 1.6-2.2 1.4 1.3 1.9 3 1.9 4.6 0 2.9-2 5-5 5z" />
+  ),
 };
 
 export function Icon({ name, size = 18, className = '' }) {

@@ -22,6 +22,7 @@ import { asksOn } from '../../functions/shared/checkin.js';
 import * as market from '../../functions/shared/market.js';
 import { PERK_IDEAS } from '../../functions/shared/market.js';
 import { START_NEED, isSpecies } from '../../functions/shared/pets.js';
+import { demoLife } from './demoLife.js';
 
 const KEY = 'ftc32313-demo-v13';
 const listeners = new Set();
@@ -690,6 +691,10 @@ function settleDemoTournament(t, now, cancel, by = '') {
   for (const p of r.refunds) state.coins.push({ id: `c${uid()}`, ...market.refundEntry(p.name, p.amount, t.title, `tour:${t.id}`, now) });
   Object.assign(t, { status: 'done', winners: r.winners, paid: r.pays, paidAt: now, ...(cancel && { cancelled: true, cancelledBy: by }) });
 }
+
+// Team life (demoLife.js): bingo, predictions, streak coins, the weekly recap.
+const life = demoLife({ get: () => state, commit: () => commit(), uid });
+life.seedSamples();
 
 function commit() {
   try {
@@ -1668,7 +1673,9 @@ export const demoStore = {
     return listen(() => cb([...(state.runs || [])]));
   },
   async createRun(data, actor) {
-    state.runs = [...(state.runs || []), { id: uid(), ...newRunDefaults(data), createdAt: Date.now(), createdBy: actor.name }];
+    const run = { id: uid(), ...newRunDefaults(data), createdAt: Date.now(), createdBy: actor.name };
+    state.runs = [...(state.runs || []), run];
+    life.runLogged(run);
     commit();
   },
   async updateRun(id, patch, actor) {
@@ -1707,6 +1714,7 @@ export const demoStore = {
       ? (state.runs || []).filter((r) => r.id !== runId).concat({ id: runId, ...newRunDefaults(run), updatedBy: actor.name, createdAt: Date.now() })
       : [...(state.runs || []), { id: runId, ...newRunDefaults(run), createdAt: Date.now(), createdBy: actor.name }];
     state.matches = (state.matches || []).map((m) => (m.id === matchId ? { ...m, ours: { ...ours, runId }, result, updatedBy: actor.name } : m));
+    life.runLogged(state.runs.find((r) => r.id === runId));
     commit();
   },
   async setChecklistQueue(id, queue) {
@@ -1715,6 +1723,20 @@ export const demoStore = {
   },
   // No FTC Events key in the demo: the same answer the real function gives
   // before one is set up.
+  // Team life (demoLife.js), the same answers as the server's functions.
+  async claimBingo(req, actor) {
+    return life.claimBingo(req, actor);
+  },
+  async predict(req, actor) {
+    return life.predict(req, actor);
+  },
+  async recap(req, actor) {
+    return life.recap(req, actor);
+  },
+  subscribePredictions(cb) {
+    life.tick();
+    return listen(() => cb([...(state.predictions || [])]));
+  },
   async ftcEvents() {
     await new Promise((r) => setTimeout(r, 400));
     return { notSetUp: true };
@@ -2046,7 +2068,9 @@ export const demoStore = {
     commit();
   },
   async updateShift(id, patch, actor) {
+    const was = (state.shifts || []).find((s) => s.id === id);
     state.shifts = (state.shifts || []).map((s) => (s.id === id ? { ...s, ...patch, updatedBy: actor.name } : s));
+    if (was && was.end == null && patch.end != null) life.shiftEnded(was.person);
     commit();
   },
   async deleteShift(id) {

@@ -21,6 +21,7 @@ import { MANAGER_NAMES, PASSWORD_MIN, cleanName, isManagerName, knownName } from
 import { TEAM_NUMBER, fromSchedule, rankOf, scoreOf, seasonOf } from './shared/matches.js';
 import { asksOn } from './shared/checkin.js';
 import { marketFunctions } from './market.js';
+import { lifeFunctions } from './life.js';
 
 // Functions run next to the database. The deploy workflow writes location.json
 // from the database's location; nam5 (the US multi-region) pairs with us-central1.
@@ -1471,3 +1472,10 @@ export const ftcEvents = onCall(
     };
   },
 );
+
+// Team life (life.js): the weekly recap, lab bingo, score predictions and
+// coins for streak milestones.
+export const { claimBingo, bingoSweep, predict, onRunLogged, lockPredictions, onShiftEnded, weeklyRecap, recap } = lifeFunctions({
+  db,
+  renamer,
+});
