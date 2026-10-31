@@ -48,14 +48,14 @@ const rules = [
 
 const PTS = 'Table 10-2, p. 89';
 const strategy = [
-  mc('strategy', 's1', 1, 'One ROBOT LEAVES and AUTO PARKS. No TIP. How many AUTO points?', ['5', '8', '10', '13'], 1, 'LEAVE 3 + PARK 5 = 8.', { source: PTS }),
-  mc('strategy', 's2', 1, 'Your HIVE TIPS twice in TELEOP. How many points is that?', ['20', '30', '40', '60'], 2, '2 × 20 = 40.', { source: PTS }),
-  mc('strategy', 's3', 2, 'You own a FLOWER holding 6 elements. How many points?', ['6', '10', '12', '18'], 2, 'Each element in an owned FLOWER is 2 points: 6 × 2 = 12.', { source: PTS }),
-  mc('strategy', 's4', 2, 'At a regular event, how many TIPS earn POLLINATOR 1?', ['3', '4', '5', '7'], 1, 'POLLINATOR 1 needs 4 TIPS; POLLINATOR 2 needs 7.', { source: 'Table 10-3, p. 89' }),
-  tf('strategy', 's5', 2, 'both ROBOTS LEAVING and AUTO PARKING is enough for SWARM at a regular event.', true, '2 × 3 + 2 × 5 = 16, which meets the 16-point threshold.', 'Table 10-3, p. 89'),
-  mc('strategy', 's6', 2, 'How many RP is a WIN worth?', ['1', '2', '3', '4'], 2, 'A WIN is 3 RP; a TIE is 1.', { source: PTS }),
-  mc('strategy', 's7', 3, 'At the end, 5 elements sit in your up CELL and 3 POLLEN in your GARDEN. Points?', ['8', '13', '16', '25'], 1, 'CELL: 5 × 2 = 10. GARDEN: 3 × 1 = 3. Total 13.', { source: PTS }),
-  mc('strategy', 's8', 3, 'What is the Bottom NECTAR Bonus worth?', ['2', '5', '10', '20'], 1, 'The ALLIANCE with the bottom-most scored NECTAR of its color in a FLOWER gets 5.', { source: PTS }),
+  mc('strategy', 'st1', 1, 'One ROBOT LEAVES and AUTO PARKS. No TIP. How many AUTO points?', ['5', '8', '10', '13'], 1, 'LEAVE 3 + PARK 5 = 8.', { source: PTS }),
+  mc('strategy', 'st2', 1, 'Your HIVE TIPS twice in TELEOP. How many points is that?', ['20', '30', '40', '60'], 2, '2 × 20 = 40.', { source: PTS }),
+  mc('strategy', 'st3', 2, 'You own a FLOWER holding 6 elements. How many points?', ['6', '10', '12', '18'], 2, 'Each element in an owned FLOWER is 2 points: 6 × 2 = 12.', { source: PTS }),
+  mc('strategy', 'st4', 2, 'At a regular event, how many TIPS earn POLLINATOR 1?', ['3', '4', '5', '7'], 1, 'POLLINATOR 1 needs 4 TIPS; POLLINATOR 2 needs 7.', { source: 'Table 10-3, p. 89' }),
+  tf('strategy', 'st5', 2, 'both ROBOTS LEAVING and AUTO PARKING is enough for SWARM at a regular event.', true, '2 × 3 + 2 × 5 = 16, which meets the 16-point threshold.', 'Table 10-3, p. 89'),
+  mc('strategy', 'st6', 2, 'How many RP is a WIN worth?', ['1', '2', '3', '4'], 2, 'A WIN is 3 RP; a TIE is 1.', { source: PTS }),
+  mc('strategy', 'st7', 3, 'At the end, 5 elements sit in your up CELL and 3 POLLEN in your GARDEN. Points?', ['8', '13', '16', '25'], 1, 'CELL: 5 × 2 = 10. GARDEN: 3 × 1 = 3. Total 13.', { source: PTS }),
+  mc('strategy', 'st8', 3, 'What is the Bottom NECTAR Bonus worth?', ['2', '5', '10', '20'], 1, 'The ALLIANCE with the bottom-most scored NECTAR of its color in a FLOWER gets 5.', { source: PTS }),
 ];
 
 // Wiring: port ids match the hub drawings in src/electrical.js.
