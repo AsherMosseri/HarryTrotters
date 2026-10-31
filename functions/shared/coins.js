@@ -4,24 +4,41 @@
 // bonuses are entries in the coins ledger (Firestore "coins").
 //
 // Earning: perTask for each task you were assigned that's done, if someone
-// else created it (no paying yourself for tasks you made up); perHour for
-// time at the lab, at most dayCap hours a day. Everything since `start`.
-// Asher also earns the ad money, as the app's owner.
+// else created it (no paying yourself for tasks you made up); perQuarter for
+// every full 15 minutes at the lab (4 an hour), at most dayCap hours a day.
+// Everything since `start`.
+// Nobody earns coins from ads (views and taps are still counted for the ads
+// dashboard; they just don't pay).
 
 import { mergedMs } from './hours.js';
 
 export const COIN_DEFAULTS = {
   perTask: 15,
-  perHour: 5,
+  // Coins for each full 15 minutes at the lab. It replaced perHour (5 an
+  // hour), so an old perHour saved in settings/team.coins is ignored.
+  perQuarter: 1,
   dayCap: 10,
   start: '2026-08-28',
   prices: { hour: 10, today: 25, week: 120, skip: 2 },
-  viewsPerCoin: 25,
-  perTap: 1,
 };
 
 export function coinSettings(raw) {
-  return { ...COIN_DEFAULTS, ...(raw || {}), prices: { ...COIN_DEFAULTS.prices, ...(raw?.prices || {}) } };
+  // Old settings that no longer do anything (the hourly rate and ad money).
+  const rest = { ...(raw || {}) };
+  for (const k of ['perHour', 'viewsPerCoin', 'perTap']) delete rest[k];
+  return { ...COIN_DEFAULTS, ...rest, prices: { ...COIN_DEFAULTS.prices, ...(raw?.prices || {}) } };
+}
+// Coins an hour at the lab (for the help text and the Coins page).
+export const perHourOf = (cfg) => cfg.perQuarter * 4;
+
+// Coins for one day's lab time. Paid per day, not per shift: the day's shifts
+// are merged first (overlaps count once), capped at dayCap hours, then paid
+// for each full 15 minutes. So two 10-minute shifts in a day earn 1 coin
+// (20 minutes), where rounding each shift down would pay nothing.
+export const QUARTER_MIN = 15;
+export function coinsForMinutes(minutes, cfg) {
+  const counted = Math.min(Math.max(0, minutes), cfg.dayCap * 60);
+  return Math.floor(counted / QUARTER_MIN) * cfg.perQuarter;
 }
 
 // Days are the team's days (New York), on every phone and on the server, so
@@ -55,7 +72,7 @@ const startMs = (cfg) => teamMidnight(cfg.start);
 const toMs = (v) => (v && typeof v.toMillis === 'function' ? v.toMillis() : typeof v === 'number' ? v : 0);
 
 // Everything someone has earned, newest first: [{ at, amount, icon, label, kind }].
-export function earnedItems(name, { tasks = [], shifts = [], adStats, owner = false, cfg, now = Date.now() }) {
+export function earnedItems(name, { tasks = [], shifts = [], cfg, now = Date.now() }) {
   const from = startMs(cfg);
   const items = [];
   for (const t of tasks) {
@@ -64,7 +81,8 @@ export function earnedItems(name, { tasks = [], shifts = [], adStats, owner = fa
     if (at < from) continue;
     items.push({ kind: 'task', at, amount: cfg.perTask, icon: '✅', label: t.title || 'A task' });
   }
-  // Lab time, added up per day (overlapping shifts count once) and capped.
+  // Lab time, added up per day (overlapping shifts count once), capped, and
+  // paid per full 15 minutes of the day (coinsForMinutes).
   const byDay = new Map();
   for (const s of shifts) {
     if (s.person !== name || !s.start || s.start < from) continue;
@@ -76,17 +94,11 @@ export function earnedItems(name, { tasks = [], shifts = [], adStats, owner = fa
   );
   for (const [key, d] of days) {
     const minutes = Math.min(d.minutes, cfg.dayCap * 60);
-    const amount = Math.floor((minutes * cfg.perHour) / 60);
+    const amount = coinsForMinutes(d.minutes, cfg);
     if (amount > 0) {
       const hours = Math.round((minutes / 60) * 10) / 10;
       items.push({ kind: 'hours', at: d.at, amount, icon: '⏱', label: `${hours} h at the lab`, day: key, capped: d.minutes > minutes });
     }
-  }
-  if (owner && adStats) {
-    const views = Object.values(adStats).reduce((t, s) => t + (s.views || 0), 0);
-    const taps = Object.values(adStats).reduce((t, s) => t + (s.taps || 0), 0);
-    const amount = Math.floor(views / cfg.viewsPerCoin) + taps * cfg.perTap;
-    if (amount > 0) items.push({ kind: 'ads', at: now, amount, icon: '📺', label: `Ad money (${views} views, ${taps} taps)` });
   }
   return items.sort((a, b) => b.at - a.at);
 }
@@ -148,7 +160,7 @@ export function wallet(name, data) {
 export function leaderboard(roster, data, since = 0) {
   return roster
     .map((name) => {
-      const items = [...earnedItems(name, { ...data, owner: false }), ...ledgerItems(name, data.ledger).filter((x) => x.kind === 'grant')];
+      const items = [...earnedItems(name, data), ...ledgerItems(name, data.ledger).filter((x) => x.kind === 'grant')];
       return { name, coins: items.filter((x) => x.at >= since).reduce((t, x) => t + x.amount, 0) };
     })
     .sort((a, b) => b.coins - a.coins);

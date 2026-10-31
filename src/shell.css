@@ -1595,4 +1595,62 @@ button.pm-row:hover { background: color-mix(in srgb, var(--text) 4%, transparent
   }
   .ll-body { padding: 14px 16px 18px; }
   .ll-titles h2 { font-size: 22px; }
+/* ---------- Shifts 3.0: season stats, shift requests and changes, check-in skips, streaks ---------- */
+/* Team this season: three figures, each with this week against last week. */
+.season-strip { margin: -14px 0 30px; }
+.season-strip h2 { margin: 0 0 8px; font-size: 12.5px; font-weight: 750; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+.ss-items { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; padding: 12px 0; border-bottom: 1px solid var(--border); }
+.ss-item { display: flex; flex-direction: column; gap: 3px; padding: 0 20px; border-left: 1px solid var(--hairline); min-width: 0; }
+.ss-item:first-child { border-left: 0; padding-left: 0; }
+.ss-item b { font-size: 24px; font-weight: 700; letter-spacing: -0.04em; line-height: 1.1; }
+.ss-label { font-size: 13px; font-weight: 600; }
+.ss-week { font-size: 12.5px; color: var(--muted); }
+.ss-up { color: var(--st-done); font-weight: 600; }
+.ss-down { color: var(--muted); font-weight: 600; }
+@media (max-width: 760px) {
+  .ss-items { grid-template-columns: 1fr; gap: 10px; }
+  .ss-item { padding: 0 0 10px; border-left: 0; border-bottom: 1px solid var(--hairline); display: grid; grid-template-columns: auto 1fr; column-gap: 12px; align-items: baseline; }
+  .ss-item:last-child { border-bottom: 0; padding-bottom: 0; }
+  .ss-item b { grid-row: span 2; min-width: 64px; }
+}
+/* Today: the team's week under the board. */
+.pit-stats {
+  display: flex; flex-wrap: wrap; gap: 4px 14px; align-self: flex-start; max-width: 100%; border: 0; background: none; padding: 2px 0;
+  font: inherit; font-size: 13.5px; color: rgb(255 255 255 / 72%); text-align: left; border-radius: 6px;
+}
+.pit-stats b { color: #fff; font-weight: 600; }
+.pit-stats .ss-up { color: #6ff0a4; }
+.pit-stats .ss-down { color: rgb(255 255 255 / 60%); }
+.pit-stats:hover { text-decoration: underline; text-underline-offset: 3px; text-decoration-color: rgb(255 255 255 / 30%); }
+/* Waiting for approval, approved, declined. */
+.shift-badge.wait { background: var(--p-high-bg); color: var(--p-high); }
+.shift-badge.ok { background: color-mix(in srgb, var(--st-done) 16%, var(--surface)); color: var(--st-done); }
+.shift-badge.no { background: var(--surface-2); color: var(--muted); }
+.shift-edited { white-space: nowrap; }
+.shift-req-list, .shift-change-list { list-style: none; margin: 0; padding: 0; }
+.shift-req-list li { display: flex; align-items: flex-start; gap: 10px; padding: 12px 0; border-bottom: 1px solid var(--hairline); }
+.shift-req-list li:last-child { border-bottom: 0; }
+.shift-req-actions { display: flex; align-items: center; gap: 8px; flex: none; flex-wrap: wrap; justify-content: flex-end; }
+.shift-change-list li { display: flex; align-items: flex-start; gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--hairline); line-height: 1.45; }
+.shift-change-list li:last-child { border-bottom: 0; }
+.shift-pending-note { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 10px; margin-bottom: 10px; border-radius: 10px; background: var(--surface-2); }
+.shift-history { margin: 4px 0 12px; }
+.shift-history ul { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; line-height: 1.45; }
+.shift-sure { padding: 10px 12px; border-radius: 10px; background: color-mix(in srgb, var(--danger) 8%, var(--surface)); }
+@media (max-width: 760px) {
+  .shift-req-list li { flex-wrap: wrap; }
+  .shift-req-actions { width: 100%; justify-content: flex-end; }
+}
+/* The check-in schedule line: Not today / Not tomorrow, and Skipped · Undo. */
+.ci-quick { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.ci-skipped { font-size: 13.5px; font-weight: 600; color: var(--muted); }
+.ci-skip-help { margin: 0 0 6px; }
+.ci-skip-days { flex-wrap: wrap; }
+.ci-skip-chip.skipped { text-decoration: line-through; color: var(--muted); background: var(--surface-2); border-color: var(--border); }
+/* Streaks on the profile card; six figures on the full profile. */
+.streak-line { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0; }
+.streak-line b { font-size: 17px; font-weight: 700; }
+.pp-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 760px) {
+  .pp-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

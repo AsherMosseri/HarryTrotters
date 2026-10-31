@@ -508,25 +508,100 @@ service cloud.firestore {
 
     // Shifts (clock in/out). You clock yourself in (now, or up to 12 hours
     // earlier) and out; team management can add, fix, or remove anyone's.
-    // A shift you started in the last 15 minutes can be cancelled.
+    // A shift you started in the last 15 minutes can be cancelled. A finished
+    // shift of yours you can delete or make shorter, each written down in
+    // shiftEdits in the same batch; making one longer or adding a missed one
+    // is a shiftRequest that team management approves.
     function nowMs() { return request.time.toMillis(); }
     function validStart(s) { return s is int && s <= nowMs() + 300000 && s >= nowMs() - 12 * 3600000; }
+    function shiftPath(sid) { return /databases/$(database)/documents/shifts/$(sid); }
+    function shiftEditPath(eid) { return /databases/$(database)/documents/shiftEdits/$(eid); }
+    // A name that is me, or an old name of mine: a device that signed in
+    // after a rename has the new name, and shifts keep the name they were
+    // saved with.
+    function wasMe(name) {
+      return isMe(name) || (exists(namesPath()) && get(namesPath()).data.get('renames', {}).get(name, '') == myName());
+    }
     match /shifts/{id} {
+      // Your running shift: move the start earlier, end it, notes (as before).
+      function runningChange() {
+        return resource.data.end == null
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['start', 'end', 'note', 'subteam', 'taskIds', 'updatedBy'])
+          && (request.resource.data.start == resource.data.start || validStart(request.resource.data.start))
+          && (request.resource.data.end == resource.data.end
+              || (request.resource.data.end is int && request.resource.data.end >= request.resource.data.start
+                  && request.resource.data.end <= nowMs() + 300000));
+      }
+      function detailsChange() {
+        return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['note', 'subteam', 'taskIds', 'updatedBy']);
+      }
+      // A finished shift made shorter (starts later and/or ends earlier), with its edit record.
+      function shrink(n) {
+        return resource.data.end != null
+          && n.diff(resource.data).affectedKeys().hasOnly(['start', 'end', 'note', 'subteam', 'taskIds', 'updatedBy', 'editCount', 'editedAt', 'editedBy'])
+          && n.start is int && n.end is int && n.start >= resource.data.start && n.end <= resource.data.end && n.end > n.start
+          && n.editCount == resource.data.get('editCount', 0) + 1 && n.editedBy == myName() && n.editedAt is int
+          && existsAfter(shiftEditPath(id + '_' + string(n.editCount)));
+      }
       allow read: if isMember();
       allow create: if isManager() || (isMember() && isMe(request.resource.data.person)
         && request.resource.data.end == null && validStart(request.resource.data.start)
         && request.resource.data.byUid == request.auth.uid);
-      allow update: if isManager() || (isMember() && isMe(resource.data.person)
+      allow update: if isManager() || (isMember() && wasMe(resource.data.person)
         && request.resource.data.person == resource.data.person
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['start', 'end', 'note', 'subteam', 'taskIds', 'updatedBy'])
-        && (request.resource.data.start == resource.data.start
-            || (resource.data.end == null && validStart(request.resource.data.start)))
-        && (request.resource.data.end == resource.data.end
-            || (resource.data.end == null && request.resource.data.end is int
-                && request.resource.data.end >= request.resource.data.start
-                && request.resource.data.end <= nowMs() + 300000)));
-      allow delete: if isManager() || (isMember() && isMe(resource.data.person)
-        && resource.data.end == null && resource.data.start > nowMs() - 15 * 60000);
+        && (runningChange() || detailsChange() || shrink(request.resource.data)));
+      allow delete: if isManager() || (isMember() && wasMe(resource.data.person)
+        && ((resource.data.end == null && resource.data.start > nowMs() - 15 * 60000)
+            || (resource.data.end != null && existsAfter(shiftEditPath(id + '_del')))));
+    }
+    // Every change to a finished shift: who, when, and the times before and
+    // after. Team management reads them. Nobody rewrites them. A teammate's
+    // record has to match the change it goes with (ids <shift>_<editCount>
+    // and <shift>_del); team management's are their own.
+    match /shiftEdits/{eid} {
+      function validEdit(d) {
+        return d.keys().hasOnly(['shiftId', 'person', 'kind', 'by', 'byUid', 'at', 'before', 'after', 'requestId'])
+          && d.shiftId is string && d.person is string && d.kind in ['shorten', 'delete', 'edit', 'add', 'approve']
+          && d.by == myName() && d.byUid == request.auth.uid && d.at is int;
+      }
+      function ownEdit(d) {
+        let old = get(shiftPath(d.shiftId)).data;
+        return wasMe(old.person) && d.person == old.person && old.end != null
+          && d.before.start == old.start && d.before.end == old.end
+          && ((d.kind == 'delete' && eid == d.shiftId + '_del' && d.after == null && !existsAfter(shiftPath(d.shiftId)))
+            || (d.kind == 'shorten' && eid == d.shiftId + '_' + string(getAfter(shiftPath(d.shiftId)).data.editCount)
+                && d.after.start == getAfter(shiftPath(d.shiftId)).data.start
+                && d.after.end == getAfter(shiftPath(d.shiftId)).data.end));
+      }
+      allow read: if isManager();
+      allow create: if isMember() && validEdit(request.resource.data) && (isManager() || ownEdit(request.resource.data));
+      allow update, delete: if false;
+    }
+    // Asking for a missed shift (kind 'add') or a longer one ('extend', with
+    // the shift's times as they were). Only team management approves or
+    // declines; you can take back your own.
+    match /shiftRequests/{rid} {
+      function validRequest(d) {
+        return d.keys().hasOnly(['kind', 'person', 'by', 'byUid', 'shiftId', 'start', 'end', 'oldStart', 'oldEnd', 'note', 'subteam', 'taskIds', 'status', 'at', 'decidedBy', 'decidedAt'])
+          && d.kind in ['add', 'extend'] && d.person is string && d.start is int && d.end is int
+          && d.end > d.start && d.end - d.start <= 16 * 3600000 && d.end <= nowMs() + 300000 && d.start >= nowMs() - 60 * 86400000
+          && d.get('note', '') is string && d.get('note', '').size() <= 500
+          && d.get('subteam', '') is string && d.get('subteam', '').size() <= 40
+          && d.get('taskIds', []) is list && d.get('taskIds', []).size() <= 30 && d.at is int;
+      }
+      function longerMine(d) {
+        let old = get(shiftPath(d.shiftId)).data;
+        return wasMe(old.person) && d.person == old.person && old.end != null
+          && d.oldStart == old.start && d.oldEnd == old.end && (d.start < old.start || d.end > old.end);
+      }
+      allow read: if isMember();
+      allow create: if isMember() && validRequest(request.resource.data) && request.resource.data.status == 'pending'
+        && wasMe(request.resource.data.person) && request.resource.data.by == myName() && request.resource.data.byUid == request.auth.uid
+        && (request.resource.data.kind == 'add' || longerMine(request.resource.data));
+      allow update: if isManager() && resource.data.status == 'pending'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'decidedBy', 'decidedAt'])
+        && request.resource.data.status in ['approved', 'declined'] && request.resource.data.decidedBy == myName();
+      allow delete: if isManager() || (isMember() && wasMe(resource.data.person));
     }
     // The schedule: team management plans shifts; anyone answers for themselves.
     match /shiftPlans/{id} {

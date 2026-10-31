@@ -8,6 +8,7 @@ import { fullTime, relTime, useEscape, useMedia } from '../util.js';
 import { Avatar, CloseIcon, DisplayName, Overlay, StatusDot, usePeople } from './common.jsx';
 import { ProfileEffect, SubteamBadges, SubteamIcon } from './People.jsx';
 import { hoursOf, mergedMs } from '../../functions/shared/hours.js';
+import { streaksOf } from '../../functions/shared/streaks.js';
 
 // Hours are added up the same way as the Shifts page (shared/hours.js).
 const fmtHours = (ms) => hoursOf(ms).toFixed(1);
@@ -49,6 +50,7 @@ export default function ProfilePage({
   const monday = parseDay(mondayOf(todayISO())).getTime();
   const weekHours = mergedMs(mine.filter((s) => s.start >= monday));
   const seasonHours = mergedMs(mine);
+  const streak = useMemo(() => streaksOf(name, shifts), [name, shifts]);
   const open = tasks.filter((t) => t.status !== 'done' && (t.assignees || []).includes(name));
   const done = tasks
     .filter((t) => t.status === 'done' && (t.assignees || []).includes(name))
@@ -248,6 +250,14 @@ export default function ProfilePage({
                     <div>
                       <b>{open.length}</b>
                       <span>open tasks</span>
+                    </div>
+                    <div title="School days in a row with a shift. Days without school don’t break it.">
+                      <b>{streak.daily}</b>
+                      <span>school-day streak</span>
+                    </div>
+                    <div title="Weeks in a row with at least one shift">
+                      <b>{streak.weekly}</b>
+                      <span>week streak</span>
                     </div>
                   </div>
                   <section className="profile-section">

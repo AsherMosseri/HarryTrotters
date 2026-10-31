@@ -6,6 +6,10 @@ import { firstName } from '../util.js';
 import { Avatar, AvatarStack, CloseIcon, Overlay, PlusIcon } from './common.jsx';
 import { CheckinCard, CheckinDialog, scheduleText } from './Checkin.jsx';
 import { hoursLabel, hoursOf, msByPerson, msOf } from '../../functions/shared/hours.js';
+import { teamDay } from '../../functions/shared/coins.js';
+import { cleanSkips, nextSchoolDay, scheduledOn } from '../../functions/shared/checkin.js';
+import { seasonStats, versusLastWeek } from '../../functions/shared/stats.js';
+import { streaksOf } from '../../functions/shared/streaks.js';
 
 const MIN = 60000;
 const HOUR = 60 * MIN;
@@ -335,25 +339,38 @@ function PlanDialog({ onDone, onClose }) {
   );
 }
 
-// Edit a past shift (or add a missed one). Team management changes anything;
-// everyone else only their own notes.
-function ShiftDialog({ shift, roster, tasks, isManager, onSave, onDelete, onClose }) {
+// Requests to add a shift reach back at most this far (matches firestore.rules).
+const REQUEST_DAYS = 60;
+
+// Edit a past shift (or add a missed one). Team management changes anything.
+// Everyone else, on their own finished shifts: shorter saves right away,
+// longer (or a missed one) goes to team management to approve first.
+function ShiftDialog({ shift, roster, tasks, isManager, me, pending, history, rename, onSave, onDelete, onTakeBack, onClose }) {
   const isNew = !shift.id;
   const [s, setS] = useState({
-    person: shift.person || '',
+    person: shift.person || (isManager ? '' : me),
     start: toInput(shift.start || Date.now() - 2 * HOUR),
-    end: shift.end ? toInput(shift.end) : '',
+    end: shift.end ? toInput(shift.end) : isNew && !isManager ? toInput(Date.now() - HOUR) : '',
     note: shift.note || '',
     subteam: shift.subteam || '',
     taskIds: shift.taskIds || [],
   });
+  const [sure, setSure] = useState(false);
+  const [busy, setBusy] = useState(false);
   const set = (patch) => setS({ ...s, ...patch });
-  const start = new Date(s.start).getTime();
-  const end = s.end ? new Date(s.end).getTime() : null;
+  // The boxes show whole minutes; a time left as it was keeps its seconds, so
+  // it doesn't read as a change (or as a longer shift).
+  const start = shift.start && s.start === toInput(shift.start) ? shift.start : new Date(s.start).getTime();
+  const end = shift.end && s.end === toInput(shift.end) ? shift.end : s.end ? new Date(s.end).getTime() : null;
+  // Teammates change the times of their own finished shifts (or ask for a missed one).
+  const ownTimes = !isManager && (isNew || !!shift.end);
+  const showTimes = isManager || ownTimes;
+  const longer = ownTimes && !isNew && start && end && (start < shift.start || end > shift.end);
+  const shorter = ownTimes && !isNew && !longer && start && end && (start !== shift.start || end !== shift.end);
   // A missed or finished shift needs its end (without one it would count as
   // still running, from back then until now); only a shift that is still
   // running can stay open. Over 16 hours is almost always a typo in the date.
-  const problem = !isManager
+  const problem = !showTimes
     ? ''
     : !start
       ? 'Pick when it started.'
@@ -363,13 +380,35 @@ function ShiftDialog({ shift, roster, tasks, isManager, onSave, onDelete, onClos
           ? 'It has to end after it starts.'
           : end && end - start > 16 * HOUR
             ? `That’s ${hoursLabel(end - start)}. Check the dates.`
-            : start > Date.now() + 5 * MIN
+            : start > Date.now() + 5 * MIN || (end && end > Date.now() + 5 * MIN)
               ? 'That’s in the future.'
-              : '';
-  const ok = s.person && start && !problem;
+              : !isManager && (isNew || longer) && start < Date.now() - REQUEST_DAYS * 24 * HOUR
+                ? `That’s more than ${REQUEST_DAYS} days ago. Ask team management.`
+                : '';
+  const ok = s.person && start && !problem && !busy;
   const theirTasks = tasks.filter((t) => (t.assignees || []).includes(s.person) || s.taskIds.includes(t.id));
+  const asks = !isManager && (isNew || longer);
+  const title = isNew ? (isManager ? 'Add a missed shift' : 'Ask to add a missed shift') : 'Edit shift';
+  const run = async (fn) => {
+    setBusy(true);
+    await fn();
+    setBusy(false);
+  };
   return (
-    <Dialog title={isNew ? 'Add a missed shift' : 'Edit shift'} onClose={onClose}>
+    <Dialog title={title} onClose={onClose}>
+      {asks && <p className="muted small">Team management approves it first. Until then it doesn’t count toward hours or coins.</p>}
+      {pending && (
+        <div className="shift-pending-note">
+          <span className="shift-badge wait">waiting for approval</span>
+          <span className="small">
+            You asked for <span className="mono">{clock(pending.start)}–{clock(pending.end)}</span>
+          </span>
+          <span className="spacer" />
+          <button className="link-btn small" onClick={() => run(onTakeBack)}>
+            Take back
+          </button>
+        </div>
+      )}
       <div className="fields">
         {isManager && (
           <>
@@ -382,6 +421,10 @@ function ShiftDialog({ shift, roster, tasks, isManager, onSave, onDelete, onClos
                 <option key={n}>{n}</option>
               ))}
             </select>
+          </>
+        )}
+        {showTimes && (
+          <>
             <label className="field-label" htmlFor="sh-start">
               Start
             </label>
@@ -392,7 +435,12 @@ function ShiftDialog({ shift, roster, tasks, isManager, onSave, onDelete, onClos
             <input id="sh-end" type="datetime-local" className="input" value={s.end} onChange={(e) => set({ end: e.target.value })} />
             <span />
             <span className={`small${problem ? ' danger' : ' muted'}`}>
-              {problem || (end ? `${hoursLabel(end - start)}` : 'Still running')}
+              {problem ||
+                (end
+                  ? `${hoursLabel(end - start)}${
+                      longer ? ' · longer, so team management approves it' : shorter ? ' · shorter, saves right away' : ''
+                    }`
+                  : 'Still running')}
             </span>
           </>
         )}
@@ -416,31 +464,216 @@ function ShiftDialog({ shift, roster, tasks, isManager, onSave, onDelete, onClos
           </>
         )}
       </div>
-      <div className="row gap">
-        {!isNew && isManager && (
-          <button className="link-btn danger" onClick={() => confirm('Delete this shift?') && onDelete()}>
+      {isManager && history?.length > 0 && (
+        <div className="shift-history">
+          <span className="field-label">Changes</span>
+          <ul>
+            {history.map((e) => (
+              <li key={e.id} className="small">
+                <EditLine edit={e} rename={rename} withPerson={false} />
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {sure ? (
+        <div className="row gap shift-sure" role="group" aria-label="Delete this shift?">
+          <span className="small">
+            <b>Delete this shift?</b> {isManager ? '' : 'Its hours and coins go away.'}
+          </span>
+          <span className="spacer" />
+          <button className="btn" onClick={() => setSure(false)}>
+            Keep it
+          </button>
+          <button className="btn danger" disabled={busy} onClick={() => run(onDelete)}>
             Delete
           </button>
-        )}
-        <span className="spacer" />
-        <button className="btn" onClick={onClose}>
-          Cancel
-        </button>
-        <button
-          className="btn primary"
-          disabled={!ok}
-          onClick={() =>
-            onSave(
-              isManager
-                ? { person: s.person, start, end, note: s.note.trim(), subteam: s.subteam, taskIds: s.taskIds, autoEnded: false }
-                : { note: s.note.trim(), subteam: s.subteam, taskIds: s.taskIds },
-            )
-          }
-        >
-          {isNew ? 'Add shift' : 'Save'}
-        </button>
-      </div>
+        </div>
+      ) : (
+        <div className="row gap">
+          {!isNew && (isManager || shift.end) && (
+            <button className="link-btn danger" onClick={() => setSure(true)}>
+              Delete
+            </button>
+          )}
+          <span className="spacer" />
+          <button className="btn" onClick={onClose}>
+            Cancel
+          </button>
+          <button
+            className="btn primary"
+            disabled={!ok}
+            onClick={() => {
+              const details = { note: s.note.trim(), subteam: s.subteam, taskIds: s.taskIds };
+              run(() =>
+                onSave(
+                  isManager
+                    ? { person: s.person, start, end, ...details, autoEnded: false }
+                    : ownTimes
+                      ? { start, end, ...details }
+                      : details,
+                  { longer, shorter },
+                ),
+              );
+            }}
+          >
+            {asks ? 'Ask team management' : isNew ? 'Add shift' : 'Save'}
+          </button>
+        </div>
+      )}
     </Dialog>
+  );
+}
+
+// One change from shiftEdits, in plain words: "Cooper made their shift
+// shorter: 3:00–5:00 PM → 3:00–4:30 PM · Tue 4:12 PM".
+const EDIT_WORDS = {
+  shorten: 'made a shift shorter',
+  delete: 'deleted a shift',
+  edit: 'changed a shift',
+  add: 'added a shift',
+  approve: 'approved a request',
+};
+function EditLine({ edit: e, rename, withPerson = true }) {
+  const by = rename(e.by || '');
+  const person = rename(e.person || '');
+  const whose = person === by ? '' : ` for ${firstName(person)}`;
+  const times = (t) => (t ? `${clock(t.start)}–${t.end ? clock(t.end) : 'now'}` : '');
+  return (
+    <>
+      <b>{firstName(by)}</b> {EDIT_WORDS[e.kind] || 'changed a shift'}
+      {withPerson ? whose : ''}
+      {': '}
+      <span className="mono">
+        {e.before ? `${dayLabel(toISO(new Date(e.before.start)))} ${times(e.before)}` : ''}
+        {e.before && e.after ? ' → ' : ''}
+        {e.after ? `${e.before ? '' : `${dayLabel(toISO(new Date(e.after.start)))} `}${times(e.after)}` : ''}
+      </span>
+      <span className="muted">
+        {' · '}
+        {dayLabel(toISO(new Date(e.at)))} {clock(e.at)}
+      </span>
+    </>
+  );
+}
+
+// Asking to add a missed shift or make one longer. Team management sees
+// everyone's with Approve / Decline; everyone else sees their own, waiting.
+function ShiftRequests({ requests, shiftsById, isManager, me, rename, api }) {
+  const [busy, setBusy] = useState('');
+  const mine = (r) => rename(r.person || '') === me;
+  const shown = requests
+    .filter((r) => (isManager ? r.status === 'pending' : mine(r) && (r.status === 'pending' || r.decidedAt > Date.now() - 3 * 24 * HOUR)))
+    .sort((a, b) => a.at - b.at);
+  if (!shown.length) return null;
+  const act = async (id, fn) => {
+    setBusy(id);
+    await fn();
+    setBusy('');
+  };
+  return (
+    <section className="chart-card shift-requests">
+      <div className="shift-sec-head">
+        <h2>{isManager ? 'Waiting for approval' : 'Your requests'}</h2>
+        <span className="muted small mono">{shown.length}</span>
+      </div>
+      <ul className="shift-req-list">
+        {shown.map((r) => {
+          const person = rename(r.person || '');
+          const shift = r.kind === 'extend' ? shiftsById.get(r.shiftId) : null;
+          const gone = r.kind === 'extend' && !shift;
+          return (
+            <li key={r.id}>
+              <Avatar name={person} size={26} />
+              <div className="grow">
+                <div className="shift-log-top">
+                  <b>{isManager ? person : r.kind === 'add' ? 'Add a missed shift' : 'Make a shift longer'}</b>
+                  {isManager && <span className="muted small">{r.kind === 'add' ? 'asks to add a missed shift' : 'asks to make a shift longer'}</span>}
+                </div>
+                <span className="small block shift-req-when">
+                  {dayLabel(toISO(new Date(r.start)))} ·{' '}
+                  {r.kind === 'extend' && (
+                    <>
+                      <s className="muted mono">
+                        {clock(r.oldStart)}–{clock(r.oldEnd)}
+                      </s>{' '}
+                      →{' '}
+                    </>
+                  )}
+                  <b className="mono">
+                    {clock(r.start)}–{clock(r.end)}
+                  </b>
+                  <span className="muted mono"> · {hoursLabel(r.end - r.start)}</span>
+                </span>
+                {r.note && <p className="shift-note">{r.note}</p>}
+                {gone && <span className="small danger block">That shift was deleted.</span>}
+              </div>
+              {isManager ? (
+                <div className="shift-req-actions">
+                  <button
+                    className="btn small-btn"
+                    disabled={busy === r.id}
+                    onClick={() => act(r.id, () => api.decideShiftRequest(r, false, shift))}
+                  >
+                    Decline
+                  </button>
+                  <button
+                    className="btn primary small-btn"
+                    disabled={busy === r.id || gone}
+                    onClick={() => act(r.id, () => api.decideShiftRequest(r, true, shift))}
+                  >
+                    Approve
+                  </button>
+                </div>
+              ) : r.status === 'pending' ? (
+                <div className="shift-req-actions">
+                  <span className="shift-badge wait">waiting for approval</span>
+                  <button className="link-btn small" disabled={busy === r.id} onClick={() => act(r.id, () => api.cancelShiftRequest(r.id))}>
+                    Take back
+                  </button>
+                </div>
+              ) : (
+                <div className="shift-req-actions">
+                  <span className={`shift-badge ${r.status === 'approved' ? 'ok' : 'no'}`}>{r.status}</span>
+                  <button className="link-btn small" disabled={busy === r.id} onClick={() => act(r.id, () => api.cancelShiftRequest(r.id))}>
+                    OK
+                  </button>
+                </div>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
+// Team management: the latest changes to finished shifts, newest first.
+function ShiftChanges({ edits, rename }) {
+  const [all, setAll] = useState(false);
+  if (!edits.length) return null;
+  return (
+    <section className="chart-card shift-changes">
+      <div className="shift-sec-head">
+        <h2>Shift changes</h2>
+        <span className="muted small">Only team management sees these</span>
+      </div>
+      <ul className="shift-change-list">
+        {(all ? edits : edits.slice(0, 5)).map((e) => (
+          <li key={e.id} className="small">
+            <Avatar name={rename(e.person || '')} size={20} />
+            <span className="grow">
+              <EditLine edit={e} rename={rename} />
+            </span>
+          </li>
+        ))}
+      </ul>
+      {edits.length > 5 && (
+        <button className="link-btn small" onClick={() => setAll(!all)}>
+          {all ? 'Show less' : `Show all ${edits.length}`}
+        </button>
+      )}
+    </section>
   );
 }
 
@@ -498,6 +731,144 @@ function inPeriod(s, period) {
   return s.start >= from && s.start < to;
 }
 
+// The team's season: hours, tasks finished, practice runs, each with this
+// week against last week (shared/stats.js).
+const round1 = (x) => Math.round(x * 10) / 10;
+export function SeasonStrip({ stats }) {
+  const hourDiff = round1(hoursOf(stats.hours.week) - hoursOf(stats.hours.last));
+  const items = [
+    ['Team hours', hoursOf(stats.hours.season).toFixed(1), hoursOf(stats.hours.week).toFixed(1), hourDiff],
+    ['Tasks finished', stats.tasks.season, stats.tasks.week, stats.tasks.week - stats.tasks.last],
+    ['Practice runs logged', stats.runs.season, stats.runs.week, stats.runs.week - stats.runs.last],
+  ];
+  return (
+    <section className="season-strip" aria-labelledby="season-strip-h">
+      <h2 id="season-strip-h">Team this season</h2>
+      <div className="ss-items">
+        {items.map(([label, season, week, diff]) => (
+          <div key={label} className="ss-item">
+            <b className="mono">{season}</b>
+            <span className="ss-label">{label}</span>
+            <span className="ss-week">
+              <span className="mono">{week}</span> this week,{' '}
+              <span className={diff > 0 ? 'ss-up' : diff < 0 ? 'ss-down' : ''}>{versusLastWeek(diff)}</span>
+            </span>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+// "Lab check-in is asked every school day at 12:00 AM", with team
+// management's quick skips: "Not today" and "Not tomorrow" (the next school
+// day), each undoable. Skipping today also takes back today's automatic
+// check-in if it was already asked (Undo puts it back, answers and all).
+function ScheduleLine({ schedule, checkins, isManager, api, onEdit }) {
+  const today = teamDay(Date.now());
+  const skip = schedule.skip || [];
+  const [stopping, setStopping] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const removed = useRef(new Map());
+  const save = (nextSkip) => api.saveSettings({ checkinSchedule: { ...schedule, skip: cleanSkips(nextSkip, today) } });
+  const run = async (fn) => {
+    setBusy(true);
+    await fn();
+    setBusy(false);
+  };
+  const skipDay = (day) =>
+    run(async () => {
+      await save([...skip, day]);
+      const asked = day === today && checkins.find((c) => c.date === today && c.auto);
+      if (asked) {
+        removed.current.set(day, asked);
+        await api.deleteCheckin(asked.id);
+      }
+    });
+  const undo = (day) =>
+    run(async () => {
+      await save(skip.filter((d) => d !== day));
+      const back = removed.current.get(day);
+      if (back) {
+        removed.current.delete(day);
+        await api.restoreCheckin(back);
+      }
+    });
+  const next = nextSchoolDay(today);
+  const nameOf = (d) =>
+    d === today ? 'today' : d === addDays(today, 1) ? 'tomorrow' : parseDay(d).toLocaleDateString(undefined, { weekday: 'long' });
+  const quick = [today, next].filter((d) => scheduledOn(schedule, d));
+  const later = skip.filter((d) => d >= today && !quick.includes(d));
+  return (
+    <div className="checkin-schedule">
+      {stopping ? (
+        <>
+          <span>
+            <b>Stop asking automatically?</b>
+          </span>
+          <span className="spacer" />
+          <button className="btn small-btn" onClick={() => setStopping(false)}>
+            Keep asking
+          </button>
+          <button
+            className="btn small-btn danger"
+            onClick={() => api.saveSettings({ checkinSchedule: { ...schedule, on: false } }).then(() => setStopping(false))}
+          >
+            Stop
+          </button>
+        </>
+      ) : (
+        <>
+          <span className="ci-sched-text">
+            Lab check-in is asked <b>{scheduleText(schedule)}</b>
+            {later.length > 0 && (
+              <span className="muted small">
+                {' '}
+                · skipping <span className="mono">{later.map(shortDay).join(', ')}</span>
+              </span>
+            )}
+          </span>
+          <span className="ci-quick">
+            {quick.map((d) =>
+              skip.includes(d) ? (
+                <span key={d} className="ci-skipped">
+                  Skipped {nameOf(d)}
+                  {isManager && (
+                    <>
+                      {' · '}
+                      <button className="link-btn small" disabled={busy} onClick={() => undo(d)}>
+                        Undo
+                      </button>
+                    </>
+                  )}
+                </span>
+              ) : (
+                isManager && (
+                  <button key={d} className="chip" disabled={busy} onClick={() => skipDay(d)}>
+                    Not {nameOf(d)}
+                  </button>
+                )
+              ),
+            )}
+          </span>
+          {isManager && (
+            <>
+              <span className="spacer" />
+              <button className="link-btn small" onClick={onEdit}>
+                Edit
+              </button>
+              <button className="link-btn small danger" onClick={() => setStopping(true)}>
+                Stop
+              </button>
+            </>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+const shortDay = (d) => parseDay(d).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+
 export default function ShiftsView({
   shifts,
   plans,
@@ -513,6 +884,9 @@ export default function ShiftsView({
   checkins = [],
   checkinSchedule,
   gradeOf,
+  requests = [],
+  edits = [],
+  runs = [],
 }) {
   const now = useNow(30000);
   const isManager = actor.admin;
@@ -545,19 +919,63 @@ export default function ShiftsView({
   const barMax = hoursPeriod === 'all' && goalMs ? goalMs : Math.max(...totals.map(([, v]) => v), HOUR);
   const myAll = msOf(me, all, now);
   const myWeek = msOf(me, all, now, (s) => inPeriod(s, 'week'));
-  const teamWeek = [...msByPerson(all, now, (s) => inPeriod(s, 'week')).values()].reduce((n, ms) => n + ms, 0);
+  const stats = useMemo(() => seasonStats({ shifts: all, tasks: tasks || [], runs, now }), [all, tasks, runs, now]);
+  const streak = useMemo(() => streaksOf(me, all, now), [me, all, now]);
 
   const log = all
     .filter((s) => inPeriod(s, period) && (!who || s.person === who) && (!sub || s.subteam === sub))
     .sort((a, b) => b.start - a.start);
 
-  const save = async (shift, patch) => {
-    if (shift.id) await api.updateShift(shift.id, patch);
-    else {
-      const { person, start, ...rest } = patch;
-      await api.startShifts([person], start, rest);
+  // Shifts as saved (their person under the name they were saved with): the
+  // rules check the change against exactly that.
+  const savedById = useMemo(() => new Map(shifts.map((s) => [s.id, s])), [shifts]);
+  const pendingFor = useMemo(
+    () => new Map(requests.filter((r) => r.status === 'pending' && r.kind === 'extend').map((r) => [r.shiftId, r])),
+    [requests],
+  );
+  const editsFor = (id) => edits.filter((e) => e.shiftId === id);
+
+  // Team management: anything, each change to the times recorded. Everyone
+  // else, on their own finished shifts: shorter saves right away (recorded),
+  // longer or missed ones are asked for; notes save as before.
+  const save = async (shift, patch, { longer, shorter }) => {
+    const saved = savedById.get(shift.id);
+    let done;
+    if (isManager) {
+      if (!shift.id) done = await api.addShift(patch);
+      else if (patch.start !== saved.start || patch.end !== saved.end || patch.person !== shift.person)
+        done = await api.editShift(saved, { ...patch, person: patch.person === shift.person ? saved.person : patch.person }, 'edit');
+      else done = (await api.updateShift(shift.id, { ...patch, person: saved.person })) !== false;
+    } else if (!shift.id) {
+      done = await api.requestShift({ kind: 'add', person: me, ...patch });
+    } else {
+      const { start, end, ...details } = patch;
+      const detailsChanged =
+        details.note !== (saved.note || '') ||
+        details.subteam !== (saved.subteam || '') ||
+        (details.taskIds || []).join() !== (saved.taskIds || []).join();
+      if (shorter) done = await api.editShift(saved, patch, 'shorten');
+      else {
+        done = true;
+        if (detailsChanged) done = (await api.updateShift(shift.id, details)) !== false;
+        if (longer && done)
+          done = await api.requestShift({
+            kind: 'extend',
+            person: saved.person,
+            shiftId: saved.id,
+            start,
+            end,
+            oldStart: saved.start,
+            oldEnd: saved.end,
+            note: details.note,
+          });
+      }
     }
-    setDialog(null);
+    if (done) setDialog(null);
+  };
+  const remove = async (shift) => {
+    const saved = savedById.get(shift.id);
+    if (await api.removeShift(saved)) setDialog(null);
   };
 
   return (
@@ -584,27 +1002,13 @@ export default function ShiftsView({
       </div>
 
       {checkinSchedule?.on && (
-        <div className="checkin-schedule">
-          <span>
-            Lab check-in is asked <b>{scheduleText(checkinSchedule)}</b>
-          </span>
-          {isManager && (
-            <>
-              <span className="spacer" />
-              <button className="link-btn small" onClick={() => setDialog('checkin')}>
-                Edit
-              </button>
-              <button
-                className="link-btn small danger"
-                onClick={() =>
-                  confirm('Stop asking automatically?') && api.saveSettings({ checkinSchedule: { ...checkinSchedule, on: false } })
-                }
-              >
-                Stop
-              </button>
-            </>
-          )}
-        </div>
+        <ScheduleLine
+          schedule={checkinSchedule}
+          checkins={checkins}
+          isManager={isManager}
+          api={api}
+          onEdit={() => setDialog('checkin')}
+        />
       )}
       {checkins.map((c) => (
         <CheckinCard
@@ -632,11 +1036,19 @@ export default function ShiftsView({
             {goal ? <small> of {goal}</small> : null}
           </b>
         </div>
-        <div className="stat">
-          <span>Team hours this week</span>
-          <b>{hoursOf(teamWeek).toFixed(1)}</b>
+        <div className="stat" title="School days in a row with a shift (days without school don’t break it), and weeks in a row">
+          <span>Your streaks</span>
+          <b>
+            {streak.daily}
+            <small> {streak.daily === 1 ? 'day' : 'days'}</small> · {streak.weekly}
+            <small> {streak.weekly === 1 ? 'week' : 'weeks'}</small>
+          </b>
         </div>
       </div>
+
+      <SeasonStrip stats={stats} />
+
+      <ShiftRequests requests={requests} shiftsById={savedById} isManager={isManager} me={me} rename={rename} api={api} />
 
       <div className="shift-grid">
         <section className="chart-card">
@@ -848,11 +1260,9 @@ export default function ShiftsView({
         <div className="shift-sec-head">
           <h2>Log</h2>
           <span className="spacer" />
-          {isManager && (
-            <button className="btn small-btn" onClick={() => setDialog({ shift: {} })}>
-              <PlusIcon /> Add a missed shift
-            </button>
-          )}
+          <button className="btn small-btn" onClick={() => setDialog({ shift: {} })}>
+            <PlusIcon /> Add a missed shift
+          </button>
         </div>
         <div className="parts-filters">
           {PERIODS.map(([id, label]) => (
@@ -893,6 +1303,15 @@ export default function ShiftsView({
                           auto-ended
                         </span>
                       )}
+                      {pendingFor.has(s.id) && <span className="shift-badge wait">waiting for approval</span>}
+                      {s.editedAt && (
+                        <span className="muted tiny shift-edited">
+                          edited by {firstName(rename(s.editedBy || ''))}{' '}
+                          {toISO(new Date(s.editedAt)) === toISO(new Date(now))
+                            ? `at ${clock(s.editedAt)}`
+                            : `· ${dayLabel(toISO(new Date(s.editedAt)))}`}
+                        </span>
+                      )}
                     </div>
                     {s.note && <p className="shift-note">{s.note}</p>}
                     {(s.taskIds || []).some((id) => tasksById.has(id)) && (
@@ -926,6 +1345,8 @@ export default function ShiftsView({
           </button>
         )}
       </section>
+
+      {isManager && <ShiftChanges edits={edits} rename={rename} />}
 
       {dialog === 'clockin' && (
         <ClockInDialog
@@ -967,11 +1388,15 @@ export default function ShiftsView({
           roster={roster}
           tasks={tasks || []}
           isManager={isManager}
+          me={me}
+          rename={rename}
+          pending={!isManager && pendingFor.get(dialog.shift.id)}
+          history={isManager && dialog.shift.id ? editsFor(dialog.shift.id) : []}
           onClose={() => setDialog(null)}
-          onSave={(patch) => save(dialog.shift, patch)}
-          onDelete={async () => {
-            await api.deleteShift(dialog.shift.id);
-            setDialog(null);
+          onSave={(patch, how) => save(dialog.shift, patch, how)}
+          onDelete={() => remove(dialog.shift)}
+          onTakeBack={async () => {
+            if (await api.cancelShiftRequest(pendingFor.get(dialog.shift.id).id)) setDialog(null);
           }}
         />
       )}

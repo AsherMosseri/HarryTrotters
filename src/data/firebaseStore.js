@@ -79,6 +79,8 @@ const shiftsCol = collection(db, 'shifts');
 const labLogsCol = collection(db, 'labLogs');
 const shiftPlansCol = collection(db, 'shiftPlans');
 const checkinsCol = collection(db, 'checkins');
+const shiftEditsCol = collection(db, 'shiftEdits');
+const shiftRequestsCol = collection(db, 'shiftRequests');
 const isDm = (conv) => conv.startsWith('dm:');
 const convCol = (conv) => (isDm(conv) ? collection(dmsCol, conv.slice(3), 'messages') : collection(channelsCol, conv, 'messages'));
 const convFolder = (conv) => `chat/${conv.replace(':', '-')}`;
@@ -166,6 +168,17 @@ async function deletePhotoFiles(photo) {
 }
 
 const actorFields = (actor) => ({ by: actor.name, byUid: actor.uid });
+// A shiftEdits record: the shift's times before (null for a new one) and after (null when deleted).
+const editRecord = (shift, kind, after, actor, at, requestId) => ({
+  shiftId: shift.id,
+  person: shift.person,
+  kind,
+  ...actorFields(actor),
+  at,
+  before: shift.start != null ? { start: shift.start, end: shift.end ?? null } : null,
+  after,
+  ...(requestId ? { requestId } : {}),
+});
 
 export const firebaseStore = {
   mode: 'firebase',
@@ -1177,6 +1190,68 @@ export const firebaseStore = {
   deleteShift(id) {
     return deleteDoc(doc(shiftsCol, id));
   },
+  // Changes to finished shifts, each written down in shiftEdits (who, when,
+  // the times before and after) in the same batch. `shift` is the shift as
+  // saved (its person under the name it was saved with). A teammate's own
+  // records have ids the rules check: <shift>_<editCount> and <shift>_del.
+  subscribeShiftEdits(cb, onError) {
+    return onSnapshot(query(shiftEditsCol, orderBy('at', 'desc'), limit(200)), (snap) => cb(snap.docs.map(readDoc)), onError);
+  },
+  // Shorter (teammates) or anything (team management): patch has start/end and any details.
+  editShift(shift, patch, kind, actor, requestId) {
+    const n = (shift.editCount || 0) + 1;
+    const at = Date.now();
+    const batch = writeBatch(db);
+    batch.update(doc(shiftsCol, shift.id), { ...patch, editCount: n, editedAt: at, editedBy: actor.name, updatedBy: actor.name });
+    const edit = editRecord(shift, kind, { start: patch.start ?? shift.start, end: patch.end ?? shift.end }, actor, at, requestId);
+    batch.set(kind === 'shorten' ? doc(shiftEditsCol, `${shift.id}_${n}`) : doc(shiftEditsCol), edit);
+    return batch.commit();
+  },
+  removeShift(shift, actor) {
+    const batch = writeBatch(db);
+    batch.delete(doc(shiftsCol, shift.id));
+    batch.set(doc(shiftEditsCol, `${shift.id}_del`), editRecord(shift, 'delete', null, actor, Date.now()));
+    return batch.commit();
+  },
+  // Team management adding a missed shift for someone.
+  addShift(data, actor) {
+    const ref = doc(shiftsCol);
+    const at = Date.now();
+    const batch = writeBatch(db);
+    batch.set(ref, { note: '', subteam: '', taskIds: [], ...data, ...actorFields(actor), at });
+    batch.set(doc(shiftEditsCol), editRecord({ id: ref.id, person: data.person }, 'add', { start: data.start, end: data.end }, actor, at));
+    return batch.commit();
+  },
+  // Asking for a missed shift or a longer one; team management decides.
+  subscribeShiftRequests(cb, onError) {
+    return onSnapshot(shiftRequestsCol, (snap) => cb(snap.docs.map(readDoc)), onError);
+  },
+  requestShift(req, actor) {
+    return setDoc(doc(shiftRequestsCol), { ...req, status: 'pending', ...actorFields(actor), at: Date.now() });
+  },
+  cancelShiftRequest(id) {
+    return deleteDoc(doc(shiftRequestsCol, id));
+  },
+  // Approving adds the shift (or makes it longer) and writes it down, in one batch.
+  // shift: the shift a longer-shift request is for, as saved now (null if it's gone).
+  async decideShiftRequest(req, approve, shift, actor) {
+    const at = Date.now();
+    const batch = writeBatch(db);
+    batch.update(doc(shiftRequestsCol, req.id), { status: approve ? 'approved' : 'declined', decidedBy: actor.name, decidedAt: at });
+    if (approve) {
+      const span = { start: req.start, end: req.end };
+      if (req.kind === 'extend' && shift) {
+        batch.update(doc(shiftsCol, shift.id), { ...span, editCount: (shift.editCount || 0) + 1, editedAt: at, editedBy: actor.name, updatedBy: actor.name });
+        batch.set(doc(shiftEditsCol), editRecord(shift, 'approve', span, actor, at, req.id));
+      } else {
+        const ref = doc(shiftsCol);
+        const details = { note: req.note || '', subteam: req.subteam || '', taskIds: req.taskIds || [] };
+        batch.set(ref, { person: req.person, ...span, ...details, ...actorFields(actor), at });
+        batch.set(doc(shiftEditsCol), editRecord({ id: ref.id, person: req.person }, 'approve', span, actor, at, req.id));
+      }
+    }
+    return batch.commit();
+  },
   // Lab check-ins: team management asks who's coming (lunch / after school);
   // everyone answers for themselves.
   subscribeCheckins(cb, onError) {
@@ -1190,6 +1265,11 @@ export const firebaseStore = {
   },
   deleteCheckin(id) {
     return deleteDoc(doc(checkinsCol, id));
+  },
+  // Undo for "Not today": the check-in put back as it was.
+  restoreCheckin(c) {
+    const { id, ...data } = c;
+    return setDoc(doc(checkinsCol, id), data);
   },
   // The schedule: planned shifts people can sign up for.
   subscribeShiftPlans(cb, onError) {
