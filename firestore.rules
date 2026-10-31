@@ -442,7 +442,8 @@ service cloud.firestore {
     function serverCommand(m) {
       return 'cmd' in m && m.cmd is map && m.cmd.get('name', '') in
         ['slots', 'dice', 'coinflip', 'roulette', 'blackjack', 'crash', 'mines', 'highlow', 'lottery', 'daily', 'work', 'beg', 'rob',
-         'rps', 'tictactoe', 'connect4', 'duel', 'trivia', 'hangman', 'typerace', 'heist', 'labday', 'recap'];
+         'rps', 'tictactoe', 'connect4', 'duel', 'trivia', 'hangman', 'typerace', 'heist', 'labday', 'recap',
+         'battleship', 'tetris', 'minesweep'];
     }
     // ...or change one afterwards (team management can still edit/delete).
     function keepsCmd() {

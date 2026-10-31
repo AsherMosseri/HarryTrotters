@@ -11,7 +11,21 @@ export const COOLDOWN = { work: 60 * MINUTE, beg: 15 * MINUTE, rob: 3 * 60 * MIN
 export const CASINO = ['slots', 'dice', 'coinflip', 'roulette', 'blackjack', 'crash', 'mines', 'highlow', 'lottery'];
 export const ECONOMY = ['daily', 'work', 'beg', 'rob'];
 // Commands only the server may post (the rules refuse them from phones).
-export const SERVER_COMMANDS = [...CASINO, ...ECONOMY, 'rps', 'tictactoe', 'connect4', 'duel', 'trivia', 'hangman', 'typerace', 'heist'];
+export const SERVER_COMMANDS = [
+  ...CASINO,
+  ...ECONOMY,
+  'rps',
+  'tictactoe',
+  'connect4',
+  'duel',
+  'trivia',
+  'hangman',
+  'typerace',
+  'heist',
+  'battleship',
+  'tetris',
+  'minesweep',
+];
 
 const rint = (rng, a, b) => a + Math.floor(rng() * (b - a + 1));
 const pickOf = (rng, list) => list[Math.floor(rng() * list.length)];

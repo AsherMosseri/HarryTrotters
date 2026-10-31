@@ -12,11 +12,29 @@
 // out at the end. Trotbot can be challenged too: the house plays (and pays).
 
 import { MINUTE, parseBet } from './casino.js';
+import * as bs from './battleship.js';
+import { RACE_COUNTDOWN, RACE_PRIZE, rank, raceLimit } from './funGames.js';
+import { LEVELS } from './minesweeper.js';
 
-export const MULTI = ['rps', 'tictactoe', 'connect4', 'duel', 'trivia', 'hangman', 'typerace', 'heist'];
-export const CHALLENGES = ['rps', 'tictactoe', 'connect4', 'duel'];
+export const MULTI = ['rps', 'tictactoe', 'connect4', 'duel', 'trivia', 'hangman', 'typerace', 'heist', 'battleship', 'tetris', 'minesweep'];
+export const CHALLENGES = ['rps', 'tictactoe', 'connect4', 'duel', 'battleship', 'tetris', 'minesweep'];
+// Tetris and Minesweeper races: both play the same pieces or board on their
+// own screens; the card keeps score (funGame sends in each verified result).
+export const RACES = ['tetris', 'minesweep'];
 export const BOT = 'Trotbot';
-export const ICON = { rps: '✊', tictactoe: '⭕', connect4: '🔴', duel: '🤠', trivia: '🧠', hangman: '🪢', typerace: '⌨️', heist: '💰' };
+export const ICON = {
+  rps: '✊',
+  tictactoe: '⭕',
+  connect4: '🔴',
+  duel: '🤠',
+  trivia: '🧠',
+  hangman: '🪢',
+  typerace: '⌨️',
+  heist: '💰',
+  battleship: '🚢',
+  tetris: '🧱',
+  minesweep: '💣',
+};
 export const LABEL = {
   rps: 'Rock paper scissors',
   tictactoe: 'Tic-tac-toe',
@@ -26,7 +44,12 @@ export const LABEL = {
   hangman: 'Hangman',
   typerace: 'Type race',
   heist: 'Heist',
+  battleship: 'Battleship',
+  tetris: 'Tetris race',
+  minesweep: 'Minesweeper race',
 };
+// Coins for winning Battleship (the 'game' award, capped per day).
+export const BATTLESHIP_PRIZE = { bot: 2, person: 3 };
 export const TIMES = {
   challenge: 10 * MINUTE, // to accept
   turn: 3 * MINUTE, // before the other player can claim the win
@@ -38,6 +61,7 @@ export const TIMES = {
   duelIdle: 30000, // nobody shot: bets back
   cooldown: MINUTE, // between starting trivia / hangman / type races
   abandoned: 30 * MINUTE, // a board game nobody touches ends: whoever's turn it was loses
+  placing: 5 * MINUTE, // to place your Battleship fleet
 };
 export const TRIVIA_PRIZE = 8;
 // Trivia, hangman, and type races are free to play; what they pay is capped
@@ -421,9 +445,13 @@ const cooldownLeft = (bank, game, now) => Math.max(0, (bank.cooldowns?.[game] ||
 // ctx: { me, words, roster, balance, bank, now, rng }
 export function start(game, { me, words = [], roster = [], balance = 0, bank = {}, now = Date.now(), rng = Math.random }) {
   if (CHALLENGES.includes(game)) {
-    const { them, betWord } = parseChallenge(words, roster);
-    if (!them) return { error: `Challenge who? Try: /${game} @name 20 (or @Trotbot)` };
+    // A Minesweeper race's board size: "/minesweep @Cooper expert 10".
+    const level = game === 'minesweep' ? words.map((w) => w.toLowerCase()).find((w) => LEVELS[w]) || 'beginner' : '';
+    const rest = level ? words.filter((w) => w.toLowerCase() !== level) : words;
+    const { them, betWord } = parseChallenge(rest, roster);
+    if (!them) return { error: `Challenge who? Try: /${game} @name 20${RACES.includes(game) ? '' : ' (or @Trotbot)'}` };
     if (them === me) return { error: 'You can’t challenge yourself.' };
+    if (them === BOT && RACES.includes(game)) return { error: `Race Trotbot from the game screen: type /${game} and pick Trotbot.` };
     const bet = betWord ? parseBet(betWord, balance) : 0;
     if (bet == null || bet < 0) return { error: 'That’s not a bet.' };
     if (bet > balance) return { error: `You only have ${balance} coins.` };
@@ -437,6 +465,11 @@ export function start(game, { me, words = [], roster = [], balance = 0, bank = {
     if (game === 'tictactoe') Object.assign(p, { board: '.........', turn: me });
     if (game === 'connect4') Object.assign(p, { board: '.'.repeat(C4_COLS * C4_ROWS), turn: me });
     if (game === 'duel' && bot) startDuel(p, secret, now, rng);
+    if (game === 'battleship') {
+      p.placed = [];
+      if (bot) startPlacing(p, secret, now, rng);
+    }
+    if (RACES.includes(game)) Object.assign(p, { results: {}, ...(level && { level }) });
     return { pub: p, secret, money: take(me, bet), mentions: bot ? [] : [them] };
   }
 
@@ -481,6 +514,23 @@ export function start(game, { me, words = [], roster = [], balance = 0, bank = {
   return { error: 'Unknown game.' };
 }
 
+// Battleship: both place their fleets (Trotbot's goes straight in).
+function startPlacing(p, secret, now, rng) {
+  Object.assign(p, { status: 'placing', placeBy: now + TIMES.placing, lastAt: now });
+  secret.ships = { ...(secret.ships || {}) };
+  if (p.b === BOT) {
+    secret.ships[BOT] = bs.randomFleet(rng);
+    p.placed = [BOT];
+  }
+}
+// A race: the seed goes on the card, and it starts a few seconds later for both.
+function startRace(game, p, now, rng) {
+  const abc = 'abcdefghijkmnpqrstuvwxyz23456789';
+  const seed = Array.from({ length: 12 }, () => abc[Math.floor(rng() * abc.length)]).join('');
+  const startAt = now + RACE_COUNTDOWN;
+  Object.assign(p, { seed, startAt, endsAt: startAt + raceLimit(game, p.level), results: {} });
+}
+
 function startDuel(p, secret, now, rng) {
   p.status = 'playing';
   p.drawAt = now + rint(rng, 2500, 6000);
@@ -490,14 +540,16 @@ function startDuel(p, secret, now, rng) {
 
 // ---------- moves ----------
 
-// ctx: { pub, secret, me, move, balance, now, rng }. Returns { error }, or
-// { pub, secret, money } (write: false when nothing changed, like an early peek).
-export function move(game, { pub, secret = {}, me, move: mv, balance = 0, now = Date.now(), rng = Math.random }) {
+// ctx: { pub, secret, me, move, balance, now, rng, verified }. Returns { error }, or
+// { pub, secret, money, awards } (write: false when nothing changed, like an
+// early peek). awards: coins the server pays through awardCoins ('game').
+// verified: a race result the server replayed (funGame); never from the app.
+export function move(game, { pub, secret = {}, me, move: mv, balance = 0, now = Date.now(), rng = Math.random, verified = null }) {
   const p = { ...pub };
   const s = { ...secret };
   const m = String(mv || '').slice(0, 400);
   const nothing = { write: false, pub, secret, money: [] };
-  const out = (money = []) => ({ write: true, pub: p, secret: s, money });
+  const out = (money = [], awards = []) => ({ write: true, pub: p, secret: s, money, awards });
   if (!isLive(p.status)) return nothing;
 
   if (CHALLENGES.includes(game)) {
@@ -520,6 +572,8 @@ export function move(game, { pub, secret = {}, me, move: mv, balance = 0, now = 
       if (p.bet > balance) return { error: `It’s a ${p.bet} coin bet. You have ${balance}.` };
       Object.assign(p, { status: 'playing', lastAt: now });
       if (game === 'duel') startDuel(p, s, now, rng);
+      if (game === 'battleship') startPlacing(p, s, now, rng);
+      if (RACES.includes(game)) startRace(game, p, now, rng);
       if (m === 'accept') return out(take(me, p.bet));
       // RPS: picking accepts.
       const r = rpsPick(p, s, me, m, now);
@@ -548,6 +602,30 @@ export function move(game, { pub, secret = {}, me, move: mv, balance = 0, now = 
       if (now < p.drawAt) return end(other, 'early');
       p.ms = now - p.drawAt;
       return end(me, 'shot');
+    }
+    if (game === 'battleship') return battleshipMove(p, s, { me, m, now, rng, end, out, player, nothing });
+    if (RACES.includes(game)) {
+      const other = me === p.a ? p.b : p.a;
+      // Ranked by the games' own clocks; whoever didn't send a result lost.
+      const settleRace = () => {
+        const r = rank(game, p.results[p.a], p.results[p.b]);
+        const winner = r > 0 ? p.a : r < 0 ? p.b : '';
+        const loser = winner === p.a ? p.b : p.a;
+        const res = end(winner, winner && !p.results[loser] ? 'dnf' : 'race');
+        res.awards = winner ? [{ person: winner, amount: RACE_PRIZE, label: `${LABEL[game]}: beat ${loser}` }] : [];
+        return res;
+      };
+      if (m === 'peek') return now >= p.endsAt ? settleRace() : nothing;
+      if (!player) return { error: 'You’re not in this race.' };
+      if (p.results[me]) return { error: 'You already finished.' };
+      if (m === 'resign') {
+        p.results = { ...p.results, [me]: { gaveUp: true, finished: false, won: false, lines: 0, cells: 0 } };
+        return p.results[other] ? settleRace() : out();
+      }
+      if (m !== 'finish' || !verified) return { error: 'Play it from the game screen.' };
+      if (now > p.endsAt + 30000) return settleRace();
+      p.results = { ...p.results, [me]: verified };
+      return p.results[other] ? settleRace() : out();
     }
     // Tic-tac-toe and connect four.
     const ttt = game === 'tictactoe';
@@ -741,6 +819,91 @@ export function move(game, { pub, secret = {}, me, move: mv, balance = 0, now = 
   }
   return { error: 'Unknown game.' };
 }
+
+// ---------- Battleship ----------
+
+// pub: placed [names], turn, shots { name: what's been fired at name's board },
+// sunk { name: [{ k, cells }] }, last { by, i, hit, sunk }. The fleets stay
+// in the secret until the game ends (then they're shown).
+const sunkCells = (p, name) => (p.sunk?.[name] || []).flatMap((x) => x.cells);
+const afloat = (p, name) => {
+  const gone = new Set((p.sunk?.[name] || []).map((x) => x.k));
+  return bs.FLEET.map(([, len], k) => (gone.has(k) ? 0 : len)).filter(Boolean);
+};
+function battleshipMove(p, s, { me, m, now, rng, end, player, nothing }) {
+  const other = me === p.a ? p.b : p.a;
+  const finish = (winner, how) => {
+    if (s.ships) p.fleets = s.ships;
+    const res = end(winner, how);
+    const loser = winner === p.a ? p.b : p.a;
+    res.awards =
+      winner && winner !== BOT && how === 'sunk'
+        ? [{ person: winner, amount: loser === BOT ? BATTLESHIP_PRIZE.bot : BATTLESHIP_PRIZE.person, label: `Battleship: beat ${loser}` }]
+        : [];
+    return res;
+  };
+  const out = () => ({ write: true, pub: p, secret: s, money: [], awards: [] });
+  if (p.status === 'placing') {
+    if (m === 'peek') {
+      if (now < p.placeBy) return nothing;
+      const placed = (p.placed || []).filter((n) => n === p.a || n === p.b);
+      return placed.length === 1 ? finish(placed[0], 'timeout') : end('', 'noplace');
+    }
+    if (!player) return { error: 'You’re not playing this one.' };
+    if (m === 'resign') return finish(other, 'resigned');
+    if (!m.startsWith('place:')) return { error: 'Place your ships first.' };
+    if ((p.placed || []).includes(me)) return { error: 'Your ships are already placed.' };
+    const ships = bs.parseFleet(m.slice(6));
+    if (!ships) return { error: 'Those ships don’t fit there.' };
+    s.ships = { ...(s.ships || {}), [me]: ships };
+    p.placed = [...(p.placed || []), me];
+    p.lastAt = now;
+    if (s.ships[p.a] && s.ships[p.b])
+      Object.assign(p, {
+        status: 'playing',
+        turn: p.a,
+        shots: { [p.a]: bs.emptyShots(), [p.b]: bs.emptyShots() },
+        sunk: { [p.a]: [], [p.b]: [] },
+      });
+    return out();
+  }
+  // Left for good: whoever's turn it was loses.
+  if (m === 'peek') return now - p.lastAt >= TIMES.abandoned ? finish(p.turn === p.a ? p.b : p.a, 'timeout') : nothing;
+  if (!player) return { error: 'You’re not playing this one.' };
+  if (m === 'resign') return finish(other, 'resigned');
+  if (m === 'claim') {
+    if (p.turn === me) return { error: 'It’s your turn.' };
+    if (now - p.lastAt < TIMES.turn) return { error: `${p.turn} has ${Math.ceil((p.lastAt + TIMES.turn - now) / 1000)} more seconds.` };
+    return finish(me, 'timeout');
+  }
+  if (p.turn !== me) return { error: `It’s ${p.turn}’s turn.` };
+  const shoot = (by, at, i) => {
+    const r = bs.fire(p.shots[at], s.ships[at], i);
+    p.shots = { ...p.shots, [at]: r.shots };
+    if (r.sunk >= 0) p.sunk = { ...p.sunk, [at]: [...(p.sunk[at] || []), { k: r.sunk, cells: s.ships[at][r.sunk] }] };
+    p.last = { by, i, hit: r.hit, sunk: r.sunk >= 0 ? bs.FLEET[r.sunk][0] : '' };
+    return r.all;
+  };
+  if (!/^(fire:)?\d+$/.test(m)) return { error: 'Pick a square to fire at.' };
+  const i = +m.replace(/^fire:/, '');
+  if (!(i >= 0 && i < bs.N * bs.N)) return { error: 'Pick a square to fire at.' };
+  if (p.shots[other][i] !== '.') return { error: 'You already fired there.' };
+  p.lastAt = now;
+  p.mine = null;
+  if (shoot(me, other, i)) return finish(me, 'sunk');
+  p.turn = other;
+  if (other === BOT) {
+    // Trotbot answers right away; the card shows both shots.
+    p.mine = p.last;
+    const at = bs.botAim(p.shots[me], sunkCells(p, me), afloat(p, me), rng);
+    if (shoot(BOT, me, at)) return finish(BOT, 'sunk');
+    p.turn = me;
+  }
+  return out();
+}
+
+// Your own fleet, for your screen only (the play function's 'mine' move).
+export const myFleet = (game, secret, me) => (game === 'battleship' ? secret?.ships?.[me] || null : null);
 
 function rpsPick(p, s, me, pick, now) {
   if (s.picks?.[me]) return { error: 'You already picked.' };
