@@ -57,13 +57,15 @@ let saving = null;
 function ensure() {
   saving ||= (async () => {
     if (!(await current())) await save();
+    await saveExtras();
   })().finally(() => (saving = null));
   return saving;
 }
 
 async function enabled() {
   try {
-    const res = await fetch(SCOPE + 'offline.json', { cache: 'no-store' });
+    // Dead Wi-Fi can hang instead of failing: don't wait long.
+    const res = await fetch(SCOPE + 'offline.json', { cache: 'no-store', signal: AbortSignal.timeout(4000) });
     if (res.ok) return (await res.json()).enabled !== false;
   } catch {
     /* offline, or no file: keep going */
@@ -71,44 +73,46 @@ async function enabled() {
   return true;
 }
 
+// Saves one file of this build into the cache (from an older build's copy when it's a hashed file, which never changes).
+async function saveFile(cache, rel) {
+  const url = SCOPE + rel;
+  if (await cache.match(url)) return;
+  let res = null;
+  if (same(rel)) {
+    for (const k of (await caches.keys()).filter((k) => k.startsWith(PREFIX) && k !== CACHE)) {
+      res = await (await caches.open(k)).match(url);
+      if (res) break;
+    }
+  }
+  // The page and unhashed files skip the browser's own cache (GitHub Pages lets it keep them for 10 minutes).
+  res ||= await fetch(url, same(rel) ? undefined : { cache: 'reload' });
+  if (!res.ok) throw new Error(`${rel}: ${res.status}`);
+  await cache.put(url, res.clone());
+}
+
+async function saveAll(cache, files, parallel) {
+  const queue = [...files];
+  await Promise.all(
+    Array.from({ length: parallel }, async () => {
+      for (let rel; (rel = queue.shift()); ) await saveFile(cache, rel);
+    }),
+  );
+}
+
 async function save() {
   // The kill switch is on: install without saving anything.
   if (!(await enabled())) return;
   const cache = await caches.open(CACHE);
-  const older = (await caches.keys()).filter((k) => k.startsWith(PREFIX) && k !== CACHE);
-  const copyOver = async (rel) => {
-    for (const k of older) {
-      const hit = await (await caches.open(k)).match(SCOPE + rel);
-      if (hit) return hit;
-    }
-    return null;
-  };
-  const get = async (rel) => {
-    const url = SCOPE + rel;
-    if (await cache.match(url)) return;
-    const hit = same(rel) ? await copyOver(rel) : null;
-    // The page and unhashed files skip the browser's own cache (GitHub Pages lets it keep them for 10 minutes).
-    const res = hit || (await fetch(url, same(rel) ? undefined : { cache: 'reload' }));
-    if (!res.ok) throw new Error(`${rel}: ${res.status}`);
-    await cache.put(url, res.clone());
-  };
+  await saveAll(cache, MANIFEST.filter((rel) => !optional(rel)), 6);
   // The page last, so a copy of the app only exists once everything it uses is saved.
-  const files = MANIFEST.filter((rel) => !optional(rel));
-  const extra = MANIFEST.filter(optional);
-  const queue = [...files];
-  await Promise.all(
-    Array.from({ length: 6 }, async () => {
-      for (let rel; (rel = queue.shift()); ) await get(rel);
-    }),
-  );
-  await get('');
-  // Part pictures: best effort, in the background of the install.
-  const rest = [...extra];
-  await Promise.all(
-    Array.from({ length: 4 }, async () => {
-      for (let rel; (rel = rest.shift()); ) await get(rel).catch(() => {});
-    }),
-  );
+  await saveFile(cache, '');
+}
+
+// Part pictures: saved quietly after the copy is complete (the page asks on
+// each visit, so a stop halfway picks up next time), never holding up an install.
+async function saveExtras() {
+  const cache = await current();
+  if (cache) await saveAll(cache, MANIFEST.filter(optional), 2).catch(() => {});
 }
 
 self.addEventListener('activate', (event) =>
@@ -117,10 +121,14 @@ self.addEventListener('activate', (event) =>
       // Drop every other build's copy.
       for (const k of await caches.keys()) if (k.startsWith(PREFIX) && k !== CACHE) await caches.delete(k);
       await self.clients.claim();
-      await killCheck(true);
     })(),
   ),
 );
+// Not waited for: activation holds up the page's requests, and the switch is
+// also checked on every page load.
+self.addEventListener('activate', () => {
+  killCheck(true).catch(() => {});
+});
 
 // The kill switch. Off: delete the saved copies; unregister unless this
 // device has notifications on (they live on this worker), in which case it

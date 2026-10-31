@@ -88,8 +88,10 @@ const offlineCopy = {
     const list = files.filter((f) => !skip.includes(f) && !f.startsWith('next/') && !f.startsWith('.')).sort();
     const sw = readFileSync(`${outDir}/sw.js`, 'utf8');
     const out = sw.replace("/*__BUILD__*/ ''", JSON.stringify(CODE_ID)).replace('/*__MANIFEST__*/ []', JSON.stringify(list));
-    if (out === sw) throw new Error('public/sw.js: the build markers are missing');
-    writeFileSync(`${outDir}/sw.js`, out);
+    // No markers = someone replaced the worker on purpose (the emergency
+    // one in docs/3.0-launch.md): leave it as it is.
+    if (out === sw) console.warn('public/sw.js has no build markers; left as is (no offline copy).');
+    else writeFileSync(`${outDir}/sw.js`, out);
   },
 };
 

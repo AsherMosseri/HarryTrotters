@@ -51,6 +51,9 @@ export function setServerReachable(ok) {
 }
 
 export const isOnline = () => online;
+// Only what the browser itself says: enough to refuse a call that can't go out,
+// without blocking one on a wrong guess about the server.
+export const browserIsOnline = () => browserOnline;
 const subscribe = (f) => {
   subs.add(f);
   return () => subs.delete(f);

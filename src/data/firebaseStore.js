@@ -50,7 +50,7 @@ import {
 } from './diff.js';
 import { NEXT } from '../next.js';
 import { swOptions } from '../offline.js';
-import { isOnline, needsInternet, setServerReachable } from '../connection.js';
+import { browserIsOnline, isOnline, needsInternet, setServerReachable } from '../connection.js';
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -85,10 +85,10 @@ function writeBatch(...a) {
 // Pictures, files and anything else that goes through Storage can't wait in
 // the offline copy: say so right away instead of hanging.
 const UPLOAD_OFFLINE = 'Needs internet to upload. Try again when you’re back online.';
-const uploadBytes = (...a) => (isOnline() ? fsUploadBytes(...a) : Promise.reject(needsInternet(UPLOAD_OFFLINE)));
-const deleteObject = (...a) => (isOnline() ? fsDeleteObject(...a) : Promise.reject(needsInternet()));
+const uploadBytes = (...a) => (browserIsOnline() ? fsUploadBytes(...a) : Promise.reject(needsInternet(UPLOAD_OFFLINE)));
+const deleteObject = (...a) => (browserIsOnline() ? fsDeleteObject(...a) : Promise.reject(needsInternet()));
 function uploadBytesResumable(...a) {
-  if (!isOnline()) throw needsInternet(UPLOAD_OFFLINE);
+  if (!browserIsOnline()) throw needsInternet(UPLOAD_OFFLINE);
   return fsUploadBytesResumable(...a);
 }
 
@@ -97,11 +97,12 @@ function uploadBytesResumable(...a) {
 function callable(name, { timeout = 30000, offline } = {}) {
   const call = httpsCallable(getFunctions(app, FUNCTIONS_REGION), name, { timeout });
   return async (data) => {
-    if (!isOnline()) throw needsInternet(offline);
+    if (!browserIsOnline()) throw needsInternet(offline);
     try {
       return await call(data);
     } catch (e) {
-      if (!isOnline()) throw needsInternet(offline);
+      // No answer at all (the same codes the server uses for its own bugs, so only when offline).
+      if (!isOnline() && ['functions/internal', 'functions/unavailable', 'functions/deadline-exceeded'].includes(e?.code)) throw needsInternet(offline);
       // Online but no answer (a slow connection, or the minutes of a deploy).
       if (['functions/unavailable', 'functions/deadline-exceeded'].includes(e?.code))
         throw Object.assign(new Error('Can’t reach the server right now. Try again in a minute.'), { code: e.code });
@@ -314,7 +315,7 @@ export const firebaseStore = {
   // Accounts (functions/index.js account): status, create, signIn, change,
   // list, reset. Returns { ok, member } or { error } (or what was asked for).
   async account(data) {
-    const call = callable('account', { offline: 'Signing in needs internet. Connect to Wi‑Fi and try again.' });
+    const call = callable('account', { offline: 'Needs internet. Connect to Wi‑Fi and try again.' });
     try {
       return (await call(data)).data;
     } catch (e) {
