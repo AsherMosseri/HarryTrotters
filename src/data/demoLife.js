@@ -173,7 +173,9 @@ export function demoLife({ get, commit, uid }) {
     if (!round || !isLive(round)) return;
     if (round.kind === 'match' && now < (round.lockAt || 0)) return;
     const score = runTotal(run);
-    const r = settle(secrets()[round.id] || {}, score, now);
+    // Whoever logged the run can't win it (like the server's settleRound).
+    const loggedBy = [...new Set([run.createdBy, run.updatedBy].filter(Boolean))];
+    const r = settle(secrets()[round.id] || {}, score, now, loggedBy);
     const paid = {};
     for (const n of r.winners)
       paid[n] = award(
@@ -193,6 +195,7 @@ export function demoLife({ get, commit, uid }) {
       score,
       guesses: r.guesses,
       winners: r.winners,
+      loggedBy,
       paid,
       lockedAt: round.lockedAt || now,
       settledAt: now,

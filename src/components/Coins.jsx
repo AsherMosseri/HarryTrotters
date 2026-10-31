@@ -66,7 +66,8 @@ export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onMarket
               <Coins n={wallet.balance} size={30} />
             </b>
             <span className="muted small">
-              {cfg.perTask} for each task you finish · {perHourOf(cfg)} an hour at the lab, paid per 15 minutes
+              {cfg.perTask} for each task you finish (up to {cfg.tasksPerDay} a day) · {perHourOf(cfg)} an hour at the lab, paid per
+              15 minutes
             </span>
             {onMarket && (
               <button className="btn small coins-market" onClick={onMarket}>
@@ -105,10 +106,11 @@ export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onMarket
                         <span className="muted tiny">
                           {relTime(x.at)}
                           {x.capped ? ` · counted ${cfg.dayCap} h max a day` : ''}
+                          {x.note ? ` · ${x.note}` : ''}
                         </span>
                       </span>
-                      <b className={x.amount < 0 ? 'coins-minus' : 'coins-plus'}>
-                        {x.amount > 0 ? '+' : '−'}
+                      <b className={x.amount < 0 ? 'coins-minus' : x.amount > 0 ? 'coins-plus' : 'muted'}>
+                        {x.amount > 0 ? '+' : x.amount < 0 ? '−' : ''}
                         {Math.abs(x.amount)}
                       </b>
                     </li>
@@ -292,6 +294,12 @@ export function CoinsAdmin({ cfg, setCfg, roster, balances, onGrant, ledger, onU
         `Paid for each full 15 minutes of a day’s lab time: ${perHourOf(cfg)} an hour.`,
       )}
       {field('Most hours counted a day', cfg.dayCap, (v) => setCfg({ ...cfg, dayCap: Math.max(1, num(v)) }))}
+      {field(
+        'Most tasks paid a day',
+        cfg.tasksPerDay,
+        (v) => setCfg({ ...cfg, tasksPerDay: num(v) }),
+        'Tasks finished after that, the same day, show in history at 0.',
+      )}
       <h4>Prices</h4>
       {field('Remove ads for 1 hour', cfg.prices.hour, (v) => setPrice('hour', v))}
       {field('Remove ads for the rest of today', cfg.prices.today, (v) => setPrice('today', v))}

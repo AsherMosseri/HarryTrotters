@@ -8,7 +8,8 @@
 //     openedBy, openedAt, lockAt (a match's start time), lockedAt, lockedBy,
 //     guessers: [names],                 ← who guessed, shown while it's open
 //     guesses: { name: score },          ← filled in when it locks
-//     runId, score, winners: [names], paid: { name: coins }, note, settledAt }
+//     runId, score, winners: [names], paid: { name: coins }, note, settledAt,
+//     loggedBy: [names] }                ← who logged the run: their guess can't win
 // The guesses themselves wait in predictions/{id}/secret/guesses until then.
 // The app and the server use this same file.
 
@@ -51,10 +52,13 @@ export function guessProblem(round, me, now, match = null) {
 }
 
 // Who wins: the closest guesses made before `before` (ms; the run's log
-// time), all of them on a tie. guesses: { name: { score, at } }.
-export function settle(guesses, score, before = Infinity) {
-  const valid = Object.entries(guesses || {}).filter(([, g]) => cleanScore(g?.score) !== null && (g.at || 0) <= before);
-  const shown = Object.fromEntries(valid.map(([n, g]) => [n, g.score]));
+// time), all of them on a tie. guesses: { name: { score, at } }. out: names
+// that can't win (whoever logged the run: they could type in their own
+// guess); their guess still shows, and the rest settle as if it weren't there.
+export function settle(guesses, score, before = Infinity, out = []) {
+  const made = Object.entries(guesses || {}).filter(([, g]) => cleanScore(g?.score) !== null && (g.at || 0) <= before);
+  const shown = Object.fromEntries(made.map(([n, g]) => [n, g.score]));
+  const valid = made.filter(([n]) => !out.includes(n));
   if (valid.length < MIN_GUESSERS) return { guesses: shown, winners: [], off: null, pays: {} };
   const off = Math.min(...valid.map(([, g]) => Math.abs(g.score - score)));
   const winners = valid.filter(([, g]) => Math.abs(g.score - score) === off).map(([n]) => n);
@@ -69,7 +73,8 @@ export const predictKey = (roundId, name) => `predict-${roundId}-${nameKey(name)
 export function winnerLine(round) {
   const w = round?.winners || [];
   if (round?.status !== 'done') return '';
-  if (!w.length) return Object.keys(round.guesses || {}).length < MIN_GUESSERS ? 'Not enough guesses to pay out.' : '';
+  const counted = Object.keys(round.guesses || {}).filter((n) => !(round.loggedBy || []).includes(n));
+  if (!w.length) return counted.length < MIN_GUESSERS ? 'Not enough guesses to pay out.' : '';
   const first = (n) => n.split(' ')[0];
   const g = round.guesses?.[w[0]];
   const names = w.length === 1 ? first(w[0]) : w.length === 2 ? `${first(w[0])} and ${first(w[1])}` : `${w.length} people`;

@@ -51,7 +51,8 @@ export function houseNumbers(bank) {
     won,
     lost,
     house: lost - won,
-    // Everything else banks hold: /daily, /work, /beg, trivia and hangman prizes.
+    // Everything else banks hold: /work, /beg (and /daily and free-game prizes
+    // from before they were paid as awards).
     economy: sum('net') - (won - lost),
     games: Object.entries(games)
       .map(([g, t]) => ({ g, ...t, house: t.lost - t.won }))
@@ -196,7 +197,7 @@ export default function CommandsPage({ cfg = {}, channels, bank, lottery, onSave
                   </div>
                 </div>
                 <div className="muted small">
-                  /daily, /work, /beg, and game prizes have handed out {coins(Math.max(0, h.economy))} so far.
+                  /work and /beg (and, before 3.0, /daily and game prizes) have handed out {coins(Math.max(0, h.economy))} so far.
                   {lottery?.pot ? ` The lottery pot is ${coins(lottery.pot)}.` : ''}
                 </div>
                 <h4>By game</h4>

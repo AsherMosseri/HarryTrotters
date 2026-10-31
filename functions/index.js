@@ -13,11 +13,12 @@ import { initializeApp } from 'firebase-admin/app';
 import { FieldPath, FieldValue, getFirestore } from 'firebase-admin/firestore';
 import { getMessaging } from 'firebase-admin/messaging';
 import { fetchPage, firstLink, readPreview } from './preview.js';
-import { coinSettings, coinsByName, giftEntry, prizeEntry, wallet } from './shared/coins.js';
+import { AWARD_CAPS, coinSettings, coinsByName, giftEntry, prizeEntry, wallet } from './shared/coins.js';
 import * as casino from './shared/casino.js';
 import * as arcade from './shared/arcade.js';
 import { blocked, isOff, serverGroup } from './shared/commandRules.js';
-import { awardCoins } from './award.js';
+import { awardCoins, prepareAward } from './award.js';
+import * as arcadeBank from './banks/arcade.js';
 import * as fun from './shared/funGames.js';
 import { LEVELS as MINE_LEVELS } from './shared/minesweeper.js';
 import { attemptSeed, newSeed } from './shared/rng.js';
@@ -1015,7 +1016,7 @@ async function coinData() {
   ]);
   // Same as the app: assignees by their current names, deleted tasks left out.
   const taskList = tasks.docs
-    .map((d) => d.data())
+    .map((d) => ({ id: d.id, ...d.data() }))
     .filter((t) => !t.deletedAt)
     .map((t) => ({
       ...t,
@@ -1102,11 +1103,11 @@ async function workContext(me, data) {
 
 // Multiplayer games pay several people at once: read every bank first (a
 // transaction reads before it writes), then apply each change in order.
-// Winnings from the free games (x.free) stop at arcade.FREE_DAILY a day.
+// (Prizes from the free games are awards instead: payAwards.)
 async function payOut(tx, money, banks, now) {
   const names = [...new Set(money.map((x) => x.name))];
   for (const n of names) if (!banks[n]) banks[n] = (await tx.get(bankRef(n))).data() || {};
-  for (const x of money) banks[x.name] = casino.bankAfter(banks[x.name], x.name, ...arcade.paid(x, banks[x.name], nyDay(now)), now);
+  for (const x of money) banks[x.name] = casino.bankAfter(banks[x.name], x.name, x.delta, x.entry, x.extra || {}, now);
   for (const n of names) tx.set(bankRef(n), banks[n]);
 }
 
@@ -1191,16 +1192,28 @@ async function runMove({ conv, msgId, me, move, data, now, house = false, verifi
     tx.update(msgRef, update);
     return { ok: true, serverNow: now };
   });
-  return payAwards(res, msgId, now);
+  const { awards, ...rest } = res || {};
+  const cut = await payAwards(awards, msgId, now);
+  // A prize the daily game limit cut short: the card shows what it paid.
+  if (Object.keys(cut).length) await msgRef.update({ 'cmd.game.paid': cut }).catch(() => {});
+  return rest;
 }
 
-// Coins a game's end pays (arcade.js awards, like beating someone at
-// Battleship): through awardCoins, once per game and person.
-async function payAwards(res, msgId, now) {
-  const { awards, ...rest } = res || {};
-  for (const a of awards || [])
-    await awardCoins(db, { person: a.person, amount: a.amount, source: 'game', label: a.label, key: `game-${msgId}-${personId(a.person)}` }, now);
-  return rest;
+// Coins a game's end pays (arcade.js awards: beating someone at Battleship,
+// a trivia answer, a hangman word…): through awardCoins, once per game and
+// person, within the 'game' daily limit. Returns { name: paid } for the
+// prizes the limit cut short.
+async function payAwards(awards, msgId, now) {
+  const cut = {};
+  for (const a of awards || []) {
+    const paid = await awardCoins(
+      db,
+      { person: a.person, amount: a.amount, source: 'game', label: a.label, key: `game-${msgId}-${personId(a.person)}` },
+      now,
+    );
+    if (paid < a.amount) cut[a.person] = paid;
+  }
+  return cut;
 }
 
 export const play = onCall({ maxInstances: 5, invoker: 'public' }, async (req) => {
@@ -1308,7 +1321,8 @@ export const play = onCall({ maxInstances: 5, invoker: 'public' }, async (req) =
     }
 
     if (isArcade) {
-      const r = arcade.start(game, { me, words, roster, balance, bank: myBank, now });
+      const content = { trivia: arcadeBank.TRIVIA, words: arcadeBank.WORDS };
+      const r = arcade.start(game, { me, words, roster, balance, bank: myBank, now, content });
       if (r.error) return note(r.error);
       await payOut(tx, r.money, { [me]: myBank }, now);
       tx.set(db.doc(`gameSecrets/${msgRef.id}`), secretWith(r.secret, conv, now));
@@ -1400,6 +1414,20 @@ export const play = onCall({ maxInstances: 5, invoker: 'public' }, async (req) =
           : casino.beg(myBank, now);
     if (r.error) return note(r.error);
     const label = { daily: `Daily coins (streak ${r.card.streak})`, work: `Work: ${r.card.job}`, beg: 'Begging' }[game];
+    if (game === 'daily') {
+      // /daily is an award (source 'game'): it shares the 20-a-day limit
+      // with the games. The bank keeps the streak.
+      const a = await prepareAward(
+        tx,
+        db,
+        { person: me, amount: r.amount, source: 'game', label, key: `cmd-daily-${personId(me)}-${nyDay(now)}` },
+        now,
+      );
+      a.write(tx);
+      tx.set(bankRef(me), casino.bankAfter(myBank, me, 0, null, r.bank, now));
+      post(tx, { ...r.card, amount: a.pay, ...(a.pay < r.amount && { limit: AWARD_CAPS.game }) });
+      return { ok: true };
+    }
     tx.set(
       bankRef(me),
       casino.bankAfter(myBank, me, r.amount, r.amount ? { icon: { daily: '📅', work: '🛠️', beg: '🥺' }[game], label } : null, r.bank, now),

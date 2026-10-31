@@ -58,7 +58,7 @@ export const COMMANDS = [
   { name: 'wave', group: 'actions', args: '@person', desc: 'Say hi' },
 
   { name: 'balance', group: 'economy', args: '@person', desc: 'How many Jackson coins (yours or theirs)' },
-  { name: 'daily', group: 'economy', args: '', desc: 'Free coins once a day (streaks pay more)', server: true },
+  { name: 'daily', group: 'economy', args: '', desc: 'Free coins once a day (shares the 20-a-day game limit)', server: true },
   { name: 'work', group: 'economy', args: '', desc: 'Coins for your work, while you’re clocked in (once an hour)', server: true },
   { name: 'beg', group: 'economy', args: '', desc: 'Ask around for coins. No promises.', server: true },
   { name: 'give', group: 'economy', args: '@person amount', desc: 'Send someone coins' },

@@ -389,7 +389,8 @@ function BingoDialog({ card, onClose, onOpen }) {
           </p>
           {waiting && <p className="muted small">Some lines will pay tomorrow: bingo pays up to 25 coins a day.</p>}
           <p className="muted small bingo-how">
-            Squares fill in by themselves from your shifts, lab logs, tasks and the match log. A full row, column or diagonal pays{' '}
+            Squares fill in by themselves from your shifts, lab logs, tasks and the match log (lab logs count on days you had a
+            shift). A full row, column or diagonal pays{' '}
             <span className="mono">{LINE_COINS}</span> coins, and the whole card <span className="mono">{FULL_COINS}</span> more. Same card
             for everyone; a new one every Monday.
           </p>
@@ -458,6 +459,7 @@ function Guesses({ round }) {
           <Avatar name={n} size={22} />
           <span className="guess-name">{firstName(n)}</span>
           {g != null && <b className="mono">{g}</b>}
+          {(round.loggedBy || []).includes(n) && <span className="muted tiny">logged the run</span>}
           {round.paid?.[n] > 0 && <span className="guess-coins mono">+{round.paid[n]}</span>}
         </li>
       ))}
@@ -515,7 +517,7 @@ function RoundBox({ round, title, actor, api, mine, remember, onGuess, canLock, 
             {hint && (
               <p className="muted small">
                 Closest guess wins <span className="mono">{WIN_COINS}</span> coins (spot on, double). One guess each, hidden until it
-                starts.
+                starts. Whoever logs the score can’t win it.
               </p>
             )}
           </>

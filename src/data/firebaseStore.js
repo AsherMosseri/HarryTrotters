@@ -742,11 +742,16 @@ export const firebaseStore = {
   },
 
   createRun(data, actor) {
-    return setDoc(doc(runsCol), { ...newRunDefaults(data), createdAt: serverTimestamp(), createdBy: actor.name });
+    return setDoc(doc(runsCol), {
+      ...newRunDefaults(data),
+      createdAt: serverTimestamp(),
+      createdBy: actor.name,
+      createdByUid: actor.uid,
+    });
   },
 
   updateRun(id, patch, actor) {
-    return updateDoc(doc(runsCol, id), { ...patch, updatedAt: serverTimestamp(), updatedBy: actor.name });
+    return updateDoc(doc(runsCol, id), { ...patch, updatedAt: serverTimestamp(), updatedBy: actor.name, updatedByUid: actor.uid });
   },
 
   deleteRun(id) {
@@ -775,8 +780,8 @@ export const firebaseStore = {
     batch.set(
       runRef,
       ours.runId
-        ? { ...run, updatedAt: serverTimestamp(), updatedBy: actor.name }
-        : { ...newRunDefaults(run), createdAt: serverTimestamp(), createdBy: actor.name },
+        ? { ...run, updatedAt: serverTimestamp(), updatedBy: actor.name, updatedByUid: actor.uid }
+        : { ...newRunDefaults(run), createdAt: serverTimestamp(), createdBy: actor.name, createdByUid: actor.uid },
       { merge: true },
     );
     batch.update(doc(matchesCol, matchId), {

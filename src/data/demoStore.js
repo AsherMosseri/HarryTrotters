@@ -786,8 +786,30 @@ function demoAward({ person, amount, source, label = '', key = '' }, now = Date.
   if (key) state.awardKeys = { ...keys, [key]: { person, source, day, at: now } };
   return pay;
 }
+// Returns { name: paid } for prizes the daily limit cut short (shown on the card).
 const payDemoAwards = (awards, msgId, now) => {
-  for (const a of awards || []) demoAward({ ...a, source: 'game', key: `game-${msgId}-${personId(a.person)}` }, now);
+  const cut = {};
+  for (const a of awards || []) {
+    const paid = demoAward({ ...a, source: 'game', key: `game-${msgId}-${personId(a.person)}` }, now);
+    if (paid < a.amount) cut[a.person] = paid;
+  }
+  return cut;
+};
+// Demo mode's own few /trivia questions and /hangman words. The real ones
+// stay on the server (functions/banks/arcade.js), out of the app.
+const DEMO_ARCADE = {
+  trivia: [
+    ['How long is the autonomous period of an FTC match?', '30 seconds', '15 seconds', '45 seconds', '1 minute'],
+    ['What does CAD stand for?', 'Computer-aided design', 'Custom assembly drawing', 'Calibrated axis drive', 'Coded arm design'],
+    ['Which tool measures a part’s thickness most precisely?', 'Calipers', 'A tape measure', 'A ruler', 'A square'],
+    ['What does a motor encoder count?', 'How far the shaft turned', 'The battery’s voltage', 'The motor’s temperature', 'The robot’s weight'],
+  ],
+  words: [
+    ['ALLEN KEY', 'Tool'],
+    ['GYROSCOPE', 'Sensor'],
+    ['SPROCKET', 'Part'],
+    ['AUTONOMOUS', 'Match'],
+  ],
 };
 
 function setCard({ conv, id }, fields) {
@@ -1347,7 +1369,7 @@ export const demoStore = {
     const done = (r) => (commit(), r);
     // Several people's coins at once (multiplayer games).
     const payOut = (money) => {
-      for (const x of money) setBank(x.name, casino.bankAfter(bank(x.name), x.name, ...arcade.paid(x, bank(x.name), teamDay(now)), now));
+      for (const x of money) setBank(x.name, casino.bankAfter(bank(x.name), x.name, x.delta, x.entry, x.extra || {}, now));
     };
 
     // Gifts and ad prizes, checked the way the server checks them.
@@ -1382,8 +1404,9 @@ export const demoStore = {
         if (r.error) return note(r.error);
         if (!r.write) return { ok: true, serverNow: now };
         payOut(r.money);
-        payDemoAwards(r.awards, msgId, now);
+        const cut = payDemoAwards(r.awards, msgId, now);
         const { status, ...g } = r.pub;
+        if (Object.keys(cut).length) g.paid = cut;
         if (arcade.isLive(status)) state.gameSecrets = { ...state.gameSecrets, [msgId]: r.secret };
         else delete state.gameSecrets[msgId];
         state.chat = { ...state.chat, [conv]: list.map((x) => (x.id === msgId ? { ...x, cmd: { ...c, game: g, status } } : x)) };
@@ -1416,7 +1439,7 @@ export const demoStore = {
     const balance = balanceOf(me);
     const mine = bank(me);
     if (arcade.MULTI.includes(game)) {
-      const r = arcade.start(game, { me, words, roster, balance, bank: mine, now });
+      const r = arcade.start(game, { me, words, roster, balance, bank: mine, now, content: DEMO_ARCADE });
       if (r.error) return note(r.error);
       payOut(r.money);
       const { status, ...g } = r.pub;
@@ -1520,6 +1543,13 @@ export const demoStore = {
           : casino.beg(mine, now);
     if (r.error) return note(r.error);
     const label = { daily: `Daily coins (streak ${r.card.streak})`, work: `Work: ${r.card.job}`, beg: 'Begging' }[game];
+    if (game === 'daily') {
+      // Like the server: an award within the 20-a-day game limit; the bank keeps the streak.
+      const paid = demoAward({ person: me, amount: r.amount, source: 'game', label, key: `cmd-daily-${personId(me)}-${teamDay(now)}` }, now);
+      setBank(me, casino.bankAfter(mine, me, 0, null, r.bank, now));
+      post({ ...r.card, amount: paid, ...(paid < r.amount && { limit: AWARD_CAPS.game }) });
+      return done({ ok: true });
+    }
     setBank(
       me,
       casino.bankAfter(mine, me, r.amount, r.amount ? { icon: { daily: '📅', work: '🛠️', beg: '🥺' }[game], label } : null, r.bank, now),
