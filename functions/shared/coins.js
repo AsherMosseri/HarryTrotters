@@ -7,11 +7,19 @@
 // else created it (no paying yourself for tasks you made up), for at most
 // tasksPerDay of them a team day; perQuarter for every full 15 minutes at the
 // lab (4 an hour), at most dayCap hours a day.
-// Everything since `start`.
+// Everything since `start`. Days before RATES_FROM (the 3.0 launch) keep
+// 2.75's rules, so nobody's balance changes at the launch.
 // Nobody earns coins from ads (views and taps are still counted for the ads
 // dashboard; they just don't pay).
 
 import { mergedMs } from './hours.js';
+
+// The team day 3.0's earning rules start (4 an hour in 15-minute steps, cut
+// at midnight, at most tasksPerDay paid tasks a day). Earlier days pay as
+// 2.75 did: perHourBefore an hour, rounded down per day, each shift counted
+// on the day it started, every finished task paid. The lead sets this to the
+// launch day when 3.0 goes out.
+export const RATES_FROM = '2026-11-02';
 
 export const COIN_DEFAULTS = {
   perTask: 15,
@@ -19,8 +27,9 @@ export const COIN_DEFAULTS = {
   // audit: friends could make tasks for each other and farm them).
   tasksPerDay: 5,
   // Coins for each full 15 minutes at the lab. It replaced perHour (5 an
-  // hour), so an old perHour saved in settings/team.coins is ignored.
+  // hour), which now only pays days before RATES_FROM (perHourBefore).
   perQuarter: 1,
+  perHourBefore: 5,
   dayCap: 10,
   start: '2026-08-28',
   prices: { hour: 10, today: 25, week: 120, skip: 2 },
@@ -41,9 +50,16 @@ export const AWARD_CAPS = {
 
 export function coinSettings(raw) {
   // Old settings that no longer do anything (the hourly rate and ad money).
+  // A perHour saved before 3.0 is the rate for days before RATES_FROM.
   const rest = { ...(raw || {}) };
   for (const k of ['perHour', 'viewsPerCoin', 'perTap']) delete rest[k];
-  return { ...COIN_DEFAULTS, ...rest, prices: { ...COIN_DEFAULTS.prices, ...(raw?.prices || {}) } };
+  const before = Number(raw?.perHourBefore ?? raw?.perHour);
+  return {
+    ...COIN_DEFAULTS,
+    ...rest,
+    perHourBefore: Number.isFinite(before) && before >= 0 ? before : COIN_DEFAULTS.perHourBefore,
+    prices: { ...COIN_DEFAULTS.prices, ...(raw?.prices || {}) },
+  };
 }
 // Coins an hour at the lab (for the help text and the Coins page).
 export const perHourOf = (cfg) => cfg.perQuarter * 4;
@@ -95,8 +111,12 @@ const toMs = (v) => (v && typeof v.toMillis === 'function' ? v.toMillis() : type
 // Everything someone has earned, newest first: [{ at, amount, icon, label, kind }].
 export function earnedItems(name, { tasks = [], shifts = [], cfg, now = Date.now() }) {
   const from = startMs(cfg);
+  // Where 3.0's rules start. A ratesFrom in settings/team.coins overrides it
+  // (the emulator tests use that); the constant is what ships.
+  const switchDay = cfg.ratesFrom || RATES_FROM;
+  const switchAt = teamMidnight(switchDay);
   const items = [];
-  // Tasks pay for the first tasksPerDay finished each team day, in the order
+  // From RATES_FROM, tasks pay for the first tasksPerDay finished each team day, in the order
   // they were finished (then by id), so the same ones always count, here and
   // on the server. Later ones still show, at 0. Moving a task out of Done and
   // back gives it a new finish time, so it lines up again behind the others.
@@ -110,6 +130,11 @@ export function earnedItems(name, { tasks = [], shifts = [], cfg, now = Date.now
   done.sort((a, b) => a.at - b.at || String(a.t.id || '').localeCompare(String(b.t.id || '')));
   const perDay = new Map();
   for (const { t, at } of done) {
+    // Before the switch every finished task paid (2.75).
+    if (at < switchAt) {
+      items.push({ kind: 'task', at, amount: cfg.perTask, icon: '✅', label: t.title || 'A task' });
+      continue;
+    }
     const day = teamDay(at);
     const n = (perDay.get(day) || 0) + 1;
     perDay.set(day, n);
@@ -129,21 +154,48 @@ export function earnedItems(name, { tasks = [], shifts = [], cfg, now = Date.now
   // past midnight is cut at midnight, so each day counts only its own time:
   // otherwise a shift from 11 PM to 11 AM and another from midnight to 11 AM
   // would land on different days and the same hours would pay twice.
+  // Before RATES_FROM it's 2.75's way: each shift on the day it started,
+  // merged and capped per day, perHourBefore an hour rounded down. Time past
+  // the switch's midnight counts on the new days.
+  const oldDays = new Map();
   const byDay = new Map();
   for (const s of shifts) {
     if (s.person !== name || !s.start || s.start < from) continue;
+    let start = s.start;
     const end = Math.max(s.start, s.end ?? now);
-    for (let day = teamDay(s.start), i = 0; i < 400; i++) {
+    if (start < switchAt) {
+      const key = teamDay(start);
+      oldDays.set(key, [...(oldDays.get(key) || []), { start, end: Math.min(end, switchAt) }]);
+      if (end <= switchAt) continue;
+      start = switchAt;
+    }
+    for (let day = teamDay(start), i = 0; i < 400; i++) {
       const next = nextMidnight(day);
-      const piece = { start: Math.max(s.start, teamMidnight(day)), end: Math.min(end, next) };
+      const piece = { start: Math.max(start, teamMidnight(day)), end: Math.min(end, next) };
       byDay.set(day, [...(byDay.get(day) || []), piece]);
       if (end <= next) break;
       day = teamDay(next);
     }
   }
-  const days = new Map(
-    [...byDay].map(([key, list]) => [key, { minutes: mergedMs(list, now) / 60000, at: Math.max(...list.map((s) => s.end || now)) }]),
-  );
+  const dayOf = ([key, list]) => [key, { minutes: mergedMs(list, now) / 60000, at: Math.max(...list.map((s) => s.end || now)) }];
+  for (const [key, d] of [...oldDays].map(dayOf)) {
+    const minutes = Math.min(d.minutes, cfg.dayCap * 60);
+    const amount = Math.floor((minutes * cfg.perHourBefore) / 60);
+    if (amount > 0) {
+      const hours = Math.round((minutes / 60) * 10) / 10;
+      items.push({
+        kind: 'hours',
+        at: d.at,
+        amount,
+        icon: '⏱',
+        label: `${hours} h at the lab`,
+        day: key,
+        capped: d.minutes > minutes,
+        note: `before 3.0: ${cfg.perHourBefore} an hour`,
+      });
+    }
+  }
+  const days = new Map([...byDay].map(dayOf));
   for (const [key, d] of days) {
     const minutes = Math.min(d.minutes, cfg.dayCap * 60);
     const amount = coinsForMinutes(d.minutes, cfg);
