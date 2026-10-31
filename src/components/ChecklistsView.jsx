@@ -3,6 +3,7 @@ import { STARTER_CHECKLISTS, starterItems } from '../checklists.js';
 import { itemId } from '../data/diff.js';
 import { fullTime } from '../util.js';
 import { CloseIcon, DraftInput, PlusIcon } from './common.jsx';
+import { confirmDialog } from './Dialogs.jsx';
 
 function ChecklistCard({ list, api, isManager, fresh }) {
   const [text, setText] = useState('');
@@ -64,13 +65,29 @@ function ChecklistCard({ list, api, isManager, fresh }) {
       </form>
       <footer className="row gap">
         {done > 0 && (
-          <button className="link-btn" onClick={() => confirm(`Uncheck everything in “${list.title}”?`) && api.uncheckAll(list, items)}>
+          <button
+            className="link-btn"
+            onClick={async () =>
+              (await confirmDialog({ title: `Uncheck everything in “${list.title}”?`, okLabel: 'Uncheck all' })) &&
+              api.uncheckAll(list, items)
+            }
+          >
             Uncheck all
           </button>
         )}
         <span className="spacer" />
         {isManager && (
-          <button className="link-btn danger" onClick={() => confirm(`Delete the “${list.title}” checklist?`) && api.deleteChecklist(list)}>
+          <button
+            className="link-btn danger"
+            onClick={async () =>
+              (await confirmDialog({
+                title: `Delete the “${list.title}” checklist?`,
+                body: 'This can’t be undone.',
+                okLabel: 'Delete',
+                danger: true,
+              })) && api.deleteChecklist(list)
+            }
+          >
             Delete checklist
           </button>
         )}

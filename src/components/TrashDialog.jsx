@@ -1,5 +1,6 @@
 import { relTime, useEscape } from '../util.js';
 import { CloseIcon, Overlay, StatusDot } from './common.jsx';
+import { confirmDialog } from './Dialogs.jsx';
 
 export default function TrashDialog({ trash, days, isManager, api, onClose }) {
   useEscape(onClose);
@@ -33,7 +34,14 @@ export default function TrashDialog({ trash, days, isManager, api, onClose }) {
                 {isManager && (
                   <button
                     className="link-btn danger"
-                    onClick={() => confirm(`Delete “${t.title || 'Untitled'}” forever? This can't be undone.`) && api.deleteForever(t)}
+                    onClick={async () =>
+                      (await confirmDialog({
+                        title: `Delete “${t.title || 'Untitled'}” forever?`,
+                        body: 'This can’t be undone.',
+                        okLabel: 'Delete forever',
+                        danger: true,
+                      })) && api.deleteForever(t)
+                    }
                   >
                     Delete forever
                   </button>

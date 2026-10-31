@@ -11,6 +11,7 @@ import { matchCommands, parseCommand, runCommand } from '../../commands.js';
 import { CommandOption } from './Commands.jsx';
 import { whatIs } from './Message.jsx';
 import { relTime } from '../../util.js';
+import { alertDialog } from '../Dialogs.jsx';
 
 // The formatting bar: [label, title, what it does].
 const FORMATS = [
@@ -255,8 +256,9 @@ export default function Composer({
     }
   };
   const uploadGif = async (file) => {
-    if (file.type !== 'image/gif') return alert('That file is not a GIF.');
-    if (file.size > 8e6) return alert('That GIF is too big (8 MB max).');
+    if (file.type !== 'image/gif')
+      return alertDialog({ title: 'That file isn’t a GIF.', body: 'Pick a .gif file, or send it as a photo or file.' });
+    if (file.size > 8e6) return alertDialog({ title: 'That GIF is too big.', body: 'GIFs can be up to 8 MB.' });
     setPanel(null);
     setSending(true);
     try {
@@ -269,7 +271,7 @@ export default function Composer({
   };
   // Any file up to 25 MB goes out as its own message (videos play in chat).
   const sendFile = async (f) => {
-    if (f.size > 25e6) return alert('That file is too big (25 MB max).');
+    if (f.size > 25e6) return alertDialog({ title: 'That file is too big.', body: 'Files can be up to 25 MB.' });
     setPanel(null);
     setUpload({ name: f.name, progress: 0 });
     try {

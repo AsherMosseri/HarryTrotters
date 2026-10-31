@@ -6,6 +6,7 @@ import { Avatar, CloseIcon, DisplayName, Nameplate, Overlay, usePeople } from '.
 import { renderRich } from './format.jsx';
 import { timeOf } from './Message.jsx';
 import { useEscape } from '../../util.js';
+import { confirmDialog } from '../Dialogs.jsx';
 
 const dateOf = (ms) => new Date(ms).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 
@@ -289,7 +290,14 @@ export function ChannelDialog({ channel, channels, onSave, onDelete, onMove, onC
               <button
                 type="button"
                 className="btn danger"
-                onClick={() => confirm(`Delete #${channel.name}? Its messages will be hidden.`) && onDelete()}
+                onClick={async () =>
+                  (await confirmDialog({
+                    title: `Delete #${channel.name}?`,
+                    body: 'Its messages will be hidden.',
+                    okLabel: 'Delete channel',
+                    danger: true,
+                  })) && onDelete()
+                }
               >
                 Delete channel
               </button>

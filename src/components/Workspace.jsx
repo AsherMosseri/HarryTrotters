@@ -82,6 +82,7 @@ import { coinSettings, coinsByName, wallet } from '../coins.js';
 import { hoursOf, mergedMs } from '../../functions/shared/hours.js';
 import { teamDay } from '../../functions/shared/coins.js';
 import { streaksOf } from '../../functions/shared/streaks.js';
+import { confirmDialog } from './Dialogs.jsx';
 
 // Versions were renumbered once (2.0 became 1.9, 2.1 became 2.0, and so
 // on). Move this device's "last seen" version along so What's new doesn't
@@ -2081,7 +2082,13 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
       </div>
       <button
         className="link-btn me-switch"
-        onClick={() => confirm('Switch user? You’ll sign in again with a name and password.') && store.leave()}
+        onClick={async () =>
+          (await confirmDialog({
+            title: 'Switch user?',
+            body: 'You’ll sign in again with a name and password.',
+            okLabel: 'Switch user',
+          })) && store.leave()
+        }
       >
         Switch user
       </button>

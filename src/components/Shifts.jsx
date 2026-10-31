@@ -10,6 +10,7 @@ import { teamDay } from '../../functions/shared/coins.js';
 import { cleanSkips, nextSchoolDay, scheduledOn } from '../../functions/shared/checkin.js';
 import { seasonStats, versusLastWeek } from '../../functions/shared/stats.js';
 import { streaksOf } from '../../functions/shared/streaks.js';
+import { confirmDialog } from './Dialogs.jsx';
 
 const MIN = 60000;
 const HOUR = 60 * MIN;
@@ -1084,9 +1085,12 @@ export default function ShiftsView({
                       <button
                         className="btn small-btn"
                         // Ending it for them skips the lab log they'd fill in when ending it themselves.
-                        onClick={() =>
-                          confirm(`End ${s.person.split(' ')[0]}’s shift now? They won’t get to fill in their lab log first.`) &&
-                          api.updateShift(s.id, { end: Date.now() })
+                        onClick={async () =>
+                          (await confirmDialog({
+                            title: `End ${s.person.split(' ')[0]}’s shift now?`,
+                            body: 'They won’t get to fill in their lab log first.',
+                            okLabel: 'End shift',
+                          })) && api.updateShift(s.id, { end: Date.now() })
                         }
                       >
                         End
@@ -1166,12 +1170,19 @@ export default function ShiftsView({
                           className="icon-btn small"
                           aria-label="Delete planned shift"
                           title="Delete"
-                          onClick={() => {
-                            if (!confirm('Delete this planned shift?')) return;
+                          onClick={async () => {
+                            if (!(await confirmDialog({ title: 'Delete this planned shift?', okLabel: 'Delete', danger: true }))) return;
                             const later = p.repeatId
                               ? plans.filter((x) => x.repeatId === p.repeatId && x.date > p.date).map((x) => x.id)
                               : [];
-                            const alsoLater = later.length > 0 && confirm(`Also delete the ${later.length} later repeats?`);
+                            const alsoLater =
+                              later.length > 0 &&
+                              (await confirmDialog({
+                                title: `Also delete the ${later.length} later ${later.length === 1 ? 'repeat' : 'repeats'}?`,
+                                okLabel: 'Delete them too',
+                                cancelLabel: 'Just this one',
+                                danger: true,
+                              }));
                             api.deleteShiftPlans([p.id, ...(alsoLater ? later : [])]);
                           }}
                         >

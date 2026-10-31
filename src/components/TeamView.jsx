@@ -19,6 +19,7 @@ import { personId } from '../data/diff.js';
 import { todayISO } from '../milestones.js';
 import { Avatar, CloseIcon } from './common.jsx';
 import { useEscape } from '../util.js';
+import { confirmDialog } from './Dialogs.jsx';
 
 // Team Management sits under the team name with the subteams below it;
 // Secretary is a support role that hangs off to the side of Team Management.
@@ -332,7 +333,12 @@ export default function TeamView({ roster, roles, tasks, api, isManager, rename,
               ? null
               : async () => {
                   if (
-                    !confirm(`Remove ${editing.name} from the team? Their tasks stay, but they disappear from the org chart and pickers.`)
+                    !(await confirmDialog({
+                      title: `Remove ${editing.name} from the team?`,
+                      body: 'Their tasks stay, but they disappear from the org chart and pickers.',
+                      okLabel: 'Remove',
+                      danger: true,
+                    }))
                   )
                     return;
                   const p = editing;

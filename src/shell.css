@@ -1654,3 +1654,33 @@ button.pm-row:hover { background: color-mix(in srgb, var(--text) 4%, transparent
 @media (max-width: 760px) {
   .pp-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* ---------- Ask dialogs (Dialogs.jsx: confirm, alert, prompt) ----------
+   A small centered card everywhere, phones included (other pop-ups fill a
+   phone's screen). Above any panel or dialog it was opened from. */
+.panel-backdrop.center.ask-backdrop { z-index: 55; align-items: center; padding: 16px; }
+.panel-backdrop.center > .dialog.ask {
+  width: min(400px, 100%); height: auto; min-height: 0; max-height: 100%;
+  border-radius: 16px; padding: 20px 20px 16px; gap: 10px; outline: none;
+}
+.dialog.ask h2 { margin: 0; font-size: 18px; line-height: 1.3; overflow-wrap: anywhere; }
+.dialog.ask p { margin: 0; line-height: 1.45; white-space: pre-line; overflow-wrap: anywhere; }
+.dialog.ask .ask-field { display: flex; flex-direction: column; gap: 4px; }
+.dialog.ask .ask-field .input { width: 100%; font-size: 16px; }
+.dialog.ask .ask-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
+.dialog.ask .ask-actions .btn { min-height: 38px; padding: 0 16px; font-weight: 600; }
+.btn.danger.solid { background: var(--danger); border-color: var(--danger); color: #fff; }
+.btn.danger.solid:hover { background: color-mix(in srgb, var(--danger) 88%, #000); }
+@media (max-width: 760px) {
+  /* Phones paint full-screen pop-ups' backdrops solid; these keep the page
+     showing, dimmed, behind the card (the delete-messages one too). */
+  :root .panel-backdrop.center.ask-backdrop,
+  :root .panel-backdrop.center:has(> .dialog.delete-msgs) { background: rgb(10 12 20 / 40%); padding: 16px; }
+  .panel-backdrop.center > .dialog.ask { width: min(400px, 100%); min-height: 0; border-radius: 16px; }
+  /* Thumb-sized buttons that share the row. */
+  .dialog.ask .ask-actions .btn { flex: 1; min-height: 44px; }
+}
+.dialog.ask .ask-actions .btn { justify-content: center; }
+/* Dark: a hairline so the card doesn't melt into a dark page. */
+@media (prefers-color-scheme: dark) { :root:not([data-theme='light']) .dialog.ask { box-shadow: var(--shadow-lg), 0 0 0 1px var(--border); } }
+:root[data-theme='dark'] .dialog.ask { box-shadow: var(--shadow-lg), 0 0 0 1px var(--border); }

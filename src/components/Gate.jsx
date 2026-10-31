@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { TEAM_NAME, TEAM_NICKNAME, ROSTER, PASSWORD_MIN, cleanName, sameName } from '../config.js';
 import { Avatar } from './common.jsx';
 import { homeAppUrl } from '../data/push.js';
+import { promptDialog } from './Dialogs.jsx';
 
 function Shell({ children }) {
   return (
@@ -231,7 +232,13 @@ export function InstallScreen({ device, browser }) {
               await navigator.clipboard.writeText(link);
               setCopied(true);
             } catch {
-              prompt('Copy this link:', link);
+              promptDialog({
+                title: 'Copy this link',
+                body: 'Select it and copy it, then open it in Safari.',
+                initial: link,
+                readOnly: true,
+                okLabel: 'Done',
+              });
             }
           }}
         >

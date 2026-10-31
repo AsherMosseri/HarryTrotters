@@ -5,6 +5,7 @@ import ElectricalEditor, { DiagramPreview } from './ElectricalEditor.jsx';
 import { useFeature } from '../controls.js';
 import { Icon } from './shell/icons.jsx';
 import { PlusIcon } from './common.jsx';
+import { confirmDialog } from './Dialogs.jsx';
 
 const host = (url) => {
   try {
@@ -181,7 +182,13 @@ export default function ResourcesView({ resources, diagram, actor, isManager, ca
                       <button className="link-btn small" onClick={() => setEditing(r.id)}>
                         Edit
                       </button>
-                      <button className="link-btn small danger" onClick={() => confirm(`Remove “${r.title}”?`) && api.deleteResource(r.id)}>
+                      <button
+                        className="link-btn small danger"
+                        onClick={async () =>
+                          (await confirmDialog({ title: `Remove “${r.title}”?`, okLabel: 'Remove', danger: true })) &&
+                          api.deleteResource(r.id)
+                        }
+                      >
                         Remove
                       </button>
                     </span>

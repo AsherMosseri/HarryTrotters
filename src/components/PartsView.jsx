@@ -4,6 +4,7 @@ import { PART_STATUSES } from '../data/diff.js';
 import { relTime, useEscape } from '../util.js';
 import { CloseIcon, Overlay, PlusIcon } from './common.jsx';
 import { Icon } from './shell/icons.jsx';
+import { confirmDialog } from './Dialogs.jsx';
 
 const VENDORS = ['goBILDA', 'REV Robotics', 'AndyMark', 'ServoCity', 'McMaster-Carr', 'Amazon', 'Home Depot'];
 const statusById = Object.fromEntries(PART_STATUSES.map((s) => [s.id, s]));
@@ -355,7 +356,15 @@ export default function PartsView({ parts, tasks, api, onOpenTask, chatToggle })
           onDelete={
             editing.id
               ? async () => {
-                  if (!confirm(`Delete “${editing.name}”?`)) return;
+                  if (
+                    !(await confirmDialog({
+                      title: `Delete “${editing.name}”?`,
+                      body: 'It comes off the parts list for everyone.',
+                      okLabel: 'Delete',
+                      danger: true,
+                    }))
+                  )
+                    return;
                   const p = editing;
                   setEditing(null);
                   await api.deletePart(p);
