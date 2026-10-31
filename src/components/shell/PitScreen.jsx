@@ -3,6 +3,7 @@ import { Avatar } from '../common.jsx';
 import { Icon } from './icons.jsx';
 import { PitGuess } from '../Life.jsx';
 import Debrief from './Debrief.jsx';
+import { BatteryStrip } from '../Batteries.jsx';
 import { QUEUE_CHECKLIST, STARTER_CHECKLISTS, isQueueChecklist, starterItems } from '../../checklists.js';
 import { parseDay } from '../../milestones.js';
 import { teamDay } from '../../../functions/shared/coins.js';
@@ -21,8 +22,9 @@ import {
 
 // Today on competition day: a pit screen for the drive team. The next match
 // (alliance, partners, countdown), the "before queueing" checklist with its
-// own countdown, the drive team, quick score entry into the match log, and
-// our schedule. Team management types the schedule in (or pulls it from FTC
+// own countdown, the batteries (which one is in the robot, which are
+// charged; the first checklist line is the battery), the drive team, quick
+// score entry into the match log, and our schedule. Team management types the schedule in (or pulls it from FTC
 // Events) and sets things up at the bottom. Everything works offline: reads
 // come from the offline cache and writes go through when the Wi-Fi is back.
 
@@ -590,7 +592,7 @@ function SyncButton({ settings, api }) {
   );
 }
 
-export default function PitScreen({ actor, settings, matches, checklists, roster, competition, api, predictions = [], onPerson, onUsual }) {
+export default function PitScreen({ actor, settings, matches, batteries = [], checklists, roster, competition, api, predictions = [], onPerson, onUsual }) {
   const now = useNow(1000);
   const isManager = !!actor.admin;
   const event = settings.compEvent || {};
@@ -681,6 +683,7 @@ export default function PitScreen({ actor, settings, matches, checklists, roster
 
       <div className="today-grid pm-grid">
         <div className="today-col">
+          <BatteryStrip batteries={batteries} matches={ours} api={api} isManager={isManager} />
           <QueueCard list={list} next={next} lead={lead} now={now} actor={actor} api={api} onAddList={addList} />
           <ScorePad matches={ours} now={now} driveTeam={team} api={api} />
           <PitGuess predictions={predictions} next={next} actor={actor} api={api} now={now} />

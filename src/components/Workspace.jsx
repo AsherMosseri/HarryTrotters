@@ -89,6 +89,7 @@ import { AdBlockWall, GameDialog, PrizeWheel, VideoAd } from './AdGames.jsx';
 import { coinSettings, coinsByName, wallet } from '../coins.js';
 import { hoursOf, mergedMs } from '../../functions/shared/hours.js';
 import { teamDay } from '../../functions/shared/coins.js';
+import { hasLabel, newBattery, putOnRobot, statusPatch } from '../batteries.js';
 import { streaksOf } from '../../functions/shared/streaks.js';
 import { confirmDialog } from './Dialogs.jsx';
 
@@ -751,6 +752,20 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
   // the new rules are published.
   const [matches, setMatches] = useState([]);
   useEffect(() => store.subscribeMatches(setMatches, (e) => console.warn('matches', e)), [store]);
+  // Robot batteries (batteries.js), under current names. Quiet on failure too.
+  const [rawBatteries, setBatteries] = useState([]);
+  useEffect(() => store.subscribeBatteries(setBatteries, (e) => console.warn('batteries', e)), [store]);
+  const batteries = useMemo(
+    () =>
+      rawBatteries.map((b) => ({
+        ...b,
+        statusBy: rename(b.statusBy || ''),
+        history: (b.history || []).map((h) => (h.by && rename(h.by) !== h.by ? { ...h, by: rename(h.by) } : h)),
+      })),
+    [rawBatteries, rename],
+  );
+  const batteriesRef = useRef(batteries);
+  batteriesRef.current = batteries;
   useEffect(() => store.subscribeRobot(setRobot, loadFail('the robot')), [store, loadFail]);
   // Chat extras. Quiet on failure: the board works without them (e.g. before
   // the new rules are published).
@@ -1504,6 +1519,24 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
         return store.logMatchScore(match.id, run, ours, result, actor).catch(fail);
       },
       setChecklistQueue: (list, queue) => store.setChecklistQueue(list.id, queue).catch(fail),
+      // Robot batteries. Not awaited on the pit screen: offline, a change
+      // shows at once and reaches the server when the Wi-Fi is back.
+      setBatteryStatus: (b, status) =>
+        store.changeBatteries([{ id: b.id, patch: statusPatch(b, status, { by: actor.name }) }]).catch(fail),
+      // Put one on the robot for a match; whatever was on it goes to "Needs charging".
+      putBatteryOn: (b, match) => store.changeBatteries(putOnRobot(batteriesRef.current, b.id, { by: actor.name, match })).catch(fail),
+      addBattery: (data) => {
+        const list = batteriesRef.current;
+        if (hasLabel(list, data.label)) return fail({ message: `There’s already a battery ${data.label}.` });
+        const order = Math.max(0, ...list.map((b) => b.order || 0)) + 1;
+        return store.addBattery(newBattery(data, actor.name, Date.now(), order)).catch(fail);
+      },
+      editBattery: (b, patch) => store.updateBattery(b.id, patch).catch(fail),
+      // Retire (or bring back) a battery.
+      retireBattery: (b, on) => store.changeBatteries([{ id: b.id, patch: statusPatch(b, on ? 'retired' : 'needs', { by: actor.name }) }]).catch(fail),
+      deleteBattery: (b) => store.deleteBattery(b.id).catch(fail),
+      // Lab logs from a day on, for the notebook export (the page itself reads the last 30 days).
+      subscribeLabLogs: (since, cb) => store.subscribeLabLogs(since, cb, (e) => console.warn('lab log', e)),
       // A tick on the pit's "before queueing" list counts for this round only.
       tickQueueItem: (list, item, done, round) =>
         store
@@ -2478,6 +2511,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
                     competition={{ name: COMPETITION.name, date: competitionDate }}
                     settings={settings}
                     matches={matches}
+                    batteries={batteries}
                     checklists={checklists}
                     roster={roster}
                     joinRequests={joinRequests}
@@ -2652,6 +2686,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
                     requests={shiftRequests}
                     edits={shiftEdits}
                     runs={runs}
+                    milestones={milestones}
                   />
                 ) : view === 'resources' ? (
                   <ResourcesView
@@ -2696,7 +2731,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
                     />
                   </Suspense>
                 ) : view === 'runs' ? (
-                  <RunsView runs={runs} roster={roster} api={api} actor={actor} predictions={predictions} matches={matches} />
+                  <RunsView runs={runs} roster={roster} api={api} actor={actor} predictions={predictions} matches={matches} batteries={batteries} />
                 ) : view === 'team' ? (
                   <TeamView
                     roster={roster}

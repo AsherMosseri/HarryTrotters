@@ -68,6 +68,7 @@ const diagramsCol = collection(db, 'diagrams');
 const notesCol = collection(db, 'notes');
 const runsCol = collection(db, 'runs');
 const matchesCol = collection(db, 'matches');
+const batteriesCol = collection(db, 'batteries');
 const channelsCol = collection(db, 'channels');
 const dmsCol = collection(db, 'dms');
 const profilesCol = collection(db, 'profiles');
@@ -799,6 +800,27 @@ export const firebaseStore = {
       updatedBy: actor.name,
     });
     return batch.commit();
+  },
+  // Robot batteries (src/batteries.js). Everyone changes a status; team
+  // management adds, edits and removes them. Plain writes: offline they land
+  // in the local cache and reach the server when the Wi-Fi is back.
+  subscribeBatteries(cb, onError) {
+    return onSnapshot(batteriesCol, (snap) => cb(snap.docs.map(readDoc)), onError);
+  },
+  addBattery(data) {
+    return setDoc(doc(batteriesCol), data);
+  },
+  // Several statuses in one write (a swap changes two batteries): [{ id, patch }].
+  changeBatteries(changes) {
+    const batch = writeBatch(db);
+    for (const { id, patch } of changes) batch.update(doc(batteriesCol, id), patch);
+    return batch.commit();
+  },
+  updateBattery(id, patch) {
+    return updateDoc(doc(batteriesCol, id), patch);
+  },
+  deleteBattery(id) {
+    return deleteDoc(doc(batteriesCol, id));
   },
   // The pit's queue countdown started by hand ({ round, at, by }), kept on
   // the "before queueing" checklist so anyone on the team can set it.
