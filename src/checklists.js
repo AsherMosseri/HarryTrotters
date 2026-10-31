@@ -1,5 +1,10 @@
 import { itemId } from './data/diff.js';
 
+// The checklist Today's pit screen runs before each match (found by name, so
+// renaming it on the Checklists tab unhooks it).
+export const QUEUE_CHECKLIST = 'Before queueing';
+export const isQueueChecklist = (c) => (c?.title || '').trim().toLowerCase() === QUEUE_CHECKLIST.toLowerCase();
+
 // Starting points for the Checklists tab. Inspection rules change each season,
 // so the team should compare the inspection list with this season's
 // Competition Manual and edit it on the site.
@@ -38,6 +43,21 @@ export const STARTER_CHECKLISTS = [
       'Team shirts',
       'Safety glasses for everyone',
       'Water and snacks',
+    ],
+  },
+  // The pit screen on Today shows this one before each match, and its ticks
+  // reset for every match.
+  {
+    title: QUEUE_CHECKLIST,
+    items: [
+      'Fresh battery in, charged and strapped down',
+      'Driver Hub charged and connected to the robot',
+      'Gamepads paired, spare in the bag',
+      'Right autonomous picked for our start spot',
+      'Alliance marker matches our color',
+      'Robot fits in its starting size, preloads ready',
+      'Plan agreed with our alliance partner',
+      'Drive team badges and safety glasses on',
     ],
   },
   {

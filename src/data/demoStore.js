@@ -9,7 +9,8 @@ import {
   newRunDefaults,
   personId,
 } from './diff.js';
-import { STARTER_CHECKLISTS, starterItems } from '../checklists.js';
+import { STARTER_CHECKLISTS, isQueueChecklist, starterItems } from '../checklists.js';
+import { matchId, matchLabel } from '../../functions/shared/matches.js';
 import { REQUESTS_TO } from '../config.js';
 import { deliver } from '../adOrders.js';
 import * as casino from '../../functions/shared/casino.js';
@@ -460,6 +461,41 @@ function updateMsg(conv, id, fn) {
 function demoPreview(url) {
   const host = new URL(url).hostname.replace(/^www\./, '');
   return { url, site: host, title: `A page on ${host}`, description: 'Link previews are made by the server on the real board.' };
+}
+
+// A sample event around now: one match played and scored, one just played
+// waiting for its score, and the next few coming up. Re-made once they're all
+// more than half a day old. Also the drive team and the "before queueing"
+// checklist the pit screen uses.
+const DEMO_EVENT = 'DEMO';
+function demoMatchesStale() {
+  const list = state.matches;
+  return !list || (list.length > 0 && list.every((m) => m.event === DEMO_EVENT && m.time && m.time < Date.now() - 12 * 3600000));
+}
+function seedDemoMatches() {
+  const min = 60000;
+  const base = Math.round(Date.now() / (5 * min)) * 5 * min;
+  const m = (number, offset, alliance, partners, opponents, extra = {}) => {
+    const label = matchLabel('qual', number);
+    return { id: matchId(DEMO_EVENT, label), event: DEMO_EVENT, label, level: 'qual', number, time: base + offset * min, alliance, partners, opponents, source: 'typed', ...extra };
+  };
+  state.matches = [
+    m(2, -95, 'blue', [24601], [11115, 8565], { ours: { auto: 25, teleop: 62, endgame: 20, total: 107, by: 'Jackson Lucks', at: base - 85 * min }, result: 'win' }),
+    m(6, -35, 'red', [16236], [9794, 20409]),
+    m(9, 22, 'red', [7244], [14270, 3491]),
+    m(14, 70, 'blue', [19055], [23122, 12454]),
+    m(19, 118, 'red', [5961], [16626, 21229]),
+    m(23, 165, 'blue', [9773], [18421, 6022]),
+  ];
+  state.settings = {
+    ...(state.settings || {}),
+    compEvent: state.settings?.compEvent || { code: DEMO_EVENT, name: 'Demo Qualifier' },
+    driveTeam: state.settings?.driveTeam || { coach: 'Asher Mosseri', drivers: ['Sebastian Tolbert', 'Jackson Lucks'], human: '' },
+  };
+  if (!(state.checklists || []).some(isQueueChecklist)) {
+    const list = STARTER_CHECKLISTS.find(isQueueChecklist);
+    state.checklists = [...(state.checklists || []), { id: uid(), title: list.title, items: starterItems(list), createdAt: Date.now() }];
+  }
 }
 
 let state;
@@ -1268,6 +1304,46 @@ export const demoStore = {
   async deleteRun(id) {
     state.runs = state.runs.filter((r) => r.id !== id);
     commit();
+  },
+
+  // Competition matches: a sample event around now, so the pit screen has
+  // something to show (team management turns competition mode on by hand).
+  subscribeMatches(cb) {
+    if (demoMatchesStale()) {
+      seedDemoMatches();
+      commit();
+    }
+    return listen(() => cb([...(state.matches || [])]));
+  },
+  async saveMatch({ id, ...data }, actor, oldId = null) {
+    const was = (state.matches || []).find((m) => m.id === id);
+    state.matches = [
+      ...(state.matches || []).filter((m) => m.id !== id && m.id !== oldId),
+      { ...was, id, ...data, updatedAt: Date.now(), updatedBy: actor.name },
+    ];
+    commit();
+  },
+  async deleteMatch(id) {
+    state.matches = (state.matches || []).filter((m) => m.id !== id);
+    commit();
+  },
+  async logMatchScore(matchId, run, ours, result, actor) {
+    const runId = ours.runId && (state.runs || []).some((r) => r.id === ours.runId) ? ours.runId : uid();
+    state.runs = ours.runId
+      ? (state.runs || []).filter((r) => r.id !== runId).concat({ id: runId, ...newRunDefaults(run), updatedBy: actor.name, createdAt: Date.now() })
+      : [...(state.runs || []), { id: runId, ...newRunDefaults(run), createdAt: Date.now(), createdBy: actor.name }];
+    state.matches = (state.matches || []).map((m) => (m.id === matchId ? { ...m, ours: { ...ours, runId }, result, updatedBy: actor.name } : m));
+    commit();
+  },
+  async setChecklistQueue(id, queue) {
+    state.checklists = state.checklists.map((c) => (c.id === id ? { ...c, queue } : c));
+    commit();
+  },
+  // No FTC Events key in the demo: the same answer the real function gives
+  // before one is set up.
+  async ftcEvents() {
+    await new Promise((r) => setTimeout(r, 400));
+    return { notSetUp: true };
   },
 
   // Chat: messages kept per conversation (channel id or 'dm:<id>'); photos
