@@ -1,6 +1,7 @@
 // Checks every question bank: run `node functions/banks/validate.js`.
 // Exits non-zero on any problem and prints counts per bank.
-import { BANKS, ALL, gearQuestion, publicView, nextQuestion, dailyQuestion, dayIndex, SEASON } from './index.js';
+import { existsSync } from 'fs';
+import { BANKS, ALL, PARTS, gearQuestion, publicView, nextQuestion, dailyQuestion, dayIndex, SEASON } from './index.js';
 
 const problems = [];
 const bad = (id, msg) => problems.push(`${id}: ${msg}`);
@@ -49,6 +50,13 @@ for (const [name, list] of Object.entries(BANKS)) {
     const pub = JSON.stringify(publicView(q));
     for (const k of ['answer', 'bugLine', 'fixed', 'explain', 'ports']) if (pub.includes(`"${k}"`)) bad(q.id, `public view leaks ${k}`);
   }
+}
+
+// Part photos: the file exists, and its name doesn't give the part away.
+for (const p of PARTS) {
+  if (!p.photo) continue;
+  if (!/^parts\/[a-z0-9]{10}\.webp$/.test(p.photo)) bad(p.id, `photo name "${p.photo}"`);
+  if (!existsSync(new URL(`../../public/${p.photo}`, import.meta.url))) bad(p.id, `photo ${p.photo} missing`);
 }
 
 // Gear questions: a few thousand seeds, all well formed and stable.

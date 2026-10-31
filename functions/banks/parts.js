@@ -39,9 +39,48 @@ const KIND = {
 };
 export const kindOf = (p) => KIND[p.family] || p.family;
 
-function others(part, key, pick, n = 3) {
-  const same = PARTS.filter((p) => p.category === part.category && kindOf(p) !== kindOf(part));
-  const rest = PARTS.filter((p) => p.category !== part.category && kindOf(p) !== kindOf(part));
+// Kinds that look alike in a product photo even though they do different jobs
+// (a REV spacer and a through bore bearing are both black hex-bore tubes).
+// Photo questions never offer one of these as a wrong answer for another.
+const LOOK = {
+  'u-beam': 'u-channel',
+  sprocket: 'gear', 'rev-sprocket': 'gear',
+  color: 'sensor-box', distance: 'sensor-box', mag: 'sensor-box', touch: 'sensor-box',
+  'enc-cable': 'cable', jst3: 'cable', splitter: 'cable', 'servo-ext': 'cable', 'xt30-tamiya': 'cable', 'xt30-anderson': 'cable', ground: 'cable',
+  'rev-bracket': 'rev-plate', 'rev-mount': 'rev-plate',
+  'rev-spacer': 'bearing', 'tbe-insert': 'bearing',
+  viper: 'slide', actuator: 'slide', 'slide-pack': 'slide',
+  'rev-shaft-bundle': 'bundle',
+  'sensor-bundle': 'flat-lay', 'cable-bundle': 'flat-lay', 'rev-starter': 'flat-lay',
+  'up-hw': 'screw',
+};
+const lookOf = (p) => LOOK[kindOf(p)] || kindOf(p);
+
+// Families whose sizes share one photo (every Yellow Jacket ratio looks the
+// same). Only the named part gets a photo question ('' = none of them); the
+// rest would show the same picture with a different answer.
+const ONE_PHOTO = {
+  yj: '5203-2402-0019', 'yj-d': '',
+  'gb-servo': '2000-0025-0002',
+  standoff: '1501-0006-0240',
+  shcs: '2800-0004-0008',
+  bearing: '1611-0514-4008', 'bearing-round': '',
+  'gb-mecanum': '3213-3606-0002',
+  gecko: '3613-0014-0096',
+  rhino: '3614-0014-0096',
+  strafer: '3209-0001-0007',
+  viper: '3210-0003-0004',
+  pinpoint: '3110-0002-0002',
+  'servo-ext': '3802-1718-0300',
+  'up-cart': 'REV-41-1601',
+  color: 'REV-31-1557', color2: '',
+  extrusion: 'REV-41-1431',
+};
+const photoQuestion = (p) => !!p.photo && (!(p.family in ONE_PHOTO) || ONE_PHOTO[p.family] === p.partNumber);
+
+function others(part, key, pick, n = 3, kind = kindOf) {
+  const same = PARTS.filter((p) => p.category === part.category && kind(p) !== kind(part));
+  const rest = PARTS.filter((p) => p.category !== part.category && kind(p) !== kind(part));
   const pool = [...shuffle(same, `${part.id}-${key}`), ...shuffle(rest, `${part.id}-${key}-x`)];
   const out = [];
   for (const p of pool) {
@@ -81,9 +120,11 @@ function questionsFor(part) {
       }),
     );
   }
-  if (part.photo) {
+  if (photoQuestion(part)) {
+    // Wrong answers must look clearly different, so the photo alone decides.
+    const wrong = others(part, 'photo', (p) => p.name, 3, lookOf);
     out.push(
-      choice(`${part.id}-photo`, 1, 'Name this part.', part.name, others(part, 'photo', (p) => p.name), {
+      choice(`${part.id}-photo`, 1, 'Name this part.', part.name, wrong, {
         image: part.photo,
         explain: `That's the ${label} (${part.partNumber}). ${part.purpose}`,
         ...ref,
