@@ -19,6 +19,10 @@ import { cleanScore, guessProblem, isLive, matchRoundId, predictKey, ROUND_TTL, 
 import { streakAwards } from './shared/streakRewards.js';
 
 const TIME_ZONE = 'America/New_York';
+// The time everything here goes by. Tests set a fixed clock (lifeClock.now)
+// to run the scheduled functions as if it were, say, Sunday at 6 PM.
+export const lifeClock = { now: () => Date.now() };
+const clock = lifeClock;
 const toMs = (v) => (v && typeof v.toMillis === 'function' ? v.toMillis() : typeof v === 'number' ? v : 0);
 // Same as COMPETITION in src/config.js (settings/team.competitionDate overrides it).
 const COMPETITION_DATE = '2026-11-14';
@@ -127,7 +131,7 @@ export function lifeFunctions({ db, renamer }) {
   // The app asks for its card (Today); lines it completed pay here.
   const claimBingo = onCall({ maxInstances: 5, invoker: 'public' }, async (req) => {
     const me = await memberOf(req);
-    const now = Date.now();
+    const now = clock.now();
     const { week } = bingoWeek(now);
     // Last week's card can still pay through Tuesday (for lines that waited
     // on Sunday's daily cap).
@@ -138,7 +142,7 @@ export function lifeFunctions({ db, renamer }) {
 
   // Every night: pay everyone's finished lines, opened Today or not.
   const bingoSweep = onSchedule({ schedule: '50 23 * * *', timeZone: TIME_ZONE }, async () => {
-    const now = Date.now();
+    const now = clock.now();
     const rename = await renamer();
     const roster = [...new Set((await db.collection('people').get()).docs.map((d) => rename(d.get('name') || '')).filter(Boolean))];
     const { week } = bingoWeek(now);
@@ -170,7 +174,7 @@ export function lifeFunctions({ db, renamer }) {
 
   const predict = onCall({ maxInstances: 5, invoker: 'public' }, async (req) => {
     const me = await memberOf(req);
-    const now = Date.now();
+    const now = clock.now();
     const { action, id, matchId } = req.data || {};
     const safeId = (v) => (/^[\w-]{1,80}$/.test(String(v || '')) ? String(v) : null);
 
@@ -284,7 +288,7 @@ export function lifeFunctions({ db, renamer }) {
   const onRunLogged = onDocumentWritten('runs/{runId}', async (event) => {
     if (event.data?.before?.exists || !event.data?.after?.exists) return; // new runs only
     const run = event.data.after.data();
-    const now = Date.now();
+    const now = clock.now();
     const loggedAt = toMs(run.createdAt) || Date.parse(event.time || '') || now;
     let ref = null;
     if (run.matchId) ref = roundRef(matchRoundId(String(run.matchId)));
@@ -298,7 +302,7 @@ export function lifeFunctions({ db, renamer }) {
   // Every 10 minutes: show the guesses on matches that have started, and
   // call off practice rounds nobody logged a run for.
   const lockPredictions = onSchedule({ schedule: 'every 10 minutes', timeZone: TIME_ZONE }, async () => {
-    const now = Date.now();
+    const now = clock.now();
     const open = await db.collection('predictions').where('status', '==', 'open').get();
     for (const d of open.docs) {
       if (d.get('kind') === 'match' && d.get('lockAt') && now >= d.get('lockAt'))
@@ -318,7 +322,7 @@ export function lifeFunctions({ db, renamer }) {
     const after = event.data?.after?.data();
     if (!after || after.end == null || !after.person || (before && before.end != null)) return;
     if (await coinsOff()) return;
-    const now = Date.now();
+    const now = clock.now();
     const rename = await renamer();
     const name = rename(after.person);
     const aliases = rename.aliases(name).slice(0, 30);
@@ -383,7 +387,7 @@ export function lifeFunctions({ db, renamer }) {
 
   // Sundays at 6 PM (New York).
   const weeklyRecap = onSchedule({ schedule: '0 18 * * 0', timeZone: TIME_ZONE }, async () => {
-    const r = await postRecap(Date.now(), 'Trotbot');
+    const r = await postRecap(clock.now(), 'Trotbot');
     logger.info('weekly recap', r.status);
   });
 
@@ -391,7 +395,7 @@ export function lifeFunctions({ db, renamer }) {
   const recap = onCall({ maxInstances: 2, invoker: 'public', timeoutSeconds: 60 }, async (req) => {
     const me = await memberOf(req);
     if (!me.admin) throw new HttpsError('permission-denied', 'Only team management can do that.');
-    const now = Date.now();
+    const now = clock.now();
     const week = recapWeek(now);
     const stateRef = db.doc(`recaps/${week}`);
     const { action } = req.data || {};

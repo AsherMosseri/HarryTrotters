@@ -53,7 +53,7 @@ export function guessProblem(round, me, now, match = null) {
 // Who wins: the closest guesses made before `before` (ms; the run's log
 // time), all of them on a tie. guesses: { name: { score, at } }.
 export function settle(guesses, score, before = Infinity) {
-  const valid = Object.entries(guesses || {}).filter(([, g]) => cleanScore(g?.score) !== null && (g.at || 0) < before);
+  const valid = Object.entries(guesses || {}).filter(([, g]) => cleanScore(g?.score) !== null && (g.at || 0) <= before);
   const shown = Object.fromEntries(valid.map(([n, g]) => [n, g.score]));
   if (valid.length < MIN_GUESSERS) return { guesses: shown, winners: [], off: null, pays: {} };
   const off = Math.min(...valid.map(([, g]) => Math.abs(g.score - score)));
