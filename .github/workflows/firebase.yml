@@ -46,7 +46,7 @@ jobs:
         run: |
           SA=github-deploy@ftc-32313-tasks.iam.gserviceaccount.com
           added=
-          for role in roles/run.admin roles/cloudfunctions.admin; do
+          for role in roles/run.admin roles/cloudfunctions.admin roles/secretmanager.admin; do
             if ! gcloud projects get-iam-policy ftc-32313-tasks --flatten='bindings[].members' \
                 --filter="bindings.role=$role AND bindings.members=serviceAccount:$SA" --format='value(bindings.role)' | grep -q .; then
               gcloud projects add-iam-policy-binding ftc-32313-tasks --member="serviceAccount:$SA" --role="$role" --condition=None --quiet >/dev/null
@@ -55,6 +55,31 @@ jobs:
           done
           # New permissions take a minute to apply.
           if [ -n "$added" ]; then sleep 90; fi
+      # The FTC Events API key for the match schedule (the ftcEvents function
+      # reads it with defineSecret, and a deploy fails if those secrets don't
+      # exist). When both GitHub secrets FTC_API_USER and FTC_API_KEY are set,
+      # they're copied into Firebase's Secret Manager (a new version only when
+      # the value changed, so versions don't pile up). Until then each secret
+      # holds "unset", the deploy still works, and the site says the API isn't
+      # set up. Values are never printed.
+      - name: FTC Events API key
+        env:
+          FTC_API_USER: ${{ secrets.FTC_API_USER }}
+          FTC_API_KEY: ${{ secrets.FTC_API_KEY }}
+        run: |
+          P=ftc-32313-tasks
+          gcloud services enable secretmanager.googleapis.com --project "$P" --quiet
+          both=
+          if [ -n "$FTC_API_USER" ] && [ -n "$FTC_API_KEY" ]; then both=1; fi
+          for name in FTC_API_USER FTC_API_KEY; do
+            want=unset
+            if [ -n "$both" ]; then want="${!name}"; fi
+            if ! gcloud secrets describe "$name" --project "$P" >/dev/null 2>&1; then
+              printf '%s' "$want" | gcloud secrets create "$name" --project "$P" --replication-policy=automatic --data-file=- --quiet >/dev/null
+            elif [ -n "$both" ] && [ "$(gcloud secrets versions access latest --secret="$name" --project "$P")" != "$want" ]; then
+              printf '%s' "$want" | gcloud secrets versions add "$name" --project "$P" --data-file=- --quiet >/dev/null
+            fi
+          done
       - run: npm ci --prefix functions
       - run: npx -y firebase-tools@15.34.0 deploy --only firestore:rules,storage,functions --project ftc-32313-tasks --non-interactive --force
       - name: Check the morning reminder is scheduled
