@@ -330,7 +330,7 @@ export function useAdsEngine({ settings, actor, view, shifts, submissions, ledge
     return () => clearTimeout(t);
   }, [on, cfg.wheel.on, coins, spunToday]);
   // The server checks it's the first spin today and pays it.
-  const winWheel = (seg) => (coins ? coins.prize({ what: 'wheel', amount: seg.coins, hour: !!seg.hour }) : Promise.resolve(null));
+  const winWheel = () => (coins ? coins.prize({ what: 'wheel' }) : Promise.resolve(null));
 
   // Playable ads: small prizes, up to cfg.games.cap a day.
   const [game, setGame] = useState(null);

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useEscape } from '../util.js';
 import { CloseIcon, Overlay } from './common.jsx';
+import { WHEEL as SLICES } from '../coins.js';
 
 // The fun ad formats: playable mini-games, the prize wheel, video-style
 // ads, and the "ad blocker detected" wall. Prizes are Jackson coins (small,
@@ -291,16 +292,19 @@ export function GameDialog({ ad, capLeft, onPrize, onClose }) {
 
 // ---------- the prize wheel ----------
 
-export const WHEEL = [
-  { label: '+1', coins: 1, color: '#ff6b6b', weight: 25 },
-  { label: '+2', coins: 2, color: '#feca57', weight: 20 },
-  { label: 'Nothing', coins: 0, color: '#576574', weight: 13 },
-  { label: '+5', coins: 5, color: '#1dd1a1', weight: 8 },
-  { label: '1 h no ads', coins: 0, hour: true, color: '#54a0ff', weight: 8 },
-  { label: '+3', coins: 3, color: '#ff9ff3', weight: 12 },
-  { label: 'Nothing', coins: 0, color: '#8395a7', weight: 12 },
-  { label: '+10', coins: 10, color: '#5f27cd', weight: 2 },
+// The slices and their odds are in shared/coins.js (the server spins);
+// here is how each one looks.
+const LOOK = [
+  { label: '+1', color: '#ff6b6b' },
+  { label: '+2', color: '#feca57' },
+  { label: 'Nothing', color: '#576574' },
+  { label: '+5', color: '#1dd1a1' },
+  { label: '1 h no ads', color: '#54a0ff' },
+  { label: '+3', color: '#ff9ff3' },
+  { label: 'Nothing', color: '#8395a7' },
+  { label: '+10', color: '#5f27cd' },
 ];
+export const WHEEL = SLICES.map((s, i) => ({ ...s, ...LOOK[i] }));
 const SEG = 360 / WHEEL.length;
 
 export function PrizeWheel({ onWin, onClose }) {
@@ -308,17 +312,21 @@ export function PrizeWheel({ onWin, onClose }) {
   const [spinning, setSpinning] = useState(false);
   const [won, setWon] = useState(null);
   useEscape(onClose, !spinning);
-  const spin = () => {
-    let r = Math.random() * WHEEL.reduce((t, s) => t + s.weight, 0);
-    const i = WHEEL.findIndex((s) => (r -= s.weight) < 0);
+  const spin = async () => {
     setSpinning(true);
-    setTurn(360 * 6 + (360 - (i * SEG + SEG / 2)));
-    setTimeout(async () => {
-      // Paid by the server; if it says no (already spun today), the note shows and the wheel closes.
-      const paid = await onWin(WHEEL[i]);
+    // The server spins and pays; the wheel turns to where it landed. If it
+    // says no (already spun today), the note shows and the wheel closes.
+    const paid = await onWin();
+    const i = Number.isInteger(paid?.seg) && WHEEL[paid.seg] ? paid.seg : -1;
+    if (i < 0) {
       setSpinning(false);
-      if (paid) setWon(WHEEL[i]);
-      else onClose();
+      onClose();
+      return;
+    }
+    setTurn(360 * 6 + (360 - (i * SEG + SEG / 2)));
+    setTimeout(() => {
+      setSpinning(false);
+      setWon(WHEEL[i]);
     }, 4700);
   };
   const gradient = `conic-gradient(${WHEEL.map((s, i) => `${s.color} ${i * SEG}deg ${(i + 1) * SEG}deg`).join(', ')})`;

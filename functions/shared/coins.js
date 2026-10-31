@@ -257,8 +257,24 @@ export function coinsByName({ shifts = [], ledger = [], bank = [] }, rename = (n
 // checks them against the real balance and today's limits; demo mode runs the
 // same checks. Each returns the ledger entry to add, or { error }.
 export const GIFT_MAX = 5000;
-// The prize wheel's coin slices (AdGames.jsx draws the wheel).
-export const WHEEL_COINS = [0, 1, 2, 3, 5, 10];
+// The prize wheel's slices, in the order AdGames.jsx draws them, and how
+// likely each one is. The server spins it (prizeEntry); the app only shows
+// where it landed, so it can't pick the +10.
+export const WHEEL = [
+  { coins: 1, weight: 25 },
+  { coins: 2, weight: 20 },
+  { coins: 0, weight: 13 },
+  { coins: 5, weight: 8 },
+  { coins: 0, hour: true, weight: 8 },
+  { coins: 3, weight: 12 },
+  { coins: 0, weight: 12 },
+  { coins: 10, weight: 2 },
+];
+export function spinWheel(rng = Math.random) {
+  let r = rng() * WHEEL.reduce((t, s) => t + s.weight, 0);
+  const i = WHEEL.findIndex((s) => (r -= s.weight) < 0);
+  return i < 0 ? WHEEL.length - 1 : i;
+}
 export const GAME_PRIZE_MAX = 20;
 const text = (v, n) => String(v || '').slice(0, n);
 
@@ -272,13 +288,14 @@ export function giftEntry(from, { to, amount, note }, { roster, balance, now = D
   return { type: 'gift', from, to, amount: n, note: text(note, 140).trim(), at: now };
 }
 
-export function prizeEntry(name, { what, amount, hour, label }, { ledger, gameCap, now = Date.now() }) {
+export function prizeEntry(name, { what, amount, label }, { ledger, gameCap, now = Date.now(), rng = Math.random }) {
   if (what === 'wheel') {
     if (prizesToday(name, ledger, 'wheel', now).length) return { error: 'You already spun the wheel today.' };
-    if (hour) return { type: 'prize', person: name, what, amount: 0, label: 'Prize wheel: 1 hour with no ads', until: now + 3600000, at: now };
-    const n = Number(amount);
-    if (!WHEEL_COINS.includes(n)) return { error: 'That isn’t on the wheel.' };
-    return { type: 'prize', person: name, what, amount: n, label: n ? `Prize wheel: +${n}` : 'Prize wheel: nothing', at: now };
+    // seg: the slice it landed on, for the app to turn the wheel to.
+    const seg = spinWheel(rng);
+    const { coins: n, hour } = WHEEL[seg];
+    if (hour) return { type: 'prize', person: name, what, amount: 0, label: 'Prize wheel: 1 hour with no ads', until: now + 3600000, seg, at: now };
+    return { type: 'prize', person: name, what, amount: n, label: n ? `Prize wheel: +${n}` : 'Prize wheel: nothing', seg, at: now };
   }
   if (what === 'game') {
     const left = Math.max(0, gameCap - prizesToday(name, ledger, 'game', now).reduce((t, x) => t + x.amount, 0));
