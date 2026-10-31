@@ -13,7 +13,7 @@ import { awardCoins } from './award.js';
 import { AWARD_CAPS, teamDay } from './shared/coins.js';
 import { addDay } from './shared/streaks.js';
 import { nameKey } from './shared/team.js';
-import { bingoAwards, bingoCard, bingoWeek } from './shared/bingo.js';
+import { bingoAwards, bingoCard, bingoWeek, dailyAnswersIn } from './shared/bingo.js';
 import { buildRecap, recapWeek } from './shared/recap.js';
 import { cleanScore, guessProblem, isLive, matchRoundId, predictKey, ROUND_TTL, runTotal, settle } from './shared/predict.js';
 import { streakAwards } from './shared/streakRewards.js';
@@ -78,7 +78,7 @@ export function lifeFunctions({ db, renamer }) {
     const from = Date.parse(`${addDay(week, -1)}T00:00:00Z`); // a day early: covers New York's offset
     const to = Date.parse(`${addDay(week, 8)}T00:00:00Z`);
     const aliases = rename.aliases(name).slice(0, 30);
-    const [shifts, logs, tasks, runs, plans, rounds] = await Promise.all([
+    const [shifts, logs, tasks, runs, plans, rounds, daily] = await Promise.all([
       db.collection('shifts').where('start', '>=', from).where('start', '<', to).get(),
       db.collection('labLogs').where('person', 'in', aliases).get(),
       db.collection('tasks').where('status', '==', 'done').get(),
@@ -88,6 +88,8 @@ export function lifeFunctions({ db, renamer }) {
         .collection('predictions')
         .where('openedAt', '>=', from - 7 * 86400000)
         .get(),
+      // The daily question (learn.js): one dailyAnswers doc per person and day.
+      db.collection('dailyAnswers').where('day', '>=', week).where('day', '<', addDay(week, 7)).get(),
     ]);
     const mine = (n) => rename(n || '') === name;
     const { from: wFrom, to: wTo } = bingoWeek(Date.parse(`${week}T16:00:00Z`));
@@ -110,6 +112,11 @@ export function lifeFunctions({ db, renamer }) {
         .map((d) => d.data())
         .map((p) => ({ ...p, people: Object.fromEntries(Object.entries(p.people || {}).map(([n, v]) => [rename(n), v])) })),
       guesses: rounds.docs.filter((d) => Object.entries(d.get('times') || {}).some(([n, at]) => mine(n) && at >= wFrom && at < wTo)).length,
+      dailyAnswers: dailyAnswersIn(
+        daily.docs.map((d) => ({ ...d.data(), name: rename(d.get('name') || '') })),
+        name,
+        week,
+      ),
     };
     return bingoCard(name, data, { week, now });
   }

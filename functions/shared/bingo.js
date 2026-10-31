@@ -105,7 +105,10 @@ export const POOL = [
   // person answered) in the inputs. Weeks before DAILY_FROM keep their cards.
   { id: 'daily', tier: 1, label: 'Answered the daily question', hook: 'daily', test: (c) => c.dailyAnswers > 0 },
 ];
-export const DAILY_FROM = null; // 'YYYY-MM-DD' (a Monday), or null while the daily question isn't live
+// The daily question (functions/learn.js) is on cards from this Monday on:
+// the first full week after 3.0 goes out. `dailyAnswers` is how many days
+// that week the person answered it (dailyAnswersIn below).
+export const DAILY_FROM = '2026-11-09';
 const squareById = Object.fromEntries(POOL.map((s) => [s.id, s]));
 
 // A small seeded random number generator (mulberry32), so a week always
@@ -212,4 +215,11 @@ export function bingoAwards(me, card) {
     }));
   if (card.full) out.push({ line: 'full', amount: FULL_COINS, key: `bingo-${card.week}-full-${pid}`, label: 'Lab bingo, full card' });
   return out;
+}
+
+// How many days of `week` (its Monday) `me` answered the daily question,
+// from dailyAnswers docs ({ name, day }) under current names.
+export function dailyAnswersIn(answers, me, week) {
+  const end = addDay(week, 7);
+  return new Set((answers || []).filter((a) => a.name === me && a.day >= week && a.day < end).map((a) => a.day)).size;
 }

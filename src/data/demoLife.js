@@ -3,7 +3,7 @@
 // weekly recap (with a sample recap already posted in #general).
 import { AWARD_CAPS, teamDay } from '../../functions/shared/coins.js';
 import { addDay } from '../../functions/shared/streaks.js';
-import { bingoAwards, bingoCard, bingoWeek } from '../../functions/shared/bingo.js';
+import { bingoAwards, bingoCard, bingoWeek, dailyAnswersIn } from '../../functions/shared/bingo.js';
 import { buildRecap, recapWeek } from '../../functions/shared/recap.js';
 import { cleanScore, guessProblem, isLive, matchRoundId, predictKey, ROUND_TTL, runTotal, settle } from '../../functions/shared/predict.js';
 import { streakAwards } from '../../functions/shared/streakRewards.js';
@@ -49,6 +49,7 @@ export function demoLife({ get, commit, uid }) {
           const at = p.times?.[actor.name];
           return at >= from && at < to;
         }).length,
+        dailyAnswers: dailyAnswersIn(Object.values(s.dailyAnswers || {}), actor.name, week),
       },
       { week, now },
     );
