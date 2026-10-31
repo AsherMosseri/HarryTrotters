@@ -663,6 +663,7 @@ try {
   state = seed();
 }
 if (!state.marketSeeded) seedMarket();
+if (!state.scoutSeeded) seedScout();
 // Someone new waiting for team management to let them in (Roster, Today).
 if (!state.joinSeeded) {
   state.joinRequests = [{ id: 'riley-chen', name: 'Riley Chen', at: Date.now() - 25 * 60000 }];
@@ -734,6 +735,75 @@ function seedMarket() {
     state.coins.push({ id: `c${uid()}`, type: 'spend', person: name, amount: 15, what: 'tournament', item: 'tour:tour1', label: 'Tournament entry: Friday Tetris', at: p.joinedAt });
   }
   state.marketSeeded = 1;
+}
+// Scouting in the demo: a dozen teams at the demo event with standings, twenty
+// scouting entries from a few people, and a short pick list.
+function seedScout() {
+  const now = Date.now();
+  const min = 60000;
+  const rows = [
+    [24601, 'Les Mécaniques', 'Brooklyn, NY', [4, 0, 0, 12.5]],
+    [16236, 'Gear Goblins', 'Queens, NY', [3, 1, 0, 9.5]],
+    [9794, 'Cardboard Dynamics', 'Yonkers, NY', [3, 1, 0, 9]],
+    [32313, 'Harry Trotters', 'Miami, FL', [2, 1, 1, 7.25]],
+    [7244, 'Byte Force', 'Newark, NJ', [2, 2, 0, 6.5]],
+    [19055, 'Wrench Wizards', 'Stamford, CT', [2, 2, 0, 6]],
+    [11115, 'The Bolt Bunch', 'Hoboken, NJ', [2, 2, 0, 5.5]],
+    [5961, 'Servo Squad', 'White Plains, NY', [1, 3, 0, 4]],
+    [9773, 'Torque Titans', 'Bronx, NY', [1, 3, 0, 3.5]],
+    [14270, 'Red Hot Cobalt', 'Staten Island, NY', [1, 3, 0, 3]],
+    [20409, 'Loose Screws', 'Paterson, NJ', [0, 4, 0, 1.5]],
+    [3491, 'Open Circuit', 'Jersey City, NJ', [0, 4, 0, 1]],
+  ];
+  state.scoutTeams = rows.map(([number, name, city, [w, l, t, rp]], i) => ({
+    id: String(number),
+    number,
+    name,
+    city,
+    event: DEMO_EVENT,
+    source: 'api',
+    rank: { rank: i + 1, wins: w, losses: l, ties: t, played: w + l + t, rp, tb1: 40 + (12 - i) * 3, tb2: 80 + (12 - i) * 5 },
+    notes: number === 16236 ? 'Wide drivetrain. Cycles from the left side, good partner for a team that scores in auto.' : '',
+    notesBy: number === 16236 ? 'Cooper Mlezcko' : '',
+    syncedAt: now - 20 * min,
+  }));
+  const who = ['Cooper Mlezcko', 'Jackson Lucks', 'Sebastian Tolbert', 'Katarina Jurasic', 'Sophia Bermudez'];
+  const e = (team, match, [a, tp, en, r, d], tags, note, ago, by) => ({
+    id: `s${uid()}`,
+    team,
+    match,
+    ratings: { auto: a, teleop: tp, endgame: en, reliability: r, drive: d },
+    tags,
+    note,
+    event: DEMO_EVENT,
+    createdBy: by,
+    createdByUid: `demo-${personId(by)}`,
+    createdAt: now - ago * min,
+  });
+  state.scoutEntries = [
+    e(24601, 'Q2', [5, 5, 4, 5, 3], ['autoScores', 'fastCycles', 'consistent'], 'Best robot we saw so far. Never missed.', 150, who[1]),
+    e(24601, 'Q8', [5, 4, 5, 5, 2], ['autoScores', 'strongEndgame'], '', 80, who[0]),
+    e(16236, 'Q6', [4, 4, 3, 4, 5], ['goodDefense', 'fastCycles'], 'Blocked two of ours in the middle.', 110, who[0]),
+    e(16236, 'Q11', [3, 4, 3, 4, 4], ['goodDefense'], '', 60, who[2]),
+    e(9794, 'Q6', [2, 4, 4, 3, 2], ['strongEndgame'], 'Slow to start but a solid finish.', 110, who[3]),
+    e(9794, 'Q13', [3, 3, 4, 3, 3], [], '', 45, who[3]),
+    e(7244, 'Q9', [4, 3, 2, 4, 3], ['autoScores', 'consistent'], '', 95, who[4]),
+    e(7244, 'Q15', [4, 3, 3, 4, 3], ['autoScores'], '', 30, who[1]),
+    e(19055, 'Q14', [1, 3, 2, 2, 2], ['penalties'], 'Two penalties for pinning.', 40, who[2]),
+    e(19055, 'Q5', [2, 3, 2, 3, 3], [], '', 100, who[4]),
+    e(11115, 'Q2', [2, 2, 1, 2, 2], ['brokeDown', 'tippy'], 'Lost a wheel mid-match.', 150, who[1]),
+    e(11115, 'Q10', [3, 3, 2, 3, 2], [], '', 85, who[0]),
+    e(5961, 'Q19', [3, 2, 3, 3, 4], ['goodDefense'], '', 20, who[0]),
+    e(9773, 'Q4', [1, 2, 1, 1, 2], ['brokeDown'], 'Dead on the field for the last minute.', 125, who[2]),
+    e(14270, 'Q3', [3, 4, 4, 4, 3], ['fastCycles', 'consistent'], 'Surprisingly quick for a 1-3 team.', 135, who[3]),
+    e(14270, 'Q12', [3, 4, 3, 4, 3], ['fastCycles'], '', 55, who[4]),
+    e(20409, 'Q7', [1, 1, 1, 2, 1], ['brokeDown'], '', 90, who[1]),
+    e(3491, 'Q1', [2, 2, 3, 3, 2], [], 'Still figuring out their endgame.', 160, who[2]),
+    e(3491, 'Q16', [2, 3, 3, 3, 3], ['penalties'], '', 15, who[3]),
+    e(16236, 'Q17', [4, 5, 3, 4, 5], ['goodDefense', 'fastCycles', 'consistent'], 'Even better this time.', 10, who[1]),
+  ];
+  state.scoutPicks = { order: [24601, 16236, 14270, 9794, 7244], dont: [11115], taken: [24601], updatedBy: 'Asher Mosseri', updatedAt: now - 5 * min };
+  state.scoutSeeded = 1;
 }
 // Tournaments that ended get paid, the way payTournaments does it.
 function settleDemoTournaments(now = Date.now()) {
@@ -2111,6 +2181,49 @@ export const demoStore = {
   async ftcEvents() {
     await new Promise((r) => setTimeout(r, 400));
     return { notSetUp: true };
+  },
+
+  // Scouting (the Scout page).
+  subscribeScoutTeams(cb) {
+    return listen(() => cb([...(state.scoutTeams || [])]));
+  },
+  subscribeScoutEntries(cb) {
+    return listen(() => cb([...(state.scoutEntries || [])]));
+  },
+  subscribeScoutPicks(cb) {
+    return listen(() => cb({ ...(state.scoutPicks || {}) }));
+  },
+  async saveScoutTeam({ number, ...data }, actor) {
+    const id = String(number);
+    const was = (state.scoutTeams || []).find((t) => t.id === id);
+    state.scoutTeams = [...(state.scoutTeams || []).filter((t) => t.id !== id), { ...was, id, number, ...data, updatedAt: Date.now(), updatedBy: actor.name }];
+    commit();
+  },
+  async deleteScoutTeam(number) {
+    state.scoutTeams = (state.scoutTeams || []).filter((t) => t.id !== String(number));
+    commit();
+  },
+  async saveScoutNotes(number, notes, actor) {
+    state.scoutTeams = (state.scoutTeams || []).map((t) =>
+      t.id === String(number) ? { ...t, notes, notesBy: actor.name, notesAt: Date.now(), updatedAt: Date.now(), updatedBy: actor.name } : t,
+    );
+    commit();
+  },
+  async createScoutEntry(entry, actor) {
+    state.scoutEntries = [...(state.scoutEntries || []), { id: `s${uid()}`, ...entry, createdBy: actor.name, createdByUid: actor.uid || 'demo', createdAt: Date.now() }];
+    commit();
+  },
+  async updateScoutEntry(id, patch, actor) {
+    state.scoutEntries = (state.scoutEntries || []).map((e) => (e.id === id ? { ...e, ...patch, updatedAt: Date.now(), updatedBy: actor.name } : e));
+    commit();
+  },
+  async deleteScoutEntry(id) {
+    state.scoutEntries = (state.scoutEntries || []).filter((e) => e.id !== id);
+    commit();
+  },
+  async saveScoutPicks(patch, actor) {
+    state.scoutPicks = { ...(state.scoutPicks || {}), ...patch, updatedAt: Date.now(), updatedBy: actor.name };
+    commit();
   },
 
   // Chat: messages kept per conversation (channel id or 'dm:<id>'); photos

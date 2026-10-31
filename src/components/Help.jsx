@@ -94,6 +94,15 @@ const SECTIONS = [
     ],
   ],
   [
+    'Scout',
+    [
+      'Scout has every team at the event. Team management pulls the teams and rankings from FTC Events (Pull teams and rankings, then Refresh rankings between matches); anyone can add a team by hand.',
+      'Scout a match: pick the match and the team, tap 1 to 5 for Auto, TeleOp, Endgame, Reliability and Drive / defense, tap any tags that fit and add one line. Save and next clears the form and keeps the match. It saves even with bad Wi-Fi and reaches the server when you’re back online. You can fix or delete your own notes in a team’s page.',
+      'A team’s page shows our averages, the tags that come up most, every note with who wrote it, and a team notes box for everyone.',
+      'Pick list: team management drags teams into order (or uses the arrows), marks Don’t pick and Picked by others, and Suggest order sorts by our scores. At the table is the list in big type for alliance selection. Scouting pays no coins.',
+    ],
+  ],
+  [
     'Learn',
     [
       'Ten games to learn the robot and the game: Name that part, Rules check, Strategy, Wiring puzzle, Spot the problem, Fix the bug, Gear ratios, the Auto path planner, and quizzes from the team’s own work.',
@@ -288,6 +297,7 @@ const SECTION_TABS = {
   Checklists: 'checklists',
   Shifts: 'shifts',
   'Match Log': 'runs',
+  Scout: 'scout',
   Chat: 'chat',
   'Robot (3D)': 'robot',
 };

@@ -822,6 +822,46 @@ export const firebaseStore = {
   deleteBattery(id) {
     return deleteDoc(doc(batteriesCol, id));
   },
+  // Scouting (the Scout page). Writes return at once from the local cache
+  // (the caller doesn't wait for the server), so scouting works on bad Wi-Fi.
+  subscribeScoutTeams(cb, onError) {
+    return onSnapshot(collection(db, 'scoutTeams'), (snap) => cb(snap.docs.map(readDoc)), onError);
+  },
+  subscribeScoutEntries(cb, onError) {
+    return onSnapshot(collection(db, 'scoutEntries'), (snap) => cb(snap.docs.map(readDoc)), onError);
+  },
+  subscribeScoutPicks(cb, onError) {
+    return onSnapshot(doc(db, 'scoutPicks', 'main'), (snap) => cb(snap.exists() ? snap.data() : {}), onError);
+  },
+  // A team added or fixed by hand (team management can change anything; anyone adds a missing one).
+  saveScoutTeam({ number, ...data }, actor) {
+    return setDoc(doc(db, 'scoutTeams', String(number)), { number, ...data, updatedAt: serverTimestamp(), updatedBy: actor.name }, { merge: true });
+  },
+  deleteScoutTeam(number) {
+    return deleteDoc(doc(db, 'scoutTeams', String(number)));
+  },
+  // Free notes on a team: anyone on the team.
+  saveScoutNotes(number, notes, actor) {
+    return updateDoc(doc(db, 'scoutTeams', String(number)), { notes, notesBy: actor.name, notesAt: Date.now(), updatedAt: serverTimestamp(), updatedBy: actor.name });
+  },
+  createScoutEntry(entry, actor) {
+    return setDoc(doc(collection(db, 'scoutEntries')), {
+      ...entry,
+      createdBy: actor.name,
+      createdByUid: actor.uid,
+      createdAt: serverTimestamp(),
+    });
+  },
+  updateScoutEntry(id, patch, actor) {
+    return updateDoc(doc(db, 'scoutEntries', id), { ...patch, updatedAt: serverTimestamp(), updatedBy: actor.name });
+  },
+  deleteScoutEntry(id) {
+    return deleteDoc(doc(db, 'scoutEntries', id));
+  },
+  // { order, dont, taken }: team numbers (team management).
+  saveScoutPicks(patch, actor) {
+    return setDoc(doc(db, 'scoutPicks', 'main'), { ...patch, updatedAt: serverTimestamp(), updatedBy: actor.name }, { merge: true });
+  },
   // The pit's queue countdown started by hand ({ round, at, by }), kept on
   // the "before queueing" checklist so anyone on the team can set it.
   setChecklistQueue(id, queue) {

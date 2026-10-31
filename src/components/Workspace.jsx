@@ -45,6 +45,8 @@ const loadRobotView = () => import('./RobotView.jsx');
 const RobotView = lazy(loadRobotView);
 // The learning games load when Learn opens.
 const LearnView = lazy(() => import('./learn/Learn.jsx'));
+// Scouting loads when the Scout page opens.
+const ScoutView = lazy(() => import('./scout/Scout.jsx'));
 import { DailyContext } from './learn/DailyCard.jsx';
 import { HelpDialog, WelcomeCard } from './Help.jsx';
 import { VersionLogDialog, WhatsNew } from './VersionLog.jsx';
@@ -464,6 +466,7 @@ const VIEWS = [
   ['team', 'Roster'],
   ['market', 'Market'],
   ['learn', 'Learn'],
+  ['scout', 'Scout'],
 ];
 
 function matchesFilters(t, filters, me, view) {
@@ -1546,6 +1549,18 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
           .catch(fail),
       // The caller shows what came back (or went wrong) next to the button.
       ftcEvents: (req) => store.ftcEvents(req),
+      // Scouting (the Scout page). Not awaited by the page: offline, a write
+      // shows at once and reaches the server when the Wi-Fi comes back.
+      subscribeScoutTeams: (cb) => store.subscribeScoutTeams(cb, quiet('scout teams')),
+      subscribeScoutEntries: (cb) => store.subscribeScoutEntries(cb, quiet('scout entries')),
+      subscribeScoutPicks: (cb) => store.subscribeScoutPicks(cb, quiet('scout picks')),
+      saveScoutTeam: (t) => store.saveScoutTeam(t, actor).catch(fail),
+      deleteScoutTeam: (n) => store.deleteScoutTeam(n).catch(fail),
+      saveScoutNotes: (n, notes) => store.saveScoutNotes(n, notes, actor).catch(fail),
+      createScoutEntry: (e) => store.createScoutEntry(e, actor).catch(fail),
+      updateScoutEntry: (id, patch) => store.updateScoutEntry(id, patch, actor).catch(fail),
+      deleteScoutEntry: (id) => store.deleteScoutEntry(id).catch(fail),
+      saveScoutPicks: (patch) => store.saveScoutPicks(patch, actor).catch(fail),
       // Team life (functions/life.js): the server decides and pays; these only ask.
       claimBingo: (req) => store.claimBingo(req || {}, actor),
       predict: (req) => store.predict(req, actor).catch((e) => ({ error: e?.message || 'That didn’t work.' })),
@@ -2729,6 +2744,16 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
                       onOpenDaily={() => openConv('general')}
                       dailyToday={(rawChat.general || []).find((m) => m.id === `daily-${teamDay(Date.now())}`) || null}
                     />
+                  </Suspense>
+                ) : view === 'scout' ? (
+                  <Suspense
+                    fallback={
+                      <main className="content">
+                        <p className="empty">Loading…</p>
+                      </main>
+                    }
+                  >
+                    <ScoutView actor={actor} settings={settings} matches={matches} api={api} rename={rename} />
                   </Suspense>
                 ) : view === 'runs' ? (
                   <RunsView runs={runs} roster={roster} api={api} actor={actor} predictions={predictions} matches={matches} batteries={batteries} />
