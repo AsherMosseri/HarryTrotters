@@ -72,9 +72,9 @@ import ControlsPage from './ControlsPage.jsx';
 import { PreviewBar } from './Preview.jsx';
 import { ControlsContext, commandCfgFor, makeControls, profileView } from '../controls.js';
 import { CoinsDialog, Coins } from './Coins.jsx';
-import { LabLogContext, LabLogDialog } from './LabLog.jsx';
+import { LabLogContext, LabLogDialog, LabPayoff } from './LabLog.jsx';
 import { LotteryContext } from './chat/Casino.jsx';
-import { dayOf, hoursOn, logId, missingLogDay } from '../labLog.js';
+import { addLocalTouch, dayOf, hoursOn, localTouches, logId, missingLogDay, payoffLines, touchedOn } from '../labLog.js';
 import { OrderTracker, OrdersDialog, orderActive } from './AdOrders.jsx';
 import { setServerSkew } from '../serverTime.js';
 import { AdBlockWall, GameDialog, PrizeWheel, VideoAd } from './AdGames.jsx';
@@ -578,6 +578,16 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
   const [filters, setFilters] = useLocalStorage('filters', EMPTY_FILTERS);
   const [theme, setTheme] = useLocalStorage('theme', 'system');
   const [openId, setOpenId] = useState(null);
+  // The lab log picks the tasks you opened, moved or commented on today
+  // (labLog.js): noted once per task per day, on this device and in the database.
+  const touchTask = useRef(() => {});
+  touchTask.current = (id) => {
+    const day = dayOf(Date.now());
+    if (id && !actor.preview && addLocalTouch(day, actor.name, id)) store.addLabTouch?.(day, actor.name, id);
+  };
+  useEffect(() => {
+    if (openId) touchTask.current(openId);
+  }, [openId]);
   const [newTask, setNewTask] = useState(null);
   const [toast, setToast] = useState(null); // { text, action?: { label, run } }
   const botHook = useRef(null); // brand bots hear chat messages (set once ads are ready)
@@ -1106,7 +1116,10 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
         }
         return id;
       },
-      update: (task, patch) => store.updateTask(task.id, patch, actor, task).catch(fail),
+      update: (task, patch) => {
+        touchTask.current(task.id);
+        return store.updateTask(task.id, patch, actor, task).catch(fail);
+      },
       remove: async (task) => {
         try {
           await store.trashTask(task.id, actor);
@@ -1132,7 +1145,10 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
         }
       },
       removePhoto: (task, photo) => store.removeTaskPhoto(task.id, photo, actor).catch(fail),
-      comment: (task, text) => store.addComment(task.id, text, actor).catch(fail),
+      comment: (task, text) => {
+        touchTask.current(task.id);
+        return store.addComment(task.id, text, actor).catch(fail);
+      },
       subscribeActivity: (id, cb) => store.subscribeActivity(id, cb, fail),
       createMilestone: (data) => store.createMilestone(data, actor).catch(fail),
       updateMilestone: (m, patch) => store.updateMilestone(m.id, patch, actor).catch(fail),
@@ -1425,11 +1441,22 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
   const [rawLabLogs, setLabLogs] = useState(null);
   // Under current names (a log saved before a rename still counts as yours).
   const labLogs = useMemo(
-    () => rawLabLogs && rawLabLogs.map((l) => (l.person && rename(l.person) !== l.person ? { ...l, person: rename(l.person) } : l)),
+    () =>
+      rawLabLogs &&
+      rawLabLogs.map((l) => {
+        const out = l.person && rename(l.person) !== l.person ? { ...l, person: rename(l.person) } : l;
+        return Array.isArray(l.workedWith) && l.workedWith.some((n) => rename(n) !== n) ? { ...out, workedWith: l.workedWith.map(rename) } : out;
+      }),
     [rawLabLogs, rename],
   );
-  useEffect(() => store.subscribeLabLogs(dayOf(Date.now() - 30 * 86400000), setLabLogs, loadFail('the lab log')), [store, loadFail]);
+  // Back 30 days, and to the 1st of the month (the "this month" hours after you log).
+  useEffect(() => {
+    const back = dayOf(Date.now() - 30 * 86400000);
+    const month = `${dayOf(Date.now()).slice(0, 7)}-01`;
+    return store.subscribeLabLogs(back < month ? back : month, setLabLogs, loadFail('the lab log'));
+  }, [store, loadFail]);
   const [labLog, setLabLog] = useState(null); // { mode: 'end' | 'edit', day, person, shift? }
+  const [labPayoff, setLabPayoff] = useState(null); // { lines, ended } after you log
   const namedShifts = useMemo(() => shifts.map((s) => (s.person ? { ...s, person: rename(s.person) } : s)), [shifts, rename]);
   // Lab log (Controls): required, optional (ending a shift can skip it), or off.
   const owedLog = labLogs && controls.labLog === 'required' ? missingLogDay(actor.name, namedShifts, labLogs) : null;
@@ -1445,17 +1472,27 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
     }),
     [labLogs, namedShifts, tasks, actor.name, actor.admin],
   );
-  const saveLabLog = async (form) => {
+  // form: the log's fields (labLog.js logFields); then = what to do to tasks
+  // ({ done: ids to move to Done, blocked: [{ id, reason }], chips: chip ids to count }).
+  const saveLabLog = async (form, then = {}) => {
     const st = labLog || { mode: 'missing', day: owedDay, person: actor.name };
     const id = logId(st.day, st.person);
     const prev = (labLogs || []).find((l) => l.id === id);
-    await store.saveLabLog(id, { day: st.day, person: st.person, uid: prev?.uid || actor.uid, at: prev?.at || Date.now(), ...form }, actor);
-    // Tasks marked finished in the log get marked done.
-    for (const tid of form.doneTaskIds) {
-      const t = (tasks || []).find((x) => x.id === tid);
+    const shiftIds = [...new Set([...(prev?.shiftIds || []), ...(st.shift?.id ? [st.shift.id] : [])])].slice(-10);
+    const saved = { day: st.day, person: st.person, uid: prev?.uid || actor.uid, at: prev?.at || Date.now(), ...form, shiftIds };
+    await store.saveLabLog(id, saved, actor);
+    const byId = new Map((tasks || []).map((t) => [t.id, t]));
+    for (const tid of then.done || []) {
+      const t = byId.get(tid);
       if (t && t.status !== 'done') await api.update(t, { status: 'done' });
     }
-    if (st.mode === 'end' && st.shift)
+    for (const { id: tid, reason } of then.blocked || []) {
+      const t = byId.get(tid);
+      if (t && t.status !== 'blocked') await api.update(t, { status: 'blocked', ...(reason ? { blockedReason: reason } : {}) });
+    }
+    if (then.chips?.length) store.bumpLabChips?.(then.chips);
+    const ended = st.mode === 'end' && !!st.shift;
+    if (ended)
       await api.updateShift(st.shift.id, {
         note: st.shift.note || '',
         subteam: st.shift.subteam || '',
@@ -1463,7 +1500,16 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
         end: Date.now(),
       });
     setLabLog(null);
-    setToast({ text: st.mode === 'end' ? 'Logged. Your shift is over.' : 'Saved to #lab-log.' });
+    if (st.person !== actor.name) return setToast({ text: 'Saved to #lab-log.' });
+    const all = [...(labLogs || []).filter((l) => l.id !== id), { ...saved, id }];
+    const shiftsNow = ended ? namedShifts.map((x) => (x.id === st.shift.id ? { ...x, end: Date.now() } : x)) : namedShifts;
+    setLabPayoff({ lines: payoffLines(actor.name, saved, all, shiftsNow, tasks || []), ended });
+  };
+  // Ending a short shift: "Quick visit, nothing to log".
+  const endQuickVisit = async (shift) => {
+    await api.updateShift(shift.id, { note: shift.note || '', subteam: shift.subteam || '', taskIds: shift.taskIds || [], end: Date.now() });
+    setLabLog(null);
+    setToast({ text: 'Shift ended. Thanks for stopping by.' });
   };
 
   const startMyShift = useCallback(
@@ -2541,11 +2587,21 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
                         key={`${st.mode}-${id}`}
                         day={st.day}
                         person={st.person}
+                        mine={st.person === actor.name}
                         log={(labLogs || []).find((l) => l.id === id)}
                         shift={st.shift}
                         tasks={tasks || []}
+                        logs={labLogs || []}
+                        shifts={namedShifts}
+                        subteams={peopleCtx.infoOf(st.person).subteams}
                         hours={hoursOn(st.day, namedShifts)[st.person]}
                         mode={st.mode}
+                        loadTouched={async () => {
+                          const extra = st.person === actor.name ? localTouches(st.day, actor.name) : [];
+                          const cloud = await (store.getLabTouches?.(st.day, st.person) || []);
+                          return [...touchedOn(st.day, st.person, tasks || [], namedShifts, [...extra, ...cloud])];
+                        }}
+                        subscribeChips={store.subscribeLabChips ? (cb) => store.subscribeLabChips(cb) : undefined}
                         onSave={saveLabLog}
                         // A missing log has to be written (unless Asher is previewing); ending a shift can wait ("Not yet").
                         onCancel={st.mode === 'missing' ? skipInPreview?.(`lablog:${st.day}`) || null : () => setLabLog(null)}
@@ -2564,10 +2620,13 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
                               }
                             : null
                         }
+                        onQuick={st.mode === 'end' && st.shift ? () => endQuickVisit(st.shift) : null}
                         uploadPhoto={async (f) => store.uploadLabPhoto(await preparePhoto(f))}
+                        uploadVoice={(blob, ms) => store.uploadLabVoice(blob, ms, actor)}
                       />
                     );
                   })()}
+                {labPayoff && <LabPayoff lines={labPayoff.lines} ended={labPayoff.ended} onClose={() => setLabPayoff(null)} />}
                 {pendingCheckin && (
                   <CheckinGate
                     checkin={pendingCheckin}

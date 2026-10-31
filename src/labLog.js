@@ -217,22 +217,91 @@ export function teammatesOn(day, person, shifts) {
 // already picked when you log). Kept on this device and in labTouches/
 // <day>_<person> so it follows you to your other devices.
 const TOUCH_KEY = 'lablog-touched';
-export function localTouches(day) {
+export function localTouches(day, name) {
   try {
     const v = JSON.parse(localStorage.getItem(TOUCH_KEY) || 'null');
-    return v && v.day === day && Array.isArray(v.ids) ? v.ids : [];
+    return v && v.day === day && v.name === name && Array.isArray(v.ids) ? v.ids : [];
   } catch {
     return [];
   }
 }
 // Adds a task to today's list; true if it wasn't there yet.
-export function addLocalTouch(day, id) {
-  const ids = localTouches(day);
+export function addLocalTouch(day, name, id) {
+  const ids = localTouches(day, name);
   if (ids.includes(id)) return false;
   try {
-    localStorage.setItem(TOUCH_KEY, JSON.stringify({ day, ids: [...ids, id].slice(-100) }));
+    localStorage.setItem(TOUCH_KEY, JSON.stringify({ day, name, ids: [...ids, id].slice(-100) }));
   } catch {
     /* private mode: the database copy still has it */
   }
   return true;
+}
+
+// Every task this person touched on a day, from what the app already knows:
+// tasks they changed or finished that day, the tasks they picked on that
+// day's shifts, and the ones they opened or commented on (`extra`, from
+// labTouches and this device).
+export function touchedOn(day, person, tasks, shifts, extra = []) {
+  const ids = new Set(extra);
+  for (const t of tasks || []) {
+    if (t.deletedAt) continue;
+    if (t.updatedBy === person && t.updatedAt && dayOf(t.updatedAt) === day) ids.add(t.id);
+  }
+  for (const s of shifts || []) if (s.person === person && s.start && dayOf(s.start) === day) for (const id of s.taskIds || []) ids.add(id);
+  return ids;
+}
+
+// The areas someone works in, from their subteams (Team Management and
+// Secretary are General).
+export const areasOfSubteams = (subteams) => sortAreas([...new Set((subteams || []).map(areaOfSubteam))]);
+
+// What a log saves, from the form. The structured fields, plus the older ones
+// (taskIds, doneTaskIds, blockers) that earlier versions of the app read.
+export function logFields({ areas, picks, note, chips, photos, voice, workedWith }) {
+  const tasks = picks.slice(0, 30).map((p) => ({
+    id: p.id || null,
+    title: (p.title || '').trim().slice(0, 200),
+    area: p.area,
+    outcome: p.outcome || '',
+    blocker: p.outcome === 'stuck' ? (p.blocker || '').trim().slice(0, 300) : '',
+  }));
+  const text = (note || '').trim().slice(0, 1000);
+  return {
+    v: 2,
+    areas: sortAreas([...new Set([...areas, ...tasks.map((t) => t.area)])]),
+    tasks,
+    note: text,
+    chips: [...new Set(chips)].filter((id) => chipById[id] && chipIn(text, chipById[id])).slice(0, 30),
+    photos: (photos || []).slice(0, 4),
+    voice: voice || null,
+    workedWith: [...new Set(workedWith || [])].slice(0, 20),
+    taskIds: tasks.filter((t) => t.id).map((t) => t.id),
+    doneTaskIds: tasks.filter((t) => t.id && t.outcome === 'done').map((t) => t.id),
+    blockers: tasks
+      .filter((t) => t.blocker)
+      .map((t) => `${t.title}: ${t.blocker}`)
+      .join('\n')
+      .slice(0, 2000),
+  };
+}
+
+// The "nice work" lines after you log: hours on your areas this month, and
+// how many tasks moved forward today.
+export function payoffLines(person, entry, logs, shifts, tasks, now = Date.now()) {
+  const hours = areaHoursThisMonth(person, logs, shifts, tasks, now);
+  const lines = [];
+  for (const a of sortAreas(entry.areas || [])
+    .filter((x) => hours[x])
+    .sort((x, y) => hours[y] - hours[x])
+    .slice(0, 2))
+    lines.push({ num: `${hours[a]} h`, text: `on ${areaById[a].label} this month`, icon: areaById[a].icon });
+  const forward = (entry.tasks || []).filter((t) => FORWARD.includes(t.outcome)).length;
+  const done = (entry.tasks || []).filter((t) => t.outcome === 'done').length;
+  if (forward) lines.push({ num: String(forward), text: `${forward === 1 ? 'task' : 'tasks'} moved forward today`, icon: 'progress' });
+  if (done) lines.push({ num: String(done), text: `${done === 1 ? 'task' : 'tasks'} finished`, icon: 'check' });
+  const day = entry.day || dayOf(now);
+  const team = new Set((logs || []).filter((l) => l.day === day).map((l) => l.person));
+  team.add(person);
+  if (team.size > 1) lines.push({ num: String(team.size), text: 'people logged today', icon: 'team' });
+  return lines;
 }
