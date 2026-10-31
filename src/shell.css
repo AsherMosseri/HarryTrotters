@@ -2798,3 +2798,11 @@ button.pm-row:hover { background: color-mix(in srgb, var(--text) 4%, transparent
   color: var(--muted);
 }
 .dialog.whats-new .version-section h4 { padding: 0; }
+
+/* 3.0: the old Home Screen app makes your password before the install steps (Gate.jsx GetNewApp). */
+.new-app-pw { margin-top: 14px; text-align: left; }
+.gate-card .new-app-pw-title { margin: 0; font-size: 17px; font-weight: 700; }
+.new-app-pw .link-btn { align-self: flex-start; }
+.new-app-pw-row { display: flex; align-items: center; gap: 14px; margin-top: 8px; }
+.new-app-done { display: flex; align-items: flex-start; gap: 10px; margin: 14px 0 4px; text-align: left; }
+.new-app-done svg { flex: none; margin-top: 1px; color: var(--accent); }

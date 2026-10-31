@@ -61,7 +61,7 @@ export const CHANGELOG = [
       {
         title: 'Jackson coins',
         items: [
-          'Lab time pays 4 coins an hour, for every full 15 minutes. Nobody earns coins from ads any more.',
+          'From 3.0 on, lab time pays 4 coins an hour, for every full 15 minutes (earlier time keeps what it earned). Nobody earns coins from ads any more.',
           'Finished tasks pay for up to 5 tasks a day; games, trivia and /daily share a limit of 20 coins a day.',
           'New Market: pet care, real perks (team management approves each one), chat extras for a day and tournaments.',
           'Pets: adopt one if you want. It grows with your time at the lab and shows on your profile and next to your name.',

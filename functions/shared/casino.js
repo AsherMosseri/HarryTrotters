@@ -363,10 +363,15 @@ export const minutesText = (ms) => {
   return m >= 60 ? `${Math.floor(m / 60)} h ${m % 60} min` : `${m} min`;
 };
 
+// /daily: 5 coins, plus 1 for each day in a row before today, up to 15
+// (paid as a 'game' award, within the shared 20-a-day limit).
+export const DAILY_COINS = { base: 5, perDay: 1, max: 15 };
+export const dailyAmount = (streak) => Math.min(DAILY_COINS.base + DAILY_COINS.perDay * Math.max(0, streak - 1), DAILY_COINS.max);
+
 export function daily(bank, day, yesterday) {
   if (bank.daily?.day === day) return { error: `You already got today’s coins. Come back tomorrow (streak: ${bank.daily.streak} 🔥).` };
   const streak = bank.daily?.day === yesterday ? (bank.daily.streak || 0) + 1 : 1;
-  const amount = 15 + 3 * Math.min(streak - 1, 10);
+  const amount = dailyAmount(streak);
   return { amount, card: { amount, streak }, bank: { daily: { day, streak } } };
 }
 
