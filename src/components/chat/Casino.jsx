@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { Avatar } from '../common.jsx';
-import { HL_NAMES, MINES_TILES, crashMultiplier, handValue, hlChance, hlStep, minesMultiplier } from '../../../functions/shared/casino.js';
+import { HL_NAMES, MINES_TILES, crashMultiplier, dailyAmount, handValue, hlChance, hlStep, minesMultiplier } from '../../../functions/shared/casino.js';
 import { AWARD_CAPS } from '../../../functions/shared/coins.js';
 import { serverNow } from '../../serverTime.js';
 import { Die } from './Die.jsx';
@@ -380,7 +380,7 @@ function Economy({ c, by, Name }) {
           <div className="muted tiny">
             {c.limit
               ? `Daily limit reached: /daily and game prizes pay up to ${c.limit} coins a day together. Your streak still counts.`
-              : `Come back tomorrow for up to ${Math.min(15 + 3 * c.streak, 45, AWARD_CAPS.game)}. It shares the ${AWARD_CAPS.game}-a-day limit with game prizes.`}
+              : `Come back tomorrow for up to ${Math.min(dailyAmount(c.streak + 1), AWARD_CAPS.game)}. It shares the ${AWARD_CAPS.game}-a-day limit with game prizes.`}
           </div>
         </div>
       );
