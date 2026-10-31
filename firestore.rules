@@ -138,10 +138,19 @@ service cloud.firestore {
       function validSpend(d) {
         return d.keys().hasOnly(['type', 'person', 'amount', 'what', 'label', 'until', 'at']) && isMe(d.person) && amount(d)
           && shortStr(d.get('what', ''), 20) && shortStr(d.get('label', ''), 80)
-          && (!('until' in d) || (d.until is int && d.until <= request.time.toMillis() + 8 * 86400000))
+          && (!('until' in d) || (d.until is int && d.until <= request.time.toMillis() + 8 * 86400000 && d.amount * 2 >= adFreePrice(d)))
           // Market buys and tournament entries are written by the server only
           // (functions/market.js), which also hands over what was bought.
           && !(d.get('what', '') in ['market', 'tournament']);
+      }
+      // Time without ads (`until`) costs its price in settings/team.coins.prices
+      // (Ads.jsx buyRemoval: an hour, the rest of today or a week), less at
+      // most the best ad coupon (50% off), so it can't be bought for 1 coin.
+      function adFreePrice(d) {
+        let team = /databases/$(database)/documents/settings/team;
+        let p = exists(team) ? get(team).data.get('coins', {}).get('prices', {}) : {};
+        let span = d.until - d.at;
+        return span <= 3720000 ? p.get('hour', 10) : span <= 25 * 3600000 + 120000 ? p.get('today', 25) : p.get('week', 120);
       }
       function validGrant(d) {
         return d.keys().hasOnly(['type', 'to', 'amount', 'note', 'by', 'at']) && requestsOwner() && d.to is string
@@ -426,8 +435,9 @@ service cloud.firestore {
     function renamedMe() {
       return exists(namesPath()) ? get(namesPath()).data.get('renames', {}).get(myName(), '') : '';
     }
-    function isMe(name) { return name == myName() || name == renamedMe(); }
-    function inPeople(people) { return myName() in people || renamedMe() in people; }
+    // renamedMe() is '' for someone never renamed, and '' is nobody.
+    function isMe(name) { return name == myName() || (name == renamedMe() && name != ''); }
+    function inPeople(people) { return myName() in people || (renamedMe() != '' && renamedMe() in people); }
 
     // A new message: posted as yourself, sane size, and only team management
     // can @everyone.
@@ -749,8 +759,22 @@ service cloud.firestore {
     }
 
     // Deleting moves a task to Recently deleted (an update); only managers delete for good.
+    // A done task pays coins to its assignees unless they created it
+    // (functions/shared/coins.js), so the creator is whoever saves it first
+    // and never changes, and its times come from the server's clock.
+    function serverTime(d, k) { return d.get(k, null) == null || d.get(k, null) == request.time; }
+    function stampedIfChanged(k) {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny([k]) || serverTime(request.resource.data, k);
+    }
     match /tasks/{taskId} {
-      allow read, create, update: if isMember();
+      allow read: if isMember();
+      allow create: if isMember() && isMe(request.resource.data.get('createdBy', ''))
+        && request.resource.data.get('createdAt', null) == request.time
+        && serverTime(request.resource.data, 'completedAt') && serverTime(request.resource.data, 'updatedAt');
+      allow update: if isMember()
+        && request.resource.data.get('createdBy', null) == resource.data.get('createdBy', null)
+        && request.resource.data.get('createdAt', null) == resource.data.get('createdAt', null)
+        && stampedIfChanged('completedAt') && stampedIfChanged('updatedAt');
       allow delete: if isManager();
 
       // Comments + change history: anyone on the team can add; nobody can rewrite history.
