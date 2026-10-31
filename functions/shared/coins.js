@@ -116,12 +116,19 @@ export function earnedItems(name, { tasks = [], shifts = [], cfg, now = Date.now
   return items.sort((a, b) => b.at - a.at);
 }
 
+// Spending: ad breaks and skips (the app), market buys and tournament
+// entries (the server).
+const SPEND_ICON = { skip: '⏭', market: '🛍️', tournament: '🏆' };
 // Someone's entries in the ledger, as signed amounts.
 export function ledgerItems(name, ledger = []) {
   const out = [];
   for (const x of ledger) {
     if (x.type === 'spend' && x.person === name)
-      out.push({ kind: 'spend', at: x.at, amount: -x.amount, icon: x.what === 'skip' ? '⏭' : '🚫', label: x.label || 'Spent' });
+      out.push({ kind: 'spend', at: x.at, amount: -x.amount, icon: SPEND_ICON[x.what] || '🚫', label: x.label || 'Spent' });
+    // Coins back from the market (functions/market.js): a declined perk, a
+    // cancelled tournament. Only the server writes these.
+    else if (x.type === 'refund' && x.person === name)
+      out.push({ kind: 'refund', at: x.at, amount: x.amount, icon: '↩️', label: x.label || 'Refund' });
     else if (x.type === 'gift' && x.from === name)
       out.push({ kind: 'gift-out', at: x.at, amount: -x.amount, icon: '🎁', label: `To ${x.to}${x.note ? `: “${x.note}”` : ''}` });
     else if (x.type === 'gift' && x.to === name)
@@ -129,7 +136,13 @@ export function ledgerItems(name, ledger = []) {
     else if (x.type === 'award' && x.person === name)
       out.push({ kind: 'award', at: x.at, amount: x.amount, icon: '★', label: x.label || 'Earned' });
     else if (x.type === 'prize' && x.person === name)
-      out.push({ kind: 'prize', at: x.at, amount: x.amount, icon: x.what === 'wheel' ? '🎡' : '🎮', label: x.label || 'Prize' });
+      out.push({
+        kind: 'prize',
+        at: x.at,
+        amount: x.amount,
+        icon: x.what === 'wheel' ? '🎡' : x.what === 'tournament' ? '🏆' : '🎮',
+        label: x.label || 'Prize',
+      });
     else if (x.type === 'grant' && x.to === name)
       out.push({
         kind: 'grant',
