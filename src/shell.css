@@ -1735,3 +1735,7 @@ button.pm-row:hover { background: color-mix(in srgb, var(--text) 4%, transparent
 .anim-area .grow { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .anim-area b { font-size: 14px; }
 .anim-areas.all-off .anim-area { opacity: 0.5; cursor: default; }
+
+/* Appearance: the theme menu inside the dialog keeps the floating menu's
+   z-index, which (as a flex item) put the tiles over the sticky title. */
+.theme-menu.inline { z-index: auto; }
