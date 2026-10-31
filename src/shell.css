@@ -1684,3 +1684,51 @@ button.pm-row:hover { background: color-mix(in srgb, var(--text) 4%, transparent
 /* Dark: a hairline so the card doesn't melt into a dark page. */
 @media (prefers-color-scheme: dark) { :root:not([data-theme='light']) .dialog.ask { box-shadow: var(--shadow-lg), 0 0 0 1px var(--border); } }
 :root[data-theme='dark'] .dialog.ask { box-shadow: var(--shadow-lg), 0 0 0 1px var(--border); }
+
+/* ---------- More animation (motion.js; Appearance → Animations) ----------
+   <html data-anim> lists the kinds that play: celebrate, move, pages, taps.
+   It's empty with Animations off, or on Match device with Reduce Motion on.
+   Only transform, scale and opacity move, with fixed values (smooth on iPad). */
+
+/* Celebrations: celebrate() puts this at a point and animates each piece. */
+.celebrate { position: fixed; z-index: 90; width: 0; height: 0; pointer-events: none; }
+.celebrate > i { position: absolute; display: block; will-change: transform, opacity; }
+.celebrate-bit { left: -4px; top: -3px; width: 8px; height: 6px; border-radius: 1.5px; }
+.celebrate-bit.round { left: -3.5px; top: -3.5px; width: 7px; height: 7px; border-radius: 50%; }
+.celebrate-ring { left: -26px; top: -26px; width: 52px; height: 52px; border-radius: 50%; border: 2px solid var(--accent); opacity: 0; }
+
+/* Moving things: counting numbers keep their width. */
+.count-up { font-variant-numeric: tabular-nums; }
+
+/* Page changes: pop-ups rise in a little (the profile card has its own pop). */
+@keyframes dialog-in { from { opacity: 0; transform: translateY(10px) scale(0.98); } }
+:root[data-anim~='pages'] .panel-backdrop.center > .dialog:not(.profile-card):not(.profile-page) {
+  animation: dialog-in 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+:root:not([data-anim~='pages']) :is(.panel-backdrop, .panel, .panel-backdrop > .dialog, .dg-screen, .sb-foot .me-menu) { animation: none; }
+
+/* Buttons and taps: things you tap press in a little, and hover colors ease. */
+:root[data-anim~='taps'] :is(
+  .btn, .chip, .icon-btn, .text-btn, .link-btn, .seg button, .segmented button, .tabs button, .bottom-nav button,
+  .phone-status, .quick-chip, .reaction, .msg-actions button, .person, .switch, .sb-row, .t-row, .card, .cp-row
+) {
+  transition: scale 0.12s ease, translate 0.15s ease, background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+:root[data-anim~='taps'] :is(
+  .btn, .chip, .icon-btn, .text-btn, .link-btn, .seg button, .segmented button, .tabs button, .bottom-nav button,
+  .phone-status, .quick-chip, .reaction, .msg-actions button, .person, .switch
+):active:not(:disabled) { scale: 0.97; }
+/* Big rows and cards press in less, so they don't look like they shrink. */
+:root[data-anim~='taps'] :is(.sb-row, .t-row, .card, .cp-row):active { scale: 0.985; }
+@media (hover: hover) {
+  :root[data-anim~='taps'] .card:not(.dragging):not(.overlay):hover { translate: 0 -1px; box-shadow: var(--shadow); }
+}
+:root[data-anim~='taps'] input[type='checkbox'] { transition: scale 0.12s ease; }
+:root[data-anim~='taps'] input[type='checkbox']:active { scale: 0.88; }
+
+/* Appearance: the four kinds of animation, under Animations. */
+.anim-areas { display: flex; flex-direction: column; gap: 2px; margin-top: -4px; }
+.anim-area { display: flex; align-items: center; gap: 12px; padding: 8px 0; cursor: pointer; }
+.anim-area .grow { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.anim-area b { font-size: 14px; }
+.anim-areas.all-off .anim-area { opacity: 0.5; cursor: default; }

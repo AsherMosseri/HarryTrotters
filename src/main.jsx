@@ -8,10 +8,12 @@ import './styles.css';
 import './shell.css';
 import { installEmojiKeyFix } from './emojiKeyFix.js';
 import { installKeyboardFit, installNoPageZoom } from './keyboard.js';
+import { installAnim } from './motion.js';
 
 installEmojiKeyFix();
 installKeyboardFit();
 installNoPageZoom();
+installAnim();
 
 window.addEventListener('vite:preloadError', (e) => {
   if (reloadOnceForNewVersion()) e.preventDefault();

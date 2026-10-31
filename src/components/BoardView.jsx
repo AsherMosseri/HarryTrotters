@@ -16,6 +16,8 @@ import { AvatarStack, PlusIcon } from './common.jsx';
 import { Icon } from './shell/icons.jsx';
 import { dueInfo, useLocalStorage, waitingNote } from '../util.js';
 import { SponsoredCard, boardAdCount, useAds } from './Ads.jsx';
+import { flipFrom, useFlip } from '../motion.js';
+import CountUp from './CountUp.jsx';
 
 // Drop into whichever column is under the finger/cursor; fall back to overlap.
 const collision = (args) => {
@@ -80,6 +82,7 @@ function Card({ task, onOpen }) {
   return (
     <div
       ref={setNodeRef}
+      data-flip={task.id}
       className={`card${isDragging ? ' dragging' : ''}${task.status === 'done' ? ' is-done' : ''}`}
       onClick={() => onOpen(task.id)}
       {...attributes}
@@ -117,7 +120,9 @@ function Column({ status, tasks, onOpen, onAdd }) {
       <header className="column-head">
         <span className="dot" />
         <h2>{status.label}</h2>
-        <span className="count">{tasks.length}</span>
+        <span className="count">
+          <CountUp value={tasks.length} from={tasks.length} />
+        </span>
         <button className="icon-btn small" title={`Add to ${status.label}`} onClick={() => onAdd(status.id)}>
           <PlusIcon />
         </button>
@@ -146,6 +151,9 @@ function PhoneBoard({ columns, onOpen, onAdd }) {
   const ads = useAds();
   const { after, tail } = adSlots(boardAdCount(ads, current.id), list.length);
   const k0 = STATUSES.findIndex((s) => s.id === current.id) * 3;
+  // Cards ease in and out as the list changes (Moving things).
+  const cardsRef = useRef(null);
+  useFlip(cardsRef, list);
   return (
     <div className="phone-board">
       <div className="phone-status-chips" role="tablist">
@@ -164,10 +172,10 @@ function PhoneBoard({ columns, onOpen, onAdd }) {
           </button>
         ))}
       </div>
-      <div className="phone-cards">
+      <div className="phone-cards" ref={cardsRef}>
         {list.map((t, i) => (
           <Fragment key={t.id}>
-            <button className={`card phone-card${t.status === 'done' ? ' is-done' : ''}`} onClick={() => onOpen(t.id)}>
+            <button data-flip={t.id} className={`card phone-card${t.status === 'done' ? ' is-done' : ''}`} onClick={() => onOpen(t.id)}>
               <CardBody task={t} />
             </button>
             {after.has(i) && <SponsoredCard slot="board" k={k0 + after.get(i)} />}
@@ -227,6 +235,11 @@ export default function BoardView({ tasks, milestones = [], api, onOpen, onAdd, 
     return at.x < r.left + 56 || at.x > r.right - 56;
   }, []);
 
+  // A card that changes column slides there (Moving things); a dropped one
+  // slides from where it was let go.
+  const boardRef = useRef(null);
+  useFlip(boardRef, tasks);
+
   // The column's copy, so the drag preview keeps its milestone name.
   const active = activeId ? Object.values(columns).flat().find((t) => t.id === activeId) : null;
   if (phone) return <PhoneBoard columns={columns} onOpen={onOpen} onAdd={onAdd} />;
@@ -242,10 +255,12 @@ export default function BoardView({ tasks, milestones = [], api, onOpen, onAdd, 
         setActiveId(null);
         const task = tasks.find((t) => t.id === e.active.id);
         const to = e.over?.id;
+        const dropped = document.querySelector('.card.overlay');
+        if (task && to && to !== task.status && dropped) flipFrom(task.id, dropped.getBoundingClientRect());
         if (task && to && to !== task.status) api.update(task, { status: to });
       }}
     >
-      <div className="board">
+      <div className="board" ref={boardRef}>
         {STATUSES.map((s) => (
           <Column key={s.id} status={s} tasks={columns[s.id]} onOpen={onOpen} onAdd={onAdd} />
         ))}
