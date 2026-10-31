@@ -586,6 +586,18 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
     console.error(e);
     setToast({ text: e?.code === 'permission-denied' ? "You don't have permission to do that." : e?.message || 'Something went wrong.' });
   }, []);
+  // true once saved; false (after the toast) if it wasn't.
+  const ok = useCallback(
+    (p) =>
+      p.then(
+        () => true,
+        (e) => {
+          fail(e);
+          return false;
+        },
+      ),
+    [fail],
+  );
   // Loading errors name what failed, so a screenshot tells us where to look.
   // Collects every part that failed to load into one message, so nothing is hidden.
   const loadFailures = useRef(new Map());
@@ -675,6 +687,15 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
   const [shiftPanel, setShiftPanel] = useState(false);
   useEffect(() => store.subscribeShifts(setShifts, quiet('shifts')), [store, quiet]);
   useEffect(() => store.subscribeShiftPlans(setShiftPlans, quiet('shift schedule')), [store, quiet]);
+  // Asking for a longer or missed shift (team management approves), and the
+  // record of every change to a finished shift (team management only).
+  const [shiftRequests, setShiftRequests] = useState([]);
+  useEffect(() => store.subscribeShiftRequests(setShiftRequests, quiet('shift requests')), [store, quiet]);
+  const [shiftEdits, setShiftEdits] = useState([]);
+  useEffect(
+    () => (actor.admin ? store.subscribeShiftEdits(setShiftEdits, quiet('shift changes')) : setShiftEdits([])),
+    [store, quiet, actor.admin],
+  );
   // Lab check-ins: today's unanswered one blocks the app until it's answered.
   const [checkins, setCheckins] = useState([]);
   useEffect(() => store.subscribeCheckins(setCheckins, quiet('lab check-ins')), [store, quiet]);
@@ -1280,6 +1301,15 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
       startShifts: (people, start, extra = {}) => store.startShifts(people, start, extra, actor).catch(fail),
       updateShift: (id, patch) => store.updateShift(id, patch, actor).catch(fail),
       deleteShift: (id) => store.deleteShift(id).catch(fail),
+      // Changes to finished shifts (each one recorded) and asking for longer or
+      // missed ones. `shift` is the shift as saved. Each resolves true when saved.
+      editShift: (shift, patch, kind) => ok(store.editShift(shift, patch, kind, actor)),
+      removeShift: (shift) => ok(store.removeShift(shift, actor)),
+      addShift: (data) => ok(store.addShift(data, actor)),
+      requestShift: (req) => ok(store.requestShift(req, actor)),
+      cancelShiftRequest: (id) => ok(store.cancelShiftRequest(id)),
+      decideShiftRequest: (req, approve, shift) => ok(store.decideShiftRequest(req, approve, shift, actor)),
+      restoreCheckin: (c) => store.restoreCheckin(c).catch(fail),
       addShiftPlans: (list) => store.addShiftPlans(list, actor).catch(fail),
       addCheckin: (data) => store.addCheckin(data, actor).catch(fail),
       answerCheckin: (id, answer) => store.answerCheckin(id, actor.name, answer).catch(fail),
@@ -1313,7 +1343,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
       updateRun: (r, patch) => store.updateRun(r.id, patch, actor).catch(fail),
       deleteRun: (r) => store.deleteRun(r.id).catch(fail),
     }),
-    [store, actor, fail, setFilters, renames],
+    [store, actor, fail, ok, setFilters, renames],
   );
 
   const filtered = useMemo(
@@ -2323,6 +2353,9 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
                     checkins={upcomingCheckins}
                     checkinSchedule={settings.checkinSchedule}
                     gradeOf={gradeOf}
+                    requests={shiftRequests}
+                    edits={shiftEdits}
+                    runs={runs}
                   />
                 ) : view === 'resources' ? (
                   <ResourcesView

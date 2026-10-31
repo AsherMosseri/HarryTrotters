@@ -16,7 +16,8 @@ import * as casino from '../../functions/shared/casino.js';
 import { dayOf } from '../labLog.js';
 import * as arcade from '../../functions/shared/arcade.js';
 import { blocked, serverGroup } from '../../functions/shared/commandRules.js';
-import { giftEntry, prizeEntry, teamDay } from '../../functions/shared/coins.js';
+import { giftEntry, prizeEntry, teamDay, teamMidnight } from '../../functions/shared/coins.js';
+import { asksOn } from '../../functions/shared/checkin.js';
 
 const KEY = 'ftc32313-demo-v13';
 const listeners = new Set();
@@ -297,6 +298,7 @@ function seed() {
     stickers: [],
     shifts,
     shiftPlans: demoPlans(),
+    shiftRequests: demoShiftRequests(shifts, now),
     requests: [
       {
         id: uid(),
@@ -415,6 +417,28 @@ function demoShifts(now) {
     s('Michael Meidan', day(8, 15), 3, { subteam: 'CAD', autoEnded: true }),
   ];
 }
+// Jackson asking for his shift yesterday to be 30 minutes longer, so team
+// management has one to approve.
+function demoShiftRequests(shifts, now) {
+  const s = shifts.find((x) => x.person === 'Jackson Lucks' && x.end);
+  if (!s) return [];
+  return [
+    {
+      id: uid(),
+      kind: 'extend',
+      person: s.person,
+      shiftId: s.id,
+      start: s.start,
+      end: s.end + 1800000,
+      oldStart: s.start,
+      oldEnd: s.end,
+      note: 'Forgot to clock out, stayed to help with wiring',
+      status: 'pending',
+      by: s.person,
+      at: now - 3 * 3600000,
+    },
+  ];
+}
 function demoPlans() {
   const iso = (n) => {
     const d = new Date(Date.now() + n * 86400000);
@@ -483,6 +507,40 @@ function listen(fn) {
   fn();
   return () => listeners.delete(fn);
 }
+
+// A shiftEdits record (the same shape firebaseStore.js writes).
+function addShiftEdit(shift, kind, after, actor, at, requestId) {
+  const edit = {
+    id: uid(),
+    shiftId: shift.id,
+    person: shift.person,
+    kind,
+    by: actor.name,
+    at,
+    before: shift.start != null ? { start: shift.start, end: shift.end ?? null } : null,
+    after,
+    ...(requestId ? { requestId } : {}),
+  };
+  state.shiftEdits = [edit, ...(state.shiftEdits || [])].slice(0, 200);
+}
+
+// The server asks the scheduled lab check-in (functions/index.js
+// scheduledCheckin); the demo asks it when the app opens, on the same days.
+function demoScheduledCheckin() {
+  const s = state.settings?.checkinSchedule;
+  if (!s?.on || !(s.slots || []).length) return;
+  const today = teamDay(Date.now());
+  if (!asksOn(s, today) || Date.now() < teamMidnight(today) + clockMs(s.time)) return;
+  if ((state.checkins || []).some((c) => c.date === today)) return;
+  state.checkins = [
+    ...(state.checkins || []),
+    { id: `auto-${today}`, date: today, question: s.question || 'Who’s going to the lab today?', slots: s.slots, answers: {}, by: s.by || 'Team management', auto: true, at: Date.now() },
+  ];
+}
+const clockMs = (hhmm) => {
+  const [h, m] = String(hhmm || '00:00').split(':').map(Number);
+  return ((h || 0) * 60 + (m || 0)) * 60000;
+};
 
 // Fridays at 6 PM, like the real draw (local time in the demo).
 function nextFridayLocal(now) {
@@ -1573,8 +1631,74 @@ export const demoStore = {
     state.shifts = (state.shifts || []).filter((s) => s.id !== id);
     commit();
   },
+  // Changes to finished shifts, written down like the real store does
+  // (firebaseStore.js): who, when, the times before and after.
+  subscribeShiftEdits(cb) {
+    return listen(() => cb([...(state.shiftEdits || [])].sort((a, b) => b.at - a.at)));
+  },
+  async editShift(shift, patch, kind, actor, requestId) {
+    const n = (shift.editCount || 0) + 1;
+    const at = Date.now();
+    state.shifts = (state.shifts || []).map((s) =>
+      s.id === shift.id ? { ...s, ...patch, editCount: n, editedAt: at, editedBy: actor.name, updatedBy: actor.name } : s,
+    );
+    addShiftEdit(shift, kind, { start: patch.start ?? shift.start, end: patch.end ?? shift.end }, actor, at, requestId);
+    commit();
+  },
+  async removeShift(shift, actor) {
+    state.shifts = (state.shifts || []).filter((s) => s.id !== shift.id);
+    addShiftEdit(shift, 'delete', null, actor, Date.now());
+    commit();
+  },
+  async addShift(data, actor) {
+    const id = uid();
+    const at = Date.now();
+    state.shifts = [...(state.shifts || []), { id, note: '', subteam: '', taskIds: [], ...data, createdBy: actor.name, at }];
+    addShiftEdit({ id, person: data.person }, 'add', { start: data.start, end: data.end }, actor, at);
+    commit();
+  },
+  subscribeShiftRequests(cb) {
+    return listen(() => cb([...(state.shiftRequests || [])]));
+  },
+  async requestShift(req, actor) {
+    state.shiftRequests = [...(state.shiftRequests || []), { id: uid(), ...req, status: 'pending', by: actor.name, at: Date.now() }];
+    commit();
+  },
+  async cancelShiftRequest(id) {
+    state.shiftRequests = (state.shiftRequests || []).filter((r) => r.id !== id);
+    commit();
+  },
+  async decideShiftRequest(req, approve, shift, actor) {
+    const at = Date.now();
+    state.shiftRequests = (state.shiftRequests || []).map((r) =>
+      r.id === req.id ? { ...r, status: approve ? 'approved' : 'declined', decidedBy: actor.name, decidedAt: at } : r,
+    );
+    if (approve) {
+      const span = { start: req.start, end: req.end };
+      if (req.kind === 'extend' && shift) {
+        state.shifts = (state.shifts || []).map((s) =>
+          s.id === shift.id
+            ? { ...s, ...span, editCount: (s.editCount || 0) + 1, editedAt: at, editedBy: actor.name, updatedBy: actor.name }
+            : s,
+        );
+        addShiftEdit(shift, 'approve', span, actor, at, req.id);
+      } else {
+        const id = uid();
+        const details = { note: req.note || '', subteam: req.subteam || '', taskIds: req.taskIds || [] };
+        state.shifts = [...(state.shifts || []), { id, person: req.person, ...span, ...details, createdBy: actor.name, at }];
+        addShiftEdit({ id, person: req.person }, 'approve', span, actor, at, req.id);
+      }
+    }
+    commit();
+  },
   subscribeCheckins(cb) {
+    demoScheduledCheckin();
     return listen(() => cb([...(state.checkins || [])]));
+  },
+  // Undo for "Not today": the check-in put back as it was.
+  async restoreCheckin(c) {
+    state.checkins = [...(state.checkins || []).filter((x) => x.id !== c.id), c];
+    commit();
   },
   async addCheckin(data, actor) {
     state.checkins = [...(state.checkins || []), { id: uid(), ...data, answers: {}, by: actor.name, at: Date.now() }];
