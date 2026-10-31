@@ -17,6 +17,8 @@ import { MascotCard } from '../Pet.jsx';
 import { ShoutOuts } from '../Market.jsx';
 import { LabLogContext } from '../LabLog.jsx';
 import { BingoCard, RecapRow } from '../Life.jsx';
+import Readiness from './Readiness.jsx';
+import { readiness } from '../../readiness.js';
 
 // The first page, like a pit board: the countdown and the robot up top with a
 // few plain lines on what needs you, then your tasks, what's due, who's at the
@@ -85,6 +87,9 @@ export default function Today({
   onOpenConv,
   onPage,
   onNewTask,
+  onShowTasks,
+  onShowParts,
+  parts = [],
   onStartShift,
   onOpenShift,
   onPerson,
@@ -116,6 +121,7 @@ export default function Today({
   return (
     <UsualToday
       {...{ actor, tasks, milestones, competition, shifts, runs, myShift, convs, unread, chat, on, onOpenTask, onOpenConv, onPage, onNewTask, roster, joinRequests }}
+      {...{ settings, checklists, parts, onShowTasks, onShowParts }}
       {...{ onStartShift, onOpenShift, onPerson, onEditProfile, people, today, api }}
       pitButton={
         compOn ? (
@@ -137,6 +143,11 @@ function UsualToday({
   tasks,
   milestones,
   competition,
+  settings = {},
+  checklists = [],
+  parts = [],
+  onShowTasks,
+  onShowParts,
   shifts,
   runs = [],
   myShift,
@@ -180,6 +191,9 @@ function UsualToday({
   const nextMs = milestones.filter((m) => !m.done && m.end && m.end >= today).sort((a, b) => a.end.localeCompare(b.end))[0];
   const msProgress = nextMs ? milestoneProgress(nextMs, all) : null;
   const left = competition.date ? daysBetween(today, competition.date) : -1;
+  // "Before the event": from now until the competition day (D4).
+  const ready = readiness({ tasks: all, parts, checklists, runs, goal: settings.runGoal, today, eventDate: competition.date });
+  const showReady = ready.show && tasks != null && !ready.ready;
 
   // The board's lines: short notes in plain words, each one tappable.
   const firstOverdue = mine.find((t) => t.dueDate && t.dueDate < today);
@@ -216,6 +230,10 @@ function UsualToday({
         text: `${unreadCount} unread in ${waiting.length === 1 ? (waiting[0].c.kind === 'dm' ? first(waiting[0].c.short) + '’s DM' : `#${waiting[0].c.name}`) : `${waiting.length} chats`}`,
         go: () => onOpenConv(waiting[0].c.key),
       },
+    // Nothing left before the event (the card hides itself).
+    ready.show &&
+      tasks != null &&
+      ready.ready && { tone: 'good', text: 'Ready. Nothing left before the event.', go: () => onPage('tasks') },
   ].filter(Boolean);
   const noPhoto = people && !people.photoOf(actor.name);
   // The team's week, small, under the board (the full strip is on Shifts).
@@ -306,6 +324,19 @@ function UsualToday({
 
       <div className="today-grid" ref={gridRef}>
         <div className="today-col">
+          {showReady && (
+            <Readiness
+              r={ready}
+              on={on}
+              eventDate={competition.date}
+              isManager={!!actor.admin}
+              api={api}
+              onShowTasks={onShowTasks}
+              onShowParts={onShowParts}
+              onPage={onPage}
+              onOpenTask={onOpenTask}
+            />
+          )}
           {on.includes('tasks') && (
             <section className="today-sec">
               <div className="sec-head">

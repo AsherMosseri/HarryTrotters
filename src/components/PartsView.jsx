@@ -212,8 +212,10 @@ function PartDialog({ part, tasks, onClose, onSave, onDelete }) {
   );
 }
 
-export default function PartsView({ parts, tasks, api, onOpenTask, chatToggle }) {
-  const [filter, setFilter] = useState('');
+// initialFilter: a status, or 'pending' (needed or ordered: not here yet), when Today's
+// "Before the event" card sends you here.
+export default function PartsView({ parts, tasks, api, onOpenTask, chatToggle, initialFilter = '' }) {
+  const [filter, setFilter] = useState(initialFilter);
   const [q, setQ] = useState('');
   const [editing, setEditing] = useState(null);
   const taskTitle = useMemo(() => Object.fromEntries(tasks.map((t) => [t.id, t.title])), [tasks]);
@@ -231,7 +233,7 @@ export default function PartsView({ parts, tasks, api, onOpenTask, chatToggle })
     const rank = Object.fromEntries(PART_STATUSES.map((s, i) => [s.id, i]));
     const needle = q.trim().toLowerCase();
     return parts
-      .filter((p) => !filter || p.status === filter)
+      .filter((p) => !filter || (filter === 'pending' ? p.status !== 'arrived' : p.status === filter))
       .filter((p) => !needle || `${p.name} ${p.vendor} ${p.partNumber} ${p.notes}`.toLowerCase().includes(needle))
       .sort((a, b) => rank[a.status] - rank[b.status] || (b.updatedAt || 0) - (a.updatedAt || 0));
   }, [parts, filter, q]);
@@ -257,6 +259,9 @@ export default function PartsView({ parts, tasks, api, onOpenTask, chatToggle })
         <input className="search" type="search" placeholder="Search parts…" value={q} onChange={(e) => setQ(e.target.value)} />
         <button className={`chip${!filter ? ' on' : ''}`} onClick={() => setFilter('')}>
           All <strong>{parts.length}</strong>
+        </button>
+        <button className={`chip${filter === 'pending' ? ' on' : ''}`} onClick={() => setFilter(filter === 'pending' ? '' : 'pending')}>
+          Not arrived <strong>{(totals.counts.needed || 0) + (totals.counts.ordered || 0)}</strong>
         </button>
         {PART_STATUSES.map((s) => (
           <button key={s.id} className={`chip${filter === s.id ? ' on' : ''}`} onClick={() => setFilter(filter === s.id ? '' : s.id)}>

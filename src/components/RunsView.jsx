@@ -4,6 +4,8 @@ import { Avatar, CloseIcon, Overlay, PlusIcon } from './common.jsx';
 import { useEscape } from '../util.js';
 import { confirmDialog } from './Dialogs.jsx';
 import { GuessCard } from './Life.jsx';
+import Debrief from './shell/Debrief.jsx';
+import { sortMatches } from '../../functions/shared/matches.js';
 import { winnerLine } from '../../functions/shared/predict.js';
 
 const PERIODS = [
@@ -342,6 +344,8 @@ export default function RunsView({ runs, roster, api, actor, predictions = [], m
   // Score guesses, by the run that settled them (shown under its total).
   const guessOf = useMemo(() => new Map(predictions.filter((p) => p.status === 'done' && p.runId).map((p) => [p.runId, p])), [predictions]);
   const [editing, setEditing] = useState(null);
+  // After a new competition match is logged: the optional "what went wrong?" step (D4).
+  const [debrief, setDebrief] = useState(null);
 
   const shown = useMemo(() => runs.filter((r) => !filter || r.type === filter).sort(byTime), [runs, filter]);
   const stats = useMemo(() => {
@@ -473,6 +477,8 @@ export default function RunsView({ runs, roster, api, actor, predictions = [], m
         </div>
       )}
 
+      {debrief && <Debrief match={debrief.match} next={debrief.next} api={api} onClose={() => setDebrief(null)} />}
+
       {editing && (
         <RunDialog
           run={editing}
@@ -483,6 +489,13 @@ export default function RunsView({ runs, roster, api, actor, predictions = [], m
             setEditing(null);
             if (r.id) await api.updateRun(r, data);
             else await api.createRun(data);
+            if (!r.id && data.type === 'match') {
+              // Which match? The schedule's one with this label, else just the label typed in.
+              const label = data.matchNumber || 'Match';
+              const hit = matches.find((m) => m.label?.toLowerCase() === label.toLowerCase());
+              const next = sortMatches(matches.filter((m) => m.time && !m.ours && m.id !== hit?.id && m.time > (hit?.time || Date.now())))[0] || null;
+              setDebrief({ match: { id: hit?.id || '', label }, next });
+            }
             if (issueTask) {
               await api.create({
                 title: `Fix: ${data.issues.length > 70 ? data.issues.slice(0, 67) + '…' : data.issues}`,

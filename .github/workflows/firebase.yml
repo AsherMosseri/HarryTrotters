@@ -88,7 +88,9 @@ jobs:
       # and a failed functions deploy would leave everyone locked out.
       - run: npx -y firebase-tools@15.34.0 deploy --only functions --project ftc-32313-tasks --non-interactive --force
       - run: npx -y firebase-tools@15.34.0 deploy --only firestore:rules,storage --project ftc-32313-tasks --non-interactive --force
-      - name: Check the morning reminder is scheduled
+      - name: Check the morning reminder and the queue alert are scheduled
         run: |
           REGION=$(node -e 'const l=require("./functions/location.json").firestore;console.log({nam5:"us-central1",nam7:"us-central1",eur3:"europe-west1"}[l]||l)')
-          gcloud scheduler jobs describe "firebase-schedule-dueTomorrow-$REGION" --location="$REGION" --format='value(schedule,timeZone,state)'
+          for job in dueTomorrow queueAlert; do
+            gcloud scheduler jobs describe "firebase-schedule-$job-$REGION" --location="$REGION" --format='value(schedule,timeZone,state)'
+          done

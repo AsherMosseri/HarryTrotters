@@ -2806,3 +2806,55 @@ button.pm-row:hover { background: color-mix(in srgb, var(--text) 4%, transparent
 .new-app-pw-row { display: flex; align-items: center; gap: 14px; margin-top: 8px; }
 .new-app-done { display: flex; align-items: flex-start; gap: 10px; margin: 14px 0 4px; text-align: left; }
 .new-app-done svg { flex: none; margin-top: 1px; color: var(--accent); }
+
+/* ---------- Before the event (Readiness.jsx, on Today) and the match debrief (Debrief.jsx) (D4) ---------- */
+.rd-list, .rd-blocked { list-style: none; margin: 0; padding: 0; }
+.rd-list > li + li { border-top: 1px solid var(--hairline); }
+.rd-row {
+  width: calc(100% + 12px); margin: 0 -6px; display: flex; align-items: center; gap: 12px; padding: 10px 6px; border: 0; border-radius: 6px;
+  background: none; color: inherit; font: inherit; text-align: left; min-height: 44px;
+}
+.rd-row:hover { background: color-mix(in srgb, var(--text) 4%, transparent); }
+.rd-dot { width: 9px; height: 9px; border-radius: 2px; flex: none; background: var(--muted); }
+.rd-row.bad .rd-dot { background: var(--danger); }
+.rd-row.warn .rd-dot { background: #e0a100; }
+.rd-row.good .rd-dot { background: var(--st-done); }
+.rd-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.rd-label { font-size: 15px; font-weight: 500; }
+.rd-sub { font-size: 12.5px; color: var(--muted); }
+.rd-row.bad .rd-sub { color: var(--danger); }
+.rd-n { font-family: var(--mono); font-size: 18px; font-weight: 650; letter-spacing: -0.03em; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.rd-n small { font-size: 13px; font-weight: 500; color: var(--muted); }
+.rd-row.good .rd-n { color: var(--muted); font-weight: 500; }
+.rd-blocked { margin: 2px 0 0 21px; padding-left: 12px; border-left: 2px solid color-mix(in srgb, var(--danger) 45%, var(--border)); }
+.rd-task { width: 100%; display: flex; flex-direction: column; gap: 1px; padding: 6px 4px; border: 0; background: none; color: inherit; font: inherit; text-align: left; border-radius: 6px; }
+.rd-task:hover { background: color-mix(in srgb, var(--text) 4%, transparent); }
+.rd-task-title { font-size: 14.5px; font-weight: 550; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rd-task-why { font-size: 12.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme='light']) .rd-row.warn .rd-dot { background: #fbbf24; } }
+:root[data-theme='dark'] .rd-row.warn .rd-dot { background: #fbbf24; }
+
+/* The debrief after a score: a small centered card (like the ask dialogs). */
+.panel-backdrop.center.db-backdrop { z-index: 55; align-items: center; padding: 16px; }
+.panel-backdrop.center > .dialog.debrief {
+  width: min(460px, 100%); height: auto; min-height: 0; max-height: 100%; overflow-y: auto; border-radius: 16px; padding: 18px 20px 16px; gap: 12px;
+}
+.dialog.debrief .panel-head { margin: 0; }
+.dialog.debrief h2 { margin: 0; font-size: 18px; line-height: 1.3; }
+.db-ask { margin: 0; line-height: 1.4; }
+.db-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.db-chips .chip { min-height: 44px; padding: 0 14px; font-size: 15px; font-weight: 600; }
+.db-chips .chip.on { box-shadow: inset 0 0 0 2px var(--accent); }
+.db-note { width: 100%; font-size: 16px; }
+.db-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 2px; }
+.db-actions .btn { min-height: 44px; padding: 0 16px; font-weight: 600; justify-content: center; }
+.db-made { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.db-made li { display: flex; flex-direction: column; gap: 1px; padding: 8px 10px; border-radius: 8px; background: var(--surface-2); font-weight: 550; }
+.db-made small { color: var(--muted); font-weight: 400; font-size: 12.5px; }
+@media (max-width: 760px) {
+  :root .panel-backdrop.center.db-backdrop { background: rgb(10 12 20 / 40%); padding: 16px; }
+  .panel-backdrop.center > .dialog.debrief { width: min(460px, 100%); min-height: 0; border-radius: 16px; }
+  .db-actions .btn { flex: 1; }
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme='light']) .dialog.debrief { box-shadow: var(--shadow-lg), 0 0 0 1px var(--border); } }
+:root[data-theme='dark'] .dialog.debrief { box-shadow: var(--shadow-lg), 0 0 0 1px var(--border); }

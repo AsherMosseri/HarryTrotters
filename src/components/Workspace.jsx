@@ -475,6 +475,8 @@ function matchesFilters(t, filters, me, view) {
   if (filters.subteam && t.subteam !== filters.subteam) return false;
   if (filters.priority && t.priority !== filters.priority) return false;
   if (filters.hideDone && t.status === 'done') return false;
+  // Today's "Before the event" card: only what's due before this day.
+  if (filters.dueBefore && !(t.dueDate && t.dueDate < filters.dueBefore)) return false;
   if (view === 'table' && filters.statuses.length && !filters.statuses.includes(t.status)) return false;
   return true;
 }
@@ -482,7 +484,7 @@ function matchesFilters(t, filters, me, view) {
 const TRASH_DAYS = 30;
 const CHAT_PAGE = 60;
 
-const EMPTY_FILTERS = { q: '', person: '', subteam: '', priority: '', statuses: [], hideDone: false };
+const EMPTY_FILTERS = { q: '', person: '', subteam: '', priority: '', statuses: [], hideDone: false, dueBefore: '' };
 
 // What components deep in the app read: people (profiles, who's online) and the lab log.
 function Contexts({ people, lab, lottery, controls, market, daily, children }) {
@@ -587,6 +589,8 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
   const [tasksMode, setTasksMode] = useLocalStorage('tasks-mode', 'board');
   // The #parts chat beside the Parts list can be hidden (remembered on this device).
   const [partsChatOpen, setPartsChatOpen] = useLocalStorage('parts-chat-open', true);
+  // Parts opened from Today's "Before the event" card start on this filter.
+  const [partsFilter, setPartsFilter] = useState('');
   // Phones get a slim top bar, a bottom tab bar, and sheets instead of the header's buttons.
   const phone = useMedia('(max-width: 760px)');
   const showRobot = ROBOT_TAB_PEOPLE.includes(actor.name);
@@ -625,6 +629,9 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
   const [filtersOpen, setFiltersOpen] = useState(false);
   const view = views.some(([id]) => id === savedView) ? savedView : views[0][0];
   const taskView = view === 'board' || view === 'table';
+  useEffect(() => {
+    if (view !== 'parts') setPartsFilter('');
+  }, [view]);
   // Page changes (Appearance): the new page fades and slides up a little.
   const scrollRef = useRef(null);
   const shownView = useRef(view);
@@ -1736,7 +1743,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
     return () => sw.removeEventListener('message', onMessage);
   }, [goTo]);
   const setF = (patch) => setFilters({ ...EMPTY_FILTERS, ...filters, ...patch });
-  const anyFilter = filters.q || filters.person || filters.subteam || filters.priority || filters.statuses.length || filters.hideDone;
+  const anyFilter = filters.q || filters.person || filters.subteam || filters.priority || filters.statuses.length || filters.hideDone || filters.dueBefore;
 
   const shiftButton = (
     <ShiftButton
@@ -1812,6 +1819,11 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
       <button className={`chip${filters.hideDone ? ' on' : ''}`} onClick={() => setF({ hideDone: !filters.hideDone })}>
         Hide done
       </button>
+      {filters.dueBefore && (
+        <button className="chip on" onClick={() => setF({ dueBefore: '' })} title="Show tasks with any due date">
+          Due before {parseDay(filters.dueBefore).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+        </button>
+      )}
       {anyFilter ? (
         <button className="link-btn" onClick={() => setFilters(EMPTY_FILTERS)}>
           Clear
@@ -2090,6 +2102,16 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
   const openConv = (key) => {
     setChatChannel(key);
     setView('chat');
+  };
+  // Today's "Before the event" card: the tasks page with a filter on (and the table, if asked and on).
+  const showTasks = (patch = {}, mode = '') => {
+    setFilters({ ...EMPTY_FILTERS, ...patch });
+    const on = views.map(([v]) => v);
+    setView(on.includes(mode) ? mode : on.includes(tasksMode) ? tasksMode : on.includes('board') ? 'board' : 'table');
+  };
+  const showParts = (filter) => {
+    setPartsFilter(filter);
+    setView('parts');
   };
   const [chatAsk, setChatAsk] = useState(null);
   // The sidebar can fold to a strip of icons (remembered on this device).
@@ -2472,6 +2494,9 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
                     onOpenConv={openConv}
                     onPage={openPage}
                     onNewTask={() => setNewTask({ status: 'todo', assignees: [actor.name] })}
+                    onShowTasks={showTasks}
+                    onShowParts={showParts}
+                    parts={parts}
                     onStartShift={startMyShift}
                     onOpenShift={() => setShiftPanel(true)}
                     onPerson={openPerson}
@@ -2491,6 +2516,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
                 ) : view === 'parts' ? (
                   <div className={`parts-layout${partsConv && partsChatOpen ? '' : ' no-chat'}`}>
                     <PartsView
+                      initialFilter={partsFilter}
                       parts={parts}
                       tasks={tasks}
                       api={api}

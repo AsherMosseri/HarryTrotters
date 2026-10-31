@@ -13,7 +13,7 @@ import { initializeApp } from 'firebase-admin/app';
 import { FieldPath, FieldValue, getFirestore } from 'firebase-admin/firestore';
 import { getMessaging } from 'firebase-admin/messaging';
 import { fetchPage, firstLink, readPreview } from './preview.js';
-import { AWARD_CAPS, coinSettings, coinsByName, giftEntry, prizeEntry, wallet } from './shared/coins.js';
+import { AWARD_CAPS, coinSettings, coinsByName, giftEntry, prizeEntry, teamDay, wallet } from './shared/coins.js';
 import * as casino from './shared/casino.js';
 import * as arcade from './shared/arcade.js';
 import { blocked, isOff, serverGroup } from './shared/commandRules.js';
@@ -22,8 +22,19 @@ import * as arcadeBank from './banks/arcade.js';
 import * as fun from './shared/funGames.js';
 import * as mines from './shared/minesweeper.js';
 import { newSeed } from './shared/rng.js';
-import { MANAGER_NAMES, PASSWORD_MIN, ROSTER, cleanName, isManagerName, knownName, memberOk, onTeam, sameName } from './shared/team.js';
-import { TEAM_NUMBER, fromSchedule, rankOf, scoreOf, seasonOf } from './shared/matches.js';
+import { MANAGER_NAMES, PASSWORD_MIN, ROSTER, cleanName, isManagerName, knownName, memberOk, nameKey, onTeam, sameName } from './shared/team.js';
+import {
+  DEFAULT_COMPETITION_DATE,
+  TEAM_NUMBER,
+  alreadyAlerted,
+  competitionOn,
+  fromSchedule,
+  queueAlertText,
+  queueAlertsDue,
+  rankOf,
+  scoreOf,
+  seasonOf,
+} from './shared/matches.js';
 import { asksOn } from './shared/checkin.js';
 import { marketFunctions } from './market.js';
 import { lifeFunctions } from './life.js';
@@ -669,6 +680,57 @@ export const reminders = onSchedule({ schedule: 'every 1 minutes', timeZone: TIM
   const batch = db.batch();
   for (const d of due.docs) batch.delete(d.ref);
   await batch.commit();
+});
+
+// Competition day (D4): every minute, tell the drive team it's time to queue
+// for our next match (match time minus "Queue lead" in Competition setup;
+// shared/matches.js has the rules). The drive team is the people picked in
+// Competition setup, or team management when nobody is. One alert per match
+// per person (queueAlerts/{match}_{person}); a match that moves 5+ minutes
+// after its alert gets a new one. It is an event day, so there are no quiet
+// hours: the push always buzzes on devices that turned notifications on, and
+// everyone also gets it in the inbox.
+export const queueAlert = onSchedule({ schedule: 'every 1 minutes', timeZone: TIME_ZONE }, async () => {
+  const now = Date.now();
+  const settings = (await db.doc('settings/team').get()).data() || {};
+  // Cheap exit: competition mode off, so no need to read the schedule.
+  if (!competitionOn(settings.compMode, teamDay(now), settings.competitionDate || DEFAULT_COMPETITION_DATE)) return;
+  const matches = (await db.collection('matches').get()).docs.map((d) => ({ id: d.id, ...d.data() }));
+  const due = queueAlertsDue({ matches, settings, now, today: teamDay(now) });
+  if (!due.length) return;
+
+  const rename = await renamer();
+  const team = settings.driveTeam || {};
+  let people = [team.coach, ...(team.drivers || []), team.human].filter(Boolean).map(rename);
+  if (!people.length) {
+    const admins = await db.collection('members').where('admin', '==', true).get();
+    people = admins.docs.map((d) => rename(d.get('name') || '')).filter(Boolean);
+  }
+  people = [...new Map(people.map((p) => [nameKey(p), p])).values()];
+
+  const notes = [];
+  const claimed = [];
+  for (const { match, minutes } of due) {
+    for (const to of people) {
+      const ref = db.doc(`queueAlerts/${match.id}_${personId(to)}`);
+      // Claim first so two runs (or a retry) can't both send it.
+      const mine = await db.runTransaction(async (tx) => {
+        if (alreadyAlerted((await tx.get(ref)).data(), match.time)) return false;
+        tx.set(ref, { match: match.id, person: to, time: match.time, at: now });
+        return true;
+      });
+      if (!mine) continue;
+      claimed.push(ref);
+      notes.push({ to, type: 'queue', ...queueAlertText(match, minutes), open: 'view:today', tag: `queue-${match.id}` });
+    }
+  }
+  try {
+    await notify(notes);
+  } catch (e) {
+    // Not sent: let the next minute try again.
+    await Promise.all(claimed.map((r) => r.delete()));
+    throw e;
+  }
 });
 
 // A rename on the Roster (settings/names): move what's stored under the old

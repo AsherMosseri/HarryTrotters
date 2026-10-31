@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Avatar } from '../common.jsx';
 import { Icon } from './icons.jsx';
 import { PitGuess } from '../Life.jsx';
+import Debrief from './Debrief.jsx';
 import { QUEUE_CHECKLIST, STARTER_CHECKLISTS, isQueueChecklist, starterItems } from '../../checklists.js';
 import { parseDay } from '../../milestones.js';
 import { teamDay } from '../../../functions/shared/coins.js';
@@ -9,6 +10,7 @@ import {
   MATCH_WINDOW,
   QUEUE_LEAD,
   TEAM_TZ,
+  eventMatches,
   matchToScore,
   nextMatch,
   queueTime,
@@ -162,6 +164,10 @@ function ScorePad({ matches, now, driveTeam, api }) {
   const [result, setResult] = useState('');
   const [field, setField] = useState('auto');
   const [saved, setSaved] = useState('');
+  // The optional "what went wrong?" step after a score is saved (D4); asked
+  // once per match on this screen, and never in the way of saving.
+  const [debrief, setDebrief] = useState(null);
+  const debriefed = useRef(new Set());
   // Load what's saved when the match changes.
   const loadedFor = useRef(null);
   useEffect(() => {
@@ -195,6 +201,10 @@ function ScorePad({ matches, now, driveTeam, api }) {
     });
     setPicked({ id: match.id, until: Date.now() + 5 * 60000 });
     setSaved(`${match.label} saved to the match log.`);
+    if (!debriefed.current.has(match.id)) {
+      debriefed.current.add(match.id);
+      setDebrief({ match, next: sorted.find((m) => m.time > match.time && m.id !== match.id && !m.ours) || null });
+    }
   };
 
   return (
@@ -279,6 +289,7 @@ function ScorePad({ matches, now, driveTeam, api }) {
           )
         )}
       </div>
+      {debrief && <Debrief match={debrief.match} next={debrief.next} api={api} onClose={() => setDebrief(null)} />}
     </section>
   );
 }
@@ -586,10 +597,7 @@ export default function PitScreen({ actor, settings, matches, checklists, roster
   const lead = Number(settings.queueLead) || QUEUE_LEAD;
   const list = useMemo(() => checklists.find(isQueueChecklist) || null, [checklists]);
   // This event's matches (all of them while no event is picked).
-  const ours = useMemo(
-    () => (event.code ? matches.filter((m) => !m.event || m.event.toUpperCase() === event.code.toUpperCase()) : matches),
-    [matches, event.code],
-  );
+  const ours = useMemo(() => eventMatches(matches, event.code), [matches, event.code]);
   const next = nextMatch(ours, now);
   const toStart = next?.time ? next.time - now : null;
   const team = settings.driveTeam || {};

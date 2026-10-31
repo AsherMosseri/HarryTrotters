@@ -772,6 +772,11 @@ service cloud.firestore {
         && request.resource.data.get('result', '') in ['', 'win', 'loss', 'tie']);
     }
 
+    // Who has been told to queue for which match (the queueAlert function): the server only.
+    match /queueAlerts/{id} {
+      allow read, write: if false;
+    }
+
     // Notifications (the bell). Only the Cloud Functions create them; anyone on
     // the team can mark them read or clear them.
     match /inbox/{person}/items/{id} {

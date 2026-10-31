@@ -281,6 +281,16 @@ function seed() {
   };
   // Sample notifications, the same for whoever the demo signs in as.
   const inbox = [
+    // What the queue alert looks like (the real one is sent by the queueAlert function).
+    {
+      id: uid(),
+      type: 'queue',
+      title: 'Match 9 in 20 min',
+      body: 'Time to queue — start the checklist',
+      open: 'view:today',
+      at: now - 60000,
+      read: false,
+    },
     {
       id: uid(),
       type: 'announcement',
@@ -597,6 +607,8 @@ function seedDemoMatches() {
     ...(state.settings || {}),
     compEvent: state.settings?.compEvent || { code: DEMO_EVENT, name: 'Demo Qualifier' },
     driveTeam: state.settings?.driveTeam || { coach: 'Asher Mosseri', drivers: ['Sebastian Tolbert', 'Jackson Lucks'], human: '' },
+    // The practice score the "Before the event" card on Today measures against.
+    runGoal: state.settings?.runGoal ?? 120,
   };
   if (!(state.checklists || []).some(isQueueChecklist)) {
     const list = STARTER_CHECKLISTS.find(isQueueChecklist);

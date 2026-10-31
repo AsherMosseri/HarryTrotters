@@ -200,3 +200,48 @@ export function competitionOn(mode, today, competitionDate) {
   if (mode === 'off') return false;
   return !!competitionDate && today === competitionDate;
 }
+
+// The matches for one event (all of them while no event code is set); a match
+// typed in without an event counts for any.
+export function eventMatches(matches, code) {
+  const want = String(code || '').toUpperCase();
+  return want ? (matches || []).filter((m) => !m.event || m.event.toUpperCase() === want) : matches || [];
+}
+
+// ---------- queue alert (D4) ----------
+
+// The queue alert is sent once per match per person. If the match then moves
+// by this much (a delay at the field), the new time gets its own alert.
+export const ALERT_MOVED = 5 * 60000;
+// Same as COMPETITION in src/config.js (settings/team.competitionDate overrides it).
+export const DEFAULT_COMPETITION_DATE = '2026-11-14';
+
+// Minutes before the match to queue, as team management set it (1-60).
+export const queueLeadOf = (settings) => Math.max(1, Math.min(60, Number(settings?.queueLead) || QUEUE_LEAD));
+
+// The matches whose queue time has come: their queue time (match time minus
+// the lead) is now or past, and the match hasn't started, has no score and
+// isn't from another event. Nothing at all unless competition mode is on
+// (the same rule that turns Today into the pit screen), and nothing without
+// a match time. `today` is the team's day for `now`.
+export function queueAlertsDue({ matches, settings = {}, now, today }) {
+  if (!competitionOn(settings.compMode, today, settings.competitionDate || DEFAULT_COMPETITION_DATE)) return [];
+  const lead = queueLeadOf(settings);
+  return sortMatches(eventMatches(matches, settings.compEvent?.code))
+    .filter((m) => m.time && !m.ours && !m.result && !m.score && m.time > now && queueTime(m, lead) <= now)
+    .map((m) => ({ match: m, queueAt: queueTime(m, lead), minutes: Math.max(1, Math.round((m.time - now) / 60000)) }));
+}
+
+// Has this person already been told about the match at this time?
+export const alreadyAlerted = (prev, matchTime) => !!prev && Math.abs((Number(prev.time) || 0) - matchTime) < ALERT_MOVED;
+
+// "Match 12" for qual 12, "Playoff match 3" for P3.
+export function matchWords(m) {
+  if (m.level === 'qual' || /^q/i.test(m.label || '')) return `Match ${m.number || String(m.label).replace(/\D/g, '')}`;
+  return `Playoff match ${String(m.label || '').replace(/^p/i, '')}`;
+}
+
+// The notification text: "Match 12 in 20 min" / "Time to queue — start the checklist".
+export function queueAlertText(m, minutes) {
+  return { title: `${matchWords(m)} in ${minutes} min`, body: 'Time to queue — start the checklist' };
+}

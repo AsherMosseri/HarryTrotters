@@ -16,6 +16,8 @@ const ICONS = {
   shift: 'shifts',
   checkin: 'flag',
   join: 'person',
+  // The pit's "time to queue" alert.
+  queue: 'trophy',
   // Ads and coupons get a tag, not the product's emoji.
   ad: 'tag',
 };
