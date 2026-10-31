@@ -71,6 +71,7 @@ import {
   useAdsEngine,
 } from './Ads.jsx';
 import CommandsPage from './CommandsPage.jsx';
+import GameHost from './games/GameHost.jsx';
 import { ShutdownPage, shutdownUnread } from './Shutdown.jsx';
 import ControlsPage from './ControlsPage.jsx';
 import { PreviewBar } from './Preview.jsx';
@@ -1346,6 +1347,17 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
           .play(req, actor, { balanceOf: (n) => cmdData.current.wallet(n).balance, roster: cmdData.current.roster })
           .then((r) => (setServerSkew(r?.serverNow), r))
           .catch((e) => ({ note: { title: 'Trotbot couldn’t do that', body: e.message || String(e) } })),
+      // Tetris and Minesweeper: the funGame function starts and checks each game.
+      funGame: (req) =>
+        store
+          .funGame(req, actor, { balanceOf: (n) => cmdData.current.wallet(n).balance, roster: cmdData.current.roster })
+          .then((r) => (setServerSkew(r?.serverNow), r))
+          .catch((e) => ({ note: { title: 'Trotbot couldn’t do that', body: e.message || String(e) } })),
+      submitTournamentScore: (req) =>
+        store.submitTournamentScore(req, actor).catch((e) => ({ note: { title: 'That score didn’t go in', body: e.message || String(e) } })),
+      subscribeTournaments: (cb) => store.subscribeTournaments(cb),
+      setRaceLive: (race, data) => store.setRaceLive(race, data, actor).catch(() => {}),
+      subscribeRaceLive: (race, cb) => store.subscribeRaceLive(race, cb),
       wallet: (name) => cmdData.current.wallet(name),
       richest: () => cmdData.current.richest(),
       lottery: () => cmdData.current.lottery,
@@ -3131,6 +3143,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
               onClose={() => setShutdownPage(false)}
             />
           )}
+          <GameHost api={api} actor={actor} roster={roster} isOn={controls.isOn} />
           {commandsPage && (
             <CommandsPage
               cfg={settings.commands}

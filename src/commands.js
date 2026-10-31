@@ -8,6 +8,7 @@
 
 import { overdueTasks, parseMatch, parseTask, seasonRecord, todayISO } from './teamCommands.js';
 import { blocked, isOff } from '../functions/shared/commandRules.js';
+import { gameArgs } from './components/games/launch.js';
 
 export const GROUPS = [
   ['basics', 'Basics'],
@@ -80,6 +81,9 @@ export const COMMANDS = [
   { name: 'hangman', group: 'arcade', args: '', desc: 'Guess the robotics word together', server: true },
   { name: 'typerace', group: 'arcade', args: '', desc: 'Race to type a sentence (no pasting)', server: true },
   { name: 'heist', group: 'arcade', args: 'bet', desc: 'Plan a heist: more crew, better odds', server: true },
+  { name: 'tetris', group: 'arcade', args: '@person | bot | sprint', desc: 'Tetris: alone, race someone live, or race Trotbot', server: true },
+  { name: 'minesweep', group: 'arcade', args: '@person | bot | expert', desc: 'Minesweeper: alone, race someone on the same board, or Trotbot', server: true },
+  { name: 'battleship', group: 'arcade', args: '@person bet', desc: 'Battleship, turn by turn (anyone, or @Trotbot)', server: true },
 
   { name: 'task', group: 'team', args: 'title @person friday !high', desc: 'Make a task' },
   { name: 'mytasks', group: 'team', args: '', desc: 'Your open tasks (check them off right here)' },
@@ -119,6 +123,13 @@ export function matchCommands(typed, cfg) {
 }
 
 const pick = (list) => list[Math.floor(Math.random() * list.length)];
+// Anything left after the game words ("bot", "hard", "expert"…) is a person to race.
+const GAME_WORDS = /^(bot|trotbot|easy|medium|hard|beginner|intermediate|expert|marathon|sprint|ultra|\d+)$/i;
+const namesSomeone = (args) =>
+  args
+    .replace(/@/g, '')
+    .split(/\s+/)
+    .some((w) => w && !GAME_WORDS.test(w));
 const between = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
 // The same answer every time for the same thing (so /rate pizza is consistent).
 const hash = (s) => [...String(s).toLowerCase()].reduce((h, c) => (h * 31 + c.codePointAt(0)) >>> 0, 7);
@@ -426,6 +437,9 @@ export async function runCommand({ cmd, args }, ctx) {
   // Turned off, or not in this channel (Asher's Commands page).
   const stop = blocked(cmd.name, cmd.group, ctx.conv, ctx.commandCfg);
   if (stop) return { note: stop };
+  // Tetris and Minesweeper alone or against Trotbot open the game screen;
+  // with someone named, it's a race challenge (the server posts the card).
+  if ((cmd.name === 'tetris' || cmd.name === 'minesweep') && !namesSomeone(args)) return { game: { ...gameArgs(cmd.name, args), conv: ctx.conv } };
   // Casino and economy: the server rolls and posts the card (functions/index.js play).
   if (cmd.server) {
     const r = await ctx.play(cmd.name, args ? args.split(/\s+/) : []);

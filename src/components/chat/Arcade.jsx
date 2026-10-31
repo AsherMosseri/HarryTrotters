@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { Avatar } from '../common.jsx';
-import { BOT, C4_COLS, C4_ROWS, RPS, TIMES, isLive } from '../../../functions/shared/arcade.js';
+import { BOT, C4_COLS, C4_ROWS, RACES, RPS, TIMES, isLive } from '../../../functions/shared/arcade.js';
 import { serverNow } from '../../serverTime.js';
+import { Battleship, FunShare, RaceCard } from './FunCards.jsx';
 
 // Multiplayer game cards in #arcade (the play function runs the games; see
 // functions/shared/arcade.js). Buttons send moves; timers ask the server to
 // move things along ("peek") when a countdown runs out.
 
-export const ARCADE_CARDS = ['rps', 'tictactoe', 'connect4', 'duel', 'trivia', 'hangman', 'typerace', 'heist'];
+export const ARCADE_CARDS = ['rps', 'tictactoe', 'connect4', 'duel', 'trivia', 'hangman', 'typerace', 'heist', 'battleship', 'tetris', 'minesweep'];
 const coins = (n) => `${n} 🪙`;
 const secs = (ms) => Math.max(0, Math.ceil(ms / 1000));
 const clock = (ms) => {
@@ -37,7 +38,7 @@ function usePeekAt(at, live, act) {
   }, [at, live]); // eslint-disable-line react-hooks/exhaustive-deps
 }
 
-const Who = ({ name, Name }) =>
+export const Who = ({ name, Name }) =>
   name === BOT ? (
     <b className="arc-bot">🤖 Trotbot</b>
   ) : (
@@ -49,7 +50,7 @@ const Who = ({ name, Name }) =>
 
 // ---------- challenges ----------
 
-function Versus({ g, Name, marks }) {
+export function Versus({ g, Name, marks }) {
   return (
     <div className="arc-vs">
       <span className={g.turn === g.a && isLive(g.status) ? 'turn' : ''}>
@@ -65,7 +66,7 @@ function Versus({ g, Name, marks }) {
 }
 
 // Waiting for the other person: accept / decline / cancel.
-function Invite({ g, me, act, game, now }) {
+export function Invite({ g, me, act, game, now }) {
   const left = g.expiresAt - now;
   if (me === g.b && game !== 'rps')
     return (
@@ -97,7 +98,7 @@ function Invite({ g, me, act, game, now }) {
   );
 }
 
-function Result({ g, Name }) {
+export function Result({ g, Name }) {
   if (isLive(g.status)) return null;
   const pot = g.bet ? ` · ${coins(g.bet * 2)}` : '';
   const text = {
@@ -160,7 +161,7 @@ function Rps({ g, me, act, Name, now }) {
   );
 }
 
-function TurnBar({ g, me, act, now }) {
+export function TurnBar({ g, me, act, now }) {
   if (g.status !== 'playing') return null;
   const player = me === g.a || me === g.b;
   const late = now - g.lastAt > TIMES.turn;
@@ -578,7 +579,7 @@ function Heist({ g, me, act, Name, now }) {
   );
 }
 
-export function ArcadeBody({ m, me, Name, onMove }) {
+export function ArcadeBody({ m, me, Name, onMove, conv }) {
   const c = m.cmd;
   const g = { ...c.game, status: c.status };
   const live = isLive(c.status);
@@ -600,16 +601,19 @@ export function ArcadeBody({ m, me, Name, onMove }) {
   const at = {
     open: c.name === 'typerace' ? g.startAt : c.name === 'heist' ? g.endsAt : g.expiresAt,
     playing:
-      c.name === 'typerace' || c.name === 'trivia'
+      c.name === 'typerace' || c.name === 'trivia' || RACES.includes(c.name)
         ? g.endsAt
         : c.name === 'duel' && g.b !== BOT
           ? (g.drawAt || 0) + TIMES.duelIdle
           : c.name === 'rps'
             ? (g.lastAt || 0) + TIMES.turn
             : 0,
+    placing: g.placeBy,
   }[c.status];
   usePeekAt(at, live, act);
   const props = { g, me, act, Name, now };
+  // A Tetris or Minesweeper result someone posted (not a race).
+  if (c.share) return <FunShare c={c} by={m.by} Name={Name} />;
   const body = {
     rps: <Rps {...props} />,
     tictactoe: <TicTacToe {...props} />,
@@ -619,6 +623,9 @@ export function ArcadeBody({ m, me, Name, onMove }) {
     hangman: <Hangman {...props} />,
     typerace: <TypeRace {...props} />,
     heist: <Heist {...props} />,
+    battleship: <Battleship {...props} />,
+    tetris: <RaceCard {...props} name="tetris" conv={conv} msgId={m.id} />,
+    minesweep: <RaceCard {...props} name="minesweep" conv={conv} msgId={m.id} />,
   }[c.name];
   return (
     <>

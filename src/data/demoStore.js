@@ -17,7 +17,10 @@ import * as casino from '../../functions/shared/casino.js';
 import { dayOf, logFields, taskArea } from '../labLog.js';
 import * as arcade from '../../functions/shared/arcade.js';
 import { blocked, serverGroup } from '../../functions/shared/commandRules.js';
-import { giftEntry, prizeEntry, teamDay, teamMidnight } from '../../functions/shared/coins.js';
+import { AWARD_CAPS, giftEntry, prizeEntry, teamDay, teamMidnight } from '../../functions/shared/coins.js';
+import * as fun from '../../functions/shared/funGames.js';
+import { LEVELS as MINE_LEVELS } from '../../functions/shared/minesweeper.js';
+import { attemptSeed, newSeed } from '../../functions/shared/rng.js';
 import { asksOn } from '../../functions/shared/checkin.js';
 import * as market from '../../functions/shared/market.js';
 import { PERK_IDEAS } from '../../functions/shared/market.js';
@@ -760,6 +763,55 @@ function nextFridayLocal(now) {
   return d.getTime();
 }
 // Change fields on a command card's cmd (the open lottery card).
+// Coins from games and quizzes, the way functions/award.js pays them: each
+// source capped per person per team day, and a key pays only once.
+function demoAward({ person, amount, source, label = '', key = '' }, now = Date.now()) {
+  const want = Math.floor(Number(amount) || 0);
+  const cap = AWARD_CAPS[source] || 0;
+  if (!person || want <= 0 || !cap) return 0;
+  const keys = state.awardKeys || {};
+  if (key && keys[key]) return 0;
+  const day = teamDay(now);
+  const sofar = (state.coins || [])
+    .filter((x) => x.type === 'award' && x.person === person && x.source === source && x.day === day)
+    .reduce((t, x) => t + (x.amount || 0), 0);
+  const pay = Math.min(want, Math.max(0, cap - sofar));
+  if (!pay) return 0;
+  state.coins = [...(state.coins || []), { id: uid(), type: 'award', person, amount: pay, source, label: String(label).slice(0, 80), day, at: now }];
+  if (key) state.awardKeys = { ...keys, [key]: { person, source, day, at: now } };
+  return pay;
+}
+const payDemoAwards = (awards, msgId, now) => {
+  for (const a of awards || []) demoAward({ ...a, source: 'game', key: `game-${msgId}-${personId(a.person)}` }, now);
+};
+
+// Two practice tournaments so demo mode can try them (the market makes the real ones).
+function demoTournaments() {
+  if (state.tournaments) return state.tournaments;
+  const now = Date.now();
+  const players = (game) => ({
+    'Asher Mosseri': { joinedAt: now, best: null, at: now },
+    'Cooper Mlezcko': { joinedAt: now, best: null, at: now },
+    'Sophia Bermudez': { joinedAt: now, best: game === 'tetris' ? 8420 : fun.tournamentScore('minesweep', { won: true, ms: 74300 }), at: now },
+    'Jackson Lucks': { joinedAt: now, best: game === 'tetris' ? 5310 : fun.tournamentScore('minesweep', { won: false, cells: 151 }), at: now },
+  });
+  state.tournaments = ['tetris', 'minesweep'].map((game) => ({
+    id: `demo-${game}`,
+    game,
+    title: game === 'tetris' ? 'Friday Tetris' : 'Mine Sweep Showdown',
+    entry: 5,
+    pot: 20,
+    seed: newSeed(),
+    status: 'open',
+    opensAt: now - 3600000,
+    endsAt: now + 6 * 86400000,
+    players: players(game),
+    winners: [],
+    by: 'Asher Mosseri',
+  }));
+  return state.tournaments;
+}
+
 function setCard({ conv, id }, fields) {
   const list = state.chat?.[conv];
   if (!list) return;
@@ -1260,7 +1312,7 @@ export const demoStore = {
   // The casino and economy, run here the way the play function runs them on
   // the server (functions/index.js), with the same rules (casino.js).
   // balanceOf(name): the person's coins, from the app's wallet; roster: the team.
-  async play(req, actor, { balanceOf, roster = [] }) {
+  async play(req, actor, { balanceOf, roster = [] }, verified = null) {
     const now = Date.now();
     const me = actor.name;
     const { action, game, conv = '', args = [], msgId, move } = req;
@@ -1320,6 +1372,7 @@ export const demoStore = {
       if (!m?.cmd || !secret) return note('That game is gone.');
       const c = m.cmd;
       if (arcade.MULTI.includes(c.name)) {
+        if (move === 'mine') return { ok: true, mine: arcade.myFleet(c.name, secret, me) };
         if (!arcade.isLive(c.status)) return { ok: true };
         const r = arcade.move(c.name, {
           pub: { ...c.game, status: c.status },
@@ -1328,10 +1381,12 @@ export const demoStore = {
           move: String(move),
           balance: balanceOf(me),
           now,
+          verified,
         });
         if (r.error) return note(r.error);
         if (!r.write) return { ok: true, serverNow: now };
         payOut(r.money);
+        payDemoAwards(r.awards, msgId, now);
         const { status, ...g } = r.pub;
         if (arcade.isLive(status)) state.gameSecrets = { ...state.gameSecrets, [msgId]: r.secret };
         else delete state.gameSecrets[msgId];
@@ -1478,6 +1533,131 @@ export const demoStore = {
   },
   subscribeBank(cb) {
     return listen(() => cb({ ...(state.bank || {}) }));
+  },
+  // Tetris and Minesweeper, run here the way the funGame function runs them
+  // (functions/shared/funGames.js): a game gets its seed here and its moves
+  // are replayed here before anything is paid or counted.
+  async funGame(req, actor, ctx) {
+    const now = Date.now();
+    const me = actor.name;
+    const note = (title, body = '') => ({ note: { title, body } });
+    const games = (state.funGames ||= {});
+    if (req.action === 'start') {
+      const { game, mode } = req;
+      if (!fun.GAMES.includes(game) || !fun.MODES[game]?.[mode]) return note('Which game?');
+      if ((state.settings?.commands?.off || []).includes(game)) return note(`/${game} is turned off`);
+      const s = { person: me, game, mode, startedAt: now, done: false, level: 1, speed: '', race: null, tournament: null };
+      if (mode === 'race') {
+        const { conv, msgId } = req.race || {};
+        const c = ((state.chat || {})[conv] || []).find((x) => x.id === msgId)?.cmd;
+        if (!c || c.name !== game || c.status !== 'playing') return note('That race isn’t on.');
+        if (me !== c.game.a && me !== c.game.b) return note('You’re not in this race.');
+        if (c.game.results?.[me]) return note('You already finished this race.');
+        Object.assign(s, { seed: c.game.seed, level: c.game.level || 'beginner', race: { conv, msgId } });
+      } else if (mode === 'tournament') {
+        const t = demoTournaments().find((x) => x.id === req.tournament);
+        if (!t || t.game !== game || t.status !== 'open' || now >= t.endsAt) return note('That tournament is over.');
+        if (!t.players?.[me]) return note('Join it first.', 'Tournament entries are in the market.');
+        const attempt = Object.values(games).filter((x) => x.tournament === t.id && x.person === me).length + 1;
+        Object.assign(s, { tournament: t.id, attempt, seed: attemptSeed(`${t.seed}:demo`, attempt), level: game === 'minesweep' ? fun.TOURNAMENT_LEVEL : 1 });
+      } else {
+        s.seed = newSeed();
+        if (game === 'tetris') s.level = Math.max(1, Math.min(15, Math.floor(Number(req.level)) || 1));
+        else s.level = MINE_LEVELS[req.level] ? req.level : 'beginner';
+        if (mode === 'bot') s.speed = fun.SPEEDS.includes(req.speed) ? req.speed : 'medium';
+      }
+      const id = uid();
+      games[id] = s;
+      commit();
+      return { ok: true, id, seed: s.seed, mode, level: s.level, speed: s.speed, attempt: s.attempt || 0, serverNow: now };
+    }
+    const s = games[req.id];
+    if (req.action === 'finish' || req.action === 'tournament') {
+      if (!s || s.person !== me) return note('That game is gone.');
+      if (s.done) return note('That game is already in.');
+      const r = fun.replayGame(s, req.moves);
+      if (r.error) return note(r.error);
+      const problem = fun.timingProblem(s, r, now - s.startedAt);
+      Object.assign(s, { done: true, finishedAt: now, result: r, problem });
+      if (s.mode === 'tournament') {
+        const t = demoTournaments().find((x) => x.id === s.tournament);
+        const score = fun.tournamentScore(s.game, r);
+        s.score = score;
+        commit();
+        if (problem) return note(problem);
+        const before = t.players[me].best;
+        const best = before == null ? score : Math.max(before, score);
+        t.players = { ...t.players, [me]: { ...t.players[me], best, at: now } };
+        commit();
+        return { ok: true, score, best, improved: best !== before, text: fun.tournamentText(s.game, score), bestText: fun.tournamentText(s.game, best) };
+      }
+      if (s.mode === 'race') {
+        commit();
+        const out = await demoStore.play({ action: 'move', conv: s.race.conv, msgId: s.race.msgId, move: problem ? 'resign' : 'finish' }, actor, ctx, problem ? null : r);
+        if (problem) return note(problem);
+        return out.note ? out : { ok: true, result: r };
+      }
+      const bot = s.mode === 'bot' ? fun.botResult(s) : null;
+      const won = bot ? fun.beatBot(s.game, r, bot) : false;
+      const coins = problem || (state.controls?.off || []).includes('coins') ? 0 : fun.coinsFor(s, r, won);
+      Object.assign(s, { bot, won, coins });
+      const label = `${fun.GAME_LABEL[s.game]}: ${bot ? (won ? 'beat Trotbot' : 'lost to Trotbot') : fun.resultLine(s.game, s.mode, r)}`;
+      const paid = coins ? demoAward({ person: me, amount: coins, source: 'game', label, key: `game-${req.id}` }, now) : 0;
+      s.paid = paid;
+      commit();
+      if (problem) return note(problem, 'It doesn’t count, and pays nothing.');
+      return { ok: true, result: r, bot, won, coins, paid };
+    }
+    if (req.action === 'share') {
+      if (!s || s.person !== me || !s.done || s.problem) return note('That game can’t be shared.');
+      if (s.shared) return note('Already posted.');
+      const line = fun.resultLine(s.game, s.mode, s.result);
+      s.shared = true;
+      const m = {
+        id: uid(),
+        text: `/${s.game} · ${line}`,
+        by: me,
+        byUid: actor.uid,
+        at: now,
+        cmd: {
+          name: s.game,
+          share: true,
+          mode: s.mode,
+          level: s.level,
+          speed: s.speed || '',
+          result: s.result,
+          line,
+          bot: s.bot ? { ...s.bot, line: fun.resultLine(s.game, 'bot', s.bot) } : null,
+          won: !!s.won,
+          paid: s.paid || 0,
+        },
+        mentions: [],
+        taskIds: [],
+        replyTo: null,
+        reactions: {},
+      };
+      state.chat = { ...(state.chat || {}), [req.conv]: [...((state.chat || {})[req.conv] || []), m] };
+      commit();
+      return { ok: true };
+    }
+    return note('Unknown action.');
+  },
+  async submitTournamentScore({ id, moves, session }, actor) {
+    const s = (state.funGames || {})[session];
+    if (!s || s.tournament !== id) return { note: { title: 'That game is gone.' } };
+    return demoStore.funGame({ action: 'tournament', id: session, moves }, actor);
+  },
+  subscribeTournaments(cb) {
+    demoTournaments();
+    return listen(() => cb((state.tournaments || []).filter((t) => t.status === 'open')));
+  },
+  // Races in demo mode are against Trotbot, so nobody else's picture comes in.
+  async setRaceLive(race, data, actor) {
+    state.raceLive = { ...(state.raceLive || {}), [`${race}_${actor.name}`]: { ...data, race, name: actor.name, at: Date.now() } };
+  },
+  subscribeRaceLive(race, cb) {
+    cb(Object.values(state.raceLive || {}).filter((x) => x.race === race));
+    return () => {};
   },
   subscribeLottery(cb) {
     // Friday 6 PM came and went: draw it (the real one is a scheduled function).

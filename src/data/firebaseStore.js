@@ -1052,6 +1052,36 @@ export const firebaseStore = {
     const call = httpsCallable(getFunctions(app, FUNCTIONS_REGION), 'play');
     return (await call(req)).data;
   },
+  // Tetris and Minesweeper (functions/shared/funGames.js): the funGame
+  // function starts a game (the seed) and finishes it (replays the moves).
+  async funGame(req) {
+    const call = httpsCallable(getFunctions(app, FUNCTIONS_REGION), 'funGame');
+    return (await call(req)).data;
+  },
+  async submitTournamentScore(req) {
+    const call = httpsCallable(getFunctions(app, FUNCTIONS_REGION), 'submitTournamentScore');
+    return (await call(req)).data;
+  },
+  subscribeTournaments(cb) {
+    return onSnapshot(
+      query(collection(db, 'tournaments'), where('status', '==', 'open')),
+      (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+      () => cb([]),
+    );
+  },
+  // A race's live picture of each player's board (raceLive/{race}_{uid}).
+  setRaceLive(race, data, actor) {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return Promise.resolve();
+    return setDoc(doc(db, 'raceLive', `${race}_${uid}`), { ...data, race, uid, name: actor.name, at: Date.now() });
+  },
+  subscribeRaceLive(race, cb) {
+    return onSnapshot(
+      query(collection(db, 'raceLive'), where('race', '==', race)),
+      (snap) => cb(snap.docs.map((d) => d.data())),
+      () => cb([]),
+    );
+  },
   subscribeBank(cb) {
     return onSnapshot(
       collection(db, 'bank'),

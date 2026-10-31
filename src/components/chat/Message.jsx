@@ -587,6 +587,7 @@ export default function Message({
             {m.cmd && m.cmd.name !== 'me' && m.cmd.name !== 'wyr' && (
               <CommandCard
                 m={m}
+                conv={conv}
                 onPerson={onPerson}
                 me={actor.name}
                 onMove={(move) => api.play({ action: 'move', conv, msgId: m.id, move })}

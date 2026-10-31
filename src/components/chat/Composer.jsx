@@ -12,6 +12,7 @@ import { CommandOption } from './Commands.jsx';
 import { whatIs } from './Message.jsx';
 import { relTime } from '../../util.js';
 import { alertDialog } from '../Dialogs.jsx';
+import { openGame } from '../games/launch.js';
 
 // The formatting bar: [label, title, what it does].
 const FORMATS = [
@@ -319,6 +320,9 @@ export default function Composer({
         reset();
       } else if (result.done) {
         reset();
+      } else if (result.game) {
+        reset();
+        openGame(result.game);
       } else if (result.standup) {
         setText('');
         setSuggest(null);

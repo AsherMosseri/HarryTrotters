@@ -433,6 +433,29 @@ const PATHS = {
   ),
   cross: <path d="m5.5 5.5 9 9M14.5 5.5l-9 9" />,
   order: <path d="M4 5.5h8M4 10h6M4 14.5h4M15 4v12m0 0-2.5-2.5M15 16l2.5-2.5" />,
+  // Game controls (Tetris, Minesweeper, Battleship).
+  rotateCw: <path d="M15.5 10a5.5 5.5 0 1 1-1.6-3.9M14.5 2.8v3.6h-3.6" />,
+  rotateCcw: <path d="M4.5 10a5.5 5.5 0 1 0 1.6-3.9M5.5 2.8v3.6h3.6" />,
+  left: <path d="M12.5 4.5 7 10l5.5 5.5" />,
+  right: <path d="M7.5 4.5 13 10l-5.5 5.5" />,
+  down: <path d="M4.5 7.5 10 13l5.5-5.5" />,
+  drop: <path d="M10 3v10m-4-4 4 4 4-4M4.5 16.5h11" />,
+  swap: <path d="M6 3.5 3.5 6 6 8.5M3.5 6H14a2.5 2.5 0 0 1 2.5 2.5M14 16.5l2.5-2.5-2.5-2.5m2.5 2.5H6a2.5 2.5 0 0 1-2.5-2.5" />,
+  blocks: (
+    <>
+      <rect x="3" y="9.5" width="4.5" height="4.5" rx="0.6" />
+      <rect x="7.5" y="9.5" width="4.5" height="4.5" rx="0.6" />
+      <rect x="12" y="9.5" width="4.5" height="4.5" rx="0.6" />
+      <rect x="7.5" y="5" width="4.5" height="4.5" rx="0.6" />
+    </>
+  ),
+  mine: (
+    <>
+      <circle cx="10" cy="10.5" r="4.5" />
+      <path d="M10 3v2.5M10 15.5V18M3 10.5h2.5M14.5 10.5H17M5 5.5l1.8 1.8M13.2 13.7l1.8 1.8M15 5.5l-1.8 1.8M6.8 13.7 5 15.5" />
+    </>
+  ),
+  shuffle: <path d="M3 6h2.6c3.4 0 5.4 8 8.8 8H17m-2-2 2 2-2 2M3 14h2.6c1.2 0 2.2-1 3-2.3M11.5 7.6c.8-.9 1.7-1.6 2.9-1.6H17m-2-2 2 2-2 2" />,
 };
 
 export function Icon({ name, size = 18, className = '' }) {

@@ -395,7 +395,7 @@ function Body({ c, by, onPerson }) {
   }
 }
 
-export function CommandCard({ m, onPerson, me, onMove, onBuy }) {
+export function CommandCard({ m, onPerson, me, onMove, onBuy, conv }) {
   const n = m.cmd.name;
   const kind = ARCADE_CARDS.includes(n)
     ? 'arcade'
@@ -409,7 +409,7 @@ export function CommandCard({ m, onPerson, me, onMove, onBuy }) {
     <div className={`cmd-card cmd-card-${n}${kind ? ` cmd-${kind}` : ''}`}>
       <Trotbot name={n === 'dailyq' ? '' : n} />
       {kind === 'arcade' ? (
-        <ArcadeBody m={m} me={me} onMove={onMove} Name={PersonName} />
+        <ArcadeBody m={m} me={me} onMove={onMove} Name={PersonName} conv={conv} />
       ) : kind === 'money' ? (
         <CasinoBody m={m} me={me} onMove={onMove} onBuy={onBuy} Name={PersonName} />
       ) : kind === 'team' ? (
