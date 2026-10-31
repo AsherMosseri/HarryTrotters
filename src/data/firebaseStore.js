@@ -1104,6 +1104,53 @@ export const firebaseStore = {
     const up = await uploadPhoto(convFolder('lab-log'), prepared);
     return { url: up.url, thumbUrl: up.thumbUrl, path: up.path || '', width: prepared.width, height: prepared.height };
   },
+  // A voice note (up to 30 s), named after the person so only they or team
+  // management can remove it (storage.rules).
+  async uploadLabVoice(blob, ms, actor) {
+    const type = (blob.type || 'audio/mp4').split(';')[0];
+    const ext = { 'audio/webm': 'webm', 'audio/ogg': 'ogg', 'audio/mpeg': 'mp3', 'audio/aac': 'aac' }[type] || 'm4a';
+    const path = `voice/${personId(actor.name)}-${itemId()}.${ext}`;
+    const r = fileRef(storage, path);
+    await uploadBytes(r, blob, { contentType: type });
+    return { url: await getDownloadURL(r), path, type, ms: Math.round(ms) };
+  },
+  deleteLabVoice(voice) {
+    return voice?.path ? deleteObject(fileRef(storage, voice.path)).catch(() => {}) : Promise.resolve();
+  },
+  // How often the team uses each suggestion chip (ids from labLog.js CHIPS),
+  // so the common ones come first.
+  subscribeLabChips(cb) {
+    return onSnapshot(
+      doc(db, 'labChips', 'counts'),
+      (snap) => cb(snap.data()?.counts || {}),
+      () => cb({}),
+    );
+  },
+  bumpLabChips(ids) {
+    if (!ids.length) return Promise.resolve();
+    return setDoc(
+      doc(db, 'labChips', 'counts'),
+      { counts: Object.fromEntries(ids.map((id) => [id, increment(1)])), updatedAt: Date.now() },
+      { merge: true },
+    ).catch(() => {});
+  },
+  // Tasks you opened, moved or commented on today (labLog.js): picked for you
+  // in today's log, on any of your devices.
+  async getLabTouches(day, name) {
+    try {
+      const snap = await getDoc(doc(db, 'labTouches', `${day}_${personId(name)}`));
+      return snap.data()?.taskIds || [];
+    } catch {
+      return [];
+    }
+  },
+  addLabTouch(day, name, taskId) {
+    return setDoc(
+      doc(db, 'labTouches', `${day}_${personId(name)}`),
+      { day, person: name, taskIds: arrayUnion(taskId), at: Date.now() },
+      { merge: true },
+    ).catch(() => {});
+  },
 
   subscribeShifts(cb, onError) {
     return onSnapshot(shiftsCol, (snap) => cb(snap.docs.map(readDoc)), onError);

@@ -336,6 +336,23 @@ const PATHS = {
       <path d="M6 5H3.5v1A2.5 2.5 0 0 0 6 8.5M14 5h2.5v1A2.5 2.5 0 0 1 14 8.5M10 11.5V14M7 16.5h6M8 14h4v2.5H8z" />
     </>
   ),
+  // Lab log: how a task went, and voice notes.
+  progress: <path d="M3 14.5 8 9.5l3 3 6-6.5M12.5 6H17v4.5" />,
+  stuck: (
+    <>
+      <path d="M7 2.8h6l4.2 4.2v6L13 17.2H7L2.8 13V7z" />
+      <path d="M10 6.5v4.2M10 13.4v.1" />
+    </>
+  ),
+  play: <path d="M6.5 4.2v11.6l9.3-5.8z" />,
+  pause: <path d="M7 4.5v11M13 4.5v11" />,
+  mic: (
+    <>
+      <rect x="7.5" y="2.5" width="5" height="9.5" rx="2.5" />
+      <path d="M4.5 9.5a5.5 5.5 0 0 0 11 0M10 15v2.5" />
+    </>
+  ),
+  repeat: <path d="M4 9V7.5A2.5 2.5 0 0 1 6.5 5H16m-2.5-2.5L16 5l-2.5 2.5M16 11v1.5a2.5 2.5 0 0 1-2.5 2.5H4m2.5 2.5L4 15l2.5-2.5" />,
 };
 
 export function Icon({ name, size = 18, className = '' }) {

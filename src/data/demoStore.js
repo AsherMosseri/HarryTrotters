@@ -1623,6 +1623,33 @@ export const demoStore = {
     const thumb = await toUrl(prepared.thumb);
     return { url: thumb, thumbUrl: thumb, path: '', width: prepared.width, height: prepared.height };
   },
+  // Voice notes are kept as data URLs (30 s of speech is small).
+  async uploadLabVoice(blob, ms) {
+    const url = await dataUrl(blob);
+    return { url, path: '', type: (blob.type || 'audio/mp4').split(';')[0], ms: Math.round(ms) };
+  },
+  async deleteLabVoice() {},
+  subscribeLabChips(cb) {
+    return listen(() => cb({ ...(state.labChips || {}) }));
+  },
+  async bumpLabChips(ids) {
+    if (!ids.length) return;
+    const counts = { ...(state.labChips || {}) };
+    for (const id of ids) counts[id] = (counts[id] || 0) + 1;
+    state.labChips = counts;
+    commit();
+  },
+  async getLabTouches(day, name) {
+    return (state.labTouches || {})[`${day}_${personId(name)}`] || [];
+  },
+  async addLabTouch(day, name, taskId) {
+    const key = `${day}_${personId(name)}`;
+    const all = state.labTouches || {};
+    if ((all[key] || []).includes(taskId)) return;
+    // Only today's are useful; drop older days.
+    state.labTouches = Object.fromEntries([...Object.entries(all).filter(([k]) => k.startsWith(day)), [key, [...(all[key] || []), taskId]]]);
+    commit();
+  },
   subscribeShifts(cb) {
     return listen(() => cb([...(state.shifts || [])]));
   },
