@@ -58,6 +58,28 @@ export function MembersPanel({ names, onPerson, onClose }) {
   );
 }
 
+// A slim bar under the channel header while something is pinned: the pinned
+// message (tap it to jump there; tap again for the next one) and See all.
+export function PinnedBar({ pins, at, onJump, onAll }) {
+  const m = pins[at] || pins[0];
+  if (!m) return null;
+  const text = m.poll ? `Poll: ${m.poll.question}` : (m.text || '').replace(/[*_~|`#>]+/g, '').replace(/\s+/g, ' ').trim() || (m.photo ? 'Photo' : m.gif ? 'GIF' : '');
+  return (
+    <div className="pinned-bar" role="region" aria-label="Pinned messages">
+      <button className="pb-main" onClick={() => onJump(m)} title="Jump to the pinned message">
+        <Icon name="pin" size={15} />
+        <span className="pb-label">{pins.length > 1 ? `Pinned ${at + 1} of ${pins.length}` : 'Pinned'}</span>
+        <span className="pb-text">
+          <b>{m.by}</b> {text}
+        </span>
+      </button>
+      <button className="link-btn small pb-all" onClick={onAll}>
+        {pins.length > 1 ? 'See all' : 'Open'}
+      </button>
+    </div>
+  );
+}
+
 export function PinsPanel({ conv, api, ctx, onJump, onClose, canUnpin }) {
   const [pins, setPins] = useState(null);
   useEffect(() => api.subscribePins(conv.key, (list) => setPins(list.filter((m) => !m.deleted))), [api, conv.key]);

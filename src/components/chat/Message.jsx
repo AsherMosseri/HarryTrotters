@@ -747,7 +747,7 @@ export default function Message({
               title={m.pinned ? 'Unpin' : 'Pin to this channel'}
               aria-label={m.pinned ? 'Unpin' : 'Pin'}
             >
-              <Icon name="pin" size={18} />
+              <Icon name="pin" size={18} /> <span className="act-label">{m.pinned ? 'Unpin' : 'Pin'}</span>
             </button>
           )}
           {feat('makeTask') && (

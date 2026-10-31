@@ -86,6 +86,8 @@ export const CHANGELOG = [
           'Every Sunday at 6 PM, Trotbot posts a weekly recap in #general: hours by area, tasks finished, highlights, the top contributor and streaks.',
           'Read status and notifications carry across your devices.',
           'Select several messages to delete them at once. Polls can be edited and can take written answers.',
+          'Pinned messages show in a bar under the channel name (tap it to jump there), with a count on the pin button. To pin one, tap a message, then Pin.',
+          'Electrical diagram: two fingers move the view as well as zoom it, and a hand button lets one finger move the view. Teammates can drag from anywhere to move around.',
           'Choose your quick reactions, and super reactions are much bigger.',
           'Lots of fixes across chat, tasks, the board, Roster, Milestones, Checklists and the Robot viewer.',
         ],

@@ -9,7 +9,7 @@ import Message, { messageShows } from './chat/Message.jsx';
 import { CommandNote } from './chat/Commands.jsx';
 import { mentionPattern } from './chat/format.jsx';
 import { EmojiManager, StickerManager } from './chat/Pickers.jsx';
-import { ChannelDialog, ChannelIcon, MembersPanel, NewDmDialog, NotifyMenu, PinsPanel, SearchPanel, slugChannel } from './chat/Panels.jsx';
+import { ChannelDialog, ChannelIcon, MembersPanel, NewDmDialog, NotifyMenu, PinnedBar, PinsPanel, SearchPanel, slugChannel } from './chat/Panels.jsx';
 import { Icon } from './shell/icons.jsx';
 import { BotReplies, ChatAd, chatAdSpots, useAds } from './Ads.jsx';
 
@@ -167,6 +167,9 @@ export default function ChatView({
   const [notifyOpen, setNotifyOpen] = useState(false);
   const [showTeamDms, setShowTeamDms] = useState(false);
   const [flash, setFlash] = useState(null);
+  // What's pinned here, newest first: the bar under the header and the count on the pin button.
+  const [pins, setPins] = useState([]);
+  const [pinAt, setPinAt] = useState(0);
   const list = useRef(null);
   const atBottom = useRef(true);
   const lastCount = useRef(0);
@@ -385,6 +388,13 @@ export default function ChatView({
     if (typeof matchMedia === 'function' && !matchMedia('(min-width: 1200px)').matches) setSide(null);
   };
 
+  useEffect(() => {
+    setPins([]);
+    setPinAt(0);
+    if (!feat('pins')) return undefined;
+    return api.subscribePins(conv.key, (rows) => setPins(rows.filter((m) => !m.deleted).sort((a, b) => (b.pinnedAt || 0) - (a.pinnedAt || 0))));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [api, conv.key]);
   const myConvs = useMemo(() => [...convs.channels, ...convs.dms], [convs]);
   const canPost = conv.kind === 'dm' ? conv.mine : !conv.announce || isManager;
   const level = levelOf(conv);
@@ -570,6 +580,7 @@ export default function ChatView({
                     aria-label="Pinned messages"
                   >
                     <Icon name="pin" />
+                    {pins.length > 0 && <span className="pin-count mono">{pins.length}</span>}
                   </button>
                 )}
               </>
@@ -610,6 +621,17 @@ export default function ChatView({
             )}
           </div>
         </header>
+        {feat('pins') && pins.length > 0 && side !== 'pins' && (
+          <PinnedBar
+            pins={pins}
+            at={Math.min(pinAt, pins.length - 1)}
+            onJump={(m) => {
+              jumpTo(m.id);
+              setPinAt((i) => (pins.length > 1 ? (Math.min(i, pins.length - 1) + 1) % pins.length : 0));
+            }}
+            onAll={() => setSide('pins')}
+          />
+        )}
         <div className="msg-list" ref={list} onScroll={onScroll}>
           {/* Pretend ads, every N messages (Asher's Ads page). */}
           {live.length >= PAGE && !older.done && (
