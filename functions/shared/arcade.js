@@ -519,7 +519,7 @@ function startPlacing(p, secret, now, rng) {
   Object.assign(p, { status: 'placing', placeBy: now + TIMES.placing, lastAt: now });
   secret.ships = { ...(secret.ships || {}) };
   if (p.b === BOT) {
-    secret.ships[BOT] = bs.randomFleet(rng);
+    secret.ships[BOT] = bs.fleetText(bs.randomFleet(rng));
     p.placed = [BOT];
   }
 }
@@ -824,7 +824,8 @@ export function move(game, { pub, secret = {}, me, move: mv, balance = 0, now = 
 
 // pub: placed [names], turn, shots { name: what's been fired at name's board },
 // sunk { name: [{ k, cells }] }, last { by, i, hit, sunk }. The fleets stay
-// in the secret until the game ends (then they're shown).
+// in the secret (as fleet text, battleship.fleetText) until the game ends,
+// then they go on the card as pub.fleets.
 const sunkCells = (p, name) => (p.sunk?.[name] || []).flatMap((x) => x.cells);
 const afloat = (p, name) => {
   const gone = new Set((p.sunk?.[name] || []).map((x) => x.k));
@@ -855,7 +856,7 @@ function battleshipMove(p, s, { me, m, now, rng, end, player, nothing }) {
     if ((p.placed || []).includes(me)) return { error: 'Your ships are already placed.' };
     const ships = bs.parseFleet(m.slice(6));
     if (!ships) return { error: 'Those ships don’t fit there.' };
-    s.ships = { ...(s.ships || {}), [me]: ships };
+    s.ships = { ...(s.ships || {}), [me]: bs.fleetText(ships) };
     p.placed = [...(p.placed || []), me];
     p.lastAt = now;
     if (s.ships[p.a] && s.ships[p.b])
@@ -878,9 +879,10 @@ function battleshipMove(p, s, { me, m, now, rng, end, player, nothing }) {
   }
   if (p.turn !== me) return { error: `It’s ${p.turn}’s turn.` };
   const shoot = (by, at, i) => {
-    const r = bs.fire(p.shots[at], s.ships[at], i);
+    const fleet = bs.parseFleet(s.ships[at]);
+    const r = bs.fire(p.shots[at], fleet, i);
     p.shots = { ...p.shots, [at]: r.shots };
-    if (r.sunk >= 0) p.sunk = { ...p.sunk, [at]: [...(p.sunk[at] || []), { k: r.sunk, cells: s.ships[at][r.sunk] }] };
+    if (r.sunk >= 0) p.sunk = { ...p.sunk, [at]: [...(p.sunk[at] || []), { k: r.sunk, cells: fleet[r.sunk] }] };
     p.last = { by, i, hit: r.hit, sunk: r.sunk >= 0 ? bs.FLEET[r.sunk][0] : '' };
     return r.all;
   };
@@ -902,7 +904,7 @@ function battleshipMove(p, s, { me, m, now, rng, end, player, nothing }) {
   return out();
 }
 
-// Your own fleet, for your screen only (the play function's 'mine' move).
+// Your own fleet as fleet text, for your screen only (the play function's "mine" move).
 export const myFleet = (game, secret, me) => (game === 'battleship' ? secret?.ships?.[me] || null : null);
 
 function rpsPick(p, s, me, pick, now) {

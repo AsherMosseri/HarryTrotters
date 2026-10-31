@@ -10,13 +10,17 @@ import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { defineSecret } from 'firebase-functions/params';
 import { logger } from 'firebase-functions';
 import { initializeApp } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
+import { FieldPath, getFirestore } from 'firebase-admin/firestore';
 import { getMessaging } from 'firebase-admin/messaging';
 import { fetchPage, firstLink, readPreview } from './preview.js';
 import { coinSettings, coinsByName, giftEntry, prizeEntry, wallet } from './shared/coins.js';
 import * as casino from './shared/casino.js';
 import * as arcade from './shared/arcade.js';
-import { blocked, serverGroup } from './shared/commandRules.js';
+import { blocked, isOff, serverGroup } from './shared/commandRules.js';
+import { awardCoins } from './award.js';
+import * as fun from './shared/funGames.js';
+import { LEVELS as MINE_LEVELS } from './shared/minesweeper.js';
+import { attemptSeed, newSeed } from './shared/rng.js';
 import { MANAGER_NAMES, PASSWORD_MIN, cleanName, isManagerName, knownName } from './shared/team.js';
 import { TEAM_NUMBER, fromSchedule, rankOf, scoreOf, seasonOf } from './shared/matches.js';
 import { asksOn } from './shared/checkin.js';
@@ -1035,11 +1039,12 @@ function nextFriday(now = Date.now()) {
 const secretWith = (secret, conv, now) => ({ ...secret, where: { conv, at: now } });
 
 // A move in a running game: a player's, or the house settling a game nobody
-// finished (house: true, from settleGames).
-async function runMove({ conv, msgId, me, move, data, now, house = false }) {
+// finished (house: true, from settleGames). verified: a race result funGame
+// replayed (never from the app).
+async function runMove({ conv, msgId, me, move, data, now, house = false, verified = null }) {
   const msgRef = db.doc(`channels/${conv}/messages/${msgId}`);
   const secretRef = db.doc(`gameSecrets/${msgId}`);
-  return db.runTransaction(async (tx) => {
+  const res = await db.runTransaction(async (tx) => {
     const [msg, secret] = await Promise.all([tx.get(msgRef), tx.get(secretRef)]);
     const c = msg.get('cmd');
     if (!msg.exists || !c || !secret.exists) {
@@ -1048,6 +1053,8 @@ async function runMove({ conv, msgId, me, move, data, now, house = false }) {
     }
     // Multiplayer: the game decides who may move (arcade.js).
     if (arcade.MULTI.includes(c.name)) {
+      // Battleship: your own ships, for your screen only.
+      if (move === 'mine') return { ok: true, mine: arcade.myFleet(c.name, secret.data(), me) };
       if (!arcade.isLive(c.status)) return { ok: true };
       const myBank = house ? null : (await tx.get(bankRef(me))).data() || {};
       const r = arcade.move(c.name, {
@@ -1057,6 +1064,7 @@ async function runMove({ conv, msgId, me, move, data, now, house = false }) {
         move,
         balance: house ? 0 : await balanceOf(me, myBank, data),
         now,
+        verified,
       });
       if (r.error) return note(r.error);
       if (!r.write) return { ok: true, serverNow: now };
@@ -1065,7 +1073,7 @@ async function runMove({ conv, msgId, me, move, data, now, house = false }) {
       if (arcade.isLive(status)) tx.set(secretRef, secretWith(r.secret, conv, now));
       else tx.delete(secretRef);
       tx.update(msgRef, { 'cmd.game': game, 'cmd.status': status });
-      return { ok: true, serverNow: now };
+      return { ok: true, serverNow: now, awards: r.awards || [] };
     }
     const player = data.rename(msg.get('by'));
     if (!house && move !== 'peek' && player !== me) return note('That’s not your game.');
@@ -1097,6 +1105,16 @@ async function runMove({ conv, msgId, me, move, data, now, house = false }) {
     tx.update(msgRef, update);
     return { ok: true, serverNow: now };
   });
+  return payAwards(res, msgId, now);
+}
+
+// Coins a game's end pays (arcade.js awards, like beating someone at
+// Battleship): through awardCoins, once per game and person.
+async function payAwards(res, msgId, now) {
+  const { awards, ...rest } = res || {};
+  for (const a of awards || [])
+    await awardCoins(db, { person: a.person, amount: a.amount, source: 'game', label: a.label, key: `game-${msgId}-${personId(a.person)}` }, now);
+  return rest;
 }
 
 export const play = onCall({ maxInstances: 5, invoker: 'public' }, async (req) => {
@@ -1303,6 +1321,212 @@ export const play = onCall({ maxInstances: 5, invoker: 'public' }, async (req) =
     post(tx, r.card);
     return { ok: true };
   });
+});
+
+// ---------- Tetris and Minesweeper (functions/shared/funGames.js) ----------
+// A game starts here (the server picks the seed) and ends here: the moves are
+// replayed, so the coins it pays (awardCoins, 'game'), a race card's result
+// and a tournament score are whatever the moves really did. funGames/{id}
+// (one per game played) and funSecrets are server-only.
+
+const funRef = (id) => db.doc(`funGames/${id}`);
+const validId = (id) => typeof id === 'string' && /^[\w-]{1,40}$/.test(id);
+
+async function caller(req) {
+  const uid = req.auth?.uid;
+  if (!uid) throw new HttpsError('unauthenticated', 'Sign in first.');
+  const member = await db.doc(`members/${uid}`).get();
+  if (!member.exists || member.get('via') !== 'password') throw new HttpsError('permission-denied', 'Sign in first.');
+  const rename = await renamer();
+  return { uid, me: rename(member.get('name')), rename };
+}
+
+// Tournament boards are made from the tournament's seed and this, so nobody
+// can work out a board from the tournament doc before they start a game.
+async function tournamentPepper() {
+  const ref = db.doc('funSecrets/pepper');
+  return db.runTransaction(async (tx) => {
+    const d = await tx.get(ref);
+    if (d.exists) return d.get('value');
+    const value = randomBytes(16).toString('hex');
+    tx.set(ref, { value });
+    return value;
+  });
+}
+
+// The key a person has in a tournament's players map (they may have joined under an old name).
+const playerKey = (t, me, rename) => rename.aliases(me).find((n) => t.players?.[n]) || null;
+
+// Marks a session finished, once. Returns false if it already was.
+async function closeSession(ref, patch) {
+  return db.runTransaction(async (tx) => {
+    const cur = await tx.get(ref);
+    if (!cur.exists || cur.get('done')) return false;
+    tx.update(ref, { done: true, ...patch });
+    return true;
+  });
+}
+
+export const funGame = onCall({ maxInstances: 5, invoker: 'public' }, async (req) => {
+  const { uid, me, rename } = await caller(req);
+  const body = req.data || {};
+  const now = Date.now();
+
+  if (body.action === 'start') {
+    const game = body.game;
+    const mode = String(body.mode || '');
+    if (!fun.GAMES.includes(game) || !fun.MODES[game][mode]) throw new HttpsError('invalid-argument', 'Which game?');
+    if (isOff(game, (await db.doc('settings/team').get()).get('commands')))
+      return note(`/${game} is turned off`, 'It’s off for now. Type / to see what’s on.');
+    const s = { person: me, uid, game, mode, startedAt: now, done: false, level: 1, speed: '', race: null, tournament: null };
+    if (mode === 'race') {
+      const { conv, msgId } = body.race || {};
+      if (!validId(conv) || !validId(msgId)) throw new HttpsError('invalid-argument', 'Which race?');
+      const c = (await db.doc(`channels/${conv}/messages/${msgId}`).get()).get('cmd');
+      if (!c || c.name !== game || c.status !== 'playing') return note('That race isn’t on.');
+      const g = c.game || {};
+      if (me !== g.a && me !== g.b) return note('You’re not in this race.');
+      if (g.results?.[me]) return note('You already finished this race.');
+      if (now > g.endsAt) return note('That race is over.');
+      Object.assign(s, { seed: g.seed, level: g.level || 'beginner', race: { conv, msgId } });
+    } else if (mode === 'tournament') {
+      const id = body.tournament;
+      if (!validId(id)) throw new HttpsError('invalid-argument', 'Which tournament?');
+      const t = (await db.doc(`tournaments/${id}`).get()).data();
+      if (!t || t.game !== game) return note('That tournament is gone.');
+      if (t.status === 'done' || now >= t.endsAt) return note('That tournament is over.');
+      if (t.opensAt && now < t.opensAt) return note('That tournament hasn’t started yet.');
+      if (!playerKey(t, me, rename)) return note('Join it first.', 'Tournament entries are in the market.');
+      // Everyone's 1st game is on the same board (or pieces), everyone's 2nd on the next…
+      const tries = await db.collection('funGames').where('tournament', '==', id).where('person', '==', me).count().get();
+      const attempt = tries.data().count + 1;
+      Object.assign(s, {
+        tournament: id,
+        attempt,
+        seed: attemptSeed(`${t.seed}:${await tournamentPepper()}`, attempt),
+        level: game === 'minesweep' ? (MINE_LEVELS[t.level] ? t.level : fun.TOURNAMENT_LEVEL) : 1,
+      });
+    } else {
+      s.seed = newSeed();
+      if (game === 'tetris') s.level = Math.max(1, Math.min(15, Math.floor(Number(body.level)) || 1));
+      else s.level = MINE_LEVELS[body.level] ? body.level : 'beginner';
+      if (mode === 'bot') s.speed = fun.SPEEDS.includes(body.speed) ? body.speed : 'medium';
+    }
+    const ref = db.collection('funGames').doc();
+    await ref.set(s);
+    return { ok: true, id: ref.id, seed: s.seed, mode, level: s.level, speed: s.speed, attempt: s.attempt || 0, serverNow: now };
+  }
+
+  if (body.action === 'finish') {
+    if (!validId(body.id)) throw new HttpsError('invalid-argument', 'Which game?');
+    const ref = funRef(body.id);
+    const s = (await ref.get()).data();
+    if (!s || s.person !== me) return note('That game is gone.');
+    if (s.done) return note('That game is already in.');
+    if (s.mode === 'tournament') return note('Tournament games go in with submitTournamentScore.');
+    const r = fun.replayGame(s, body.moves);
+    if (r.error) return note(r.error);
+    const problem = fun.timingProblem(s, r, now - s.startedAt);
+    if (s.mode === 'race') {
+      if (!(await closeSession(ref, { finishedAt: now, result: r, problem }))) return note('That game is already in.');
+      const data = await coinData();
+      // A game that didn't pass the clock check counts as giving up.
+      const out = await runMove({ ...s.race, me, move: problem ? 'resign' : 'finish', data, now, verified: problem ? null : r });
+      if (problem) return note(problem);
+      return out.note ? out : { ok: true, result: r };
+    }
+    const bot = s.mode === 'bot' ? fun.botResult(s) : null;
+    const won = bot ? fun.beatBot(s.game, r, bot) : false;
+    const controls = (await db.doc('settings/controls').get()).data() || {};
+    const coinsOff = me !== REQUESTS_TO && (controls.off || []).includes('coins');
+    const coins = problem || coinsOff ? 0 : fun.coinsFor(s, r, won);
+    if (!(await closeSession(ref, { finishedAt: now, result: r, bot, won, coins, problem }))) return note('That game is already in.');
+    const label = `${fun.GAME_LABEL[s.game]}: ${bot ? (won ? 'beat Trotbot' : 'lost to Trotbot') : fun.resultLine(s.game, s.mode, r)}`;
+    const paid = coins ? await awardCoins(db, { person: me, amount: coins, source: 'game', label, key: `game-${body.id}` }, now) : 0;
+    if (problem) return note(problem, 'It doesn’t count, and pays nothing.');
+    if (paid) await ref.update({ paid });
+    return { ok: true, result: r, bot, won, coins, paid };
+  }
+
+  // Post a finished game to chat (the card shows what the server checked).
+  if (body.action === 'share') {
+    if (!validId(body.id) || !validId(body.conv) || body.conv === 'announcements') throw new HttpsError('invalid-argument', 'Where?');
+    const ref = funRef(body.id);
+    const s = (await ref.get()).data();
+    if (!s || s.person !== me || !s.done || s.problem) return note('That game can’t be shared.');
+    if (s.shared) return note('Already posted.');
+    if (s.mode === 'race' || s.mode === 'tournament') return note('That one’s already on its card.');
+    if (me !== REQUESTS_TO) {
+      const controls = (await db.doc('settings/controls').get()).data() || {};
+      if ((controls.channelsOff || []).includes(body.conv)) return note('Not here.', 'This channel is off right now.');
+    }
+    const line = fun.resultLine(s.game, s.mode, s.result);
+    await ref.update({ shared: true });
+    await db.collection(`channels/${body.conv}/messages`).add({
+      text: `/${s.game} · ${line}`,
+      by: me,
+      byUid: uid,
+      at: now,
+      cmd: {
+        name: s.game,
+        share: true,
+        mode: s.mode,
+        level: s.level,
+        speed: s.speed || '',
+        result: s.result,
+        line,
+        bot: s.bot ? { ...s.bot, line: fun.resultLine(s.game, 'bot', s.bot) } : null,
+        won: !!s.won,
+        paid: s.paid || 0,
+      },
+      mentions: [],
+      taskIds: [],
+      replyTo: null,
+      reactions: {},
+      photo: null,
+    });
+    return { ok: true };
+  }
+  throw new HttpsError('invalid-argument', 'Unknown action.');
+});
+
+// A tournament game (tournaments/{id}, see the market): the moves are
+// replayed on the tournament's board and the player's best is kept. The pot
+// is paid out when the tournament ends (not here). session: the funGame
+// 'start' that handed out the board, so the clock can be checked.
+export const submitTournamentScore = onCall({ maxInstances: 5, invoker: 'public' }, async (req) => {
+  const { me, rename } = await caller(req);
+  const { id, moves, session } = req.data || {};
+  const now = Date.now();
+  if (!validId(id) || !validId(session)) throw new HttpsError('invalid-argument', 'Which tournament?');
+  const sref = funRef(session);
+  const s = (await sref.get()).data();
+  if (!s || s.person !== me || s.tournament !== id) return note('That game is gone.');
+  if (s.done) return note('That game is already in.');
+  const tref = db.doc(`tournaments/${id}`);
+  const t = (await tref.get()).data();
+  if (!t || t.game !== s.game) return note('That tournament is gone.');
+  if (t.status === 'done' || s.startedAt >= t.endsAt) return note('That tournament is over.');
+  if (now > s.startedAt + fun.tournamentGrace(s.game)) return note('That game took too long to count.');
+  const r = fun.replayGame(s, moves);
+  if (r.error) return note(r.error);
+  const problem = fun.timingProblem(s, r, now - s.startedAt);
+  const score = fun.tournamentScore(s.game, r);
+  const res = await db.runTransaction(async (tx) => {
+    const [cur, tdoc] = await Promise.all([tx.get(sref), tx.get(tref)]);
+    if (cur.get('done')) return note('That game is already in.');
+    const td = tdoc.data();
+    const key = td && playerKey(td, me, rename);
+    tx.update(sref, { done: true, finishedAt: now, result: r, score, problem });
+    if (!key) return note('You’re not in that tournament.');
+    if (problem) return note(problem);
+    if (td.status === 'done') return note('That tournament is over.');
+    const before = td.players[key].best;
+    const best = before == null ? score : Math.max(before, score);
+    if (best !== before) tx.update(tref, new FieldPath('players', key, 'best'), best, new FieldPath('players', key, 'at'), now);
+    return { ok: true, score, best, improved: best !== before, text: fun.tournamentText(s.game, score), bestText: fun.tournamentText(s.game, best) };
+  });
+  return res;
 });
 
 // Every 10 minutes: finish games nobody finished, so no one's bet stays stuck

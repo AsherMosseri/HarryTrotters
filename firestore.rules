@@ -240,6 +240,32 @@ service cloud.firestore {
     match /gameSecrets/{id} {
       allow read, write: if false;
     }
+    // Tetris and Minesweeper games (seeds, results, what they paid) and the
+    // tournament board key: the funGame function only.
+    match /funGames/{id} {
+      allow read, write: if false;
+    }
+    match /funSecrets/{id} {
+      allow read, write: if false;
+    }
+    // Tournaments: the team reads them; scores come from submitTournamentScore.
+    match /tournaments/{id} {
+      allow read: if isMember();
+    }
+    // A live race's picture of each player's board (shown small to the other
+    // player). Only for showing: the result comes from the replayed moves.
+    // One doc per player's device, id <race>_<uid>.
+    match /raceLive/{id} {
+      allow read: if isMember();
+      allow create, update: if isMember() && request.resource.data.uid == request.auth.uid
+        && id == request.resource.data.race + '_' + request.auth.uid
+        && isMe(request.resource.data.name)
+        && request.resource.data.keys().hasOnly(['race', 'uid', 'name', 'at', 'game', 'board', 'score', 'lines', 'cells', 'over', 'done'])
+        && request.resource.data.race is string && request.resource.data.race.size() <= 40
+        && request.resource.data.board is string && request.resource.data.board.size() <= 600
+        && request.resource.data.at is int;
+      allow delete: if isMember() && resource.data.uid == request.auth.uid;
+    }
 
     // Learn (functions/learn.js): only the server writes these. You read your
     // own progress and daily answers (a missing doc reads as empty). Open
