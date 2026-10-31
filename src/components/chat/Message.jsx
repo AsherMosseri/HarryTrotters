@@ -9,6 +9,9 @@ import { EmojiPicker, PollDialog, QUICK_MAX } from './Pickers.jsx';
 import { CUSTOM_RE } from './emoji.js';
 import { isCoinCommand, useControls } from '../../controls.js';
 import { pollVotes, sentByMe } from '../../people.js';
+import { useMarket } from '../../market.js';
+import { glows } from '../../../functions/shared/market.js';
+import { PetBadge } from '../Pet.jsx';
 
 export const QUICK_REACTIONS = ['👍', '✅', '😂', '❤️', '🔥', '👀'];
 // Your quick reactions (the picker's Edit, saved on your profile), or the first three.
@@ -334,19 +337,19 @@ function Attachment({ f }) {
 // The big moment when a super reaction lands: the emoji blows up over the
 // chat from the reaction, with a shockwave and a spray of little copies and
 // sparks, then shrinks back into place.
-function SuperBurst({ from, emoji, teamEmoji }) {
+function SuperBurst({ from, emoji, teamEmoji, mega }) {
   const r = from.current?.getBoundingClientRect();
   if (!r) return null;
   return (
     <Overlay>
-      <div className="super-fx" style={{ left: r.left + r.width / 2, top: r.top + r.height / 2 }} aria-hidden="true">
+      <div className={`super-fx${mega ? ' mega' : ''}`} style={{ left: r.left + r.width / 2, top: r.top + r.height / 2 }} aria-hidden="true">
         <span className="super-fx-wave" />
         <span className="super-fx-wave late" />
         {Array.from({ length: 14 }, (_, i) => (
           <i key={i} className="super-fx-spark" style={{ '--a': `${i * (360 / 14)}deg`, '--d': `${90 + (i % 3) * 40}px` }} />
         ))}
-        {Array.from({ length: 6 }, (_, i) => (
-          <span key={i} className="super-fx-mini" style={{ '--a': `${i * 60 + 30}deg` }}>
+        {Array.from({ length: mega ? 12 : 6 }, (_, i) => (
+          <span key={i} className="super-fx-mini" style={{ '--a': `${i * (mega ? 30 : 60) + 30}deg` }}>
             <ReactionGlyph emoji={emoji} teamEmoji={teamEmoji} />
           </span>
         ))}
@@ -360,7 +363,8 @@ function SuperBurst({ from, emoji, teamEmoji }) {
 
 // A super reaction: bursts when someone adds one (and again when you point at
 // it, like replaying it).
-function SuperChip({ emoji, who, mine, teamEmoji, onClick, fresh }) {
+// mega: someone on it bought Mega super reactions (the market's chat extras).
+function SuperChip({ emoji, who, mine, teamEmoji, onClick, fresh, mega }) {
   const count = Object.keys(who).length;
   const last = useRef(count);
   const chip = useRef(null);
@@ -379,12 +383,12 @@ function SuperChip({ emoji, who, mine, teamEmoji, onClick, fresh }) {
   return (
     <button
       ref={chip}
-      className={`reaction super${mine ? ' mine' : ''}${burst ? ' burst' : ''}`}
+      className={`reaction super${mine ? ' mine' : ''}${burst ? ' burst' : ''}${mega ? ' mega' : ''}`}
       title={`Super reaction: ${Object.values(who).join(', ')}`}
       onClick={onClick}
       onPointerEnter={(e) => e.pointerType === 'mouse' && !burst && setBurst(true)}
     >
-      {burst && <SuperBurst from={chip} emoji={emoji} teamEmoji={teamEmoji} />}
+      {burst && <SuperBurst from={chip} emoji={emoji} teamEmoji={teamEmoji} mega={mega} />}
       <span className="super-glyph">
         <ReactionGlyph emoji={emoji} teamEmoji={teamEmoji} />
         {burst && (
@@ -444,6 +448,7 @@ export default function Message({
   const actionsRef = useRef(null);
   const quick = quickOf(usePeople()?.profileOf(actor.name));
   const feat = useControls().isOn;
+  const market = useMarket();
   const mine = sentByMe(m, actor);
   // The author's message border (Edit profile → Style → Borders).
   const frame = borderProps(usePeople()?.profileOf(m.by)?.msgBorder);
@@ -507,7 +512,7 @@ export default function Message({
 
   return (
     <div
-      className={`msg${first ? ' first' : ''}${(selected || picker) && !picking ? ' selected' : ''}${mentionsMe ? ' mentions-me' : ''}${m.pinned && feat('pins') ? ' pinned' : ''}${picking ? ' picking' : ''}${picked ? ' picked' : ''}`}
+      className={`msg${first ? ' first' : ''}${(selected || picker) && !picking ? ' selected' : ''}${mentionsMe ? ' mentions-me' : ''}${m.pinned && feat('pins') ? ' pinned' : ''}${picking ? ' picking' : ''}${picked ? ' picked' : ''}${glows(market?.extras, m) ? ' glow' : ''}`}
       id={`msg-${m.id}`}
       onPointerEnter={(e) => e.pointerType === 'mouse' && requestAnimationFrame(() => placeActions())}
       onClickCapture={(e) => {
@@ -548,7 +553,10 @@ export default function Message({
                 <b>Trotbot</b> <span className="cmd-tag">BOT</span>
               </>
             ) : (
-              <DisplayName as="button" name={m.by} className="name-btn" onClick={(e) => onPerson(m.by, e)} />
+              <>
+                <DisplayName as="button" name={m.by} className="name-btn" onClick={(e) => onPerson(m.by, e)} />
+                <PetBadge name={m.by} />
+              </>
             )}{' '}
             <span className="muted tiny">{timeOf(m.at)}</span>
             {m.pinned && feat('pins') && (
@@ -636,6 +644,7 @@ export default function Message({
                 emoji={emoji}
                 who={who}
                 mine={!!who[actor.uid]}
+                mega={Object.values(who).some((n) => market?.extras.mega.has(n))}
                 teamEmoji={teamEmoji}
                 onClick={() => superReact(emoji)}
               />

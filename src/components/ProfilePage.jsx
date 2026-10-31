@@ -10,6 +10,8 @@ import { ProfileEffect, SubteamBadges, SubteamIcon } from './People.jsx';
 import { hoursOf, mergedMs } from '../../functions/shared/hours.js';
 import { streaksOf } from '../../functions/shared/streaks.js';
 import CountUp from './CountUp.jsx';
+import { PetCard } from './Pet.jsx';
+import { useMarket } from '../market.js';
 
 // Hours are added up the same way as the Shifts page (shared/hours.js).
 const fmtHours = (ms) => hoursOf(ms).toFixed(1);
@@ -33,6 +35,8 @@ export default function ProfilePage({
 }) {
   useEscape(onClose);
   const people = usePeople();
+  const market = useMarket();
+  const hasPet = !!market?.petOf(name);
   const phone = useMedia('(max-width: 760px)');
   const [tab, setTab] = useState('about');
   const [note, setNote] = useState(notes[name] || '');
@@ -182,6 +186,12 @@ export default function ProfilePage({
 
               {tab === 'about' && (
                 <div className="pp-body">
+                  {hasPet && (
+                    <section className="profile-section">
+                      <h3>Pet</h3>
+                      <PetCard name={name} />
+                    </section>
+                  )}
                   {profile.about && (
                     <section className="profile-section">
                       <h3>About me</h3>

@@ -3,6 +3,7 @@ import { GIFT_MAX, leaderboard, perHourOf, teamDay, teamMidnight, wallet as wall
 import { mondayOf } from '../milestones.js';
 import { relTime, useEscape } from '../util.js';
 import { Avatar, CloseIcon, Overlay } from './common.jsx';
+import { Icon } from './shell/icons.jsx';
 
 // A Jackson coin: a little gold coin with a J.
 export const Coin = ({ size = 16 }) => (
@@ -19,7 +20,7 @@ export const Coins = ({ n, size }) => (
 
 const WHO = (n) => n.split(' ')[0];
 
-export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onClose }) {
+export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onMarket, onClose }) {
   useEscape(onClose);
   const [tab, setTab] = useState('wallet');
   const [range, setRange] = useState('week');
@@ -67,6 +68,11 @@ export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onClose 
             <span className="muted small">
               {cfg.perTask} for each task you finish · {perHourOf(cfg)} an hour at the lab, paid per 15 minutes
             </span>
+            {onMarket && (
+              <button className="btn small coins-market" onClick={onMarket}>
+                <Icon name="market" size={16} /> Market
+              </button>
+            )}
           </div>
           <div className="segmented coins-tabs" role="tablist">
             {[

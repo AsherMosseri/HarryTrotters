@@ -138,7 +138,10 @@ service cloud.firestore {
       function validSpend(d) {
         return d.keys().hasOnly(['type', 'person', 'amount', 'what', 'label', 'until', 'at']) && isMe(d.person) && amount(d)
           && shortStr(d.get('what', ''), 20) && shortStr(d.get('label', ''), 80)
-          && (!('until' in d) || (d.until is int && d.until <= request.time.toMillis() + 8 * 86400000));
+          && (!('until' in d) || (d.until is int && d.until <= request.time.toMillis() + 8 * 86400000))
+          // Market buys and tournament entries are written by the server only
+          // (functions/market.js), which also hands over what was bought.
+          && !(d.get('what', '') in ['market', 'tournament']);
       }
       function validGrant(d) {
         return d.keys().hasOnly(['type', 'to', 'amount', 'note', 'by', 'at']) && requestsOwner() && d.to is string
@@ -151,6 +154,37 @@ service cloud.firestore {
         || (request.resource.data.type == 'grant' && validGrant(request.resource.data)));
       allow update: if false;
       allow delete: if requestsOwner();
+    }
+
+    // The market (functions/market.js). Perks are added, changed and removed
+    // by team management; buying anything, refunds, chat extras, pets and
+    // tournaments happen only on the server, so the app just reads them.
+    match /perks/{id} {
+      function validPerk(d) {
+        return d.keys().hasOnly(['name', 'desc', 'price', 'stock', 'limit', 'per', 'approval', 'active', 'idea', 'by', 'at', 'updatedAt'])
+          && d.name is string && d.name.size() > 0 && d.name.size() <= 60
+          && d.get('desc', '') is string && d.get('desc', '').size() <= 200
+          && d.price is int && d.price >= 1 && d.price <= 5000
+          && (d.get('stock', null) == null || (d.stock is int && d.stock >= 0 && d.stock <= 1000))
+          && (d.get('limit', null) == null || (d.limit is int && d.limit >= 1 && d.limit <= 100))
+          && d.get('per', 'season') in ['season', 'week']
+          && d.get('approval', true) is bool && d.get('active', true) is bool;
+      }
+      allow read: if isMember();
+      allow create, update: if isManager() && validPerk(request.resource.data);
+      allow delete: if isManager();
+    }
+    match /purchases/{id} {
+      allow read: if isMember();
+      allow write: if false;
+    }
+    match /pets/{id} {
+      allow read: if isMember();
+      allow write: if false;
+    }
+    match /tournaments/{id} {
+      allow read: if isMember();
+      allow write: if false;
     }
 
     // How many ads each person has seen and tapped (Asher's per-person stats).

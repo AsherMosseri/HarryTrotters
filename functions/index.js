@@ -20,6 +20,7 @@ import { blocked, serverGroup } from './shared/commandRules.js';
 import { MANAGER_NAMES, PASSWORD_MIN, cleanName, isManagerName, knownName } from './shared/team.js';
 import { TEAM_NUMBER, fromSchedule, rankOf, scoreOf, seasonOf } from './shared/matches.js';
 import { asksOn } from './shared/checkin.js';
+import { marketFunctions } from './market.js';
 
 // Functions run next to the database. The deploy workflow writes location.json
 // from the database's location; nam5 (the US multi-region) pairs with us-central1.
@@ -961,6 +962,18 @@ async function freshCoins(name, bank, data) {
   return { balance: wallet(name, { ...data, ledger: mine.ledger, bank: mine.bank }).balance, ledger: mine.ledger };
 }
 const nyDay = (ms) => new Date(ms).toLocaleDateString('en-CA', { timeZone: TIME_ZONE });
+
+// The market and pets (functions/market.js): buying, tournaments, pet care.
+export const { buy, joinTournament, marketManage, pet, payTournaments } = marketFunctions({
+  db,
+  coinData,
+  freshCoins,
+  notify,
+  bankRef,
+  personId,
+  owner: REQUESTS_TO,
+  timeZone: TIME_ZONE,
+});
 
 const ICON = {
   slots: '🎰',
