@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Avatar } from '../common.jsx';
 import { Icon } from './icons.jsx';
+import { PitGuess } from '../Life.jsx';
 import { QUEUE_CHECKLIST, STARTER_CHECKLISTS, isQueueChecklist, starterItems } from '../../checklists.js';
 import { parseDay } from '../../milestones.js';
 import { teamDay } from '../../../functions/shared/coins.js';
@@ -578,7 +579,7 @@ function SyncButton({ settings, api }) {
   );
 }
 
-export default function PitScreen({ actor, settings, matches, checklists, roster, competition, api, onPerson, onUsual }) {
+export default function PitScreen({ actor, settings, matches, checklists, roster, competition, api, predictions = [], onPerson, onUsual }) {
   const now = useNow(1000);
   const isManager = !!actor.admin;
   const event = settings.compEvent || {};
@@ -674,6 +675,7 @@ export default function PitScreen({ actor, settings, matches, checklists, roster
         <div className="today-col">
           <QueueCard list={list} next={next} lead={lead} now={now} actor={actor} api={api} onAddList={addList} />
           <ScorePad matches={ours} now={now} driveTeam={team} api={api} />
+          <PitGuess predictions={predictions} next={next} actor={actor} api={api} now={now} />
         </div>
         <div className="today-col side">
           <section className="today-sec pit-sec">

@@ -726,6 +726,9 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
   // Chat extras. Quiet on failure: the board works without them (e.g. before
   // the new rules are published).
   const quiet = useCallback((what) => (e) => console.warn(what, e), []);
+  // Score guesses (functions/life.js predict): the Match log and the pit screen.
+  const [predictions, setPredictions] = useState([]);
+  useEffect(() => store.subscribePredictions(setPredictions, quiet('predictions')), [store, quiet]);
   const [channelDocs, setChannelDocs] = useState([]);
   const [dmDocs, setDmDocs] = useState([]);
   const [presence, setPresence] = useState([]);
@@ -1457,6 +1460,10 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
           .catch(fail),
       // The caller shows what came back (or went wrong) next to the button.
       ftcEvents: (req) => store.ftcEvents(req),
+      // Team life (functions/life.js): the server decides and pays; these only ask.
+      claimBingo: (req) => store.claimBingo(req || {}, actor),
+      predict: (req) => store.predict(req, actor).catch((e) => ({ error: e?.message || 'That didn’t work.' })),
+      recap: (req) => store.recap(req, actor),
     }),
     [store, actor, fail, ok, quiet, setFilters, renames],
   );
@@ -1779,6 +1786,33 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
   // spending, gifts, and bonuses are in the ledger.
   const [ledger, setLedger] = useState([]);
   useEffect(() => store.subscribeCoins(setLedger), [store]);
+  // Coins the server just paid you for a streak milestone, a bingo line or
+  // the closest guess: a toast, and a burst for streaks and big wins. The
+  // newest one seen is kept on this device so a reload doesn't repeat it.
+  useEffect(() => {
+    const mine = ledger.filter(
+      (x) => x.type === 'award' && ['streak', 'bingo', 'predict'].includes(x.source) && rename(x.person || '') === actor.name && x.at,
+    );
+    if (!mine.length) return;
+    let seen = 0;
+    try {
+      seen = Number(localStorage.getItem('awards-seen') || 0);
+    } catch {
+      /* private mode */
+    }
+    const fresh = mine.filter((x) => x.at > seen && x.at > Date.now() - 10 * 60000).sort((a, b) => a.at - b.at);
+    try {
+      localStorage.setItem('awards-seen', String(Math.max(seen, ...mine.map((x) => x.at))));
+    } catch {
+      /* private mode */
+    }
+    if (!fresh.length) return;
+    const total = fresh.reduce((t, x) => t + x.amount, 0);
+    const streak = fresh.find((x) => x.source === 'streak');
+    const big = streak || fresh.find((x) => x.source === 'predict' || /full card/.test(x.label || ''));
+    setToast({ text: `${(streak || fresh.at(-1)).label.replace(/^Streak: /, '')}: +${total} coins` });
+    if (big) celebrate();
+  }, [ledger, rename, actor.name]);
   const [coinsOpen, setCoinsOpen] = useState(false);
   const coinCfg = useMemo(() => coinSettings(settings.coins), [settings.coins]);
   // Casino and economy winnings/losses (bank) and the Friday lottery; the
@@ -2350,6 +2384,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
                     api={api}
                     shifts={namedShifts}
                     runs={runs}
+                    predictions={predictions}
                     myShift={myShift}
                     convs={convs}
                     unread={unread}
@@ -2524,7 +2559,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
                     api={api}
                   />
                 ) : view === 'runs' ? (
-                  <RunsView runs={runs} roster={roster} api={api} />
+                  <RunsView runs={runs} roster={roster} api={api} actor={actor} predictions={predictions} matches={matches} />
                 ) : view === 'team' ? (
                   <TeamView
                     roster={roster}

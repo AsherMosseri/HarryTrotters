@@ -48,7 +48,9 @@ function cameToPlan(ctx) {
   return ctx.plans.some((p) => {
     if (!p.date || !p.start || p.people?.[ctx.me] !== 'in') return false;
     const [h, m] = String(p.start).split(':').map(Number);
-    const [eh, em] = String(p.end || p.start).split(':').map(Number);
+    const [eh, em] = String(p.end || p.start)
+      .split(':')
+      .map(Number);
     const from = teamMidnight(p.date) + (h * 60 + m) * 60000;
     const to = Math.max(from + 30 * 60000, teamMidnight(p.date) + (eh * 60 + em) * 60000);
     return ctx.shifts.some((s) => s.start < to && (s.end ?? ctx.now) > from);
@@ -60,7 +62,12 @@ function cameToPlan(ctx) {
 export const POOL = [
   { id: 'shift', tier: 1, label: 'Logged a shift', test: (c) => c.shifts.length > 0 },
   { id: 'log', tier: 1, label: 'Wrote a lab log', test: (c) => c.logs.length > 0 },
-  { id: 'forward', tier: 1, label: 'Moved a task forward', test: (c) => c.logs.some((l) => (l.tasks || []).some((t) => FORWARD.includes(t.outcome))) },
+  {
+    id: 'forward',
+    tier: 1,
+    label: 'Moved a task forward',
+    test: (c) => c.logs.some((l) => (l.tasks || []).some((t) => FORWARD.includes(t.outcome))),
+  },
   { id: 'with', tier: 1, label: 'Worked with a teammate', test: (c) => c.logs.some((l) => (l.workedWith || []).length > 0) },
   { id: 'photo', tier: 1, label: 'Photo in a lab log', test: (c) => c.logs.some((l) => (l.photos || []).length > 0) },
   { id: 'guess', tier: 1, label: 'Guessed a run’s score', test: (c) => c.guesses > 0 },
@@ -127,14 +134,26 @@ function shuffle(list, rand) {
 export function cardSquares(week) {
   const rand = rng(`bingo-${week}`);
   const pool = POOL.filter((s) => !s.hook || (s.hook === 'daily' && DAILY_FROM && week >= DAILY_FROM));
-  const pick = (tier, n) => shuffle(pool.filter((s) => s.tier === tier), rand).slice(0, n);
+  const pick = (tier, n) =>
+    shuffle(
+      pool.filter((s) => s.tier === tier),
+      rand,
+    ).slice(0, n);
   return shuffle([...pick(1, 5), ...pick(2, 8), ...pick(3, 3)], rand).map((s) => s.id);
 }
 
 // Rows, columns and the two diagonals, as lists of square positions.
 export const LINES = [
-  ...Array.from({ length: SIZE }, (_, r) => ({ id: `r${r}`, label: `Row ${r + 1}`, cells: Array.from({ length: SIZE }, (_, c) => r * SIZE + c) })),
-  ...Array.from({ length: SIZE }, (_, c) => ({ id: `c${c}`, label: `Column ${c + 1}`, cells: Array.from({ length: SIZE }, (_, r) => r * SIZE + c) })),
+  ...Array.from({ length: SIZE }, (_, r) => ({
+    id: `r${r}`,
+    label: `Row ${r + 1}`,
+    cells: Array.from({ length: SIZE }, (_, c) => r * SIZE + c),
+  })),
+  ...Array.from({ length: SIZE }, (_, c) => ({
+    id: `c${c}`,
+    label: `Column ${c + 1}`,
+    cells: Array.from({ length: SIZE }, (_, r) => r * SIZE + c),
+  })),
   { id: 'd0', label: 'Diagonal', cells: Array.from({ length: SIZE }, (_, i) => i * SIZE + i) },
   { id: 'd1', label: 'Diagonal', cells: Array.from({ length: SIZE }, (_, i) => i * SIZE + (SIZE - 1 - i)) },
 ];
@@ -185,7 +204,12 @@ export function bingoAwards(me, card) {
   const pid = nameKey(me);
   const out = card.lines
     .filter((l) => l.done)
-    .map((l) => ({ line: l.id, amount: LINE_COINS, key: `bingo-${card.week}-${l.id}-${pid}`, label: `Lab bingo: ${l.label.toLowerCase()}` }));
-  if (card.full) out.push({ line: 'full', amount: FULL_COINS, key: `bingo-${card.week}-full-${pid}`, label: 'Lab bingo: full card' });
+    .map((l) => ({
+      line: l.id,
+      amount: LINE_COINS,
+      key: `bingo-${card.week}-${l.id}-${pid}`,
+      label: `Lab bingo, ${l.label.toLowerCase()}`,
+    }));
+  if (card.full) out.push({ line: 'full', amount: FULL_COINS, key: `bingo-${card.week}-full-${pid}`, label: 'Lab bingo, full card' });
   return out;
 }

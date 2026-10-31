@@ -84,26 +84,32 @@ export function lifeFunctions({ db, renamer }) {
       db.collection('tasks').where('status', '==', 'done').get(),
       db.collection('runs').where('date', '>=', week).get(),
       db.collection('shiftPlans').where('date', '>=', week).get(),
-      db.collection('predictions').where('openedAt', '>=', from - 7 * 86400000).get(),
+      db
+        .collection('predictions')
+        .where('openedAt', '>=', from - 7 * 86400000)
+        .get(),
     ]);
     const mine = (n) => rename(n || '') === name;
     const { from: wFrom, to: wTo } = bingoWeek(Date.parse(`${week}T16:00:00Z`));
     const data = {
-      shifts: shifts.docs.map((d) => d.data()).filter((s) => mine(s.person)).map((s) => ({ ...s, person: name })),
+      shifts: shifts.docs
+        .map((d) => d.data())
+        .filter((s) => mine(s.person))
+        .map((s) => ({ ...s, person: name })),
       logs: logs.docs.map((d) => {
         const l = d.data();
         return { ...l, person: name, workedWith: (l.workedWith || []).map((n) => rename(n)) };
       }),
-      tasks: tasks.docs.map((d) => ({ id: d.id, ...d.data() })).map((t) => ({ ...t, assignees: (t.assignees || []).map((n) => rename(n)) })),
+      tasks: tasks.docs
+        .map((d) => ({ id: d.id, ...d.data() }))
+        .map((t) => ({ ...t, assignees: (t.assignees || []).map((n) => rename(n)) })),
       runs: runs.docs
         .map((d) => d.data())
         .map((r) => ({ ...r, createdBy: rename(r.createdBy || ''), drivers: (r.drivers || []).map((n) => rename(n)) })),
       plans: plans.docs
         .map((d) => d.data())
         .map((p) => ({ ...p, people: Object.fromEntries(Object.entries(p.people || {}).map(([n, v]) => [rename(n), v])) })),
-      guesses: rounds.docs.filter((d) =>
-        Object.entries(d.get('times') || {}).some(([n, at]) => mine(n) && at >= wFrom && at < wTo),
-      ).length,
+      guesses: rounds.docs.filter((d) => Object.entries(d.get('times') || {}).some(([n, at]) => mine(n) && at >= wFrom && at < wTo)).length,
     };
     return bingoCard(name, data, { week, now });
   }
@@ -279,7 +285,11 @@ export function lifeFunctions({ db, renamer }) {
         const amount = result.pays[name];
         const key = predictKey(ref.id, name);
         if ((await paidKeys(aliasKeys(key, name, rename))).size) continue;
-        paid[name] = await awardCoins(db, { person: name, amount, source: 'predict', label: `Closest guess: ${run.matchNumber || 'practice run'}`, key }, now);
+        paid[name] = await awardCoins(
+          db,
+          { person: name, amount, source: 'predict', label: `Closest guess on ${run.matchNumber || 'a practice run'}`, key },
+          now,
+        );
       }
     await ref.update({ paid });
     return result;
@@ -310,7 +320,8 @@ export function lifeFunctions({ db, renamer }) {
           const snap = await tx.get(d.ref);
           if (snap.get('status') === 'open') await lockRound(tx, d.ref, snap.data(), 'Trotbot', now);
         });
-      else if (d.get('kind') === 'run' && now - (d.get('openedAt') || 0) > ROUND_TTL) await d.ref.update({ status: 'void', note: 'No run was logged.' });
+      else if (d.get('kind') === 'run' && now - (d.get('openedAt') || 0) > ROUND_TTL)
+        await d.ref.update({ status: 'void', note: 'No run was logged.' });
     }
   });
 

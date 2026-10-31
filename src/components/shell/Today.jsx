@@ -13,6 +13,7 @@ import { hoursOf } from '../../../functions/shared/hours.js';
 import { seasonStats } from '../../../functions/shared/stats.js';
 import { useFlip } from '../../motion.js';
 import CountUp from '../CountUp.jsx';
+import { BingoCard, RecapRow } from '../Life.jsx';
 
 // The first page, like a pit board: the countdown and the robot up top with a
 // few plain lines on what needs you, then your tasks, what's due, who's at the
@@ -70,6 +71,7 @@ export default function Today({
   api,
   shifts,
   runs = [],
+  predictions = [],
   myShift,
   convs,
   unread,
@@ -102,6 +104,7 @@ export default function Today({
         roster={roster}
         competition={competition}
         api={api}
+        predictions={predictions}
         onPerson={onPerson}
         onUsual={() => setUsualOn(teamDay(Date.now()))}
       />
@@ -109,7 +112,7 @@ export default function Today({
   return (
     <UsualToday
       {...{ actor, tasks, milestones, competition, shifts, runs, myShift, convs, unread, chat, on, onOpenTask, onOpenConv, onPage, onNewTask }}
-      {...{ onStartShift, onOpenShift, onPerson, onEditProfile, people, today }}
+      {...{ onStartShift, onOpenShift, onPerson, onEditProfile, people, today, api }}
       pitButton={
         compOn ? (
           <button className="pit-btn on" onClick={() => setUsualOn('')}>
@@ -147,6 +150,7 @@ function UsualToday({
   onEditProfile,
   people,
   today,
+  api,
   pitButton,
 }) {
   const all = tasks || [];
@@ -203,6 +207,9 @@ function UsualToday({
   // The team's week, small, under the board (the full strip is on Shifts).
   const stats = seasonStats({ shifts, tasks: all, runs });
   const weekHours = hoursOf(stats.hours.week);
+  // Lab bingo asks the server again when something that could fill a square
+  // happens here (a shift ends, a task gets done, a run is logged).
+  const bingoSig = `${shifts.filter((s) => s.person === actor.name && s.end).length}-${all.filter((t) => t.status === 'done').length}-${runs.length}`;
   const hourDiff = Math.round((weekHours - hoursOf(stats.hours.last)) * 10) / 10;
 
   return (
@@ -327,6 +334,8 @@ function UsualToday({
         </div>
 
         <div className="today-col side">
+          {api && <BingoCard actor={actor} api={api} sig={bingoSig} />}
+          {api && actor.admin && <RecapRow api={api} />}
           {on.includes('shifts') && (
             <section className="today-sec">
               <div className="sec-head">

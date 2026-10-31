@@ -80,10 +80,12 @@ export function buildRecap(data, now = Date.now(), week = recapWeek(now)) {
   const weekShifts = shifts.filter((s) => s.person && Number.isFinite(s.start) && inWeek(s.start));
   const byPerson = msByPerson(weekShifts, to);
   const hoursMs = [...byPerson.values()].reduce((t, x) => t + x, 0);
-  const lastMs = [...msByPerson(shifts.filter((s) => s.person && Number.isFinite(s.start) && inLast(s.start)), to).values()].reduce(
-    (t, x) => t + x,
-    0,
-  );
+  const lastMs = [
+    ...msByPerson(
+      shifts.filter((s) => s.person && Number.isFinite(s.start) && inLast(s.start)),
+      to,
+    ).values(),
+  ].reduce((t, x) => t + x, 0);
 
   // Hours by area: each person's day at the lab is split evenly between the
   // areas in their lab log that day; days nobody logged are "Not logged".
@@ -139,7 +141,9 @@ export function buildRecap(data, now = Date.now(), week = recapWeek(now)) {
       text: clip(String(l.note).trim().replace(/\s+/g, ' '), 160),
       photo: (l.photos || [])[0]?.thumbUrl || (l.photos || [])[0]?.url || '',
       rank:
-        Math.min(String(l.note).length, 120) + ((l.photos || []).length ? 30 : 0) + 20 * (l.tasks || []).filter((t) => t.outcome === 'done').length,
+        Math.min(String(l.note).length, 120) +
+        ((l.photos || []).length ? 30 : 0) +
+        20 * (l.tasks || []).filter((t) => t.outcome === 'done').length,
     }))
     .sort((a, b) => b.rank - a.rank)
     .filter((h, i, all) => all.findIndex((x) => x.person === h.person) === i)
@@ -172,7 +176,12 @@ export function buildRecap(data, now = Date.now(), week = recapWeek(now)) {
   const logDays = (list) => new Set(list.map((l) => `${l.day}|${l.person}`)).size;
   const vs = [
     { id: 'hours', label: 'Hours at the lab', now: hours, last: hoursLast, unit: 'h' },
-    { id: 'people', label: 'People at the lab', now: byPerson.size, last: new Set(shifts.filter((s) => inLast(s.start)).map((s) => s.person)).size },
+    {
+      id: 'people',
+      label: 'People at the lab',
+      now: byPerson.size,
+      last: new Set(shifts.filter((s) => inLast(s.start)).map((s) => s.person)).size,
+    },
     { id: 'tasks', label: 'Tasks finished', now: finished.length, last: finishedLast },
     { id: 'runs', label: 'Practice runs', now: runStats.count, last: runStats.last },
     { id: 'logs', label: 'Lab logs', now: logDays(weekLogs), last: logDays(lastLogs) },
@@ -186,13 +195,18 @@ export function buildRecap(data, now = Date.now(), week = recapWeek(now)) {
       intro.push(
         `${hours.toFixed(1)} hours at the lab from ${plural(byPerson.size, 'person', 'people')}, ${versus(hours, hoursLast, ' h')}.`,
       );
-    const bits = [finished.length && plural(finished.length, 'task') + ' finished', runStats.count && plural(runStats.count, 'practice run')].filter(
-      Boolean,
-    );
+    const bits = [
+      finished.length && plural(finished.length, 'task') + ' finished',
+      runStats.count && plural(runStats.count, 'practice run'),
+    ].filter(Boolean);
     if (bits.length) intro.push(`${bits.join(' and ')}.`.replace(/^./, (c) => c.toUpperCase()));
   }
   const topWhy = top
-    ? [top.hours && `${top.hours.toFixed(1)} h at the lab`, top.tasks && `${plural(top.tasks, 'task')} finished`, top.logs && `${plural(top.logs, 'lab log')}`]
+    ? [
+        top.hours && `${top.hours.toFixed(1)} h at the lab`,
+        top.tasks && `${plural(top.tasks, 'task')} finished`,
+        top.logs && `${plural(top.logs, 'lab log')}`,
+      ]
         .filter(Boolean)
         .join(', ')
     : '';

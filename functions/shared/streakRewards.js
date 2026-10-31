@@ -66,9 +66,21 @@ export function streakAwards(name, shifts, now = Date.now()) {
   const out = [];
   const d = best(DAILY_MILESTONES, s.daily);
   if (d)
-    out.push({ kind: 'daily', n: d[0], amount: d[1], key: `streak-daily-${d[0]}-${pid}-${s.dailyStart}`, label: `Streak: ${d[0]} school days in a row` });
+    out.push({
+      kind: 'daily',
+      n: d[0],
+      amount: d[1],
+      key: `streak-daily-${d[0]}-${pid}-${s.dailyStart}`,
+      label: `Streak: ${d[0]} school days in a row`,
+    });
   const w = best(WEEKLY_MILESTONES, s.weekly);
   if (w)
-    out.push({ kind: 'weekly', n: w[0], amount: w[1], key: `streak-weekly-${w[0]}-${pid}-${s.weeklyStart}`, label: `Streak: ${w[0]} weeks in a row` });
+    out.push({
+      kind: 'weekly',
+      n: w[0],
+      amount: w[1],
+      key: `streak-weekly-${w[0]}-${pid}-${s.weeklyStart}`,
+      label: `Streak: ${w[0]} weeks in a row`,
+    });
   return out;
 }
