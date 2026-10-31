@@ -67,6 +67,7 @@ const resourcesCol = collection(db, 'resources');
 const diagramsCol = collection(db, 'diagrams');
 const notesCol = collection(db, 'notes');
 const runsCol = collection(db, 'runs');
+const matchesCol = collection(db, 'matches');
 const channelsCol = collection(db, 'channels');
 const dmsCol = collection(db, 'dms');
 const profilesCol = collection(db, 'profiles');
@@ -673,6 +674,52 @@ export const firebaseStore = {
 
   deleteRun(id) {
     return deleteDoc(doc(runsCol, id));
+  },
+
+  // Competition matches (Today's pit screen). Team management keeps the
+  // schedule; anyone logs our score, which is also saved as a run in the
+  // match log. Writes land in the offline cache first, so this works in the pits.
+  subscribeMatches(cb, onError) {
+    return onSnapshot(matchesCol, (snap) => cb(snap.docs.map(readDoc)), onError);
+  },
+  // A changed label is a new id, so the old doc goes in the same write.
+  saveMatch({ id, ...data }, actor, oldId = null) {
+    const batch = writeBatch(db);
+    if (oldId && oldId !== id) batch.delete(doc(matchesCol, oldId));
+    batch.set(doc(matchesCol, id), { ...data, updatedAt: serverTimestamp(), updatedBy: actor.name }, { merge: true });
+    return batch.commit();
+  },
+  deleteMatch(id) {
+    return deleteDoc(doc(matchesCol, id));
+  },
+  logMatchScore(matchId, run, ours, result, actor) {
+    const batch = writeBatch(db);
+    const runRef = ours.runId ? doc(runsCol, ours.runId) : doc(runsCol);
+    batch.set(
+      runRef,
+      ours.runId
+        ? { ...run, updatedAt: serverTimestamp(), updatedBy: actor.name }
+        : { ...newRunDefaults(run), createdAt: serverTimestamp(), createdBy: actor.name },
+      { merge: true },
+    );
+    batch.update(doc(matchesCol, matchId), {
+      ours: { ...ours, runId: runRef.id },
+      result,
+      updatedAt: serverTimestamp(),
+      updatedBy: actor.name,
+    });
+    return batch.commit();
+  },
+  // The pit's queue countdown started by hand ({ round, at, by }), kept on
+  // the "before queueing" checklist so anyone on the team can set it.
+  setChecklistQueue(id, queue) {
+    return updateDoc(doc(checklistsCol, id), { queue });
+  },
+  // FTC Events API (functions/index.js ftcEvents): { action: 'events' } or
+  // { action: 'sync', event }. Team management only.
+  async ftcEvents(req) {
+    const call = httpsCallable(getFunctions(app, FUNCTIONS_REGION), 'ftcEvents');
+    return (await call(req)).data;
   },
 
   // Chat. A conversation (conv) is a channel id, or 'dm:<id>' for a direct

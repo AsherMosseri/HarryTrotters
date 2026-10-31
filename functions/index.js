@@ -7,6 +7,7 @@ import { setGlobalOptions } from 'firebase-functions/v2';
 import { onDocumentCreated, onDocumentWritten } from 'firebase-functions/v2/firestore';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
+import { defineSecret } from 'firebase-functions/params';
 import { logger } from 'firebase-functions';
 import { initializeApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
@@ -17,6 +18,7 @@ import * as casino from './shared/casino.js';
 import * as arcade from './shared/arcade.js';
 import { blocked, serverGroup } from './shared/commandRules.js';
 import { MANAGER_NAMES, PASSWORD_MIN, cleanName, isManagerName, knownName } from './shared/team.js';
+import { TEAM_NUMBER, fromSchedule, rankOf, scoreOf, seasonOf } from './shared/matches.js';
 
 // Functions run next to the database. The deploy workflow writes location.json
 // from the database's location; nam5 (the US multi-region) pairs with us-central1.
@@ -1311,3 +1313,108 @@ export const drawLottery = onSchedule({ schedule: '0 18 * * 5', timeZone: TIME_Z
     });
   });
 });
+
+// The match schedule from FIRST's FTC Events API (Today's pit screen). Team
+// management only. The key lives in two Firebase secrets, FTC_API_USER (the
+// username it was issued to) and FTC_API_KEY (the authorization key). The
+// deploy workflow fills them in from the GitHub secrets of the same names, or
+// with "unset" until they're added; then this answers { notSetUp }.
+const FTC_API_USER = defineSecret('FTC_API_USER');
+const FTC_API_KEY = defineSecret('FTC_API_KEY');
+const FTC_API = 'https://ftc-api.firstinspires.org/v2.0';
+
+async function ftcGet(path, auth) {
+  let res;
+  try {
+    res = await fetch(`${FTC_API}${path}`, {
+      headers: { Authorization: `Basic ${auth}`, Accept: 'application/json' },
+      signal: AbortSignal.timeout(15000),
+    });
+  } catch (e) {
+    logger.warn('ftc events fetch', path, e?.message);
+    throw new HttpsError('unavailable', 'Couldn’t reach FTC Events. Try again, or type the matches in.');
+  }
+  if (res.status === 401 || res.status === 403)
+    throw new HttpsError('failed-precondition', 'FTC Events turned down the API key. Check FTC_API_USER and FTC_API_KEY.');
+  // An event with no schedule (or no playoffs) yet answers 404 or nothing.
+  if (res.status === 404 || res.status === 204) return null;
+  if (!res.ok) {
+    logger.warn('ftc events', path, res.status);
+    throw new HttpsError('unavailable', `FTC Events answered ${res.status}. Try again in a minute, or type the matches in.`);
+  }
+  return res.json().catch(() => null);
+}
+
+export const ftcEvents = onCall(
+  { maxInstances: 2, invoker: 'public', secrets: [FTC_API_USER, FTC_API_KEY], timeoutSeconds: 60 },
+  async (req) => {
+    const uid = req.auth?.uid;
+    if (!uid) throw new HttpsError('unauthenticated', 'Sign in first.');
+    const member = await db.doc(`members/${uid}`).get();
+    if (!member.exists || member.get('via') !== 'password' || member.get('admin') !== true)
+      throw new HttpsError('permission-denied', 'Only team management can pull the schedule.');
+    const user = (FTC_API_USER.value() || '').trim();
+    const key = (FTC_API_KEY.value() || '').trim();
+    if (!user || !key || user === 'unset' || key === 'unset') return { notSetUp: true };
+    const auth = Buffer.from(`${user}:${key}`).toString('base64');
+    const { action } = req.data || {};
+    const season = Number(req.data?.season) || seasonOf(Date.now());
+
+    // The team's events this season, to pick from.
+    if (action === 'events') {
+      const data = await ftcGet(`/${season}/events?teamNumber=${TEAM_NUMBER}`, auth);
+      const events = (data?.events || []).map((e) => ({
+        code: String(e.code || ''),
+        name: String(e.name || ''),
+        start: String(e.dateStart || '').slice(0, 10),
+        tz: String(e.timezone || ''),
+        city: [e.city, e.stateprov].filter(Boolean).join(', '),
+      }));
+      return { events: events.sort((a, b) => a.start.localeCompare(b.start)) };
+    }
+
+    if (action !== 'sync') throw new HttpsError('invalid-argument', 'Unknown action.');
+    const event = String(req.data?.event || '')
+      .trim()
+      .toUpperCase();
+    if (!/^[A-Z0-9]{2,20}$/.test(event)) throw new HttpsError('invalid-argument', 'Type the event code first (like USNYNYQ1).');
+    const info = (await ftcGet(`/${season}/events?eventCode=${event}`, auth))?.events?.[0];
+    if (!info) return { error: `FTC Events has no event ${event} in the ${season} season. Check the code.` };
+    const tz = String(info.timezone || '') || 'America/New_York';
+    const team = `teamNumber=${TEAM_NUMBER}`;
+    const [qual, playoff, qualScores, playoffScores, rankings] = await Promise.all([
+      ftcGet(`/${season}/schedule/${event}?tournamentLevel=qual&${team}`, auth),
+      ftcGet(`/${season}/schedule/${event}?tournamentLevel=playoff&${team}`, auth),
+      ftcGet(`/${season}/matches/${event}?tournamentLevel=qual&${team}`, auth),
+      ftcGet(`/${season}/matches/${event}?tournamentLevel=playoff&${team}`, auth),
+      ftcGet(`/${season}/rankings/${event}`, auth),
+    ]);
+    const found = [...(qual?.schedule || []), ...(playoff?.schedule || [])].map((e) => fromSchedule(e, event, tz)).filter(Boolean);
+    const scores = new Map(
+      [...(qualScores?.matches || []), ...(playoffScores?.matches || [])]
+        .map(scoreOf)
+        .filter(Boolean)
+        .map((s) => [s.label, s.score]),
+    );
+    // Merged, so what the team added (its own score, the checklist) stays.
+    const existing = new Set((await db.collection('matches').where('event', '==', event).get()).docs.map((d) => d.id));
+    const now = Date.now();
+    const batch = db.batch();
+    for (const { id, ...m } of found) {
+      const score = scores.get(m.label);
+      batch.set(db.doc(`matches/${id}`), { ...m, ...(score ? { score } : {}), syncedAt: now }, { merge: true });
+    }
+    const rank = rankOf(rankings?.rankings);
+    const name = String(info.name || event).slice(0, 120);
+    batch.set(db.doc('settings/team'), { compEvent: { code: event, name, tz }, compRank: rank, compSyncedAt: now }, { merge: true });
+    await batch.commit();
+    return {
+      ok: true,
+      name,
+      count: found.length,
+      added: found.filter((m) => !existing.has(m.id)).length,
+      scored: found.filter((m) => scores.has(m.label)).length,
+      rank,
+    };
+  },
+);

@@ -322,6 +322,20 @@ const PATHS = {
       <path d="M7.5 3.5v13" />
     </>
   ),
+  // The pit screen's number pad.
+  backspace: (
+    <>
+      <path d="M7 4.5h9a1.5 1.5 0 0 1 1.5 1.5v8a1.5 1.5 0 0 1-1.5 1.5H7L2.5 10z" />
+      <path d="m9.5 8 4 4M13.5 8l-4 4" />
+    </>
+  ),
+  // Competition mode: a trophy.
+  trophy: (
+    <>
+      <path d="M6 3.5h8v4a4 4 0 0 1-8 0z" />
+      <path d="M6 5H3.5v1A2.5 2.5 0 0 0 6 8.5M14 5h2.5v1A2.5 2.5 0 0 1 14 8.5M10 11.5V14M7 16.5h6M8 14h4v2.5H8z" />
+    </>
+  ),
 };
 
 export function Icon({ name, size = 18, className = '' }) {

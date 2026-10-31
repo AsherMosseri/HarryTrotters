@@ -5,6 +5,10 @@ export const isDemo = new URLSearchParams(location.search).has('demo');
 // longer exist. Reload once to pick up the new version instead of failing.
 export function reloadOnceForNewVersion() {
   const key = 'reloaded-for-new-version';
+  // Offline (the pits' Wi-Fi dropped), a file fails because there's no
+  // network, not because there's a new version; reloading would leave a blank
+  // page instead of the app that was working.
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return false;
   try {
     if (Date.now() - Number(sessionStorage.getItem(key) || 0) < 60000) return false;
     sessionStorage.setItem(key, String(Date.now()));

@@ -521,6 +521,18 @@ service cloud.firestore {
       allow read, write: if isMember();
     }
 
+    // Competition matches (Today's pit screen). Team management types in the
+    // schedule (the ftcEvents function also writes it); anyone on the team
+    // enters our score after a match.
+    match /matches/{id} {
+      allow read: if isMember();
+      allow create, delete: if isManager();
+      allow update: if isManager() || (isMember()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['ours', 'result', 'updatedAt', 'updatedBy'])
+        && (request.resource.data.get('ours', null) == null || request.resource.data.ours is map)
+        && request.resource.data.get('result', '') in ['', 'win', 'loss', 'tie']);
+    }
+
     // Notifications (the bell). Only the Cloud Functions create them; anyone on
     // the team can mark them read or clear them.
     match /inbox/{person}/items/{id} {

@@ -8,6 +8,7 @@ A live, shared task board for the team — replaces the old Google Sheet task lo
 - **Parts** tab: parts and orders (Needed → Ordered → Arrived) with vendor, quantity, cost, link, and a running total spent; a part can be linked to the task waiting on it.
 - **Checklists** tab: shared competition checklists (robot inspection, pit packing, competition day) that anyone can tick off. Tasks also have their own step checklists.
 - **Match Log** tab: practice runs and competition matches with Auto / TeleOp / Endgame points, a points-per-run chart, and problems (optionally turned into a fix task).
+- **Competition mode**: on the competition day (New York time; `settings/team.competitionDate`, set on the Milestones tab), or when team management switches it on for a scrimmage, Today becomes a pit screen (`src/components/shell/PitScreen.jsx`): the next match with our alliance, partners and a countdown; the “Before queueing” checklist with a queue countdown (from the match time minus the queue lead, or started by hand; ticks reset for each match); the drive team; a number pad that saves our score to the match and as a run in the Match Log; and our schedule. Team management types matches in at the event or pulls them from FTC Events (below). Works offline in the pits (the offline cache).
 - **Recently deleted**: deleting a task moves it here (with Undo) for 30 days; managers can delete for good, and a manager's device purges entries older than 30 days.
 - **Chat** tab (Discord-style): 📣 #announcements (only team management posts; the newest shows as a banner on the board), #general, a channel per subteam, and channels team management adds/renames/reorders. Text formatting (bold, italic, underline, strike, headings, subtext, quotes, lists, code, spoilers) with a formatting bar; @people, @Subteam, and @everyone (team management) mentions; :emoji: shortcodes, a full emoji picker, and team custom emoji; photos, GIFs (GIPHY search when `GIPHY_API_KEY` is set, plus uploads), polls, link previews (made by a Cloud Function) and inline YouTube; reactions, replies, pins, search, editing, and turning a message into a task. Direct messages and group DMs (team management can read them). Profile pictures, statuses, profile cards, who's online, and typing indicators. Per-channel notification settings (All / @mentions / Nothing).
 - **Nitro-style extras**: animated GIF profile pictures, banners, pronouns, about me, display-name fonts and gradient colors, avatar decorations, profile effects (including custom ones made from any emoji, GIPHY GIF, or picture), profile theme colors, super reactions, team stickers, any file up to 25 MB in chat (videos and audio play inline), and per-device app color themes. Options live in `src/nitro.js`.
@@ -56,6 +57,24 @@ The script also sets CORS on the Storage bucket so the Robot tab can download mo
 
 Test locally with the emulators: `npx firebase-tools emulators:start --only firestore,auth,functions`.
 
+### FTC Events API key (match schedule)
+
+The pit screen's **Pull from FTC Events** button runs the `ftcEvents` Cloud Function,
+which reads the team's schedule, scores and ranking from FIRST's FTC Events API
+(team management only). Until a key is set up the button says so, and matches can be
+typed in instead. To set it up:
+
+1. Sign in at <https://ftc-events.firstinspires.org/services/API> and register for API
+   access (free). FIRST emails a **username** and an **authorization key** (it can take a day or so).
+2. On GitHub: the repo → **Settings** → **Secrets and variables** → **Actions** →
+   **New repository secret**. Add `FTC_API_USER` (the username) and `FTC_API_KEY`
+   (the authorization key). Add both; one alone is ignored.
+3. **Actions** → **Deploy rules and notifications** → **Run workflow** (on `main`). The
+   workflow copies the two secrets into Firebase's Secret Manager (as Firebase secrets of
+   the same names) before it deploys the functions. Until both exist it stores `unset`
+   placeholders, so deploys keep working without a key. To change the key later, update the
+   GitHub secrets and run the workflow again.
+
 ## Configuration
 
 - `src/config.js` — Firebase config, roster, statuses, subteams, priorities.
@@ -74,7 +93,8 @@ Test locally with the emulators: `npx firebase-tools emulators:start --only fire
 
 - `milestones/{id}` — `{ title, subteam, owners[], start, end, notes, done }`; tasks link via `milestoneId`.
 - `roles/{personId}` — `{ name, title, grade, subteams[], responsibilities[], removed }` — org chart edits and people the manager added or removed.
-- `settings/team` — `{ competitionDate }`.
+- `settings/team` — `{ competitionDate, compMode: 'auto' | 'on' | 'off', compEvent: { code, name, tz }, queueLead (minutes), driveTeam: { coach, drivers[], human }, compRank, compSyncedAt }`.
+- `matches/{eventCode-label}` — `{ event, label (Q12, P3), level: 'qual' | 'playoff', number, time (ms), alliance: 'red' | 'blue', partners[], opponents[], source: 'typed' | 'api', score: { red, blue } (official, from FTC Events), ours: { auto, teleop, endgame, total, runId, by, at }, result }`. Team management writes the schedule; anyone writes `ours` / `result`. The “Before queueing” checklist also holds the pit's hand-started countdown (`queue: { round, at, by }`) and per-match ticks (`items.*.doneRound`).
 - `parts/{id}` — `{ name, vendor, partNumber, qty, unitCost, url, status, subteam, taskId, notes }`.
 - Task photos live in Cloud Storage at `tasks/{taskId}/{photoId}.jpg` (+ `-thumb.jpg`); the task's `photos` array holds their URLs.
 - `runs/{id}` — `{ date, type, matchNumber, result, drivers[], auto, teleop, endgame, penalties, issues, notes }`.

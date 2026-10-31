@@ -4,6 +4,10 @@ import { Icon } from './icons.jsx';
 import { STATUSES } from '../../config.js';
 import { dueInfo } from '../../util.js';
 import { daysBetween, milestoneProgress, parseDay, todayISO } from '../../milestones.js';
+import { useLocalStorage } from '../../util.js';
+import { teamDay } from '../../../functions/shared/coins.js';
+import { competitionOn } from '../../../functions/shared/matches.js';
+import PitScreen from './PitScreen.jsx';
 
 // The first page, like a pit board: the countdown and the robot up top with a
 // few plain lines on what needs you, then your tasks, what's due, who's at the
@@ -54,6 +58,11 @@ export default function Today({
   tasks,
   milestones,
   competition,
+  settings = {},
+  matches = [],
+  checklists = [],
+  roster = [],
+  api,
   shifts,
   myShift,
   convs,
@@ -71,6 +80,68 @@ export default function Today({
 }) {
   const people = usePeople();
   const today = todayISO();
+  // Competition mode (on the competition day, team time, or switched on by
+  // team management) turns this page into the pit screen. Anyone can step
+  // back to the usual page on their own device for the rest of the day.
+  const compOn = competitionOn(settings.compMode, teamDay(Date.now()), competition.date);
+  const [usualOn, setUsualOn] = useLocalStorage('pit-usual-day', '');
+  const usual = usualOn === teamDay(Date.now());
+  if (compOn && !usual)
+    return (
+      <PitScreen
+        actor={actor}
+        settings={settings}
+        matches={matches}
+        checklists={checklists}
+        roster={roster}
+        competition={competition}
+        api={api}
+        onPerson={onPerson}
+        onUsual={() => setUsualOn(teamDay(Date.now()))}
+      />
+    );
+  return (
+    <UsualToday
+      {...{ actor, tasks, milestones, competition, shifts, myShift, convs, unread, chat, on, onOpenTask, onOpenConv, onPage, onNewTask }}
+      {...{ onStartShift, onOpenShift, onPerson, onEditProfile, people, today }}
+      pitButton={
+        compOn ? (
+          <button className="pit-btn on" onClick={() => setUsualOn('')}>
+            <Icon name="trophy" size={16} /> Pit screen
+          </button>
+        ) : actor.admin && api ? (
+          <button className="pit-btn on" onClick={() => api.saveSettings({ compMode: 'on' })}>
+            <Icon name="trophy" size={16} /> Competition mode
+          </button>
+        ) : null
+      }
+    />
+  );
+}
+
+function UsualToday({
+  actor,
+  tasks,
+  milestones,
+  competition,
+  shifts,
+  myShift,
+  convs,
+  unread,
+  chat,
+  on,
+  onOpenTask,
+  onOpenConv,
+  onPage,
+  onNewTask,
+  onStartShift,
+  onOpenShift,
+  onPerson,
+  onEditProfile,
+  people,
+  today,
+  pitButton,
+}) {
   const all = tasks || [];
   const mine = all
     .filter((t) => t.status !== 'done' && (t.assignees || []).includes(actor.name))
@@ -149,9 +220,9 @@ export default function Today({
               </li>
             ))}
           </ul>
-          {on.includes('shifts') && (
+          {(on.includes('shifts') || pitButton) && (
             <div className="pit-actions">
-              {myShift ? (
+              {!on.includes('shifts') ? null : myShift ? (
                 <button className="pit-btn on" onClick={onOpenShift}>
                   <Icon name="shifts" size={16} /> On shift <span className="mono">{sinceLabel(myShift.start)}</span>
                 </button>
@@ -160,6 +231,7 @@ export default function Today({
                   <Icon name="shifts" size={16} /> Start a shift
                 </button>
               )}
+              {pitButton}
             </div>
           )}
         </div>

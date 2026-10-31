@@ -80,6 +80,7 @@ import { setServerSkew } from '../serverTime.js';
 import { AdBlockWall, GameDialog, PrizeWheel, VideoAd } from './AdGames.jsx';
 import { coinSettings, coinsByName, wallet } from '../coins.js';
 import { hoursOf, mergedMs } from '../../functions/shared/hours.js';
+import { teamDay } from '../../functions/shared/coins.js';
 
 // Versions were renumbered once (2.0 became 1.9, 2.1 became 2.0, and so
 // on). Move this device's "last seen" version along so What's new doesn't
@@ -635,6 +636,10 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
   useEffect(() => store.subscribeResources(setResources, (e) => console.warn('resources', e)), [store]);
   useEffect(() => store.subscribeDiagram('electrical', setDiagram, (e) => console.warn('diagram', e)), [store]);
   useEffect(() => store.subscribeRuns(setRuns, loadFail('the match log')), [store, loadFail]);
+  // Competition matches (Today's pit screen). Quiet on failure: works before
+  // the new rules are published.
+  const [matches, setMatches] = useState([]);
+  useEffect(() => store.subscribeMatches(setMatches, (e) => console.warn('matches', e)), [store]);
   useEffect(() => store.subscribeRobot(setRobot, loadFail('the robot')), [store, loadFail]);
   // Chat extras. Quiet on failure: the board works without them (e.g. before
   // the new rules are published).
@@ -1312,6 +1317,37 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
         }),
       updateRun: (r, patch) => store.updateRun(r.id, patch, actor).catch(fail),
       deleteRun: (r) => store.deleteRun(r.id).catch(fail),
+      // Competition matches. Not awaited by the pit screen: offline, a write
+      // shows at once and reaches the server when the Wi-Fi comes back.
+      saveMatch: (m, oldId) => store.saveMatch(m, actor, oldId).catch(fail),
+      deleteMatch: (m) => store.deleteMatch(m.id).catch(fail),
+      // Our score: on the match, and as a run in the match log.
+      logMatchScore: (match, { auto, teleop, endgame, result, drivers }) => {
+        const run = {
+          date: teamDay(match.time || Date.now()),
+          type: 'match',
+          matchNumber: match.label,
+          result,
+          drivers,
+          auto,
+          teleop,
+          endgame,
+          matchId: match.id,
+          event: match.event || '',
+        };
+        const ours = { auto, teleop, endgame, total: auto + teleop + endgame, runId: match.ours?.runId || null, by: actor.name, at: Date.now() };
+        return store.logMatchScore(match.id, run, ours, result, actor).catch(fail);
+      },
+      setChecklistQueue: (list, queue) => store.setChecklistQueue(list.id, queue).catch(fail),
+      // A tick on the pit's "before queueing" list counts for this round only.
+      tickQueueItem: (list, item, done, round) =>
+        store
+          .patchChecklistItems(list.id, {
+            [item.id]: { done, doneBy: done ? actor.name : '', doneAt: done ? Date.now() : null, doneRound: done ? round : '' },
+          })
+          .catch(fail),
+      // The caller shows what came back (or went wrong) next to the button.
+      ftcEvents: (req) => store.ftcEvents(req),
     }),
     [store, actor, fail, setFilters, renames],
   );
@@ -2163,6 +2199,11 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
                     tasks={tasks}
                     milestones={milestones}
                     competition={{ name: COMPETITION.name, date: competitionDate }}
+                    settings={settings}
+                    matches={matches}
+                    checklists={checklists}
+                    roster={roster}
+                    api={api}
                     shifts={namedShifts}
                     myShift={myShift}
                     convs={convs}
