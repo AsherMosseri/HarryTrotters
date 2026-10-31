@@ -228,7 +228,15 @@ export const firebaseStore = {
   // list, reset. Returns { ok, member } or { error } (or what was asked for).
   async account(data) {
     const call = httpsCallable(getFunctions(app, FUNCTIONS_REGION), 'account');
-    return (await call(data)).data;
+    try {
+      return (await call(data)).data;
+    } catch (e) {
+      // No answer from the server (offline, or the minutes during a deploy
+      // before the account function is up): say so instead of "internal".
+      if (['functions/internal', 'functions/unavailable', 'functions/not-found', 'functions/deadline-exceeded'].includes(e?.code))
+        throw Object.assign(new Error('Can’t reach the server right now. Try again in a minute.'), { code: e.code });
+      throw e;
+    }
   },
   // Asher asked to reset this person's password (they answer with account()).
   subscribeResetRequest(name, cb) {
