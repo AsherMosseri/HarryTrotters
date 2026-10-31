@@ -1238,7 +1238,7 @@ button, [role='button'] { -webkit-user-select: none; user-select: none; -webkit-
 .pm-record:empty { display: none; }
 .pm-record .mono { color: #fff; font-size: 15px; letter-spacing: -0.02em; }
 
-.pm-grid { grid-template-columns: minmax(0, 1.25fr) minmax(280px, 1fr); }
+@media (min-width: 1051px) { .pm-grid { grid-template-columns: minmax(0, 1.25fr) minmax(280px, 1fr); } }
 .pit-sec .sec-head { display: flex; align-items: center; gap: 10px; }
 .pm-count { margin-left: auto; font-size: 14px; font-weight: 600; }
 
@@ -1311,6 +1311,10 @@ button, [role='button'] { -webkit-user-select: none; user-select: none; -webkit-
 .sp-key:active, .qt-btn:active, .qc-item:active { transform: scale(0.97); }
 .sp-foot { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .sp-result button { min-height: 44px; padding: 0 16px; font-size: 15px; }
+.sp-result .plain-seg.on { color: #fff; box-shadow: none; }
+.sp-result .res-win.on { background: var(--st-done); }
+.sp-result .res-loss.on { background: var(--red); }
+.sp-result .res-tie.on { background: var(--muted); }
 .sp-save { min-height: 44px; margin-left: auto; font-size: 15.5px; }
 .sp-saved { margin: 0; display: flex; align-items: center; gap: 6px; color: var(--st-done); font-weight: 650; animation: sp-in 0.2s ease-out; }
 @keyframes sp-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }

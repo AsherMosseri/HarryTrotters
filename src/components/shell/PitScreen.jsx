@@ -236,7 +236,7 @@ function ScorePad({ matches, now, driveTeam, api }) {
         </div>
         <div className="sp-pad" role="group" aria-label={`Number pad for ${PERIODS.find(([k]) => k === field)[1]}`}>
           {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'back', '0', 'next'].map((k) => (
-            <button key={k} className={`sp-key${k.length > 1 ? ' fn' : ''}`} onClick={() => press(k)} aria-label={k === 'back' ? 'Delete' : k === 'next' ? 'Next box' : k}>
+            <button key={k} className={`sp-key${k.length > 1 ? ' fn' : ''}`} onClick={() => press(k)} aria-label={k === 'back' ? 'Erase a digit' : k === 'next' ? 'Next box' : k}>
               {k === 'back' ? <Icon name="backspace" size={24} /> : k === 'next' ? 'Next' : <span className="mono">{k}</span>}
             </button>
           ))}
@@ -252,7 +252,7 @@ function ScorePad({ matches, now, driveTeam, api }) {
                 key={id}
                 role="radio"
                 aria-checked={result === id}
-                className={`plain-seg${result === id ? ' on' : ''}`}
+                className={`plain-seg res-${id}${result === id ? ' on' : ''}`}
                 onClick={() => {
                   setResult(result === id ? '' : id);
                   setSaved('');
@@ -504,7 +504,7 @@ function Setup({ settings, competitionDate, roster, api }) {
       </div>
       <div className="mf-row">
         <label className="mf-field small">
-          <span>Queue (min before)</span>
+          <span>Queue lead (min)</span>
           <input
             className="input mono"
             type="number"
