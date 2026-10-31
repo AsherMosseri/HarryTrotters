@@ -78,12 +78,13 @@ export function LabLogDialog({
   onQuick,
   uploadPhoto,
   uploadVoice,
+  deleteVoice,
 }) {
   const people = usePeople();
   const live = useMemo(() => tasks.filter((t) => !t.deletedAt), [tasks]);
   const byId = useMemo(() => new Map(live.map((t) => [t.id, t])), [live]);
   const start = useMemo(() => (log ? fromLog(log, tasks) : null), []); // eslint-disable-line react-hooks/exhaustive-deps
-  const [areas, setAreas] = useState(() => start?.areas || areasOfSubteams(subteams));
+  const [areas, setAreas] = useState(() => (start?.areas?.length ? start.areas : areasOfSubteams(subteams)));
   // Tasks picked: id → { outcome, blocker }. "Something else" per area: area → { text, outcome, blocker }.
   const [picks, setPicks] = useState(() => start?.picks || {});
   const [others, setOthers] = useState(() => start?.others || {});
@@ -247,7 +248,10 @@ export function LabLogDialog({
     setErr('');
     const list = pickList.map((p) => ({ ...p, outcome: p.outcome || '' }));
     try {
-      await onSave(logFields({ areas, picks: list, note, chips, photos, voice, workedWith }), {
+      const fields = logFields({ areas, picks: list, note, chips, photos, voice, workedWith });
+      // A log from before 3.0 keeps its written blockers unless a task now says what's blocking it.
+      if (!fields.blockers && log?.blockers) fields.blockers = log.blockers;
+      await onSave(fields, {
         done: list.filter((p) => p.task && p.outcome === 'done' && moveDone.has(p.id)).map((p) => p.id),
         blocked: list
           .filter((p) => p.task && p.outcome === 'stuck' && markBlocked.has(p.id))
@@ -617,7 +621,16 @@ export function LabLogDialog({
                     {voice && (
                       <span className="ll-voice-row">
                         <VoicePlayer voice={voice} />
-                        <button type="button" className="icon-btn" aria-label="Remove voice note" onClick={() => setVoice(null)}>
+                        <button
+                          type="button"
+                          className="icon-btn"
+                          aria-label="Remove voice note"
+                          onClick={() => {
+                            // Not saved anywhere yet: remove the file too.
+                            if (voice.url !== log?.voice?.url) deleteVoice?.(voice);
+                            setVoice(null);
+                          }}
+                        >
                           <CloseIcon />
                         </button>
                       </span>
@@ -931,7 +944,7 @@ export function LabDay({ c, onPerson }) {
               </div>
             )}
             {/* Logs from before 3.0 kept blockers and next time as text. */}
-            {l.blockers && !Array.isArray(l.tasks) && (
+            {l.blockers && !items.some((t) => t.blocker) && (
               <div className="lablog-blockers">
                 <b>Blocked:</b> {l.blockers}
               </div>

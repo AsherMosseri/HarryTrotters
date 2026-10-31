@@ -2623,6 +2623,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
                         onQuick={st.mode === 'end' && st.shift ? () => endQuickVisit(st.shift) : null}
                         uploadPhoto={async (f) => store.uploadLabPhoto(await preparePhoto(f))}
                         uploadVoice={(blob, ms) => store.uploadLabVoice(blob, ms, actor)}
+                        deleteVoice={(v) => store.deleteLabVoice?.(v)}
                       />
                     );
                   })()}
