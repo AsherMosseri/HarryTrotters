@@ -514,7 +514,8 @@ function RoundBox({ round, title, actor, api, mine, remember, onGuess, canLock, 
             />
             {hint && (
               <p className="muted small">
-                Closest guess wins <span className="mono">{WIN_COINS}</span> coins (spot on, double). One guess each, hidden until it starts.
+                Closest guess wins <span className="mono">{WIN_COINS}</span> coins (spot on, double). One guess each, hidden until it
+                starts.
               </p>
             )}
           </>

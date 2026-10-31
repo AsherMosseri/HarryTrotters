@@ -170,6 +170,7 @@ export function demoLife({ get, commit, uid }) {
         ? (S().predictions || []).filter((p) => p.kind === 'run' && isLive(p)).sort((a, b) => a.openedAt - b.openedAt)[0]
         : null;
     if (!round || !isLive(round)) return;
+    if (round.kind === 'match' && now < (round.lockAt || 0)) return;
     const score = runTotal(run);
     const r = settle(secrets()[round.id] || {}, score, now);
     const paid = {};

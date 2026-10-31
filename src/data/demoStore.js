@@ -1472,7 +1472,7 @@ export const demoStore = {
       ? (state.runs || []).filter((r) => r.id !== runId).concat({ id: runId, ...newRunDefaults(run), updatedBy: actor.name, createdAt: Date.now() })
       : [...(state.runs || []), { id: runId, ...newRunDefaults(run), createdAt: Date.now(), createdBy: actor.name }];
     state.matches = (state.matches || []).map((m) => (m.id === matchId ? { ...m, ours: { ...ours, runId }, result, updatedBy: actor.name } : m));
-    if (!ours.runId) life.runLogged(state.runs.find((r) => r.id === runId));
+    life.runLogged(state.runs.find((r) => r.id === runId));
     commit();
   },
   async setChecklistQueue(id, queue) {

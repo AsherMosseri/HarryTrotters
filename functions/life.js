@@ -263,6 +263,9 @@ export function lifeFunctions({ db, renamer }) {
     const result = await db.runTransaction(async (tx) => {
       const snap = await tx.get(ref);
       if (!snap.exists || !isLive(snap.data())) return null;
+      // A match's score counts only once the match has started (anyone can
+      // log a run, so a made-up score before the match can't settle it).
+      if (snap.get('kind') === 'match' && loggedAt < (snap.get('lockAt') || 0)) return null;
       const secret = (await tx.get(secretRef(ref.id))).get('guesses') || {};
       const score = runTotal(run);
       const r = settle(secret, score, loggedAt);
@@ -295,11 +298,16 @@ export function lifeFunctions({ db, renamer }) {
     return result;
   }
 
+  // New runs, and a match's run whose score changed (the pit screen fixes a
+  // score by updating the run it logged, so a match still waiting on its
+  // score settles then).
   const onRunLogged = onDocumentWritten('runs/{runId}', async (event) => {
-    if (event.data?.before?.exists || !event.data?.after?.exists) return; // new runs only
+    if (!event.data?.after?.exists) return;
     const run = event.data.after.data();
+    const before = event.data.before?.exists ? event.data.before.data() : null;
+    if (before && !(run.matchId && runTotal(before) !== runTotal(run))) return;
     const now = clock.now();
-    const loggedAt = toMs(run.createdAt) || Date.parse(event.time || '') || now;
+    const loggedAt = (!before && toMs(run.createdAt)) || Date.parse(event.time || '') || now;
     let ref = null;
     if (run.matchId) ref = roundRef(matchRoundId(String(run.matchId)));
     else if ((run.type || 'practice') === 'practice') {
