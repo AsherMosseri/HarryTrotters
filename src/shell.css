@@ -1595,6 +1595,7 @@ button.pm-row:hover { background: color-mix(in srgb, var(--text) 4%, transparent
   }
   .ll-body { padding: 14px 16px 18px; }
   .ll-titles h2 { font-size: 22px; }
+}
 /* ---------- Shifts 3.0: season stats, shift requests and changes, check-in skips, streaks ---------- */
 /* Team this season: three figures, each with this week against last week. */
 .season-strip { margin: -14px 0 30px; }
@@ -1710,16 +1711,18 @@ button.pm-row:hover { background: color-mix(in srgb, var(--text) 4%, transparent
 /* Buttons and taps: things you tap press in a little, and hover colors ease. */
 :root[data-anim~='taps'] :is(
   .btn, .chip, .icon-btn, .text-btn, .link-btn, .seg button, .segmented button, .tabs button, .bottom-nav button,
-  .phone-status, .quick-chip, .reaction, .msg-actions button, .person, .switch, .sb-row, .t-row, .card, .cp-row
+  .phone-status, .quick-chip, .reaction, .msg-actions button, .person, .switch, .sb-row, .t-row, .card, .cp-row,
+  .sp-field, .plain-seg, .mf-color, .ll-same, .ll-outcome, .ll-face, .ll-extra, .ll-area, .ll-task, .ll-offer, .p-row
 ) {
   transition: scale 0.12s ease, translate 0.15s ease, background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
 }
 :root[data-anim~='taps'] :is(
   .btn, .chip, .icon-btn, .text-btn, .link-btn, .seg button, .segmented button, .tabs button, .bottom-nav button,
-  .phone-status, .quick-chip, .reaction, .msg-actions button, .person, .switch
+  .phone-status, .quick-chip, .reaction, .msg-actions button, .person, .switch,
+  .sp-field, .plain-seg, .mf-color, .ll-same, .ll-outcome, .ll-face, .ll-extra, .ll-area
 ):active:not(:disabled) { scale: 0.97; }
 /* Big rows and cards press in less, so they don't look like they shrink. */
-:root[data-anim~='taps'] :is(.sb-row, .t-row, .card, .cp-row):active { scale: 0.985; }
+:root[data-anim~='taps'] :is(.sb-row, .t-row, .card, .cp-row, .ll-task, .ll-offer, .p-row):active { scale: 0.985; }
 @media (hover: hover) {
   :root[data-anim~='taps'] .card:not(.dragging):not(.overlay):hover { translate: 0 -1px; box-shadow: var(--shadow); }
 }

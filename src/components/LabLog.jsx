@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState } from 
 import { AutoTextarea, Avatar, CloseIcon, DisplayName, Overlay, usePeople } from './common.jsx';
 import { Icon } from './shell/icons.jsx';
 import { useEscape } from '../util.js';
+import { animOn, celebrate } from '../motion.js';
 import {
   AREAS,
   MIN_SHIFT,
@@ -176,6 +177,20 @@ export function LabLogDialog({
     setStep(Math.max(0, Math.min(steps.length - 1, to)));
   };
   const canSave = areas.length > 0 || pickList.length > 0;
+  // Page changes: each step slides in from the side you're heading to.
+  const shownStep = useRef(step);
+  useEffect(() => {
+    const dir = Math.sign(step - shownStep.current);
+    shownStep.current = step;
+    if (!dir || !animOn('pages')) return;
+    body.current?.animate(
+      [
+        { opacity: 0, transform: `translateX(${dir * 14}px)` },
+        { opacity: 1, transform: 'none' },
+      ],
+      { duration: 200, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' },
+    );
+  }, [step]);
 
   useEffect(() => {
     body.current?.scrollTo?.(0, 0);
@@ -834,11 +849,17 @@ export function VoicePlayer({ voice }) {
 // After you log: what it adds up to.
 export function LabPayoff({ lines, ended, onClose }) {
   useEscape(onClose);
+  // A little burst from the check mark (Celebrations).
+  const check = useRef(null);
+  useEffect(() => {
+    const t = setTimeout(() => check.current && celebrate({ el: check.current }), 120);
+    return () => clearTimeout(t);
+  }, []);
   return (
     <Overlay>
       <div className="panel-backdrop center ll-backdrop" onClick={onClose}>
         <div className="dialog ll-payoff" role="dialog" aria-label="Logged" onClick={(e) => e.stopPropagation()}>
-          <span className="ll-payoff-check" aria-hidden="true">
+          <span className="ll-payoff-check" aria-hidden="true" ref={check}>
             <Icon name="check" size={30} />
           </span>
           <h2>Logged. Nice work.</h2>

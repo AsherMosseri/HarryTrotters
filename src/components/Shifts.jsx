@@ -11,6 +11,7 @@ import { cleanSkips, nextSchoolDay, scheduledOn } from '../../functions/shared/c
 import { seasonStats, versusLastWeek } from '../../functions/shared/stats.js';
 import { streaksOf } from '../../functions/shared/streaks.js';
 import { confirmDialog } from './Dialogs.jsx';
+import { useFlip } from '../motion.js';
 
 const MIN = 60000;
 const HOUR = 60 * MIN;
@@ -562,6 +563,9 @@ function EditLine({ edit: e, rename, withPerson = true }) {
 // everyone's with Approve / Decline; everyone else sees their own, waiting.
 function ShiftRequests({ requests, shiftsById, isManager, me, rename, api }) {
   const [busy, setBusy] = useState('');
+  // Requests ease in, and the rest close up when one is decided (Moving things).
+  const listRef = useRef(null);
+  useFlip(listRef, requests);
   const mine = (r) => rename(r.person || '') === me;
   const shown = requests
     .filter((r) => (isManager ? r.status === 'pending' : mine(r) && (r.status === 'pending' || r.decidedAt > Date.now() - 3 * 24 * HOUR)))
@@ -578,13 +582,13 @@ function ShiftRequests({ requests, shiftsById, isManager, me, rename, api }) {
         <h2>{isManager ? 'Waiting for approval' : 'Your requests'}</h2>
         <span className="muted small mono">{shown.length}</span>
       </div>
-      <ul className="shift-req-list">
+      <ul className="shift-req-list" ref={listRef}>
         {shown.map((r) => {
           const person = rename(r.person || '');
           const shift = r.kind === 'extend' ? shiftsById.get(r.shiftId) : null;
           const gone = r.kind === 'extend' && !shift;
           return (
-            <li key={r.id}>
+            <li key={r.id} data-flip={r.id}>
               <Avatar name={person} size={26} />
               <div className="grow">
                 <div className="shift-log-top">
