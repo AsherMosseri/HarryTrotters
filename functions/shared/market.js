@@ -230,10 +230,15 @@ export const glows = (extras, m) => {
 export const playLine = (t) => `/${TOURNAMENT_GAMES[t.game]?.cmd || t.game} tournament ${t.id}`;
 
 // ---------- tournaments ----------
-// tournaments/{id}: { game, title, entry, pot, seed, status: 'open'|'done',
-//   opensAt, endsAt, players: { [name]: { joinedAt, best, at } }, winners, by }
-// The fun-games side plays them (same seed for everyone) and saves each
-// player's best; `better` says whether a high or a low score wins.
+// tournaments/{id}: { game, title, entry, pot, status: 'open'|'done',
+//   opensAt, endsAt, players: { [name]: { joinedAt, best, at, voided? } },
+//   review: { [game id]: { name, score, at, why } }, winners, by }
+// The fun-games side plays them and saves each player's best; `better` says
+// whether a high or a low score wins. The seed the games come from is in
+// tournamentSecrets/{id} (server only), never on the doc the team reads.
+// review: runs held for team management (too fast for a person, see
+// funGames.reviewReason); they count only once cleared. voided: team
+// management threw out that player's result ({ by, at }).
 export const TOURNAMENT_GAMES = {
   tetris: { name: 'Tetris', better: 'high', unit: 'points', cmd: 'tetris' },
   minesweeper: { name: 'Minesweeper', better: 'low', unit: 'seconds', cmd: 'minesweep' },
@@ -256,6 +261,7 @@ export function newTournament(form, { by, now = Date.now(), seed }) {
     title: text(form.title, 60) || `${g.name} tournament`,
     entry,
     pot: 0,
+    // Not on the doc the team reads: the server moves it to tournamentSecrets.
     seed: String(seed),
     better: g.better,
     status: 'open',
@@ -280,9 +286,13 @@ export function joinCheck(t, { me, aliases = [me], balance, now = Date.now() }) 
 // Who wins: the pot to the best score (ties split; a leftover coin goes to
 // whoever got there first). Nobody scored: everyone gets the entry back.
 // rename: players keep the name they joined with.
+// A voided result doesn't count (the pot goes to the next best), and a voided
+// player gets no refund.
 export function payoutOf(t, rename = (n) => n) {
   const better = t.better || TOURNAMENT_GAMES[t.game]?.better || 'high';
-  const players = Object.entries(t.players || {}).map(([name, p]) => ({ name: rename(name), ...p }));
+  const players = Object.entries(t.players || {})
+    .filter(([, p]) => !p.voided)
+    .map(([name, p]) => ({ name: rename(name), ...p }));
   const scored = players.filter((p) => Number.isFinite(p.best));
   if (!scored.length) return { winners: [], pays: [], refunds: players.map((p) => ({ name: p.name, amount: t.entry })) };
   const best = better === 'low' ? Math.min(...scored.map((p) => p.best)) : Math.max(...scored.map((p) => p.best));
@@ -298,3 +308,40 @@ export function payoutOf(t, rename = (n) => n) {
   };
 }
 export const prizeLabel = (t) => `Tournament: ${t.title}`.slice(0, 80);
+
+// Results in order, best first (voided ones left out), and the voided names.
+export function standings(t) {
+  const low = (t.better || TOURNAMENT_GAMES[t.game]?.better) === 'low';
+  const players = Object.entries(t.players || {}).map(([name, p]) => ({ name, ...p }));
+  return {
+    ranked: players
+      .filter((p) => !p.voided && Number.isFinite(p.best))
+      .sort((a, b) => (low ? a.best - b.best : b.best - a.best) || (a.at || 0) - (b.at || 0)),
+    voided: players.filter((p) => p.voided),
+  };
+}
+// Runs waiting for team management, oldest first.
+export const pendingReview = (t) =>
+  Object.entries(t.review || {})
+    .map(([id, r]) => ({ id, ...r }))
+    .sort((a, b) => (a.at || 0) - (b.at || 0));
+// The payout waits (up to REVIEW_WAIT after the end) while a run held for
+// review would win or tie if it were cleared, so clearing it still matters.
+export const REVIEW_WAIT = 48 * HOUR;
+export function reviewHolds(t, now = Date.now()) {
+  if (now > t.endsAt + REVIEW_WAIT) return false;
+  const low = (t.better || TOURNAMENT_GAMES[t.game]?.better) === 'low';
+  const top = standings(t).ranked[0]?.best;
+  return pendingReview(t).some(
+    (r) => !t.players?.[r.name]?.voided && Number.isFinite(r.score) && (top == null || (low ? r.score <= top : r.score >= top)),
+  );
+}
+// Clearing a held run: the player's new best and when it was set (or null if
+// it isn't better than what they have).
+export function clearedBest(t, run) {
+  const p = t.players?.[run.name];
+  if (!p || p.voided || !Number.isFinite(run.score)) return null;
+  const low = (t.better || TOURNAMENT_GAMES[t.game]?.better) === 'low';
+  if (p.best != null && !(low ? run.score < p.best : run.score > p.best)) return null;
+  return { best: run.score, at: run.at };
+}

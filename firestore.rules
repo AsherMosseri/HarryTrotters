@@ -211,6 +211,10 @@ service cloud.firestore {
       allow read: if isMember();
       allow write: if false;
     }
+    // A tournament's seed (the pieces and boards come from it): the server only.
+    match /tournamentSecrets/{id} {
+      allow read, write: if false;
+    }
 
     // How many ads each person has seen and tapped (Asher's per-person stats).
     match /adPeople/{id} {

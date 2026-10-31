@@ -9,7 +9,8 @@
 //   joinTournament({ id })         pay the entry, join, add it to the pot
 //   marketManage({ action, … })    team management: approve/decline/redeem a
 //                                  perk, take down a shout-out, start or
-//                                  cancel a tournament
+//                                  cancel a tournament, void a result, clear
+//                                  or void a run held for review
 //   pet({ action, … })             adopt, rename, show in chat, rehome
 // Scheduled: payTournaments (every 10 minutes) pays out the ones that ended.
 // The checks themselves are in shared/market.js and shared/pets.js (demo
@@ -19,7 +20,7 @@ import { randomBytes } from 'node:crypto';
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { logger } from 'firebase-functions';
-import { FieldPath } from 'firebase-admin/firestore';
+import { FieldPath, FieldValue } from 'firebase-admin/firestore';
 import * as market from './shared/market.js';
 import { START_NEED, isSpecies } from './shared/pets.js';
 import { memberOk } from './shared/team.js';
@@ -157,6 +158,8 @@ export function marketFunctions({ db, coinData, freshCoins, notify, bankRef, per
       const t = snap.data();
       const now = Date.now();
       if (!t || t.status !== 'open' || (!cancel && t.endsAt > now)) return null;
+      // A held run that could still win: wait for team management (a while).
+      if (!cancel && market.reviewHolds(t, now)) return null;
       const r = cancel
         ? { winners: [], pays: [], refunds: Object.keys(t.players || {}).map((n) => ({ name: rename(n), amount: t.entry })) }
         : market.payoutOf(t, rename);
@@ -253,10 +256,56 @@ export function marketFunctions({ db, coinData, freshCoins, notify, bankRef, per
     }
 
     if (action === 'createTournament') {
-      const t = market.newTournament(req.data || {}, { by: me, now: Date.now(), seed: randomBytes(6).toString('hex') });
+      const { seed, ...t } = market.newTournament(req.data || {}, { by: me, now: Date.now(), seed: randomBytes(6).toString('hex') });
       if (t.error) return note(t.error);
-      const ref = await db.collection('tournaments').add(t);
+      // The seed goes where only the server reads it.
+      const ref = db.collection('tournaments').doc();
+      const batch = db.batch();
+      batch.set(ref, t);
+      batch.set(db.doc(`tournamentSecrets/${ref.id}`), { seed });
+      await batch.commit();
       return { ok: true, id: ref.id };
+    }
+
+    // Void a player's result: it stops counting. Before the payout the pot
+    // goes to the next best; after it, nothing is taken back (the
+    // tournament just shows who was voided).
+    if (action === 'voidResult') {
+      const ref = db.doc(`tournaments/${id}`);
+      return db.runTransaction(async (tx) => {
+        const t = (await tx.get(ref)).data();
+        const name = String(req.data?.name || '');
+        if (!t || t.cancelled) return note('That tournament is gone.');
+        if (!t.players?.[name]) return note('They’re not in that tournament.');
+        if (t.players[name].voided) return note('Already voided.');
+        const now = Date.now();
+        const patch = [new FieldPath('players', name, 'voided'), { by: me, at: now, afterPayout: t.status === 'done' }];
+        // Their runs waiting for review go too.
+        for (const r of market.pendingReview(t)) if (r.name === name) patch.push(new FieldPath('review', r.id), FieldValue.delete());
+        tx.update(ref, ...patch);
+        return { ok: true };
+      });
+    }
+
+    // A run held for review (too fast for a person): clear it (it counts, if
+    // it's their best) or void it.
+    if (action === 'review') {
+      const ref = db.doc(`tournaments/${id}`);
+      const run = String(req.data?.run || '');
+      if (!/^[\w-]{1,40}$/.test(run)) return note('Which run?');
+      const clear = req.data?.clear === true;
+      return db.runTransaction(async (tx) => {
+        const t = (await tx.get(ref)).data();
+        const r = t?.review?.[run];
+        if (!r) return note('That run was already checked.');
+        const now = Date.now();
+        const patch = [new FieldPath('review', run), FieldValue.delete()];
+        const best = clear && t.status === 'open' ? market.clearedBest(t, r) : null;
+        if (best) patch.push(new FieldPath('players', r.name, 'best'), best.best, new FieldPath('players', r.name, 'at'), best.at);
+        tx.update(ref, ...patch);
+        tx.set(db.doc(`funGames/${run}`), { review: clear ? 'cleared' : 'voided', reviewedBy: me, reviewedAt: now }, { merge: true });
+        return { ok: true, counted: !!best };
+      });
     }
 
     if (action === 'cancelTournament') {

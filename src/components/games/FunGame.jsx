@@ -13,7 +13,8 @@ import MinesPlay, { minesText } from './MinesPlay.jsx';
 // The Tetris and Minesweeper screen (GameHost.jsx opens it). It starts each
 // game on the server (funGame: the seed), plays it here, and sends the moves
 // back; what it shows at the end is what the server checked, including any
-// coins.
+// coins. A Minesweeper tournament is played on the server tap by tap
+// (funGame 'sweep'), so its result is already in when the board ends.
 
 const SPEED_LABEL = { easy: 'Easy', medium: 'Medium', hard: 'Hard' };
 const LEVEL_KEYS = Object.keys(M.LEVELS);
@@ -67,7 +68,13 @@ export default function FunGame({ start, api, actor, roster, isOn, onClose }) {
     setPhase('play');
   };
 
-  const finish = async ({ moves, summary }) => {
+  const finish = async ({ moves, summary, server }) => {
+    if (server) {
+      setResult({ ...server, local: summary });
+      setPhase('done');
+      if (server.won) celebrate();
+      return;
+    }
     setPhase('sending');
     const req = { id: session.id, moves };
     const r =
@@ -330,7 +337,7 @@ function TournamentRow({ t, me, onPlay }) {
   const game = fun.gameOfTour(t);
   const low = fun.betterOf(t) === 'low';
   const ranked = Object.entries(t.players || {})
-    .filter(([, p]) => p.best != null)
+    .filter(([, p]) => p.best != null && !p.voided)
     .sort((a, b) => (low ? a[1].best - b[1].best : b[1].best - a[1].best) || (a[1].at || 0) - (b[1].at || 0));
   const joined = !!t.players?.[me];
   const myBest = t.players?.[me]?.best;
@@ -342,12 +349,13 @@ function TournamentRow({ t, me, onPlay }) {
         <div className="muted small">
           Pot <span className="mono">{t.pot || 0}</span> coins · ends in{' '}
           <span className="mono">{hours >= 48 ? `${Math.round(hours / 24)} days` : `${hours} h`}</span>
-          {joined && (
+          {joined && !t.players[me].voided && (
             <>
               {' '}
               · your best <span className="mono">{fun.tournamentText(game, myBest)}</span>
             </>
           )}
+          {joined && t.players[me].voided && ' · your result was voided'}
         </div>
         {ranked.length > 0 && (
           <ol className="fun-ranks small">
@@ -359,7 +367,7 @@ function TournamentRow({ t, me, onPlay }) {
           </ol>
         )}
       </div>
-      {joined ? (
+      {joined && t.players[me].voided ? null : joined ? (
         <button className="btn primary" onClick={onPlay}>
           <Icon name="play" /> Play
         </button>
@@ -423,9 +431,14 @@ function Play({ game, session, pick, api, actor, onEnd }) {
         onEnd={end}
       />
     );
+  const server = useMemo(
+    () => (session.server ? { send: (from, acts) => api.funGame({ action: 'sweep', id: session.id, from, acts }) } : null),
+    [session, api],
+  );
   return (
     <MinesPlay
       opts={opts}
+      server={server}
       bot={bot}
       other={other}
       onChange={(g) => send({ game, board: minesText(g), score: 0, lines: 0, cells: g.opened, over: g.lost, done: false })}
@@ -439,7 +452,7 @@ function Result({ game, session, pick, result, conv, api, onAgain, onPicker, onC
   const r = result || {};
   const s = r.result || r.local || {};
   const mode = session?.mode;
-  if (r.note)
+  if (r.note && !r.done)
     return (
       <div className="fun-msg">
         <b>{r.note.title}</b>
@@ -463,11 +476,13 @@ function Result({ game, session, pick, result, conv, api, onAgain, onPicker, onC
       : mode === 'race'
         ? 'Sent in'
         : mode === 'tournament'
-          ? r.improved
-            ? 'New best!'
-            : r.score == null
-              ? 'No time this round'
-              : 'Not your best'
+          ? r.held
+            ? 'Waiting for a check'
+            : r.improved
+              ? 'New best!'
+              : r.score == null
+                ? 'No time this round'
+                : 'Not your best'
           : game === 'minesweep'
             ? s.won
               ? 'Cleared!'
@@ -482,7 +497,8 @@ function Result({ game, session, pick, result, conv, api, onAgain, onPicker, onC
   };
   return (
     <div className="fun-result">
-      <div className={`fun-headline${won ? ' won' : ''}`}>{headline}</div>
+      <div className={`fun-headline${won ? ' won' : ''}`}>{r.note ? r.note.title : headline}</div>
+      {r.note?.body && <div className="muted small">{r.note.body}</div>}
       <div className="fun-line">{fun.resultLine(game, mode === 'tournament' ? (game === 'tetris' ? 'ultra' : 'solo') : mode, s)}</div>
       {game === 'tetris' && (mode === 'marathon' || mode === 'ultra' || mode === 'tournament') && (
         <div className="fun-big mono">
@@ -497,6 +513,11 @@ function Result({ game, session, pick, result, conv, api, onAgain, onPicker, onC
           <span>
             Trotbot: <b className="mono">{fun.resultLine(game, 'bot', r.bot)}</b>
           </span>
+        </div>
+      )}
+      {mode === 'tournament' && r.ok && r.held && (
+        <div className="small muted fun-held">
+          This run was faster than a person can play, so team management checks it before it counts.
         </div>
       )}
       {mode === 'tournament' && r.ok && (

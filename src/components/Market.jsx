@@ -6,6 +6,9 @@ import {
   STATUSES,
   TOURNAMENT_GAMES,
   cleanPerk,
+  pendingReview,
+  reviewHolds,
+  standings,
   weekFrom,
 } from '../../functions/shared/market.js';
 import { FULL } from '../../functions/shared/pets.js';
@@ -39,6 +42,12 @@ function timeLeft(ms) {
 }
 const first = (n = '') => n.split(' ')[0];
 const said = (r) => [r?.note?.title, r?.note?.body].filter(Boolean).join(' ');
+// A tournament score: Tetris points, or Minesweeper seconds to clear.
+function scoreText(t, n) {
+  if (t.game !== 'minesweeper') return Number(n).toLocaleString('en-US');
+  const m = Math.floor(n / 60);
+  return m ? `${m}:${(n - m * 60).toFixed(1).padStart(4, '0')}` : `${n.toFixed(1)} s`;
+}
 
 export default function MarketView({ actor, balance, onToast, onPlay, onOpenCoins }) {
   const market = useMarket();
@@ -551,7 +560,7 @@ function GamesShelf({ actor, balance, onToast, onPlay }) {
             </button>
           )}
         </div>
-        <p className="muted small">Pay the entry to play. Everyone plays the same game; when it ends, the best score takes the whole pot (a tie splits it).</p>
+        <p className="muted small">Pay the entry, then play as often as you like until it ends. The best score takes the whole pot (a tie splits it).</p>
         {form && <TournamentForm form={form} setForm={setForm} onToast={onToast} />}
         {open.length ? (
           <ul className="mk-tours">
@@ -570,24 +579,128 @@ function GamesShelf({ actor, balance, onToast, onPlay }) {
           </div>
           <ul className="mk-list">
             {done.map((t) => (
-              <li key={t.id} className="mk-row">
-                <Icon name="trophy" size={20} />
-                <span className="grow">
-                  <b>{t.title}</b>
-                  <span className="muted tiny">
-                    {t.cancelled
-                      ? 'Cancelled, entries refunded'
-                      : t.winners.length
-                        ? `${t.winners.join(' and ')} won ${t.pot} coins`
-                        : 'Nobody played; entries refunded'}
-                  </span>
-                </span>
-              </li>
+              <Finished key={t.id} t={t} actor={actor} onToast={onToast} />
             ))}
           </ul>
         </section>
       )}
     </>
+  );
+}
+
+// A finished tournament: who won, who was voided, and (team management) the
+// results, which can still be voided. Coins already paid stay paid.
+function Finished({ t, actor, onToast }) {
+  const [open, setOpen] = useState(false);
+  const { voided } = standings(t);
+  return (
+    <li className="mk-row mk-done">
+      <Icon name="trophy" size={20} />
+      <span className="grow">
+        <b>{t.title}</b>
+        <span className="muted tiny">
+          {t.cancelled
+            ? 'Cancelled, entries refunded'
+            : t.winners.length
+              ? `${t.winners.join(' and ')} won ${t.pot} coins`
+              : 'Nobody played; entries refunded'}
+        </span>
+        {voided.length > 0 && (
+          <span className="mk-voided tiny">
+            Voided: {voided.map((p) => p.name).join(', ')}
+            {voided.some((p) => p.voided.afterPayout) && ' (after the payout, so no coins were taken back)'}
+          </span>
+        )}
+      </span>
+      {actor.admin && !t.cancelled && Object.keys(t.players || {}).length > 0 && (
+        <button className="link-btn small" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
+          {open ? 'Hide results' : 'Results'}
+        </button>
+      )}
+      {open && <Results t={t} actor={actor} onToast={onToast} all />}
+    </li>
+  );
+}
+
+// The ranked results. Team management can void any of them.
+function Results({ t, actor, onToast, all = false }) {
+  const market = useMarket();
+  const { ranked } = standings(t);
+  const voidOne = async (name) => {
+    const paid = t.status === 'done';
+    const ok = await confirmDialog({
+      title: `Void ${first(name)}’s result?`,
+      body: paid
+        ? 'It stops counting. The coins were already paid, so nothing is taken back; the tournament just shows it was voided.'
+        : 'It stops counting, and any new games they play won’t count either. The pot goes to the next best.',
+      okLabel: 'Void it',
+      danger: true,
+    });
+    if (!ok) return;
+    const r = await market.run('marketManage', { action: 'voidResult', id: t.id, name });
+    onToast(r?.ok ? `${first(name)}’s result is voided.` : said(r) || 'That didn’t go through.');
+  };
+  if (!ranked.length) return null;
+  return (
+    <ol className="mk-scores">
+      {(all || actor.admin ? ranked : ranked.slice(0, 5)).map((p, i) => (
+        <li key={p.name} className={p.name === actor.name ? 'me' : ''}>
+          <span className="mono mk-rank">{i + 1}</span>
+          <Avatar name={p.name} size={22} />
+          <span className="grow">{p.name}</span>
+          <span className="mono">{scoreText(t, p.best)}</span>
+          {actor.admin && (
+            <button className="link-btn small danger mk-void" onClick={() => voidOne(p.name)} aria-label={`Void ${p.name}’s result`}>
+              Void
+            </button>
+          )}
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+// Runs held because they were faster than a person can play: team management
+// clears them (they count) or voids them.
+function Review({ t, onToast }) {
+  const market = useMarket();
+  const runs = pendingReview(t);
+  if (!runs.length) return null;
+  const decide = async (run, clear) => {
+    if (
+      !clear &&
+      !(await confirmDialog({ title: `Void ${first(run.name)}’s run?`, body: 'It won’t count. Their other games still do.', okLabel: 'Void it', danger: true }))
+    )
+      return;
+    const r = await market.run('marketManage', { action: 'review', id: t.id, run: run.id, clear });
+    if (!r?.ok) return onToast(said(r) || 'That didn’t go through.');
+    onToast(clear ? (r.counted ? 'Cleared. It counts now.' : 'Cleared. They already had a better score.') : 'Voided.');
+  };
+  return (
+    <div className="mk-review">
+      <div className="mk-review-head tiny">
+        <Icon name="flag" size={14} /> Needs a check
+      </div>
+      <ul>
+        {runs.map((run) => (
+          <li key={run.id}>
+            <Avatar name={run.name} size={22} />
+            <span className="grow">
+              <span>
+                {run.name} <span className="mono">{scoreText(t, run.score)}</span>
+              </span>
+              <span className="muted tiny">{run.why}</span>
+            </span>
+            <button className="btn small" onClick={() => decide(run, true)}>
+              Clear
+            </button>
+            <button className="link-btn small danger" onClick={() => decide(run, false)}>
+              Void
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -597,8 +710,9 @@ function Tournament({ t, actor, balance, onToast, onPlay }) {
   const g = TOURNAMENT_GAMES[t.game] || { name: t.game, unit: '' };
   const players = Object.entries(t.players || {}).map(([name, p]) => ({ name, ...p }));
   const low = (t.better || g.better) === 'low';
-  const ranked = players.filter((p) => Number.isFinite(p.best)).sort((a, b) => (low ? a.best - b.best : b.best - a.best) || (a.at || 0) - (b.at || 0));
+  const { voided } = standings(t);
   const joined = !!t.players?.[actor.name];
+  const voidedMe = !!t.players?.[actor.name]?.voided;
   const canPlay = !!commandByName[g.cmd];
   const ended = t.endsAt <= market.now;
   const join = async () => {
@@ -615,7 +729,8 @@ function Tournament({ t, actor, balance, onToast, onPlay }) {
         <span className="grow">
           <b>{t.title}</b>
           <span className="muted tiny">
-            {g.name} · {ended ? 'ended, paying out' : `ends in ${timeLeft(t.endsAt - market.now)}`}
+            {g.name} ·{' '}
+            {ended ? (reviewHolds(t, market.now) ? 'ended, waiting on a check' : 'ended, paying out') : `ends in ${timeLeft(t.endsAt - market.now)}`}
           </span>
         </span>
         <span className="mk-pot">
@@ -627,20 +742,13 @@ function Tournament({ t, actor, balance, onToast, onPlay }) {
         Entry <span className="mono">{t.entry}</span> · <span className="mono">{players.length}</span> {players.length === 1 ? 'player' : 'players'} ·{' '}
         {low ? `lowest ${g.unit} wins` : `most ${g.unit} wins`}
       </p>
-      {ranked.length > 0 && (
-        <ol className="mk-scores">
-          {ranked.slice(0, 5).map((p, i) => (
-            <li key={p.name} className={p.name === actor.name ? 'me' : ''}>
-              <span className="mono mk-rank">{i + 1}</span>
-              <Avatar name={p.name} size={22} />
-              <span className="grow">{p.name}</span>
-              <span className="mono">{p.best.toLocaleString()}</span>
-            </li>
-          ))}
-        </ol>
-      )}
+      <Results t={t} actor={actor} onToast={onToast} />
+      {voided.length > 0 && <p className="mk-voided tiny">Voided: {voided.map((p) => p.name).join(', ')}</p>}
+      {actor.admin && <Review t={t} onToast={onToast} />}
       <div className="mk-card-btns">
-        {joined ? (
+        {voidedMe ? (
+          <span className="muted small">Your result was voided.</span>
+        ) : joined ? (
           canPlay ? (
             <button className="btn small primary" onClick={() => onPlay(t)}>
               <Icon name="play" size={15} /> Play

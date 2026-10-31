@@ -6,9 +6,11 @@
 // Two kinds of board:
 //   'classic' (playing alone): mines are placed after your first tap, never
 //     on it or next to it, so the first tap is always safe and opens an area.
-//   'shared' (races, Trotbot, tournaments): everyone gets the same board,
-//     so it can't depend on where someone taps first. It opens itself at the
-//     same spot for everyone (a cell with no mines around it).
+//   'shared' (races, Trotbot): everyone gets the same board, so it can't
+//     depend on where someone taps first. It opens itself at the same spot
+//     for everyone (a cell with no mines around it).
+// Tournaments are 'classic' boards played on the server (serverTurn), so the
+// phone never has the board.
 
 import { seeded } from './rng.js';
 
@@ -178,6 +180,40 @@ export function replay(opts, moves) {
   if (taps > 3 && g.ms < taps * 60) return { error: 'That was faster than anyone can tap.' };
   return summary(g);
 }
+
+// ---------- played on the server (tournaments) ----------
+// A tournament board never leaves the server: the phone sends its taps and
+// gets back only the cells they opened. log: the server's [ms, action, cell]
+// list so far (what replay takes; only taps that did something). acts: the
+// new taps, [[action, cell], …]. ms: the server's clock since the first
+// reveal. Returns the new log, the cells that opened as [cell, number]
+// (-1 for the mine that went off), and once it's over, where the mines were.
+export function serverTurn(opts, log, acts, ms) {
+  const g = newGame(opts);
+  for (let k = 0; k < log.length; k += 3) act(g, log[k + 1], log[k + 2], log[k]);
+  const before = g.state.slice();
+  const out = log.slice();
+  for (const [kind, i] of acts) {
+    if (isDone(g) || out.length >= MAX_ACTIONS * 3) break;
+    if (act(g, kind, i, ms)) out.push(ms, kind, i);
+  }
+  const open = [];
+  for (let i = 0; i < g.w * g.h; i++) if (g.state[i] === OPEN && before[i] !== OPEN) open.push([i, g.numbers[i]]);
+  const done = isDone(g);
+  return {
+    log: out,
+    open,
+    done,
+    won: g.won,
+    lost: g.lost,
+    boom: g.boom,
+    full: out.length >= MAX_ACTIONS * 3,
+    mines: done ? g.mines.flatMap((m, i) => (m ? [i] : [])) : null,
+    game: g,
+  };
+}
+// Every open cell so far, for a phone that missed an answer (see serverTurn).
+export const openCells = (g) => g.state.flatMap((s, i) => (s === OPEN ? [[i, g.numbers[i]]] : []));
 
 // ---------- Trotbot ----------
 

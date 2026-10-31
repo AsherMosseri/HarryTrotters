@@ -2766,3 +2766,23 @@ button.pm-row:hover { background: color-mix(in srgb, var(--text) 4%, transparent
 .join-req-who > span { font-size: 14px; color: var(--muted); }
 .join-req-btns { display: flex; gap: 8px; margin-left: auto; }
 .join-req-btns .btn { min-height: 38px; }
+/* ---------- Tournament fair play (F3): Minesweeper tournament boards on the
+   server, runs held for review, voided results ---------- */
+/* A cell waiting on the server's answer: pressed, no animation (it's back in a moment). */
+.mw-cell.wait { background: var(--mw-open); box-shadow: inset 0 0 0 1px var(--mw-hidden); opacity: 0.6; cursor: progress; }
+.mw-trouble { color: #b45309; font-weight: 600; }
+.fun-held { max-width: 34ch; text-align: center; }
+.mk-scores .mk-void { margin-left: 4px; }
+.mk-voided { color: var(--muted); }
+.mk-tour .mk-voided { margin: 0; }
+.mk-row .mk-voided { display: block; }
+.mk-done .mk-scores { flex-basis: 100%; padding-left: 32px; }
+.mk-review { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border-radius: 10px; background: var(--surface-2); }
+.mk-review-head { display: flex; align-items: center; gap: 6px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #b45309; }
+.mk-review ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.mk-review li { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 14px; }
+.mk-review li .grow { display: flex; flex-direction: column; min-width: 120px; flex: 1; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .mk-review-head, :root:not([data-theme='light']) .mw-trouble { color: #fbbf24; }
+}
+:root[data-theme='dark'] .mk-review-head, :root[data-theme='dark'] .mw-trouble { color: #fbbf24; }

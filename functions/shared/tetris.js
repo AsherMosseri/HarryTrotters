@@ -569,6 +569,33 @@ export function replay(opts, moves, { maxFrames = MAX_FRAMES } = {}) {
   return summary(g);
 }
 
+// The same replay, noting when things happened (the checks on tournament
+// runs in funGames.js use it): the frame each piece locked and whether a
+// hard drop locked it, and the frame of every tap that did something (a
+// turn, a hard drop or a hold: keys that never repeat on their own, unlike a
+// held left/right or soft drop). Call it only on moves replay accepted.
+const TAPS = new Set([IN.cw, IN.ccw, IN.hard, IN.hold]);
+export function timeline(opts, moves) {
+  const g = newGame(opts);
+  const locks = [];
+  const taps = [];
+  let i = 0;
+  while (!isDone(g) && g.frame < MAX_FRAMES) {
+    while (i < moves.length && moves[i] === g.frame && !isDone(g)) {
+      const code = moves[i + 1];
+      const pieces = g.pieces;
+      if (input(g, code) && TAPS.has(code)) taps.push(g.frame);
+      if (g.pieces !== pieces) locks.push({ frame: g.frame, hard: code === IN.hard });
+      i += 2;
+    }
+    if (isDone(g) || (i >= moves.length && g.mode !== 'ultra')) break;
+    const pieces = g.pieces;
+    step(g);
+    if (g.pieces !== pieces) locks.push({ frame: g.frame, hard: false });
+  }
+  return { locks, taps, frames: g.frame };
+}
+
 // ---------- Trotbot ----------
 
 // Trotbot places pieces with the El-Tetris weights (Pierre Dellacherie's
