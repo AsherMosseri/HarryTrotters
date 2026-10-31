@@ -22,6 +22,7 @@ import { TEAM_NUMBER, fromSchedule, rankOf, scoreOf, seasonOf } from './shared/m
 import { asksOn } from './shared/checkin.js';
 import { marketFunctions } from './market.js';
 import { lifeFunctions } from './life.js';
+import { learnFunctions } from './learn.js';
 
 // Functions run next to the database. The deploy workflow writes location.json
 // from the database's location; nam5 (the US multi-region) pairs with us-central1.
@@ -1478,4 +1479,12 @@ export const ftcEvents = onCall(
 export const { claimBingo, bingoSweep, predict, onRunLogged, lockPredictions, onShiftEnded, weeklyRecap, recap } = lifeFunctions({
   db,
   renamer,
+});
+
+// ---------- the educational games and the daily question (functions/learn.js) ----------
+export const { quizNext, quizAnswer, quizProgress, quizReport, autoRun, dailyAnswer, postDailyQuestion } = learnFunctions({
+  db,
+  renamer,
+  personId,
+  timeZone: TIME_ZONE,
 });
