@@ -4,6 +4,8 @@ import { addDays, parseDay, todayISO } from '../milestones.js';
 import { firstName } from '../util.js';
 import { AutoTextarea, Avatar, CloseIcon, Overlay } from './common.jsx';
 import { sameName } from '../../functions/shared/team.js';
+import { teamDay } from '../../functions/shared/coins.js';
+import { cleanSkips, upcomingDays } from '../../functions/shared/checkin.js';
 
 export const SLOTS = [
   { id: 'lunch', label: 'Lunch', icon: '' },
@@ -206,24 +208,33 @@ const clock12 = (hhmm) => {
   const [h, m] = (hhmm || '07:00').split(':').map(Number);
   return `${((h + 11) % 12) + 1}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`;
 };
-// "every weekday at 7:00 AM" / "Mon, Wed, Fri at 3:00 PM"
+// "every school day at 12:00 AM" / "every weekday at 7:00 AM" / "Mon, Wed, Fri at 3:00 PM"
 export function scheduleText(s) {
+  if (s.mode === 'school') return `every school day at ${clock12(s.time)}`;
   const days = [...(s.days || [])].sort();
   const which =
     days.join() === WEEKDAYS.join() ? 'every weekday' : days.length === 7 ? 'every day' : days.map((d) => DAY_NAMES[d]).join(', ');
   return `${which} at ${clock12(s.time)}`;
 }
+const repeatOf = (s) =>
+  !s?.on || s.mode === 'school' ? 'school' : (s.days || []).join() === WEEKDAYS.join() ? 'weekdays' : 'days';
+const chipDay = (d) => parseDay(d).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
 
 // Team management: ask who's going to the lab, once or on a schedule.
-// A schedule (settings.checkinSchedule) is asked by the server at that time
-// (New York time) on those days.
+// A schedule (settings.checkinSchedule, shared/checkin.js) is asked by the
+// server at that time (New York time): every school day (shared/school.js),
+// or on the picked weekdays, except the days picked to skip.
 export function CheckinDialog({ schedule, onDone, onSchedule, onClose }) {
+  const today = teamDay(Date.now());
   const [date, setDate] = useState(todayISO());
   const [question, setQuestion] = useState(schedule?.question || 'Who’s going to the lab today?');
   const [slots, setSlots] = useState(schedule?.slots || ['lunch', 'after']);
-  const [repeat, setRepeat] = useState(!schedule?.on ? 'once' : (schedule.days || []).join() === WEEKDAYS.join() ? 'weekdays' : 'days');
+  const [repeat, setRepeat] = useState(() => (schedule?.on ? repeatOf(schedule) : 'once'));
   const [days, setDays] = useState(schedule?.days || WEEKDAYS);
-  const [time, setTime] = useState(schedule?.time || '07:00');
+  // Every school day is asked at midnight unless changed.
+  const [time, setTime] = useState(schedule?.time || (repeatOf(schedule) === 'school' ? '00:00' : '07:00'));
+  const [skip, setSkip] = useState(() => cleanSkips(schedule?.skip, today));
+  const [moreDays, setMoreDays] = useState(false);
   useEffect(() => {
     const esc = (e) => e.key === 'Escape' && onClose();
     window.addEventListener('keydown', esc);
@@ -231,6 +242,17 @@ export function CheckinDialog({ schedule, onDone, onSchedule, onClose }) {
   }, [onClose]);
   const toggle = (s) =>
     setSlots(slots.includes(s) ? slots.filter((x) => x !== s) : SLOTS.map((x) => x.id).filter((x) => x === s || slots.includes(x)));
+  const draft = {
+    on: true,
+    mode: repeat === 'school' ? 'school' : 'days',
+    days: repeat === 'weekdays' ? WEEKDAYS : days,
+    time,
+    question: question.trim(),
+    slots,
+    skip: cleanSkips(skip, today),
+  };
+  // The next days it would ask on, to tap the ones to skip.
+  const upcoming = repeat === 'once' ? [] : upcomingDays(draft, today, moreDays ? 30 : 10);
   return (
     <Overlay>
       <div className="panel-backdrop center" onClick={onClose}>
@@ -256,6 +278,7 @@ export function CheckinDialog({ schedule, onDone, onSchedule, onClose }) {
             <div className="segmented">
               {[
                 ['once', 'Just once'],
+                ['school', 'Every school day'],
                 ['weekdays', 'Every weekday'],
                 ['days', 'Pick days'],
               ].map(([id, label]) => (
@@ -263,7 +286,11 @@ export function CheckinDialog({ schedule, onDone, onSchedule, onClose }) {
                   key={id}
                   className={`plain-seg${repeat === id ? ' on' : ''}`}
                   aria-pressed={repeat === id}
-                  onClick={() => setRepeat(id)}
+                  onClick={() => {
+                    // Every school day starts out at midnight, so it's waiting when people wake up.
+                    if (id === 'school' && repeat !== 'school') setTime('00:00');
+                    setRepeat(id);
+                  }}
                 >
                   {label}
                 </button>
@@ -299,6 +326,32 @@ export function CheckinDialog({ schedule, onDone, onSchedule, onClose }) {
                   Ask at
                 </label>
                 <input id="ci-time" type="time" className="input" value={time} onChange={(e) => setTime(e.target.value)} />
+                <span className="field-label">Skip</span>
+                <div>
+                  <p className="muted small ci-skip-help">Tap the days not to ask.</p>
+                  <div className="checkin-days ci-skip-days">
+                    {upcoming.map((d) => {
+                      const off = skip.includes(d);
+                      return (
+                        <button
+                          key={d}
+                          className={`chip ci-skip-chip${off ? ' skipped' : ''}`}
+                          aria-pressed={off}
+                          aria-label={`${chipDay(d)}${off ? ', skipped' : ''}`}
+                          onClick={() => setSkip(off ? skip.filter((x) => x !== d) : [...skip, d])}
+                        >
+                          <span className="mono">{chipDay(d)}</span>
+                        </button>
+                      );
+                    })}
+                    {!upcoming.length && <span className="muted small">No days to ask on.</span>}
+                  </div>
+                  {!moreDays && upcoming.length >= 10 && (
+                    <button className="link-btn small" onClick={() => setMoreDays(true)}>
+                      More days
+                    </button>
+                  )}
+                </div>
               </>
             )}
             <span className="field-label">When</span>
@@ -332,9 +385,7 @@ export function CheckinDialog({ schedule, onDone, onSchedule, onClose }) {
               <button
                 className="btn primary"
                 disabled={!slots.length || !question.trim() || !time || (repeat === 'days' && !days.length)}
-                onClick={() =>
-                  onSchedule({ on: true, days: repeat === 'weekdays' ? WEEKDAYS : days, time, question: question.trim(), slots })
-                }
+                onClick={() => onSchedule(draft)}
               >
                 Save schedule
               </button>
