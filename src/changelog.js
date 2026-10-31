@@ -4,6 +4,95 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '3.0',
+    date: '2026-11-02',
+    title: 'Harry Trotters 3.0',
+    // The short list (the update prompt shows these); `sections` is the full list.
+    items: [
+      'A new look in the team colors, with a sidebar on iPad and a Today page that shows what needs you.',
+      'Everyone signs in with their own password. On iPhone and iPad, add the new app to your Home Screen and delete the old one.',
+      'Competition mode: a pit screen with our next match, a queueing checklist and a score pad.',
+      'The lab log, shifts, streaks and the team’s season stats are rebuilt.',
+      'Spend Jackson coins in the new Market: pets, real perks, chat extras and tournaments.',
+      'New Learn page with ten games, a daily question, and Tetris, Minesweeper and Battleship.',
+    ],
+    sections: [
+      {
+        title: 'New look',
+        items: [
+          'The team look in dark navy and white: a sidebar with pages, chat channels and messages on iPad and computers, and a tab bar of Today, Tasks, Chat, Shifts and More on phones.',
+          'The app opens on Today: the competition countdown, the team robot, what needs you (overdue work, who’s at the lab, unread chat), a Start a shift button and your week.',
+          'New app icon: the team horse with 32313. On iPhone and iPad the old Home Screen app shows how to get the new one.',
+          'Clean pages with big titles, line icons instead of emoji on buttons and labels, and numbers in their own typeface. Games, reactions and decorations keep their fun.',
+          'Color themes recolor the whole app, with a matching dark version, and the theme picker shows a preview of each.',
+          'Appearance → Animations: a switch for each kind (Celebrations, Moving things, Page changes, Buttons and taps). Decorations and effects loop smoothly and don’t stutter on iPad.',
+          'The app’s own pop-ups replace the iPhone and iPad system alerts, and the loading screen shows what it’s doing.',
+        ],
+      },
+      {
+        title: 'Signing in and names',
+        items: [
+          'Sign in with your name and your own password; nobody can sign in as someone else. Change it in your menu.',
+          'A new name has to be let in by team management before it can see or do anything. Names already on the team sign in as usual.',
+          'No two people can have the same name, and a rename updates everywhere at once: old messages, polls, lab logs, tasks, shifts and coins.',
+        ],
+      },
+      {
+        title: 'Lab time and shifts',
+        items: [
+          'Lab log: ending a shift asks what you did with big buttons (your areas, your tasks and how each went). Only the first step is required.',
+          'Lab log: tasks you touched today are already picked, Finished and Stuck update the task, and "Same as last time" fills in your last log.',
+          'Lab log: add a photo from the camera or hold to record a voice note, tap who you worked with, and a quick visit is one tap.',
+          'Delete your own shifts or make them shorter; making one longer or adding a missed one goes to team management to approve.',
+          'Streaks for school days and weeks in a row with a shift, and the team’s season (hours, tasks, practice runs, this week against last) on Shifts and Today.',
+          'Lab check-in can be asked every school day, with days to skip and "Not today" / "Not tomorrow" buttons.',
+          'Hours add up the same way everywhere, and overlapping shifts count once.',
+        ],
+      },
+      {
+        title: 'Competition',
+        items: [
+          'On competition day Today turns into a pit screen: our next match, alliance color, partners and a countdown.',
+          'A "Before queueing" checklist with a big countdown for the drive team, and a number pad to enter our score after each match.',
+          'Team management can type in the match schedule or pull it from FTC Events.',
+          'Guess the score before a practice run or match; the closest guess wins coins. Whoever logs the run can’t win it.',
+        ],
+      },
+      {
+        title: 'Jackson coins',
+        items: [
+          'Lab time pays 4 coins an hour, for every full 15 minutes. Nobody earns coins from ads any more.',
+          'Finished tasks pay for up to 5 tasks a day; games, trivia and /daily share a limit of 20 coins a day.',
+          'New Market: pet care, real perks (team management approves each one), chat extras for a day and tournaments.',
+          'Pets: adopt one if you want. It grows with your time at the lab and shows on your profile and next to your name.',
+          'Tournaments: pay the entry and the best Tetris or Minesweeper score wins the pot. Every score is checked by the server.',
+          'Lab bingo on Today each week, and coins for streak milestones.',
+          'Every coin is worked out and checked by the server, so balances match on every device.',
+        ],
+      },
+      {
+        title: 'Learn and games',
+        items: [
+          'New Learn page with ten games: Name that part (with real product photos), Rules check, Strategy, Wiring puzzle, Spot the problem, Fix the bug, Gear ratios, an Auto path planner, and quizzes from the team’s own work.',
+          'Hundreds of checked questions with an explanation (and the rule and page) after every answer. Something wrong? Tap "Report a problem".',
+          'A daily question in #general at 7 AM on school days, with a streak.',
+          'Tetris and Minesweeper: alone, against Trotbot, or race a teammate live. Battleship in #arcade.',
+          '49 new slash commands, like /rule G407, /define, gear math, unit conversions, /hours, /due and /nextmatch.',
+        ],
+      },
+      {
+        title: 'Team and chat',
+        items: [
+          'Every Sunday at 6 PM, Trotbot posts a weekly recap in #general: hours by area, tasks finished, highlights, the top contributor and streaks.',
+          'Read status and notifications carry across your devices.',
+          'Select several messages to delete them at once. Polls can be edited and can take written answers.',
+          'Choose your quick reactions, and super reactions are much bigger.',
+          'Lots of fixes across chat, tasks, the board, Roster, Milestones, Checklists and the Robot viewer.',
+        ],
+      },
+    ],
+  },
+  {
     version: '2.75',
     date: '2026-10-30',
     title: 'Delete several messages',

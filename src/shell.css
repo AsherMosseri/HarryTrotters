@@ -2786,3 +2786,15 @@ button.pm-row:hover { background: color-mix(in srgb, var(--text) 4%, transparent
   :root:not([data-theme='light']) .mk-review-head, :root:not([data-theme='light']) .mw-trouble { color: #fbbf24; }
 }
 :root[data-theme='dark'] .mk-review-head, :root[data-theme='dark'] .mw-trouble { color: #fbbf24; }
+
+/* Version log: a big version (3.0) lists its changes in sections. */
+.version-section h4 {
+  margin: 10px 0 4px;
+  padding: 0 14px 0 34px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.dialog.whats-new .version-section h4 { padding: 0; }

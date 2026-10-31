@@ -3,6 +3,31 @@ import { CHANGELOG } from '../changelog.js';
 import { CloseIcon, Overlay } from './common.jsx';
 import { RequestBox } from './Requests.jsx';
 
+// Every change in a version: its sections' lists when it has them (3.0 does), else its items.
+export const allItems = (v) => (v.sections ? v.sections.flatMap((x) => x.items) : v.items);
+
+function Items({ v }) {
+  if (!v.sections) {
+    return (
+      <ul className="version-items">
+        {v.items.map((it) => (
+          <li key={it}>{it}</li>
+        ))}
+      </ul>
+    );
+  }
+  return v.sections.map((sec) => (
+    <div key={sec.title} className="version-section">
+      <h4>{sec.title}</h4>
+      <ul className="version-items">
+        {sec.items.map((it) => (
+          <li key={it}>{it}</li>
+        ))}
+      </ul>
+    </div>
+  ));
+}
+
 const fmtDate = (iso) => new Date(`${iso}T12:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 
 function useEscape(onClose) {
@@ -21,19 +46,13 @@ function VersionBlock({ v, open, onToggle, current, currentLabel }) {
         <span className="grow">
           <b>{v.title}</b>
           <span className="muted tiny block">
-            {fmtDate(v.date)} · {v.items.length} change{v.items.length === 1 ? '' : 's'}
+            {fmtDate(v.date)} · {allItems(v).length} change{allItems(v).length === 1 ? '' : 's'}
           </span>
         </span>
         {current && <span className="version-current">{currentLabel}</span>}
         <span className="version-chevron">{open ? '▾' : '▸'}</span>
       </button>
-      {open && (
-        <ul className="version-items">
-          {v.items.map((it) => (
-            <li key={it}>{it}</li>
-          ))}
-        </ul>
-      )}
+      {open && <Items v={v} />}
     </section>
   );
 }
@@ -59,7 +78,7 @@ export function VersionLogDialog({ log = CHANGELOG, current, currentLabel = 'Cur
             </button>
           </div>
           <p className="muted small">
-            {log.length} versions, {log.reduce((n, v) => n + v.items.length, 0)} changes since the first board.
+            {log.length} versions, {log.reduce((n, v) => n + allItems(v).length, 0)} changes since the first board.
           </p>
           {log.map((v) => (
             <VersionBlock
@@ -98,11 +117,7 @@ export function WhatsNew({ versions, onClose, onFullLog, onRequest }) {
                 </h3>
               )}
               {versions.length === 1 && <p className="muted">{v.title}</p>}
-              <ul className="version-items">
-                {v.items.map((it) => (
-                  <li key={it}>{it}</li>
-                ))}
-              </ul>
+              <Items v={v} />
             </div>
           ))}
           {onRequest && (
