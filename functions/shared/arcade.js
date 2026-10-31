@@ -64,23 +64,9 @@ export const TIMES = {
   placing: 5 * MINUTE, // to place your Battleship fleet
 };
 export const TRIVIA_PRIZE = 8;
-// Trivia, hangman, and type races are free to play; what they pay is capped
-// per person per day (the team's day), so they can't be farmed.
-export const FREE_DAILY = 100;
-export function capFree(bank, delta, day) {
-  const so = bank.free?.day === day ? bank.free.total || 0 : 0;
-  const paid = Math.max(0, Math.min(delta, FREE_DAILY - so));
-  return { paid, free: { day, total: so + paid } };
-}
-// casino.bankAfter's [delta, entry, extra] for one payment in a game's money
-// list, with free-game winnings capped (day: the team's day, YYYY-MM-DD).
-export function paid(x, bank, day) {
-  if (!x.free) return [x.delta, x.entry, x.extra || {}];
-  const { paid: n, free } = capFree(bank, x.delta, day);
-  const note = n < x.delta ? `+${n}, daily limit reached` : `+${n}`;
-  const entry = x.entry && { ...x.entry, label: `${x.entry.label} (${note})`, shown: n };
-  return [n, entry, { ...(x.extra || {}), free }];
-}
+// Trivia, hangman, and type races are free to play. What they pay are
+// awards (source 'game'), so they share the 20-a-day game limit with the
+// other games and /daily (AWARD_CAPS in coins.js).
 
 const rint = (rng, a, b) => a + Math.floor(rng() * (b - a + 1));
 const pickOf = (rng, list) => list[Math.floor(rng() * list.length)];
@@ -216,172 +202,9 @@ const BEATS = { rock: 'scissors', paper: 'rock', scissors: 'paper' };
 
 // ---------- content ----------
 
-// [question, right answer, wrong, wrong, wrong]
-export const TRIVIA = [
-  ['What does FTC stand for?', 'FIRST Tech Challenge', 'FIRST Team Competition', 'Future Technology Challenge', 'FIRST Tournament Circuit'],
-  [
-    'What does FIRST stand for?',
-    'For Inspiration and Recognition of Science and Technology',
-    'Future Innovators in Robotics, Science, and Technology',
-    'Foundation for Inventors, Robots, Science, and Tools',
-    'For Industry, Research, Science, and Technology',
-  ],
-  ['Who founded FIRST?', 'Dean Kamen', 'Woodie Flowers', 'Steve Wozniak', 'Elon Musk'],
-  ['Who coined the phrase “Gracious Professionalism”?', 'Woodie Flowers', 'Dean Kamen', 'Bill Nye', 'Grace Hopper'],
-  [
-    'How big can an FTC robot be at the start of a match?',
-    '18 × 18 × 18 inches',
-    '12 × 12 × 12 inches',
-    '24 × 24 × 24 inches',
-    '18 × 18 × 24 inches',
-  ],
-  ['How long is the autonomous period in an FTC match?', '30 seconds', '15 seconds', '45 seconds', '1 minute'],
-  ['How long is the driver-controlled period in an FTC match?', '2 minutes', '1 minute', '2 minutes 30 seconds', '3 minutes'],
-  ['How many robots are on the field in an FTC match?', '4', '2', '6', '3'],
-  ['How many teams are on an alliance in a qualification match?', '2', '3', '1', '4'],
-  ['What colors are the two FTC alliances?', 'Red and blue', 'Red and green', 'Blue and yellow', 'Black and white'],
-  ['Which comes first in an FTC match?', 'Autonomous', 'TeleOp', 'Endgame', 'The coin toss'],
-  ['What is the top award in FTC?', 'Inspire Award', 'Think Award', 'Winning Alliance', 'Control Award'],
-  [
-    'What do judges read to learn about your design process?',
-    'The engineering portfolio',
-    'The pit map',
-    'The scouting sheet',
-    'The robot’s code comments',
-  ],
-  ['What does “TeleOp” stand for?', 'Teleoperated', 'Telephone operator', 'Television operation', 'Telemetry operation'],
-  ['What is the robot’s main computer in FTC?', 'REV Control Hub', 'Raspberry Pi', 'Arduino Uno', 'LEGO Spike Hub'],
-  ['Which company makes the Control Hub and Expansion Hub?', 'REV Robotics', 'goBILDA', 'VEX Robotics', 'AndyMark'],
-  ['What voltage is an FTC robot battery?', '12 volts', '9 volts', '24 volts', '5 volts'],
-  ['What can a driver use as the Driver Station?', 'An Android phone or REV Driver Hub', 'An iPad', 'A laptop', 'A game console'],
-  ['What is an “OpMode” in FTC code?', 'A program the robot can run', 'A type of motor', 'A field element', 'A penalty'],
-  ['A LinearOpMode runs its code…', 'Top to bottom, in order', 'In a loop 50 times a second', 'Backwards', 'Only in TeleOp'],
-  ['Most FTC teams using Android Studio write code in…', 'Java', 'Python', 'C++', 'Swift'],
-  ['What FIRST program uses the biggest robots?', 'FIRST Robotics Competition (FRC)', 'FTC', 'FIRST LEGO League', 'VEX IQ'],
-  ['Which FIRST program uses LEGO robots?', 'FIRST LEGO League', 'FTC', 'FRC', 'LEGO Masters'],
-  [
-    'What does “Coopertition” mean?',
-    'Competing hard while still helping others',
-    'Cooperating to fix the field',
-    'A tie match',
-    'Two teams sharing a robot',
-  ],
-  ['When is the new FTC game revealed?', 'At Kickoff, in September', 'In January', 'At the World Championship', 'At the first qualifier'],
-  ['What do mecanum wheels let a robot do?', 'Drive sideways (strafe)', 'Climb stairs', 'Spin faster', 'Drive underwater'],
-  ['What is “strafing”?', 'Moving sideways without turning', 'Spinning in place', 'Driving backwards', 'Lifting the robot'],
-  [
-    'What do “dead wheels” do?',
-    'Unpowered wheels that track position',
-    'Wheels with no tread left',
-    'Spare wheels in the pit',
-    'Wheels that brake',
-  ],
-  [
-    'What does “odometry” do?',
-    'Tracks where the robot is on the field',
-    'Measures the battery',
-    'Counts penalties',
-    'Smooths the joystick',
-  ],
-  ['What are AprilTags used for?', 'Camera markers that help find position', 'Team name tags', 'Wire labels', 'Inspection stickers'],
-  ['What sensor measures how far a motor has turned?', 'An encoder', 'A limit switch', 'A color sensor', 'A potentiometer on the battery'],
-  ['What does IMU stand for?', 'Inertial Measurement Unit', 'Internal Motor Unit', 'Integrated Motion Updater', 'Input Monitoring Utility'],
-  [
-    'What does PID stand for?',
-    'Proportional, Integral, Derivative',
-    'Power, Input, Direction',
-    'Position, Inertia, Distance',
-    'Pulse, Idle, Drive',
-  ],
-  ['What does PWM stand for?', 'Pulse Width Modulation', 'Power With Motors', 'Positive Wire Mode', 'Programmed Wheel Movement'],
-  ['What does a servo do that a regular motor doesn’t?', 'Moves to a set position', 'Spins faster', 'Uses no power', 'Runs backwards'],
-  [
-    'A 20-tooth gear drives a 60-tooth gear. The output turns…',
-    '3× slower with 3× the torque',
-    '3× faster with 3× the torque',
-    '3× faster with less torque',
-    'The same speed',
-  ],
-  ['A 6000 RPM motor through a 20:1 gearbox spins at about…', '300 RPM', '120,000 RPM', '3000 RPM', '60 RPM'],
-  [
-    'Bigger drive wheels (same motor) make a robot…',
-    'Faster, but with less pushing force',
-    'Slower and stronger',
-    'Turn better',
-    'Lighter',
-  ],
-  ['What is torque?', 'Twisting force', 'Top speed', 'Battery charge', 'Weight'],
-  ['Ohm’s law says…', 'V = I × R', 'V = I + R', 'P = I ÷ R', 'R = V × I'],
-  ['What do you use to measure voltage?', 'A multimeter', 'A caliper', 'A protractor', 'A torque wrench'],
-  ['What color wire usually means negative / ground?', 'Black', 'Red', 'Yellow', 'Green'],
-  ['How many sides does a hex shaft have?', '6', '4', '5', '8'],
-  ['What screw size does goBILDA use?', 'M4', 'M3', '#10-32', '1/4-20'],
-  ['What is blue threadlocker for?', 'Keeping screws from vibrating loose', 'Gluing plastic', 'Insulating wires', 'Greasing gears'],
-  ['How many millimeters are in an inch?', '25.4', '10', '2.54', '30'],
-  ['What does CAD stand for?', 'Computer-Aided Design', 'Code And Debug', 'Center Axis Drive', 'Computer Assembly Diagram'],
-  ['What’s a bill of materials?', 'A list of every part you need', 'The team’s budget', 'The robot’s weight', 'A shipping receipt'],
-  ['What does LED stand for?', 'Light-emitting diode', 'Low-energy display', 'Lit electric device', 'Light energy driver'],
-  ['How many bits are in a byte?', '8', '4', '16', '10'],
-  ['What is 5 in binary?', '101', '110', '111', '100'],
-  ['In Java, which keyword means a variable can’t change?', 'final', 'static', 'const', 'fixed'],
-  ['Which of Newton’s laws is “every action has an equal and opposite reaction”?', 'The third', 'The first', 'The second', 'The fourth'],
-  ['What is a pull request?', 'Asking to merge your code changes', 'A rope for the robot', 'A request for parts', 'A penalty call'],
-  ['What unit is torque measured in (metric)?', 'Newton-meters', 'Watts', 'Volts', 'Newtons per second'],
-];
-
-// [word or phrase, hint]
-export const WORDS = [
-  ['MECANUM', 'Drivetrain'],
-  ['ODOMETRY', 'Programming'],
-  ['ENCODER', 'Sensor'],
-  ['SERVO', 'Part'],
-  ['GEARBOX', 'Part'],
-  ['DRIVETRAIN', 'Robot'],
-  ['INTAKE', 'Robot'],
-  ['AUTONOMOUS', 'Match'],
-  ['ALLIANCE', 'Match'],
-  ['INSPECTION', 'Competition'],
-  ['PORTFOLIO', 'Judging'],
-  ['KICKOFF', 'Season'],
-  ['TORQUE', 'Physics'],
-  ['VOLTAGE', 'Electrical'],
-  ['MULTIMETER', 'Tool'],
-  ['SOLDERING', 'Electrical'],
-  ['CHAMFER', 'CAD'],
-  ['EXTRUSION', 'Build'],
-  ['BEARING', 'Part'],
-  ['SPROCKET', 'Part'],
-  ['PULLEY', 'Part'],
-  ['CHASSIS', 'Robot'],
-  ['GYROSCOPE', 'Sensor'],
-  ['TELEMETRY', 'Programming'],
-  ['ITERATION', 'Design'],
-  ['PROTOTYPE', 'Design'],
-  ['SCOUTING', 'Competition'],
-  ['QUALIFIER', 'Competition'],
-  ['SPONSOR', 'Outreach'],
-  ['OUTREACH', 'Team'],
-  ['ZIP TIE', 'The answer to everything'],
-  ['HEX KEY', 'Tool'],
-  ['HOT GLUE', 'Last resort'],
-  ['CONTROL HUB', 'Electrical'],
-  ['DRIVER STATION', 'Match'],
-  ['GRACIOUS PROFESSIONALISM', 'FIRST'],
-  ['INSPIRE AWARD', 'Judging'],
-  ['LINEAR SLIDE', 'Mechanism'],
-  ['FOUR BAR', 'Mechanism'],
-  ['GEAR RATIO', 'Physics'],
-  ['PID LOOP', 'Programming'],
-  ['ANDROID STUDIO', 'Programming'],
-  ['FIELD RESET', 'Competition'],
-  ['PIT MAP', 'Competition'],
-  ['ENGINEERING NOTEBOOK', 'Judging'],
-  ['THREADLOCKER', 'Build'],
-  ['CALIPERS', 'Tool'],
-  ['ALUMINUM', 'Material'],
-  ['POLYCARBONATE', 'Material'],
-  ['BATTERY', 'Electrical'],
-];
+// Trivia questions and hangman words come in with start()'s `content`: the
+// server's are in functions/banks/arcade.js (never in the app), demo mode's
+// in src/data/demoStore.js.
 
 export const SENTENCES = [
   'The robot fits in the sizing box if everyone breathes in at the same time.',
@@ -442,8 +265,12 @@ const cooldownLeft = (bank, game, now) => Math.max(0, (bank.cooldowns?.[game] ||
 
 // ---------- starting ----------
 
-// ctx: { me, words, roster, balance, bank, now, rng }
-export function start(game, { me, words = [], roster = [], balance = 0, bank = {}, now = Date.now(), rng = Math.random }) {
+// ctx: { me, words, roster, balance, bank, now, rng, content }. content:
+// { trivia, words }, the questions and hangman words to pick from.
+export function start(
+  game,
+  { me, words = [], roster = [], balance = 0, bank = {}, now = Date.now(), rng = Math.random, content = {} },
+) {
   if (CHALLENGES.includes(game)) {
     // A Minesweeper race's board size: "/minesweep @Cooper expert 10".
     const level = game === 'minesweep' ? words.map((w) => w.toLowerCase()).find((w) => LEVELS[w]) || 'beginner' : '';
@@ -485,7 +312,8 @@ export function start(game, { me, words = [], roster = [], balance = 0, bank = {
   if (left) return { error: `Give it a minute: you can start another in ${Math.ceil(left / 1000)} seconds.` };
   const cool = [{ name: me, delta: 0, entry: null, extra: { cooldowns: { ...bank.cooldowns, [game]: now } } }];
   if (game === 'trivia') {
-    const [q, right, ...wrong] = pickOf(rng, TRIVIA);
+    if (!content.trivia?.length) return { error: 'No trivia questions here.' };
+    const [q, right, ...wrong] = pickOf(rng, content.trivia);
     const choices = shuffle(rng, [right, ...wrong]);
     return {
       pub: { status: 'playing', q, choices, tried: {}, endsAt: now + TIMES.trivia, prize: TRIVIA_PRIZE },
@@ -495,7 +323,8 @@ export function start(game, { me, words = [], roster = [], balance = 0, bank = {
     };
   }
   if (game === 'hangman') {
-    const [word, hint] = pickOf(rng, WORDS);
+    if (!content.words?.length) return { error: 'No hangman words here.' };
+    const [word, hint] = pickOf(rng, content.words);
     return {
       pub: { status: 'playing', hint, mask: maskOf(word, []), guessed: [], misses: 0, found: {}, length: word.replace(/ /g, '').length },
       secret: { word },
@@ -716,9 +545,7 @@ export function move(game, { pub, secret = {}, me, move: mv, balance = 0, now = 
   if (game === 'trivia') {
     const reveal = (winner) => {
       Object.assign(p, { status: 'done', answer: s.answer, winner: winner || '' });
-      return out(
-        winner ? [{ name: winner, delta: p.prize, free: true, entry: { icon: ICON.trivia, label: 'Trivia: right answer' } }] : [],
-      );
+      return out([], winner ? [{ person: winner, amount: p.prize, label: 'Trivia: right answer' }] : []);
     };
     if (m === 'peek') return now >= p.endsAt ? reveal('') : nothing;
     if (now >= p.endsAt) return reveal('');
@@ -734,17 +561,14 @@ export function move(game, { pub, secret = {}, me, move: mv, balance = 0, now = 
     const word = s.word;
     const finish = (won, solver) => {
       const found = p.found;
-      const money = [];
+      const awards = [];
       if (won) {
-        for (const [name, n] of Object.entries(found)) {
-          const amount = 2 * n + (name === solver ? 5 : 0);
-          money.push({ name, delta: amount, free: true, entry: { icon: ICON.hangman, label: `Hangman: ${word}` } });
-        }
-        if (solver && !found[solver])
-          money.push({ name: solver, delta: 5, free: true, entry: { icon: ICON.hangman, label: `Hangman: solved ${word}` } });
+        for (const [name, n] of Object.entries(found))
+          awards.push({ person: name, amount: 2 * n + (name === solver ? 5 : 0), label: `Hangman: ${word}` });
+        if (solver && !found[solver]) awards.push({ person: solver, amount: 5, label: `Hangman: solved ${word}` });
       }
       Object.assign(p, { status: 'done', won, word, solver: solver || '' });
-      return out(money);
+      return out([], awards);
     };
     if (m.startsWith('solve:')) {
       const guess = normalize(m.slice(6)).toUpperCase();
@@ -781,18 +605,7 @@ export function move(game, { pub, secret = {}, me, move: mv, balance = 0, now = 
       const paid = results.length >= 2;
       const prize = 10 + 2 * (results.length - 1);
       Object.assign(p, { status: 'done', results, winner: results[0]?.name || '', prize: paid ? prize : 0 });
-      return out(
-        paid
-          ? [
-              {
-                name: results[0].name,
-                delta: prize,
-                free: true,
-                entry: { icon: ICON.typerace, label: `Type race: 1st of ${results.length}` },
-              },
-            ]
-          : [],
-      );
+      return out([], paid ? [{ person: results[0].name, amount: prize, label: `Type race: 1st of ${results.length}` }] : []);
     };
     if (p.status === 'open') {
       if (now < p.startAt) return m === 'peek' ? nothing : { error: 'Wait for GO.' };

@@ -9,7 +9,7 @@
 // server through awardCoins, source 'bingo'). The app and the server use this
 // same file; only the server's answer pays.
 
-import { teamDay, teamMidnight } from './coins.js';
+import { nextMidnight, teamDay, teamMidnight } from './coins.js';
 import { addDay, weekStart } from './streaks.js';
 import { mergedMs, HOUR } from './hours.js';
 import { nameKey } from './team.js';
@@ -27,6 +27,22 @@ const TEST_CHIPS = ['coding-test', 'mech-tested', 'elec-tested', 'asm-fit'];
 const FORWARD = ['done', 'progress', 'started'];
 
 const days = (list, at) => new Set(list.map((x) => teamDay(at(x))));
+
+// The team days someone was at the lab: every day one of their shifts
+// touches (a shift past midnight counts for both days).
+function labDays(shifts, now) {
+  const out = new Set();
+  for (const s of shifts) {
+    const end = Math.max(s.start, s.end ?? now);
+    for (let day = teamDay(s.start), i = 0; i < 60; i++) {
+      out.add(day);
+      const next = nextMidnight(day);
+      if (end <= next) break;
+      day = teamDay(next);
+    }
+  }
+  return out;
+}
 const logsWithChip = (ctx, ids) => ctx.logs.some((l) => (l.chips || []).some((c) => ids.includes(c)));
 
 // Tasks this person finished this week: assigned tasks marked done this week,
@@ -177,7 +193,11 @@ export function bingoCard(me, data, { week, now = Date.now() } = {}) {
   const to = teamMidnight(addDay(w, 7));
   const inWeek = (ms) => ms >= from && ms < to;
   const myLogs = (data.logs || []).filter((l) => l.person === me);
-  const shifts = (data.shifts || []).filter((s) => s.person === me && Number.isFinite(s.start) && inWeek(s.start));
+  const myShifts = (data.shifts || []).filter((s) => s.person === me && Number.isFinite(s.start));
+  const shifts = myShifts.filter((s) => inWeek(s.start));
+  // Lab logs (and their photos, voice notes…) count only on days this person
+  // had a shift, so the log squares can't be filled in from home.
+  const atLab = labDays(myShifts, now);
   const ctx = {
     me,
     now,
@@ -185,7 +205,7 @@ export function bingoCard(me, data, { week, now = Date.now() } = {}) {
     to,
     shifts,
     ms: mergedMs(shifts, Math.min(now, to)),
-    logs: myLogs.filter((l) => l.day >= w && l.day < addDay(w, 7)),
+    logs: myLogs.filter((l) => l.day >= w && l.day < addDay(w, 7) && atLab.has(l.day)),
     workedBefore: new Set(myLogs.filter((l) => l.day < w).flatMap((l) => l.workedWith || [])),
     tasks: data.tasks || [],
     runs: (data.runs || []).filter((r) => r.date >= w && r.date < addDay(w, 7)),

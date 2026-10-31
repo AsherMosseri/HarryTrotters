@@ -264,9 +264,28 @@ export function lifeFunctions({ db, renamer }) {
     throw new HttpsError('invalid-argument', 'Unknown action.');
   });
 
+  // Who logged a run (or changed it), under current names. The rules stamp
+  // createdByUid / updatedByUid with the writing device, so nobody can put
+  // it on someone else, and a rename doesn't matter. Runs written without
+  // them (from before, or by the server) fall back to the names saved on them.
+  async function loggersOf(run, rename) {
+    const names = new Set();
+    for (const uid of new Set([run.createdByUid, run.updatedByUid].filter((u) => typeof u === 'string' && u))) {
+      const name = (await db.doc(`members/${uid}`).get()).get('name');
+      if (name) names.add(rename(name));
+    }
+    if (!run.createdByUid && run.createdBy) names.add(rename(run.createdBy));
+    if (!run.updatedByUid && run.updatedBy) names.add(rename(run.updatedBy));
+    return names;
+  }
+
   // A run was logged: the round it belongs to (its match's, or the oldest
   // open practice round) gets its score, and the closest guess is paid.
+  // Whoever logged it can't win it (they could type in a score to match
+  // their guess): the closest of everyone else's guesses wins.
   async function settleRound(ref, run, runId, loggedAt, now) {
+    const rename = await renamer();
+    const loggers = await loggersOf(run, rename);
     const result = await db.runTransaction(async (tx) => {
       const snap = await tx.get(ref);
       if (!snap.exists || !isLive(snap.data())) return null;
@@ -275,20 +294,21 @@ export function lifeFunctions({ db, renamer }) {
       if (snap.get('kind') === 'match' && loggedAt < (snap.get('lockAt') || 0)) return null;
       const secret = (await tx.get(secretRef(ref.id))).get('guesses') || {};
       const score = runTotal(run);
-      const r = settle(secret, score, loggedAt);
+      const out = Object.keys(secret).filter((n) => loggers.has(rename(n)));
+      const r = settle(secret, score, loggedAt, out);
       tx.update(ref, {
         status: 'done',
         runId,
         score,
         guesses: r.guesses,
         winners: r.winners,
+        loggedBy: [...new Set([...loggers, ...out])],
         lockedAt: snap.get('lockedAt') || loggedAt,
         settledAt: now,
       });
       return r;
     });
     if (!result || !result.winners.length) return result;
-    const rename = await renamer();
     const paid = {};
     if (!(await coinsOff()))
       for (const name of result.winners) {

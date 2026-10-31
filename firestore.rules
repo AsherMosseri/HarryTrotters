@@ -716,8 +716,15 @@ service cloud.firestore {
     }
 
     // Practice and match log: anyone on the team.
+    // Who logged a run, and who last changed it, by device (rename-safe): the
+    // score predictions leave them out of that round (functions/life.js).
     match /runs/{id} {
-      allow read, write: if isMember();
+      allow read, delete: if isMember();
+      allow create: if isMember()
+        && request.resource.data.get('createdByUid', request.resource.data.get('updatedByUid', '')) == request.auth.uid;
+      allow update: if isMember()
+        && request.resource.data.get('createdByUid', null) == resource.data.get('createdByUid', null)
+        && request.resource.data.get('updatedByUid', '') == request.auth.uid;
     }
 
     // Score predictions (functions/life.js predict): the team sees each round,

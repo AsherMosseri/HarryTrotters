@@ -4,8 +4,9 @@
 // bonuses are entries in the coins ledger (Firestore "coins").
 //
 // Earning: perTask for each task you were assigned that's done, if someone
-// else created it (no paying yourself for tasks you made up); perQuarter for
-// every full 15 minutes at the lab (4 an hour), at most dayCap hours a day.
+// else created it (no paying yourself for tasks you made up), for at most
+// tasksPerDay of them a team day; perQuarter for every full 15 minutes at the
+// lab (4 an hour), at most dayCap hours a day.
 // Everything since `start`.
 // Nobody earns coins from ads (views and taps are still counted for the ads
 // dashboard; they just don't pay).
@@ -14,6 +15,9 @@ import { mergedMs } from './hours.js';
 
 export const COIN_DEFAULTS = {
   perTask: 15,
+  // Finished tasks that pay in one team day (Asher's call after the coin
+  // audit: friends could make tasks for each other and farm them).
+  tasksPerDay: 5,
   // Coins for each full 15 minutes at the lab. It replaced perHour (5 an
   // hour), so an old perHour saved in settings/team.coins is ignored.
   perQuarter: 1,
@@ -32,7 +36,7 @@ export const AWARD_CAPS = {
   bingo: 25, // lab bingo rows
   predict: 20, // score predictions
   streak: 20, // streak milestones
-  game: 20, // fun games (Tetris, Minesweeper, Battleship…)
+  game: 20, // fun games (Tetris, Minesweeper, Battleship…), free #arcade prizes and /daily, together
 };
 
 export function coinSettings(raw) {
@@ -92,11 +96,33 @@ const toMs = (v) => (v && typeof v.toMillis === 'function' ? v.toMillis() : type
 export function earnedItems(name, { tasks = [], shifts = [], cfg, now = Date.now() }) {
   const from = startMs(cfg);
   const items = [];
+  // Tasks pay for the first tasksPerDay finished each team day, in the order
+  // they were finished (then by id), so the same ones always count, here and
+  // on the server. Later ones still show, at 0. Moving a task out of Done and
+  // back gives it a new finish time, so it lines up again behind the others.
+  const done = [];
   for (const t of tasks) {
-    if (t.status !== 'done' || !(t.assignees || []).includes(name) || t.createdBy === name) continue;
+    if (t.status !== 'done' || t.deletedAt || !(t.assignees || []).includes(name) || t.createdBy === name) continue;
     const at = toMs(t.completedAt) || toMs(t.updatedAt) || toMs(t.createdAt);
     if (at < from) continue;
-    items.push({ kind: 'task', at, amount: cfg.perTask, icon: '✅', label: t.title || 'A task' });
+    done.push({ t, at });
+  }
+  done.sort((a, b) => a.at - b.at || String(a.t.id || '').localeCompare(String(b.t.id || '')));
+  const perDay = new Map();
+  for (const { t, at } of done) {
+    const day = teamDay(at);
+    const n = (perDay.get(day) || 0) + 1;
+    perDay.set(day, n);
+    const cap = cfg.tasksPerDay ?? COIN_DEFAULTS.tasksPerDay;
+    const over = n > cap;
+    items.push({
+      kind: 'task',
+      at,
+      amount: over ? 0 : cfg.perTask,
+      icon: '✅',
+      label: t.title || 'A task',
+      ...(over && { note: `Daily task limit (${cap} a day)` }),
+    });
   }
   // Lab time, added up per day (overlapping shifts count once), capped, and
   // paid per full 15 minutes of the day (coinsForMinutes). A shift that runs

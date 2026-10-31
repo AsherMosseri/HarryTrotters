@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Avatar } from '../common.jsx';
 import { BOT, C4_COLS, C4_ROWS, RACES, RPS, TIMES, isLive } from '../../../functions/shared/arcade.js';
+import { AWARD_CAPS } from '../../../functions/shared/coins.js';
 import { serverNow } from '../../serverTime.js';
 import { Battleship, FunShare, RaceCard } from './FunCards.jsx';
 
@@ -10,6 +11,18 @@ import { Battleship, FunShare, RaceCard } from './FunCards.jsx';
 
 export const ARCADE_CARDS = ['rps', 'tictactoe', 'connect4', 'duel', 'trivia', 'hangman', 'typerace', 'heist', 'battleship', 'tetris', 'minesweep'];
 const coins = (n) => `${n} 🪙`;
+
+// Prizes the daily game limit cut short (the server puts what it paid in g.paid).
+function LimitLine({ g, me }) {
+  const cut = Object.entries(g.paid || {});
+  if (!cut.length) return null;
+  const who = cut.map(([n, k]) => `${n === me ? 'you' : n.split(' ')[0]} got ${k}`).join(' · ');
+  return (
+    <div className="muted tiny">
+      Daily limit reached ({who}): game prizes and /daily pay up to {AWARD_CAPS.game} coins a day.
+    </div>
+  );
+}
 const secs = (ms) => Math.max(0, Math.ceil(ms / 1000));
 const clock = (ms) => {
   const s = secs(ms);
@@ -333,11 +346,12 @@ function Trivia({ g, me, act, Name, now }) {
       {!live &&
         (g.winner ? (
           <div className="arc-result win">
-            🧠 <Who name={g.winner} Name={Name} /> got it! +{coins(g.prize)}
+            🧠 <Who name={g.winner} Name={Name} /> got it! +{coins(g.paid?.[g.winner] ?? g.prize)}
           </div>
         ) : (
           <div className="arc-result">⏰ Time’s up. It was {'ABCD'[g.answer]}.</div>
         ))}
+      {!live && <LimitLine g={g} me={me} />}
     </div>
   );
 }
@@ -432,6 +446,7 @@ function Hangman({ g, me, act, Name }) {
         ) : (
           <div className="arc-result">💀 Out of guesses. It was {word}.</div>
         ))}
+      {!live && <LimitLine g={g} me={me} />}
       {Object.keys(g.found || {}).length > 0 && (
         <div className="muted tiny">
           Found:{' '}
@@ -520,13 +535,14 @@ function TypeRace({ g, me, act, Name, now }) {
       {g.status === 'done' &&
         (g.prize ? (
           <div className="arc-result win">
-            🏁 <Who name={g.winner} Name={Name} /> wins {coins(g.prize)}
+            🏁 <Who name={g.winner} Name={Name} /> wins {coins(g.paid?.[g.winner] ?? g.prize)}
           </div>
         ) : (
           <div className="muted small">
             {g.results.length ? 'Only one racer, so no prize. Race someone next time!' : 'Nobody finished.'}
           </div>
         ))}
+      {g.status === 'done' && <LimitLine g={g} me={me} />}
     </div>
   );
 }
