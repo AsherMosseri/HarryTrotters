@@ -4,6 +4,7 @@ import { Icon } from './shell/icons.jsx';
 import { alertDialog, confirmDialog } from './Dialogs.jsx';
 import { useEscape, useLocalStorage } from '../util.js';
 import { animOn, celebrate } from '../motion.js';
+import { isOnline } from '../connection.js';
 import { FULL_COINS, LINE_COINS, SIZE } from '../../functions/shared/bingo.js';
 import { streakShout } from '../../functions/shared/recap.js';
 import { MAX_SCORE, MIN_GUESSERS, WIN_COINS, isLive, matchRoundId, winnerLine } from '../../functions/shared/predict.js';
@@ -324,7 +325,7 @@ export function BingoCard({ actor, api, sig }) {
           </span>
         </button>
       ) : (
-        <p className="today-empty">{err ? 'Couldn’t load this week’s card.' : 'Getting this week’s card…'}</p>
+        <p className="today-empty">{err ? (isOnline() ? 'Couldn’t load this week’s card.' : 'Needs internet to load this week’s card.') : 'Getting this week’s card…'}</p>
       )}
       {open && card && <BingoDialog card={card} onClose={() => setOpen(false)} onOpen={ask} />}
     </section>

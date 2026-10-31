@@ -7,6 +7,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { activeExtras } from '../functions/shared/market.js';
 import { petState } from '../functions/shared/pets.js';
 import { celebrate } from './motion.js';
+import { noteFor } from './connection.js';
 
 export const MarketContext = createContext(null);
 export const useMarket = () => useContext(MarketContext);
@@ -92,7 +93,7 @@ export function useMarketData(store, { actor, rename, shifts, balanceOf, coinsOn
       try {
         return await store.market(fn, data, actor, { balanceOf: (n) => balanceRef.current(n), coinsOff: !coinsOn });
       } catch (e) {
-        return { note: { title: 'That didn’t go through', body: e?.message || String(e) } };
+        return { note: noteFor(e, 'That didn’t go through') };
       }
     },
     [store, actor, coinsOn],

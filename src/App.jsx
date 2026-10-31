@@ -5,6 +5,7 @@ import { GetNewApp, InstallScreen, LoadingScreen, SignInScreen, WaitingScreen } 
 import { installNeeded, oldHomeApp } from './data/push.js';
 import { isDemo } from './data/store.js';
 import { NEXT } from './next.js';
+import { isNetworkError, isOnline } from './connection.js';
 
 // Checked once: the Home Screen app is a separate launch, so this never changes mid-visit.
 const install = isDemo ? null : installNeeded();
@@ -16,10 +17,13 @@ import Workspace from './components/Workspace.jsx';
 import { ShutdownScreen, useShutdown } from './components/Shutdown.jsx';
 import { PreviewBar, lookOnly } from './components/Preview.jsx';
 
+// A device that has never signed in (or hasn't picked its name yet) has
+// nothing saved to open with: it needs the internet once.
+const SIGN_IN_OFFLINE = 'Signing in the first time needs internet. Connect to Wi‑Fi and this opens on its own.';
 const AUTH_ERRORS = {
   'auth/operation-not-allowed': 'Anonymous sign-in is turned off in Firebase (Authentication → Sign-in method → Anonymous).',
   'auth/admin-restricted-operation': 'Anonymous sign-in is turned off in Firebase (Authentication → Sign-in method → Anonymous).',
-  'auth/network-request-failed': 'No internet connection. Check your Wi-Fi and reload.',
+  'auth/network-request-failed': SIGN_IN_OFFLINE,
 };
 
 // Who this device is signed in as, remembered so the app opens right away next
@@ -80,7 +84,7 @@ export default function App() {
         setMember((prev) => (prev && m && prev.name === m.name && prev.admin === m.admin && prev.via === m.via && !!prev.pending === !!m.pending ? prev : m));
       },
       // Offline or a slow connection: keep going as who this device joined as.
-      (e) => alive && !saved && setError(e.message || String(e)),
+      (e) => alive && !saved && setError(isNetworkError(e) || !isOnline() ? SIGN_IN_OFFLINE : e.message || String(e)),
     );
     return () => {
       alive = false;
@@ -168,7 +172,7 @@ export default function App() {
   if (oldApp)
     return <GetNewApp member={error ? null : member} account={store?.account ? oldAppAccount : null} rename={rename} />;
   if (install) return <InstallScreen {...install} />;
-  if (error) return <LoadingScreen error={error} />;
+  if (error) return <LoadingScreen error={error} offline={error === SIGN_IN_OFFLINE} />;
   if (!store || !user || member === undefined) return <LoadingScreen step={!store ? 1 : !user ? 2 : 3} />;
   if (pending)
     return (

@@ -2,6 +2,7 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { execSync } from 'node:child_process';
 import { copyFileSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { join, relative, sep } from 'node:path';
 import { CHANGELOG } from './src/changelog.js';
 
 // Each build has two ids, baked into the app and published in version.json
@@ -65,9 +66,36 @@ const nextLook = {
   },
 };
 
+// The offline copy of the app (public/sw.js): the worker saves every file of
+// the build when it installs, so it gets the list and the build id here. Runs
+// after nextLook so the finished folder is what's listed. version.json,
+// offline.json and the worker itself are never saved (they're always fetched
+// fresh: updates, the kill switch).
+const offlineCopy = {
+  name: 'offline-copy',
+  apply: 'build',
+  closeBundle() {
+    const files = [];
+    const walk = (dir) => {
+      for (const e of readdirSync(dir, { withFileTypes: true })) {
+        const full = join(dir, e.name);
+        if (e.isDirectory()) walk(full);
+        else files.push(relative(outDir, full).split(sep).join('/'));
+      }
+    };
+    walk(outDir);
+    const skip = ['index.html', 'sw.js', 'version.json', 'offline.json'];
+    const list = files.filter((f) => !skip.includes(f) && !f.startsWith('next/') && !f.startsWith('.')).sort();
+    const sw = readFileSync(`${outDir}/sw.js`, 'utf8');
+    const out = sw.replace("/*__BUILD__*/ ''", JSON.stringify(CODE_ID)).replace('/*__MANIFEST__*/ []', JSON.stringify(list));
+    if (out === sw) throw new Error('public/sw.js: the build markers are missing');
+    writeFileSync(`${outDir}/sw.js`, out);
+  },
+};
+
 // Relative base so the build works at any GitHub Pages path.
 export default defineConfig({
-  plugins: [react(), versionFile, nextLook],
+  plugins: [react(), versionFile, nextLook, offlineCopy],
   base: './',
   define: { __BUILD_ID__: JSON.stringify(BUILD_ID), __CODE_ID__: JSON.stringify(CODE_ID) },
   build: { chunkSizeWarningLimit: 900 },
