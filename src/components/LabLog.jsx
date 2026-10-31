@@ -107,13 +107,20 @@ export function LabLogDialog({
   const shiftMs = shift ? Date.now() - shift.start : Infinity;
   const [quick, setQuick] = useState(mode === 'end' && !!onQuick && shiftMs < MIN_SHIFT);
   const body = useRef(null);
+  const areasChanged = useRef(false);
   const camera = useRef(null);
 
   // Once, when the log opens.
   useEffect(() => {
     let on = true;
     Promise.resolve(loadTouched?.())
-      .then((ids) => on && ids && setTouched(new Set(ids)))
+      .then((ids) => {
+        if (!on || !ids) return;
+        setTouched(new Set(ids));
+        // A new log also picks the areas of the tasks you touched (until you change them).
+        const extra = ids.map((id) => byId.get(id)).filter(Boolean).map(taskArea);
+        if (!log && extra.length) setAreas((a) => (areasChanged.current ? a : sortAreas([...new Set([...a, ...extra])])));
+      })
       .catch(() => {});
     const off = subscribeChips?.(setCounts);
     return () => {
@@ -188,9 +195,11 @@ export function LabLogDialog({
     setChips(prev.chips || []);
     setWorkedWith((prev.workedWith || []).filter((n) => teammates.includes(n)));
     setFilled(shortDay(prev.day));
+    areasChanged.current = true;
   };
 
   const toggleArea = (a) => {
+    areasChanged.current = true;
     setFilled('');
     if (areas.includes(a)) {
       setAreas(areas.filter((x) => x !== a));
