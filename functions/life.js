@@ -352,8 +352,19 @@ export function lifeFunctions({ db, renamer }) {
     const rename = await renamer();
     const name = rename(after.person);
     const aliases = rename.aliases(name).slice(0, 30);
-    const snap = await db.collection('shifts').where('person', 'in', aliases).get();
-    const shifts = snap.docs.map((d) => ({ ...d.data(), person: name }));
+    const [snap, edits] = await Promise.all([
+      db.collection('shifts').where('person', 'in', aliases).get(),
+      db.collection('shiftEdits').where('person', 'in', aliases).get(),
+    ]);
+    // Shifts they deleted themselves still count here: a milestone is paid
+    // once per streak (keyed by the day it started), and deleting the first
+    // day's shift would otherwise start the "same" streak a day later and
+    // pay its milestone again, every day.
+    const deleted = edits.docs
+      .map((d) => d.data())
+      .filter((e) => e.kind === 'delete' && rename(e.by || '') === name && Number.isFinite(e.before?.start))
+      .map((e) => ({ start: e.before.start, end: e.before.end ?? e.before.start, person: name }));
+    const shifts = [...snap.docs.map((d) => ({ ...d.data(), person: name })), ...deleted];
     for (const a of streakAwards(name, shifts, now)) await awardWhole(name, a, 'streak', rename, now);
   });
 
