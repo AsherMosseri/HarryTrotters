@@ -265,6 +265,10 @@ export default function ElectricalEditor({ remote, canEdit, actor, onSave, onClo
   viewRef.current = view;
   const [saving, setSaving] = useState('');
   const [panel, setPanel] = useState(null); // 'history' | 'ports'
+  // Hand tool: one finger always moves the view (parts stay put), for a crowded diagram on a tablet.
+  const [hand, setHand] = useState(false);
+  const handRef = useRef(false);
+  handRef.current = hand;
   const [adding, setAdding] = useState(false);
   const svgRef = useRef(null);
   const drag = useRef(null);
@@ -470,6 +474,15 @@ export default function ElectricalEditor({ remote, canEdit, actor, onSave, onClo
     const port = e.target.closest?.('[data-port]')?.dataset.port?.split(':');
     const partId = e.target.closest?.('[data-part]')?.dataset.part;
     const wireId = e.target.closest?.('[data-wire]')?.dataset.wire;
+    // Hand tool, or nothing to edit: a drag anywhere moves the view; a tap still picks a part or wire.
+    if (handRef.current || !canEdit) {
+      if (partId) setSel({ kind: 'part', id: partId });
+      else if (wireId) setSel({ kind: 'wire', id: wireId });
+      else setSel(null);
+      setPending(null);
+      drag.current = { mode: 'pan', sx: e.clientX, sy: e.clientY, view0: viewRef.current };
+      return;
+    }
     if (port && canEdit) {
       if (pending && pending.from[0] !== port[0]) connect(pending.from, port);
       else {
@@ -507,7 +520,11 @@ export default function ElectricalEditor({ remote, canEdit, actor, onSave, onClo
       const d = Math.hypot(a.x - b.x, a.y - b.y);
       const w = Math.min(6000, Math.max(200, g.view0.w * (g.d0 / Math.max(1, d))));
       const h = (g.view0.h * w) / g.view0.w;
-      setView({ x: g.ax - g.fx * w, y: g.ay - g.fy * h, w, h });
+      // The spot the fingers started on stays under their midpoint, so two fingers
+      // moving together pan, and spreading or pinching zooms around them.
+      const fx = ((a.x + b.x) / 2 - rect.left) / rect.width;
+      const fy = ((a.y + b.y) / 2 - rect.top) / rect.height;
+      setView({ x: g.ax - fx * w, y: g.ay - fy * h, w, h });
     } else if (g.mode === 'part') {
       const p = toSvg(e);
       const x = snap(g.orig.x + p.x - g.start.x);
@@ -705,6 +722,17 @@ export default function ElectricalEditor({ remote, canEdit, actor, onSave, onClo
               <button className="icon-btn" onClick={() => setView(fitView(parts, svgRef.current))} aria-label="Fit" title="Fit">
                 ⤢
               </button>
+              {canEdit && (
+                <button
+                  className={`icon-btn${hand ? ' on' : ''}`}
+                  onClick={() => setHand((h) => !h)}
+                  aria-pressed={hand}
+                  aria-label="Move the view"
+                  title={hand ? 'Moving the view: drag anywhere. Tap to edit again.' : 'Move the view: drag anywhere'}
+                >
+                  <Icon name="move" size={18} />
+                </button>
+              )}
             </div>
             {pending && <div className="dg-hint">Now tap the port to plug it into · Esc to cancel</div>}
           </div>

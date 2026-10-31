@@ -477,6 +477,8 @@ const PATHS = {
     </>
   ),
   grip: <path d="M7.5 5h.01M12.5 5h.01M7.5 10h.01M12.5 10h.01M7.5 15h.01M12.5 15h.01" strokeWidth="2.6" />,
+  // Four arrows: the hand tool (drag to move the view).
+  move: <path d="M10 3v14M3 10h14M10 3 7.8 5.2M10 3l2.2 2.2M10 17l-2.2-2.2M10 17l2.2-2.2M3 10l2.2-2.2M3 10l2.2 2.2M17 10l-2.2-2.2M17 10l-2.2 2.2" />,
   shuffle: <path d="M3 6h2.6c3.4 0 5.4 8 8.8 8H17m-2-2 2 2-2 2M3 14h2.6c1.2 0 2.2-1 3-2.3M11.5 7.6c.8-.9 1.7-1.6 2.9-1.6H17m-2-2 2 2-2 2" />,
 };
 

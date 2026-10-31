@@ -3249,3 +3249,20 @@ button.pm-row:hover { background: color-mix(in srgb, var(--text) 4%, transparent
   :root:not([data-theme='light']) .conn-pill.back { color: #4ade80; }
 }
 :root[data-theme='dark'] .conn-pill.back { color: #4ade80; }
+
+/* Shifts: a calmer top. Title and the two buttons, a quiet check-in line, and
+   smaller figures (the notebook export lives with the Hours list). */
+.shell .shifts .checkin-schedule { padding: 0 0 10px; font-size: 13.5px; color: var(--muted); gap: 8px; align-items: center; }
+.shell .shifts .checkin-schedule b { color: var(--text); font-weight: 600; }
+.shell .shifts .checkin-schedule .chip { font-size: 12.5px; padding: 3px 9px; }
+.shell .shifts .stat-tiles { margin: 2px 0 20px; padding: 8px 0; }
+.shell .shifts .stat b { font-size: 22px; }
+.shell .shifts .stat small { font-size: 13px; }
+.shell .shifts .season-strip { margin: -8px 0 24px; }
+.shell .shifts .season-strip h2 { margin-bottom: 4px; }
+.shell .shifts .ss-items { padding: 8px 0; }
+.shell .shifts .ss-item b { font-size: 20px; }
+
+/* Electrical diagram: the hand tool is on. */
+.dg-zoom .icon-btn.on { background: var(--accent); color: #fff; }
+.dg-svg.hand, .dg-canvas:has(.dg-zoom .icon-btn.on) .dg-svg { cursor: grab; }

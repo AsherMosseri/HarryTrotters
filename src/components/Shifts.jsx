@@ -992,9 +992,6 @@ export default function ShiftsView({
           <h1>Shifts</h1>
         </div>
         <span className="spacer" />
-        <button className="btn" onClick={() => setDialog('notebook')}>
-          <Icon name="doc" size={16} /> Export for the notebook
-        </button>
         {isManager && (
           <button className="btn" onClick={() => setDialog('checkin')}>
             Lab check-in
@@ -1249,6 +1246,9 @@ export default function ShiftsView({
           ) : (
             goal > 0 && <span className="muted small">Season goal: {goal} h</span>
           )}
+          <button className="btn small-btn" onClick={() => setDialog('notebook')}>
+            <Icon name="doc" size={14} /> Notebook export
+          </button>
           <button
             className="btn small-btn"
             onClick={() =>
