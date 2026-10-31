@@ -19,7 +19,8 @@ import * as arcade from '../../functions/shared/arcade.js';
 import { blocked, serverGroup } from '../../functions/shared/commandRules.js';
 import { AWARD_CAPS, giftEntry, prizeEntry, teamDay, teamMidnight } from '../../functions/shared/coins.js';
 import * as fun from '../../functions/shared/funGames.js';
-import { LEVELS as MINE_LEVELS } from '../../functions/shared/minesweeper.js';
+import * as mines from '../../functions/shared/minesweeper.js';
+const MINE_LEVELS = mines.LEVELS;
 import { attemptSeed, newSeed } from '../../functions/shared/rng.js';
 import { asksOn } from '../../functions/shared/checkin.js';
 import * as market from '../../functions/shared/market.js';
@@ -681,7 +682,7 @@ function seedMarket() {
 function settleDemoTournaments(now = Date.now()) {
   let changed = false;
   for (const t of state.tournaments || []) {
-    if (t.status !== 'open' || t.endsAt > now) continue;
+    if (t.status !== 'open' || t.endsAt > now || market.reviewHolds(t, now)) continue;
     settleDemoTournament(t, now, false);
     changed = true;
   }
@@ -694,6 +695,31 @@ function settleDemoTournament(t, now, cancel, by = '') {
     state.coins.push({ id: `c${uid()}`, type: 'prize', person: p.name, amount: p.amount, what: 'tournament', label: market.prizeLabel(t), item: `tour:${t.id}`, at: now });
   for (const p of r.refunds) state.coins.push({ id: `c${uid()}`, ...market.refundEntry(p.name, p.amount, t.title, `tour:${t.id}`, now) });
   Object.assign(t, { status: 'done', winners: r.winners, paid: r.pays, paidAt: now, ...(cancel && { cancelled: true, cancelledBy: by }) });
+}
+
+// A finished tournament game, the way recordTournamentRun saves it: the
+// player's best, or a run held for review (too fast for a person).
+function recordDemoRun(s, me, r, score, problem, review, now) {
+  const note = (title, body = '') => ({ note: { title, body } });
+  Object.assign(s, { done: true, finishedAt: now, result: r, score, problem, review: review || null });
+  commit();
+  const t = (state.tournaments || []).find((x) => x.id === s.tournament);
+  if (problem) return note(problem);
+  if (!t?.players?.[me] || t.status !== 'open') return note('That tournament is over.');
+  if (t.players[me].voided) return note('Your result in this tournament was voided.', 'Team management voided it, so new games don’t count.');
+  const before = t.players[me].best ?? null;
+  const text = fun.tournamentText(s.game, score);
+  const id = Object.keys(state.funGames || {}).find((k) => state.funGames[k] === s);
+  if (review) {
+    t.review = { ...(t.review || {}), [id]: { name: me, score, at: now, why: review } };
+    commit();
+    return { ok: true, score, best: before, improved: false, held: true, why: review, text, bestText: fun.tournamentText(s.game, before) };
+  }
+  const improved = fun.beats(fun.betterOf(t), score, before);
+  const best = improved ? score : before;
+  if (improved) t.players = { ...t.players, [me]: { ...t.players[me], best, at: now } };
+  commit();
+  return { ok: true, score, best, improved, text, bestText: fun.tournamentText(s.game, best) };
 }
 
 // Team life (demoLife.js): bingo, predictions, streak coins, the weekly recap.
@@ -1187,6 +1213,27 @@ export const demoStore = {
         settleDemoTournament(t, now, true, me);
         return done({ ok: true });
       }
+      if (action === 'voidResult') {
+        const t = (state.tournaments || []).find((x) => x.id === id);
+        const p = t?.players?.[data.name];
+        if (!t || t.cancelled) return note('That tournament is gone.');
+        if (!p) return note('They’re not in that tournament.');
+        if (p.voided) return note('Already voided.');
+        t.players = { ...t.players, [data.name]: { ...p, voided: { by: me, at: now, afterPayout: t.status === 'done' } } };
+        t.review = Object.fromEntries(Object.entries(t.review || {}).filter(([, r]) => r.name !== data.name));
+        return done({ ok: true });
+      }
+      if (action === 'review') {
+        const t = (state.tournaments || []).find((x) => x.id === id);
+        const r = t?.review?.[data.run];
+        if (!r) return note('That run was already checked.');
+        t.review = Object.fromEntries(Object.entries(t.review).filter(([k]) => k !== data.run));
+        const best = data.clear === true && t.status === 'open' ? market.clearedBest(t, r) : null;
+        if (best) t.players = { ...t.players, [r.name]: { ...t.players[r.name], ...best } };
+        const g = (state.funGames || {})[data.run];
+        if (g) Object.assign(g, { review: data.clear === true ? 'cleared' : 'voided', reviewedBy: me, reviewedAt: now });
+        return done({ ok: true, counted: !!best });
+      }
       return note('Unknown action.');
     }
 
@@ -1531,8 +1578,11 @@ export const demoStore = {
         const t = (state.tournaments || []).find((x) => x.id === req.tournament);
         if (!t || t.game !== fun.tourGame(game) || t.status !== 'open' || now >= t.endsAt) return note('That tournament is over.');
         if (!t.players?.[me]) return note('Join it first.', 'Tournament entries are in the market.');
+        if (t.players[me].voided) return note('Your result in this tournament was voided.', 'Team management voided it, so new games don’t count.');
         const attempt = Object.values(games).filter((x) => x.tournament === t.id && x.person === me).length + 1;
-        Object.assign(s, { tournament: t.id, attempt, seed: attemptSeed(`${t.seed}:demo`, attempt), level: game === 'minesweep' ? fun.TOURNAMENT_LEVEL : 1 });
+        // Minesweeper: a board of your own each time, played "on the server" (here).
+        const seed = game === 'minesweep' ? attemptSeed(`${t.seed}:demo:${me}`, attempt) : attemptSeed(`${t.seed}:demo`, attempt);
+        Object.assign(s, { tournament: t.id, attempt, seed, level: game === 'minesweep' ? fun.TOURNAMENT_LEVEL : 1 });
       } else {
         s.seed = newSeed();
         if (game === 'tetris') s.level = Math.max(1, Math.min(15, Math.floor(Number(req.level)) || 1));
@@ -1542,30 +1592,56 @@ export const demoStore = {
       const id = uid();
       games[id] = s;
       commit();
-      return { ok: true, id, seed: s.seed, mode, level: s.level, speed: s.speed, attempt: s.attempt || 0, serverNow: now };
+      const server = fun.serverRun(s);
+      return { ok: true, id, seed: server ? null : s.seed, server, mode, level: s.level, speed: s.speed, attempt: s.attempt || 0, serverNow: now };
     }
     const s = games[req.id];
+    // A Minesweeper tournament tap, the way funGame 'sweep' plays it.
+    if (req.action === 'sweep') {
+      if (!s || s.person !== me || !fun.serverRun(s)) return note('That game is gone.');
+      if (s.done) return note('That game is already over.');
+      const from = req.from;
+      const received = s.received || 0;
+      if (!Array.isArray(req.acts) || from > received) return note('That game got out of step.', 'Start a new one.');
+      const fresh = req.acts.slice(received - from);
+      const log = s.log || [];
+      const tooLong = now > s.startedAt + fun.tournamentGrace(s.game);
+      const firstAt = s.firstAt || (fresh.some(([k]) => k !== mines.ACT.flag) ? now : 0);
+      const ms = firstAt ? Math.max(log.length ? log[log.length - 3] : 0, now - firstAt) : 0;
+      const opts = fun.gameOpts(s);
+      const turn = mines.serverTurn(opts, log, tooLong ? [] : fresh, ms);
+      Object.assign(s, { log: turn.log, received: from + req.acts.length, firstAt });
+      const view = {
+        open: received > from ? mines.openCells(turn.game) : turn.open,
+        done: turn.done || turn.full || tooLong,
+        won: turn.won,
+        lost: turn.lost,
+        boom: turn.boom,
+        ms: turn.game.ms,
+      };
+      if (!view.done) {
+        commit();
+        return { ok: true, ...view };
+      }
+      const r = mines.replay(opts, turn.log);
+      const problem = tooLong ? 'That game took too long to count.' : turn.full ? 'That game had too many taps.' : r.error || '';
+      const result = r.error ? mines.summary(turn.game) : r;
+      const rec = recordDemoRun(s, me, result, problem ? null : fun.tournamentScore(s.game, result), problem, '', now);
+      const where = (turn.game.mines || []).flatMap((m, i) => (m ? [i] : []));
+      return { ...rec, ...view, mines: where, result };
+    }
     if (req.action === 'finish' || req.action === 'tournament') {
       if (!s || s.person !== me) return note('That game is gone.');
       if (s.done) return note('That game is already in.');
+      if (fun.serverRun(s)) return note('That game is played on the server.');
       const r = fun.replayGame(s, req.moves);
       if (r.error) return note(r.error);
       const problem = fun.timingProblem(s, r, now - s.startedAt);
-      Object.assign(s, { done: true, finishedAt: now, result: r, problem });
       if (s.mode === 'tournament') {
-        const t = (state.tournaments || []).find((x) => x.id === s.tournament);
-        const score = fun.tournamentScore(s.game, r);
-        s.score = score;
-        commit();
-        if (problem) return note(problem);
-        if (!t?.players?.[me] || t.status !== 'open') return note('That tournament is over.');
-        const before = t.players[me].best ?? null;
-        const improved = fun.beats(fun.betterOf(t), score, before);
-        const best = improved ? score : before;
-        if (improved) t.players = { ...t.players, [me]: { ...t.players[me], best, at: now } };
-        commit();
-        return { ok: true, score, best, improved, text: fun.tournamentText(s.game, score), bestText: fun.tournamentText(s.game, best) };
+        const review = problem ? '' : fun.reviewReason(s, req.moves);
+        return recordDemoRun(s, me, r, fun.tournamentScore(s.game, r), problem, review, now);
       }
+      Object.assign(s, { done: true, finishedAt: now, result: r, problem });
       if (s.mode === 'race') {
         commit();
         const out = await demoStore.play({ action: 'move', conv: s.race.conv, msgId: s.race.msgId, move: problem ? 'resign' : 'finish' }, actor, ctx, problem ? null : r);

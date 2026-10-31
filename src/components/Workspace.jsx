@@ -1352,7 +1352,8 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
         store
           .funGame(req, actor, { balanceOf: (n) => cmdData.current.wallet(n).balance, roster: cmdData.current.roster })
           .then((r) => (setServerSkew(r?.serverNow), r))
-          .catch((e) => ({ note: { title: 'Trotbot couldn’t do that', body: e.message || String(e) } })),
+          // failed: it never got an answer (a Minesweeper tournament tap is sent again).
+          .catch((e) => ({ note: { title: 'Trotbot couldn’t do that', body: e.message || String(e) }, failed: true })),
       submitTournamentScore: (req) =>
         store.submitTournamentScore(req, actor).catch((e) => ({ note: { title: 'That score didn’t go in', body: e.message || String(e) } })),
       // Tournaments come from the market (store.subscribeTournaments).

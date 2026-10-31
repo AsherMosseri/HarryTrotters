@@ -2,7 +2,7 @@
 // inbox (the 🔔 on the site) and pushed to every device they turned
 // notifications on for.
 import { readFileSync } from 'node:fs';
-import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
+import { createHmac, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 import { setGlobalOptions } from 'firebase-functions/v2';
 import { onDocumentCreated, onDocumentWritten } from 'firebase-functions/v2/firestore';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
@@ -10,7 +10,7 @@ import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { defineSecret } from 'firebase-functions/params';
 import { logger } from 'firebase-functions';
 import { initializeApp } from 'firebase-admin/app';
-import { FieldPath, getFirestore } from 'firebase-admin/firestore';
+import { FieldPath, FieldValue, getFirestore } from 'firebase-admin/firestore';
 import { getMessaging } from 'firebase-admin/messaging';
 import { fetchPage, firstLink, readPreview } from './preview.js';
 import { coinSettings, coinsByName, giftEntry, prizeEntry, wallet } from './shared/coins.js';
@@ -19,8 +19,8 @@ import * as arcade from './shared/arcade.js';
 import { blocked, isOff, serverGroup } from './shared/commandRules.js';
 import { awardCoins } from './award.js';
 import * as fun from './shared/funGames.js';
-import { LEVELS as MINE_LEVELS } from './shared/minesweeper.js';
-import { attemptSeed, newSeed } from './shared/rng.js';
+import * as mines from './shared/minesweeper.js';
+import { newSeed } from './shared/rng.js';
 import { MANAGER_NAMES, PASSWORD_MIN, cleanName, isManagerName, knownName } from './shared/team.js';
 import { TEAM_NUMBER, fromSchedule, rankOf, scoreOf, seasonOf } from './shared/matches.js';
 import { asksOn } from './shared/checkin.js';
@@ -1354,6 +1354,26 @@ async function tournamentPepper() {
   });
 }
 
+// A tournament's seed, from tournamentSecrets/{id} (server only). One made
+// before the seed moved there still has it on the doc the team reads: move it.
+async function tournamentSeed(id) {
+  const ref = db.doc(`tournamentSecrets/${id}`);
+  const tref = db.doc(`tournaments/${id}`);
+  return db.runTransaction(async (tx) => {
+    const [d, t] = await Promise.all([tx.get(ref), tx.get(tref)]);
+    const onDoc = t.exists && t.get('seed') != null;
+    const seed = d.exists && d.get('seed') ? d.get('seed') : String(t.get('seed') || randomBytes(6).toString('hex'));
+    if (!d.exists || !d.get('seed')) tx.set(ref, { seed });
+    if (onDoc) tx.update(tref, { seed: FieldValue.delete() });
+    return seed;
+  });
+}
+
+// The seed one game is played from: a keyed hash, so knowing it (a Tetris
+// game hands it to the phone, since the pieces are shown) says nothing about
+// the key, the tournament's seed or any other attempt's pieces.
+const gameSeed = (pepper, ...parts) => createHmac('sha256', pepper).update(parts.join('#')).digest('hex').slice(0, 24);
+
 // The key a person has in a tournament's players map (they may have joined under an old name).
 const playerKey = (t, me, rename) => rename.aliases(me).find((n) => t.players?.[n]) || null;
 
@@ -1396,25 +1416,89 @@ export const funGame = onCall({ maxInstances: 5, invoker: 'public' }, async (req
       if (!t || t.game !== fun.tourGame(game)) return note('That tournament is gone.');
       if (t.status === 'done' || now >= t.endsAt) return note('That tournament is over.');
       if (t.opensAt && now < t.opensAt) return note('That tournament hasn’t started yet.');
-      if (!playerKey(t, me, rename)) return note('Join it first.', 'Tournament entries are in the market.');
-      // Everyone's 1st game is on the same board (or pieces), everyone's 2nd on the next…
+      const key = playerKey(t, me, rename);
+      if (!key) return note('Join it first.', 'Tournament entries are in the market.');
+      if (t.players[key].voided) return note('Your result in this tournament was voided.', 'Team management voided it, so new games don’t count.');
       const tries = await db.collection('funGames').where('tournament', '==', id).where('person', '==', me).count().get();
       const attempt = tries.data().count + 1;
+      const [base, pepper] = await Promise.all([tournamentSeed(id), tournamentPepper()]);
       Object.assign(s, {
         tournament: id,
         attempt,
-        seed: attemptSeed(`${t.seed}:${await tournamentPepper()}`, attempt),
-        level: game === 'minesweep' ? (MINE_LEVELS[t.level] ? t.level : fun.TOURNAMENT_LEVEL) : 1,
+        // Tetris: everyone's 1st game has the same pieces, everyone's 2nd the
+        // next… Minesweeper: a board of your own each time (it's played on the
+        // server, and someone who cleared a board can't hand it to a teammate).
+        seed: game === 'minesweep' ? gameSeed(pepper, base, uid, attempt) : gameSeed(pepper, base, attempt),
+        level: game === 'minesweep' ? (mines.LEVELS[t.level] ? t.level : fun.TOURNAMENT_LEVEL) : 1,
       });
     } else {
       s.seed = newSeed();
       if (game === 'tetris') s.level = Math.max(1, Math.min(15, Math.floor(Number(body.level)) || 1));
-      else s.level = MINE_LEVELS[body.level] ? body.level : 'beginner';
+      else s.level = mines.LEVELS[body.level] ? body.level : 'beginner';
       if (mode === 'bot') s.speed = fun.SPEEDS.includes(body.speed) ? body.speed : 'medium';
     }
     const ref = db.collection('funGames').doc();
     await ref.set(s);
-    return { ok: true, id: ref.id, seed: s.seed, mode, level: s.level, speed: s.speed, attempt: s.attempt || 0, serverNow: now };
+    // A server-run game's seed stays here (see 'sweep').
+    const server = fun.serverRun(s);
+    return { ok: true, id: ref.id, seed: server ? null : s.seed, server, mode, level: s.level, speed: s.speed, attempt: s.attempt || 0, serverNow: now };
+  }
+
+  // A Minesweeper tournament game (fun.serverRun): the phone sends its taps
+  // ([[action, cell], …], a few at once if they piled up) and the server
+  // plays them on the board only it has, answering with the cells they
+  // opened. The clock is the server's, from the first reveal. from: how many
+  // taps the phone sent before these, so a resend after a lost answer skips
+  // the ones already played (and gets every open cell back).
+  if (body.action === 'sweep') {
+    if (!validId(body.id)) throw new HttpsError('invalid-argument', 'Which game?');
+    const { acts, from } = body;
+    const cells = mines.LEVELS.expert.w * mines.LEVELS.expert.h;
+    const okAct = (a) => Array.isArray(a) && a.length === 2 && [0, 1, 2].includes(a[0]) && Number.isInteger(a[1]) && a[1] >= 0 && a[1] < cells;
+    if (!Array.isArray(acts) || acts.length > 100 || !acts.every(okAct) || !Number.isInteger(from) || from < 0)
+      throw new HttpsError('invalid-argument', 'Those taps don’t look right.');
+    const ref = funRef(body.id);
+    let held = null;
+    const out = await db.runTransaction(async (tx) => {
+      const s = (await tx.get(ref)).data();
+      if (!s || s.person !== me || !fun.serverRun(s)) return note('That game is gone.');
+      if (s.done) return note('That game is already over.');
+      const tref = db.doc(`tournaments/${s.tournament}`);
+      const td = (await tx.get(tref)).data();
+      const received = s.received || 0;
+      if (from > received) return note('That game got out of step.', 'Start a new one.');
+      const fresh = acts.slice(received - from);
+      const log = s.log || [];
+      const tooLong = now > s.startedAt + fun.tournamentGrace(s.game);
+      const firstAt = s.firstAt || (fresh.some(([k]) => k !== mines.ACT.flag) ? now : 0);
+      const ms = firstAt ? Math.max(log.length ? log[log.length - 3] : 0, now - firstAt) : 0;
+      const opts = fun.gameOpts(s);
+      const turn = mines.serverTurn(opts, log, tooLong ? [] : fresh, ms);
+      const patch = { log: turn.log, received: from + acts.length, firstAt };
+      const view = {
+        open: received > from ? mines.openCells(turn.game) : turn.open,
+        done: turn.done || turn.full || tooLong,
+        won: turn.won,
+        lost: turn.lost,
+        boom: turn.boom,
+        ms: turn.game.ms,
+      };
+      if (!view.done) {
+        tx.update(ref, patch);
+        return { ok: true, ...view };
+      }
+      // Over: the whole game is replayed and checked like any other.
+      const r = mines.replay(opts, turn.log);
+      const problem = tooLong ? 'That game took too long to count.' : turn.full ? 'That game had too many taps.' : r.error || '';
+      const result = r.error ? mines.summary(turn.game) : r;
+      const score = problem ? null : fun.tournamentScore(s.game, result);
+      const rec = recordTournamentRun(tx, { sref: ref, tref, td, me, rename, s, r: result, score, problem, now, patch });
+      held = rec.held ? td : null;
+      const where = (turn.game.mines || []).flatMap((m, i) => (m ? [i] : []));
+      return { ...rec, ...view, mines: where, result };
+    });
+    if (held) await heldForReview(me, held);
+    return out;
   }
 
   if (body.action === 'finish') {
@@ -1490,10 +1574,56 @@ export const funGame = onCall({ maxInstances: 5, invoker: 'public' }, async (req
   throw new HttpsError('invalid-argument', 'Unknown action.');
 });
 
+// Inside a transaction, after its reads: saves a finished tournament game on
+// its session and, when it's the player's new best, on the tournament. A run
+// held for review (fun.reviewReason) goes on the tournament's review list
+// instead, for team management to clear or void.
+function recordTournamentRun(tx, { sref, tref, td, me, rename, s, r, score, problem, review = '', now, patch = {} }) {
+  const key = td && playerKey(td, me, rename);
+  tx.update(sref, { ...patch, done: true, finishedAt: now, result: r, score, problem, review: review || null });
+  if (!key) return note('You’re not in that tournament.');
+  if (problem) return note(problem);
+  if (td.status === 'done') return note('That tournament is over.');
+  if (td.players[key].voided) return note('Your result in this tournament was voided.', 'Team management voided it, so new games don’t count.');
+  // Only a better result counts (td.better: high points or low seconds);
+  // `at` is when the best was set, which breaks ties.
+  const before = td.players[key].best ?? null;
+  const text = fun.tournamentText(s.game, score);
+  if (review) {
+    // Capped, so a script sending run after run can't fill the doc.
+    if (score != null && Object.keys(td.review || {}).length < 30)
+      tx.update(tref, new FieldPath('review', sref.id), { name: key, score, at: now, why: review });
+    return { ok: true, score, best: before, improved: false, held: true, why: review, text, bestText: fun.tournamentText(s.game, before) };
+  }
+  const improved = fun.beats(fun.betterOf(td), score, before);
+  const best = improved ? score : before;
+  if (improved) tx.update(tref, new FieldPath('players', key, 'best'), best, new FieldPath('players', key, 'at'), now);
+  return { ok: true, score, best, improved, text, bestText: fun.tournamentText(s.game, best) };
+}
+
+// A run held for review: tell team management (after the transaction).
+async function heldForReview(me, t) {
+  const admins = await db.collection('members').where('admin', '==', true).get();
+  const rename = await renamer();
+  const to = [...new Set(admins.docs.map((d) => rename(d.get('name') || '')).filter(Boolean))];
+  await notify(
+    to.map((n) => ({
+      to: n,
+      type: 'market',
+      icon: '🏆',
+      title: `A ${t?.title || 'tournament'} run needs a look`,
+      body: `${me.split(' ')[0]}’s game was faster than a person can play. Clear it or void it in the Market.`,
+      open: 'view:market',
+      by: me,
+    })),
+  ).catch((e) => logger.warn('review notify', e.message));
+}
+
 // A tournament game (tournaments/{id}, see the market): the moves are
-// replayed on the tournament's board and the player's best is kept. The pot
+// replayed on the tournament's pieces and the player's best is kept. The pot
 // is paid out when the tournament ends (not here). session: the funGame
-// 'start' that handed out the board, so the clock can be checked.
+// 'start' that handed out the seed, so the clock can be checked. Minesweeper
+// tournament games don't come here: they're played on the server ('sweep').
 export const submitTournamentScore = onCall({ maxInstances: 5, invoker: 'public' }, async (req) => {
   const { me, rename } = await caller(req);
   const { id, moves, session } = req.data || {};
@@ -1503,6 +1633,7 @@ export const submitTournamentScore = onCall({ maxInstances: 5, invoker: 'public'
   const s = (await sref.get()).data();
   if (!s || s.person !== me || s.tournament !== id) return note('That game is gone.');
   if (s.done) return note('That game is already in.');
+  if (fun.serverRun(s)) return note('That game is played on the server.');
   const tref = db.doc(`tournaments/${id}`);
   const t = (await tref.get()).data();
   if (!t || t.game !== fun.tourGame(s.game)) return note('That tournament is gone.');
@@ -1511,24 +1642,14 @@ export const submitTournamentScore = onCall({ maxInstances: 5, invoker: 'public'
   const r = fun.replayGame(s, moves);
   if (r.error) return note(r.error);
   const problem = fun.timingProblem(s, r, now - s.startedAt);
+  const review = problem ? '' : fun.reviewReason(s, moves);
   const score = fun.tournamentScore(s.game, r);
   const res = await db.runTransaction(async (tx) => {
     const [cur, tdoc] = await Promise.all([tx.get(sref), tx.get(tref)]);
     if (cur.get('done')) return note('That game is already in.');
-    const td = tdoc.data();
-    const key = td && playerKey(td, me, rename);
-    tx.update(sref, { done: true, finishedAt: now, result: r, score, problem });
-    if (!key) return note('You’re not in that tournament.');
-    if (problem) return note(problem);
-    if (td.status === 'done') return note('That tournament is over.');
-    // Only a better result counts (td.better: high points or low seconds);
-    // `at` is when the best was set, which breaks ties.
-    const before = td.players[key].best ?? null;
-    const improved = fun.beats(fun.betterOf(td), score, before);
-    const best = improved ? score : before;
-    if (improved) tx.update(tref, new FieldPath('players', key, 'best'), best, new FieldPath('players', key, 'at'), now);
-    return { ok: true, score, best, improved, text: fun.tournamentText(s.game, score), bestText: fun.tournamentText(s.game, best) };
+    return recordTournamentRun(tx, { sref, tref, td: tdoc.data(), me, rename, s, r, score, problem, review, now });
   });
+  if (res.held) await heldForReview(me, t);
   return res;
 });
 
