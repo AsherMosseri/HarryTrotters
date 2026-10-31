@@ -79,6 +79,10 @@ export function teamMidnight(day) {
   }
   return t;
 }
+// Midnight at the end of a team day (the next day's start). 26 hours on from
+// the day's midnight is always inside the next day, even when the clocks
+// change (days of 23 or 25 hours).
+export const nextMidnight = (day) => teamMidnight(teamDay(teamMidnight(day) + 26 * 3600000));
 const startMs = (cfg) => teamMidnight(cfg.start);
 // A time as ms: the server reads Firestore Timestamps (task times are set by
 // the server clock), the app reads numbers.
@@ -95,12 +99,21 @@ export function earnedItems(name, { tasks = [], shifts = [], cfg, now = Date.now
     items.push({ kind: 'task', at, amount: cfg.perTask, icon: '✅', label: t.title || 'A task' });
   }
   // Lab time, added up per day (overlapping shifts count once), capped, and
-  // paid per full 15 minutes of the day (coinsForMinutes).
+  // paid per full 15 minutes of the day (coinsForMinutes). A shift that runs
+  // past midnight is cut at midnight, so each day counts only its own time:
+  // otherwise a shift from 11 PM to 11 AM and another from midnight to 11 AM
+  // would land on different days and the same hours would pay twice.
   const byDay = new Map();
   for (const s of shifts) {
     if (s.person !== name || !s.start || s.start < from) continue;
-    const key = teamDay(s.start);
-    byDay.set(key, [...(byDay.get(key) || []), s]);
+    const end = Math.max(s.start, s.end ?? now);
+    for (let day = teamDay(s.start), i = 0; i < 400; i++) {
+      const next = nextMidnight(day);
+      const piece = { start: Math.max(s.start, teamMidnight(day)), end: Math.min(end, next) };
+      byDay.set(day, [...(byDay.get(day) || []), piece]);
+      if (end <= next) break;
+      day = teamDay(next);
+    }
   }
   const days = new Map(
     [...byDay].map(([key, list]) => [key, { minutes: mergedMs(list, now) / 60000, at: Math.max(...list.map((s) => s.end || now)) }]),
