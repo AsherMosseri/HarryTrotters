@@ -1600,7 +1600,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
   const [adStats, setAdStats] = useState({});
   useEffect(() => store.subscribeAdStats(setAdStats), [store]);
 
-  // Jackson coins: earned from tasks and hours (and, for Asher, the ad money);
+  // Jackson coins: earned from tasks and hours (ads don't pay anyone);
   // spending, gifts, and bonuses are in the ledger.
   const [ledger, setLedger] = useState([]);
   useEffect(() => store.subscribeCoins(setLedger), [store]);
@@ -1620,13 +1620,12 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
     () => ({
       tasks: tasks || [],
       ...coinsByName({ shifts, ledger, bank: Object.values(bank) }, rename),
-      adStats,
       cfg: coinCfg,
       now: coinMinute,
     }),
-    [tasks, shifts, adStats, ledger, bank, coinCfg, rename, coinMinute],
+    [tasks, shifts, ledger, bank, coinCfg, rename, coinMinute],
   );
-  const walletOf = useCallback((name) => wallet(name, { ...coinData, owner: name === REQUESTS_TO }), [coinData]);
+  const walletOf = useCallback((name) => wallet(name, coinData), [coinData]);
   const myWallet = useMemo(() => walletOf(actor.name), [walletOf, actor.name]);
   cmdData.current = {
     roster,

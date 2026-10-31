@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react';
-import { GIFT_MAX, leaderboard, teamDay, teamMidnight, wallet as walletOf } from '../coins.js';
-import { REQUESTS_TO } from '../config.js';
+import { GIFT_MAX, leaderboard, perHourOf, teamDay, teamMidnight, wallet as walletOf } from '../coins.js';
 import { mondayOf } from '../milestones.js';
 import { relTime, useEscape } from '../util.js';
 import { Avatar, CloseIcon, Overlay } from './common.jsx';
@@ -39,7 +38,7 @@ export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onClose 
     () =>
       kind === 'coins'
         ? roster
-            .map((name) => ({ name, coins: walletOf(name, { ...data, owner: name === REQUESTS_TO }).balance }))
+            .map((name) => ({ name, coins: walletOf(name, data).balance }))
             .sort((a, b) => b.coins - a.coins)
         : leaderboard(roster, data, range === 'week' ? monday : 0),
     [kind, roster, data, range, monday],
@@ -66,7 +65,7 @@ export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onClose 
               <Coins n={wallet.balance} size={30} />
             </b>
             <span className="muted small">
-              {cfg.perTask} for each task you finish · {cfg.perHour} an hour at the lab
+              {cfg.perTask} for each task you finish · {perHourOf(cfg)} an hour at the lab, paid per 15 minutes
             </span>
           </div>
           <div className="segmented coins-tabs" role="tablist">
@@ -280,14 +279,13 @@ export function CoinsAdmin({ cfg, setCfg, roster, balances, onGrant, ledger, onU
     <>
       <h4>Earning</h4>
       {field('Coins per task', cfg.perTask, (v) => setCfg({ ...cfg, perTask: num(v) }), 'Tasks assigned to them, created by someone else.')}
-      {field('Coins per hour at the lab', cfg.perHour, (v) => setCfg({ ...cfg, perHour: num(v) }))}
-      {field('Most hours counted a day', cfg.dayCap, (v) => setCfg({ ...cfg, dayCap: Math.max(1, num(v)) }))}
       {field(
-        'Your ad money: views per coin',
-        cfg.viewsPerCoin,
-        (v) => setCfg({ ...cfg, viewsPerCoin: Math.max(1, num(v)) }),
-        `Plus ${cfg.perTap} a tap. Only you earn this.`,
+        'Coins per 15 minutes at the lab',
+        cfg.perQuarter,
+        (v) => setCfg({ ...cfg, perQuarter: num(v) }),
+        `Paid for each full 15 minutes of a day’s lab time: ${perHourOf(cfg)} an hour.`,
       )}
+      {field('Most hours counted a day', cfg.dayCap, (v) => setCfg({ ...cfg, dayCap: Math.max(1, num(v)) }))}
       <h4>Prices</h4>
       {field('Remove ads for 1 hour', cfg.prices.hour, (v) => setPrice('hour', v))}
       {field('Remove ads for the rest of today', cfg.prices.today, (v) => setPrice('today', v))}
