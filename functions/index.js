@@ -954,7 +954,9 @@ async function freshCoins(name, bank, data) {
   for (const q of found) for (const d of q.docs) ledger.set(d.id, d.data());
   const banks = [{ ...bank, name }, ...old.filter((d) => d.exists).map((d) => d.data())];
   const mine = coinsByName({ ledger: [...ledger.values()], bank: banks }, data.rename);
-  return { balance: wallet(name, { ...data, ...mine }).balance, ledger: mine.ledger };
+  // Only the ledger and banks from here: coinsByName also hands back an empty
+  // shifts list, which would hide the lab hours data.shifts already has.
+  return { balance: wallet(name, { ...data, ledger: mine.ledger, bank: mine.bank }).balance, ledger: mine.ledger };
 }
 const nyDay = (ms) => new Date(ms).toLocaleDateString('en-CA', { timeZone: TIME_ZONE });
 

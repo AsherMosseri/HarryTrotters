@@ -486,6 +486,12 @@ service cloud.firestore {
     function validStart(s) { return s is int && s <= nowMs() + 300000 && s >= nowMs() - 12 * 3600000; }
     function shiftPath(sid) { return /databases/$(database)/documents/shifts/$(sid); }
     function shiftEditPath(eid) { return /databases/$(database)/documents/shiftEdits/$(eid); }
+    // A name that is me, or an old name of mine: a device that signed in
+    // after a rename has the new name, and shifts keep the name they were
+    // saved with.
+    function wasMe(name) {
+      return isMe(name) || (exists(namesPath()) && get(namesPath()).data.get('renames', {}).get(name, '') == myName());
+    }
     match /shifts/{id} {
       // Your running shift: move the start earlier, end it, notes (as before).
       function runningChange() {
@@ -511,10 +517,10 @@ service cloud.firestore {
       allow create: if isManager() || (isMember() && isMe(request.resource.data.person)
         && request.resource.data.end == null && validStart(request.resource.data.start)
         && request.resource.data.byUid == request.auth.uid);
-      allow update: if isManager() || (isMember() && isMe(resource.data.person)
+      allow update: if isManager() || (isMember() && wasMe(resource.data.person)
         && request.resource.data.person == resource.data.person
         && (runningChange() || detailsChange() || shrink(request.resource.data)));
-      allow delete: if isManager() || (isMember() && isMe(resource.data.person)
+      allow delete: if isManager() || (isMember() && wasMe(resource.data.person)
         && ((resource.data.end == null && resource.data.start > nowMs() - 15 * 60000)
             || (resource.data.end != null && existsAfter(shiftEditPath(id + '_del')))));
     }
@@ -530,7 +536,7 @@ service cloud.firestore {
       }
       function ownEdit(d) {
         let old = get(shiftPath(d.shiftId)).data;
-        return isMe(old.person) && d.person == old.person && old.end != null
+        return wasMe(old.person) && d.person == old.person && old.end != null
           && d.before.start == old.start && d.before.end == old.end
           && ((d.kind == 'delete' && eid == d.shiftId + '_del' && d.after == null && !existsAfter(shiftPath(d.shiftId)))
             || (d.kind == 'shorten' && eid == d.shiftId + '_' + string(getAfter(shiftPath(d.shiftId)).data.editCount)
@@ -555,17 +561,17 @@ service cloud.firestore {
       }
       function longerMine(d) {
         let old = get(shiftPath(d.shiftId)).data;
-        return isMe(old.person) && d.person == old.person && old.end != null
+        return wasMe(old.person) && d.person == old.person && old.end != null
           && d.oldStart == old.start && d.oldEnd == old.end && (d.start < old.start || d.end > old.end);
       }
       allow read: if isMember();
       allow create: if isMember() && validRequest(request.resource.data) && request.resource.data.status == 'pending'
-        && isMe(request.resource.data.person) && request.resource.data.by == myName() && request.resource.data.byUid == request.auth.uid
+        && wasMe(request.resource.data.person) && request.resource.data.by == myName() && request.resource.data.byUid == request.auth.uid
         && (request.resource.data.kind == 'add' || longerMine(request.resource.data));
       allow update: if isManager() && resource.data.status == 'pending'
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'decidedBy', 'decidedAt'])
         && request.resource.data.status in ['approved', 'declined'] && request.resource.data.decidedBy == myName();
-      allow delete: if isManager() || (isMember() && isMe(resource.data.person));
+      allow delete: if isManager() || (isMember() && wasMe(resource.data.person));
     }
     // The schedule: team management plans shifts; anyone answers for themselves.
     match /shiftPlans/{id} {
