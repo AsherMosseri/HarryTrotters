@@ -241,6 +241,33 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Learn (functions/learn.js): only the server writes these. You read your
+    // own progress and daily answers (a missing doc reads as empty). Open
+    // team-data answers and the daily question list stay on the server.
+    match /quizState/{id} {
+      allow read: if isMember() && (resource == null || isMe(resource.data.name));
+      allow write: if false;
+    }
+    match /dailyAnswers/{id} {
+      allow read: if isMember() && (resource == null || isMe(resource.data.name));
+      allow write: if false;
+    }
+    match /quizSecrets/{id} {
+      allow read, write: if false;
+    }
+    match /quizMeta/{id} {
+      allow read, write: if false;
+    }
+    // "Something's wrong with this question": team management reads them
+    // (with the answer) and marks them handled.
+    match /quizReports/{id} {
+      allow read, delete: if isManager();
+      allow update: if isManager()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'handledBy', 'handledAt'])
+        && request.resource.data.status in ['open', 'fixed', 'fine'];
+      allow create: if false;
+    }
+
     // The lab log (labLog.js): one log per person per day, id <day>_<person>.
     // Everyone on the team reads them; you write your own (it's required
     // when you end a shift); team management can fix anyone's. The onLabLog
