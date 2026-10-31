@@ -1355,7 +1355,8 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
           .catch((e) => ({ note: { title: 'Trotbot couldn’t do that', body: e.message || String(e) } })),
       submitTournamentScore: (req) =>
         store.submitTournamentScore(req, actor).catch((e) => ({ note: { title: 'That score didn’t go in', body: e.message || String(e) } })),
-      subscribeTournaments: (cb) => store.subscribeTournaments(cb),
+      // Tournaments come from the market (store.subscribeTournaments).
+      subscribeTournaments: (cb) => (store.subscribeTournaments ? store.subscribeTournaments(cb) : () => {}),
       setRaceLive: (race, data) => store.setRaceLive(race, data, actor).catch(() => {}),
       subscribeRaceLive: (race, cb) => store.subscribeRaceLive(race, cb),
       wallet: (name) => cmdData.current.wallet(name),

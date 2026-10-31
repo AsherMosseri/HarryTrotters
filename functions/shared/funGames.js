@@ -110,11 +110,16 @@ export function coinsFor(s, r, won = false) {
   return 0;
 }
 
-// A tournament ranks by one number, higher is better: Tetris by points,
-// Minesweeper by time (any finish beats any loss; see minesweeper.scoreOf).
-export const tournamentScore = (game, r) => (game === 'tetris' ? r.score : mines.scoreOf(r));
+// Tournaments (the market's tournaments/{id}) call Minesweeper "minesweeper"
+// and say which way a score is better: Tetris by points (high), Minesweeper
+// by seconds to clear the board (low; a game that hits a mine has no time).
+export const tourGame = (game) => (game === 'minesweep' ? 'minesweeper' : game);
+export const gameOfTour = (t) => (t?.game === 'minesweeper' ? 'minesweep' : t?.game);
+export const betterOf = (t) => t?.better || (gameOfTour(t) === 'minesweep' ? 'low' : 'high');
+export const tournamentScore = (game, r) => (game === 'tetris' ? r.score : r.won ? Math.round(r.ms / 100) / 10 : null);
+export const beats = (better, score, before) => score != null && (before == null || (better === 'low' ? score < before : score > before));
 export const tournamentText = (game, n) =>
-  n == null ? '—' : game === 'tetris' ? `${Number(n).toLocaleString('en-US')} pts` : mines.scoreText(n);
+  n == null ? '—' : game === 'tetris' ? `${Number(n).toLocaleString('en-US')} pts` : mines.clockText(Math.round(n * 1000));
 // A tournament attempt has to finish within its game's length (plus a little)
 // of starting, and start before the tournament ends.
 export const tournamentGrace = (game) => (game === 'tetris' ? 5 * 60000 : 20 * 60000);

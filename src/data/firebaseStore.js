@@ -1062,13 +1062,6 @@ export const firebaseStore = {
     const call = httpsCallable(getFunctions(app, FUNCTIONS_REGION), 'submitTournamentScore');
     return (await call(req)).data;
   },
-  subscribeTournaments(cb) {
-    return onSnapshot(
-      query(collection(db, 'tournaments'), where('status', '==', 'open')),
-      (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
-      () => cb([]),
-    );
-  },
   // A race's live picture of each player's board (raceLive/{race}_{uid}).
   setRaceLive(race, data, actor) {
     const uid = auth.currentUser?.uid;

@@ -81,8 +81,8 @@ export const COMMANDS = [
   { name: 'hangman', group: 'arcade', args: '', desc: 'Guess the robotics word together', server: true },
   { name: 'typerace', group: 'arcade', args: '', desc: 'Race to type a sentence (no pasting)', server: true },
   { name: 'heist', group: 'arcade', args: 'bet', desc: 'Plan a heist: more crew, better odds', server: true },
-  { name: 'tetris', group: 'arcade', args: '@person | bot | sprint', desc: 'Tetris: alone, race someone live, or race Trotbot', server: true },
-  { name: 'minesweep', group: 'arcade', args: '@person | bot | expert', desc: 'Minesweeper: alone, race someone on the same board, or Trotbot', server: true },
+  { name: 'tetris', group: 'arcade', args: '@person | bot | sprint', desc: 'Tetris: alone, race someone live, race Trotbot, or a tournament', server: true },
+  { name: 'minesweep', group: 'arcade', args: '@person | bot | expert', desc: 'Minesweeper: alone, race someone on the same board, Trotbot, or a tournament', server: true },
   { name: 'battleship', group: 'arcade', args: '@person bet', desc: 'Battleship, turn by turn (anyone, or @Trotbot)', server: true },
 
   { name: 'task', group: 'team', args: 'title @person friday !high', desc: 'Make a task' },
@@ -126,6 +126,7 @@ const pick = (list) => list[Math.floor(Math.random() * list.length)];
 // Anything left after the game words ("bot", "hard", "expert"…) is a person to race.
 const GAME_WORDS = /^(bot|trotbot|easy|medium|hard|beginner|intermediate|expert|marathon|sprint|ultra|\d+)$/i;
 const namesSomeone = (args) =>
+  !/\btournament\s+\S/i.test(args) &&
   args
     .replace(/@/g, '')
     .split(/\s+/)

@@ -34,10 +34,10 @@ export function MiniMines({ text, w, h, cell = 5, label, sub }) {
     }
   }, [text, w, h, cell]);
   return (
-    <div className="tt-mini">
-      {label && <div className="tt-mini-label">{label}</div>}
+    <div className="tet-mini">
+      {label && <div className="tet-mini-label">{label}</div>}
       <canvas ref={ref} style={{ width: w * cell, height: h * cell }} aria-hidden="true" />
-      {sub && <div className="tt-mini-sub mono">{sub}</div>}
+      {sub && <div className="tet-mini-sub mono">{sub}</div>}
     </div>
   );
 }

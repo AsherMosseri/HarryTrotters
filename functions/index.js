@@ -1393,7 +1393,7 @@ export const funGame = onCall({ maxInstances: 5, invoker: 'public' }, async (req
       const id = body.tournament;
       if (!validId(id)) throw new HttpsError('invalid-argument', 'Which tournament?');
       const t = (await db.doc(`tournaments/${id}`).get()).data();
-      if (!t || t.game !== game) return note('That tournament is gone.');
+      if (!t || t.game !== fun.tourGame(game)) return note('That tournament is gone.');
       if (t.status === 'done' || now >= t.endsAt) return note('That tournament is over.');
       if (t.opensAt && now < t.opensAt) return note('That tournament hasn’t started yet.');
       if (!playerKey(t, me, rename)) return note('Join it first.', 'Tournament entries are in the market.');
@@ -1505,7 +1505,7 @@ export const submitTournamentScore = onCall({ maxInstances: 5, invoker: 'public'
   if (s.done) return note('That game is already in.');
   const tref = db.doc(`tournaments/${id}`);
   const t = (await tref.get()).data();
-  if (!t || t.game !== s.game) return note('That tournament is gone.');
+  if (!t || t.game !== fun.tourGame(s.game)) return note('That tournament is gone.');
   if (t.status === 'done' || s.startedAt >= t.endsAt) return note('That tournament is over.');
   if (now > s.startedAt + fun.tournamentGrace(s.game)) return note('That game took too long to count.');
   const r = fun.replayGame(s, moves);
@@ -1521,10 +1521,13 @@ export const submitTournamentScore = onCall({ maxInstances: 5, invoker: 'public'
     if (!key) return note('You’re not in that tournament.');
     if (problem) return note(problem);
     if (td.status === 'done') return note('That tournament is over.');
-    const before = td.players[key].best;
-    const best = before == null ? score : Math.max(before, score);
-    if (best !== before) tx.update(tref, new FieldPath('players', key, 'best'), best, new FieldPath('players', key, 'at'), now);
-    return { ok: true, score, best, improved: best !== before, text: fun.tournamentText(s.game, score), bestText: fun.tournamentText(s.game, best) };
+    // Only a better result counts (td.better: high points or low seconds);
+    // `at` is when the best was set, which breaks ties.
+    const before = td.players[key].best ?? null;
+    const improved = fun.beats(fun.betterOf(td), score, before);
+    const best = improved ? score : before;
+    if (improved) tx.update(tref, new FieldPath('players', key, 'best'), best, new FieldPath('players', key, 'at'), now);
+    return { ok: true, score, best, improved, text: fun.tournamentText(s.game, score), bestText: fun.tournamentText(s.game, best) };
   });
   return res;
 });

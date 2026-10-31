@@ -785,33 +785,6 @@ const payDemoAwards = (awards, msgId, now) => {
   for (const a of awards || []) demoAward({ ...a, source: 'game', key: `game-${msgId}-${personId(a.person)}` }, now);
 };
 
-// Two practice tournaments so demo mode can try them (the market makes the real ones).
-function demoTournaments() {
-  if (state.tournaments) return state.tournaments;
-  const now = Date.now();
-  const players = (game) => ({
-    'Asher Mosseri': { joinedAt: now, best: null, at: now },
-    'Cooper Mlezcko': { joinedAt: now, best: null, at: now },
-    'Sophia Bermudez': { joinedAt: now, best: game === 'tetris' ? 8420 : fun.tournamentScore('minesweep', { won: true, ms: 74300 }), at: now },
-    'Jackson Lucks': { joinedAt: now, best: game === 'tetris' ? 5310 : fun.tournamentScore('minesweep', { won: false, cells: 151 }), at: now },
-  });
-  state.tournaments = ['tetris', 'minesweep'].map((game) => ({
-    id: `demo-${game}`,
-    game,
-    title: game === 'tetris' ? 'Friday Tetris' : 'Mine Sweep Showdown',
-    entry: 5,
-    pot: 20,
-    seed: newSeed(),
-    status: 'open',
-    opensAt: now - 3600000,
-    endsAt: now + 6 * 86400000,
-    players: players(game),
-    winners: [],
-    by: 'Asher Mosseri',
-  }));
-  return state.tournaments;
-}
-
 function setCard({ conv, id }, fields) {
   const list = state.chat?.[conv];
   if (!list) return;
@@ -1555,8 +1528,8 @@ export const demoStore = {
         if (c.game.results?.[me]) return note('You already finished this race.');
         Object.assign(s, { seed: c.game.seed, level: c.game.level || 'beginner', race: { conv, msgId } });
       } else if (mode === 'tournament') {
-        const t = demoTournaments().find((x) => x.id === req.tournament);
-        if (!t || t.game !== game || t.status !== 'open' || now >= t.endsAt) return note('That tournament is over.');
+        const t = (state.tournaments || []).find((x) => x.id === req.tournament);
+        if (!t || t.game !== fun.tourGame(game) || t.status !== 'open' || now >= t.endsAt) return note('That tournament is over.');
         if (!t.players?.[me]) return note('Join it first.', 'Tournament entries are in the market.');
         const attempt = Object.values(games).filter((x) => x.tournament === t.id && x.person === me).length + 1;
         Object.assign(s, { tournament: t.id, attempt, seed: attemptSeed(`${t.seed}:demo`, attempt), level: game === 'minesweep' ? fun.TOURNAMENT_LEVEL : 1 });
@@ -1580,16 +1553,18 @@ export const demoStore = {
       const problem = fun.timingProblem(s, r, now - s.startedAt);
       Object.assign(s, { done: true, finishedAt: now, result: r, problem });
       if (s.mode === 'tournament') {
-        const t = demoTournaments().find((x) => x.id === s.tournament);
+        const t = (state.tournaments || []).find((x) => x.id === s.tournament);
         const score = fun.tournamentScore(s.game, r);
         s.score = score;
         commit();
         if (problem) return note(problem);
-        const before = t.players[me].best;
-        const best = before == null ? score : Math.max(before, score);
-        t.players = { ...t.players, [me]: { ...t.players[me], best, at: now } };
+        if (!t?.players?.[me] || t.status !== 'open') return note('That tournament is over.');
+        const before = t.players[me].best ?? null;
+        const improved = fun.beats(fun.betterOf(t), score, before);
+        const best = improved ? score : before;
+        if (improved) t.players = { ...t.players, [me]: { ...t.players[me], best, at: now } };
         commit();
-        return { ok: true, score, best, improved: best !== before, text: fun.tournamentText(s.game, score), bestText: fun.tournamentText(s.game, best) };
+        return { ok: true, score, best, improved, text: fun.tournamentText(s.game, score), bestText: fun.tournamentText(s.game, best) };
       }
       if (s.mode === 'race') {
         commit();
@@ -1646,10 +1621,6 @@ export const demoStore = {
     const s = (state.funGames || {})[session];
     if (!s || s.tournament !== id) return { note: { title: 'That game is gone.' } };
     return demoStore.funGame({ action: 'tournament', id: session, moves }, actor);
-  },
-  subscribeTournaments(cb) {
-    demoTournaments();
-    return listen(() => cb((state.tournaments || []).filter((t) => t.status === 'open')));
   },
   // Races in demo mode are against Trotbot, so nobody else's picture comes in.
   async setRaceLive(race, data, actor) {

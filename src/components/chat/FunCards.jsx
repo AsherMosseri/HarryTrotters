@@ -121,7 +121,8 @@ function Grid({ label, cell, info, onTap, disabled, small, children, gridRef, ..
   return (
     <div className={`bs-board${small ? ' small' : ''}`}>
       {label && <div className="bs-label small">{label}</div>}
-      <div className="bs-grid" ref={gridRef} {...rest}>
+      {/* Taps here are moves, not a tap on the message (which opens its actions). */}
+      <div className="bs-grid" ref={gridRef} onClick={(e) => e.stopPropagation()} {...rest}>
         {Array.from({ length: N * N }, (_, i) => {
           const x = info(i);
           return (

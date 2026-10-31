@@ -11,6 +11,9 @@ export function onOpenGame(fn) {
 // What "/tetris …" or "/minesweep …" asks for, when it isn't a challenge:
 // "bot hard", "expert", "sprint", "trotbot easy intermediate".
 export function gameArgs(game, args) {
+  // "tournament <id>": the market's Play button types this.
+  const tour = /\btournament\s+([\w-]{1,40})/i.exec(String(args || ''));
+  if (tour) return { game, mode: 'tournament', tournament: tour[1] };
   const words = String(args || '')
     .toLowerCase()
     .replace(/@/g, '')

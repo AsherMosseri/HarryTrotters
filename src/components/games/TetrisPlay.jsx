@@ -29,7 +29,7 @@ export function clearLabel(last) {
 
 const themeColors = (el) => {
   const cs = getComputedStyle(el);
-  return { bg: cs.getPropertyValue('--tt-bg').trim() || '#10151f', grid: cs.getPropertyValue('--tt-grid').trim() || '#1c2433' };
+  return { bg: cs.getPropertyValue('--tet-bg').trim() || '#10151f', grid: cs.getPropertyValue('--tet-grid').trim() || '#1c2433' };
 };
 
 function drawBlock(ctx, x, y, c, color, ghost = false) {
@@ -77,10 +77,10 @@ export function MiniBoard({ board, cell = 7, label, sub, over }) {
     }
   }, [board, cell]);
   return (
-    <div className={`tt-mini${over ? ' over' : ''}`}>
-      {label && <div className="tt-mini-label">{label}</div>}
+    <div className={`tet-mini${over ? ' over' : ''}`}>
+      {label && <div className="tet-mini-label">{label}</div>}
       <canvas ref={ref} style={{ width: T.W * cell, height: 20 * cell }} aria-hidden="true" />
-      {sub && <div className="tt-mini-sub mono">{sub}</div>}
+      {sub && <div className="tet-mini-sub mono">{sub}</div>}
     </div>
   );
 }
@@ -412,40 +412,48 @@ export default function TetrisPlay({ opts, bot, other, canPause, onLock, onEnd }
   const timeText = g.limit ? seconds(Math.max(0, g.limit - hud.frame)) : seconds(hud.frame);
   const small = Math.max(10, Math.round(cell * 0.55));
   const showLabels = animOn('celebrate');
+  // Pause (playing alone), or give up (a race, Trotbot, a tournament: the clock can't stop).
+  const stop = () =>
+    canPause
+      ? setPause(true)
+      : confirmDialog({ title: 'Give up this game?', body: 'It counts as not finishing.', okLabel: 'Give up', danger: true }).then((ok) => ok && quit());
 
   return (
-    <div className={`tt${touch ? ' touch' : ''}`}>
-      <div className="tt-side tt-left">
-        <div className="tt-box">
-          <div className="tt-cap">Hold</div>
+    <div className={`tet${touch ? ' touch' : ''}`}>
+      <div className="tet-side tet-left">
+        <div className="tet-box">
+          <div className="tet-cap">Hold</div>
           <PieceBox pieces={[hud.hold]} cell={small} dim={hud.held} />
         </div>
-        <div className="tt-stats">
+        <div className="tet-stats">
           <div>
-            <span className="tt-cap">Score</span>
+            <span className="tet-cap">Score</span>
             <b className="mono">{hud.score.toLocaleString('en-US')}</b>
           </div>
           <div>
-            <span className="tt-cap">{mode === 'sprint' ? 'Lines left' : 'Lines'}</span>
+            <span className="tet-cap">{mode === 'sprint' ? 'Lines left' : 'Lines'}</span>
             <b className="mono">{mode === 'sprint' ? Math.max(0, T.SPRINT_LINES - hud.lines) : hud.lines}</b>
           </div>
           {mode !== 'sprint' && (
             <div>
-              <span className="tt-cap">Level</span>
+              <span className="tet-cap">Level</span>
               <b className="mono">{hud.level}</b>
             </div>
           )}
           <div>
-            <span className="tt-cap">{g.limit ? 'Time left' : 'Time'}</span>
+            <span className="tet-cap">{g.limit ? 'Time left' : 'Time'}</span>
             <b className="mono">{timeText}</b>
           </div>
         </div>
+        <button className="btn small tet-stop" onClick={stop}>
+          <Icon name={canPause ? 'pause' : 'flag'} /> {canPause ? 'Pause' : 'Give up'}
+        </button>
       </div>
-      <div className="tt-center">
-        <div className="tt-board-wrap" ref={wrapRef}>
+      <div className="tet-center">
+        <div className="tet-board-wrap" ref={wrapRef}>
           <canvas
             ref={boardRef}
-            className="tt-board"
+            className="tet-board"
             style={{ width: T.W * cell, height: 20 * cell }}
             onPointerDown={onDown}
             onPointerMove={onMove}
@@ -454,12 +462,12 @@ export default function TetrisPlay({ opts, bot, other, canPause, onLock, onEnd }
             aria-label="Tetris board"
           />
           {label && showLabels && (
-            <div key={label.key} className={`tt-label${label.big ? ' big' : ''}`} onAnimationEnd={() => setLabel(null)}>
+            <div key={label.key} className={`tet-label${label.big ? ' big' : ''}`} onAnimationEnd={() => setLabel(null)}>
               {label.text}
             </div>
           )}
           {isPaused && (
-            <div className="tt-paused">
+            <div className="tet-paused">
               <b>Paused</b>
               <button className="btn primary" onClick={() => setPause(false)}>
                 <Icon name="play" /> Resume
@@ -471,9 +479,9 @@ export default function TetrisPlay({ opts, bot, other, canPause, onLock, onEnd }
           )}
         </div>
       </div>
-      <div className="tt-side tt-right">
-        <div className="tt-box">
-          <div className="tt-cap">Next</div>
+      <div className="tet-side tet-right">
+        <div className="tet-box">
+          <div className="tet-cap">Next</div>
           <PieceBox pieces={hud.next} cell={small} rows={touch ? 3 : 5} />
         </div>
         {bot && (
@@ -495,44 +503,44 @@ export default function TetrisPlay({ opts, bot, other, canPause, onLock, onEnd }
           />
         )}
         {!bot && !other && (
-          <div className="tt-keys muted tiny">
-            {touch ? 'Tap the board to turn, drag to move, flick down to drop.' : '← → move · ↑ / X turn · Z turn back · ↓ soft · Space drop · C hold'}
-          </div>
+          <ul className="tet-keys muted tiny">
+            {(touch
+              ? [['Tap', 'turn'], ['Drag', 'move'], ['Flick ↓', 'drop'], ['Flick ↑', 'hold']]
+              : [['← →', 'move'], ['↑ X', 'turn'], ['Z', 'turn back'], ['↓', 'soft drop'], ['Space', 'drop'], ['C', 'hold'], ['Esc', 'pause']]
+            ).map(([k, v]) => (
+              <li key={k}>
+                <kbd>{k}</kbd> {v}
+              </li>
+            ))}
+          </ul>
         )}
       </div>
-      <div className="tt-pad tt-pad-left" aria-label="Move">
-        <button className="tt-btn" aria-label="Hold" {...tap(T.IN.hold)}>
+      <div className="tet-pad tet-pad-left" aria-label="Move">
+        <button className="tet-btn" aria-label="Hold" {...tap(T.IN.hold)}>
           <Icon name="swap" size={22} />
         </button>
         <span />
-        <button className="tt-btn" aria-label="Pause" onClick={() =>
-            canPause
-              ? setPause(true)
-              : confirmDialog({ title: 'Give up this game?', body: 'It counts as not finishing.', okLabel: 'Give up', danger: true }).then(
-                  (ok) => ok && quit(),
-                )
-          }
-          title={canPause ? 'Pause' : 'Give up'}>
+        <button className="tet-btn" aria-label={canPause ? 'Pause' : 'Give up'} onClick={stop}>
           <Icon name={canPause ? 'pause' : 'flag'} size={20} />
         </button>
-        <button className="tt-btn" aria-label="Left" {...hold(() => holdDir('left', true), () => holdDir('left', false))}>
+        <button className="tet-btn" aria-label="Left" {...hold(() => holdDir('left', true), () => holdDir('left', false))}>
           <Icon name="left" size={26} />
         </button>
-        <button className="tt-btn" aria-label="Soft drop" {...hold(() => holdSoft(true), () => holdSoft(false))}>
+        <button className="tet-btn" aria-label="Soft drop" {...hold(() => holdSoft(true), () => holdSoft(false))}>
           <Icon name="down" size={26} />
         </button>
-        <button className="tt-btn" aria-label="Right" {...hold(() => holdDir('right', true), () => holdDir('right', false))}>
+        <button className="tet-btn" aria-label="Right" {...hold(() => holdDir('right', true), () => holdDir('right', false))}>
           <Icon name="right" size={26} />
         </button>
       </div>
-      <div className="tt-pad tt-pad-right" aria-label="Turn and drop">
-        <button className="tt-btn" aria-label="Turn left" {...tap(T.IN.ccw)}>
+      <div className="tet-pad tet-pad-right" aria-label="Turn and drop">
+        <button className="tet-btn" aria-label="Turn left" {...tap(T.IN.ccw)}>
           <Icon name="rotateCcw" size={24} />
         </button>
-        <button className="tt-btn" aria-label="Turn right" {...tap(T.IN.cw)}>
+        <button className="tet-btn" aria-label="Turn right" {...tap(T.IN.cw)}>
           <Icon name="rotateCw" size={24} />
         </button>
-        <button className="tt-btn wide primary" aria-label="Drop" {...tap(T.IN.hard)}>
+        <button className="tet-btn wide primary" aria-label="Drop" {...tap(T.IN.hard)}>
           <Icon name="drop" size={24} />
         </button>
       </div>

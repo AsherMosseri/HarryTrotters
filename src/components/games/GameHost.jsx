@@ -176,7 +176,7 @@ function Picker({ game, setGame, api, actor, roster, isOn, onPlay, error, onClos
   const [sent, setSent] = useState('');
   const [tournaments, setTournaments] = useState([]);
   useEffect(() => api.subscribeTournaments?.(setTournaments), [api]);
-  const mine = tournaments.filter((t) => t.game === game && t.status === 'open' && t.endsAt > Date.now());
+  const mine = tournaments.filter((t) => t.game === fun.tourGame(game) && t.status === 'open' && t.endsAt > Date.now());
   const others = roster.filter((n) => n !== actor.name);
   const challenge = async () => {
     const args = [`@${rival}`, ...(game === 'minesweep' ? [level] : [])];
@@ -295,9 +295,11 @@ function Picker({ game, setGame, api, actor, roster, isOn, onPlay, error, onClos
 }
 
 function TournamentRow({ t, me, onPlay }) {
+  const game = fun.gameOfTour(t);
+  const low = fun.betterOf(t) === 'low';
   const ranked = Object.entries(t.players || {})
     .filter(([, p]) => p.best != null)
-    .sort((a, b) => b[1].best - a[1].best);
+    .sort((a, b) => (low ? a[1].best - b[1].best : b[1].best - a[1].best) || (a[1].at || 0) - (b[1].at || 0));
   const joined = !!t.players?.[me];
   const myBest = t.players?.[me]?.best;
   const hours = Math.max(0, Math.round((t.endsAt - Date.now()) / 3600000));
@@ -310,7 +312,7 @@ function TournamentRow({ t, me, onPlay }) {
           {joined && (
             <>
               {' '}
-              · your best <span className="mono">{fun.tournamentText(t.game, myBest)}</span>
+              · your best <span className="mono">{fun.tournamentText(game, myBest)}</span>
             </>
           )}
         </div>
@@ -318,7 +320,7 @@ function TournamentRow({ t, me, onPlay }) {
           <ol className="fun-ranks small">
             {ranked.slice(0, 3).map(([name, p]) => (
               <li key={name}>
-                <Avatar name={name} size={18} /> {name.split(' ')[0]} <span className="mono muted">{fun.tournamentText(t.game, p.best)}</span>
+                <Avatar name={name} size={18} /> {name.split(' ')[0]} <span className="mono muted">{fun.tournamentText(game, p.best)}</span>
               </li>
             ))}
           </ol>
@@ -425,7 +427,9 @@ function Result({ game, session, pick, result, conv, api, onAgain, onPicker, onC
         : mode === 'tournament'
           ? r.improved
             ? 'New best!'
-            : 'Counted'
+            : r.score == null
+              ? 'No time this round'
+              : 'Not your best'
           : game === 'minesweep'
             ? s.won
               ? 'Cleared!'
@@ -459,6 +463,7 @@ function Result({ game, session, pick, result, conv, api, onAgain, onPicker, onC
       )}
       {mode === 'tournament' && r.ok && (
         <div className="small">
+          {r.score == null && 'Only a cleared board gets a time. '}
           Your best: <b className="mono">{r.bestText}</b>
         </div>
       )}
