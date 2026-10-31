@@ -4,6 +4,7 @@ import { COMMANDS, GROUPS } from '../../commands.js';
 import { CASINO_CARDS, CasinoBody, ECONOMY_CARDS } from './Casino.jsx';
 import { ARCADE_CARDS, ArcadeBody } from './Arcade.jsx';
 import { Die } from './Die.jsx';
+import { MoreBody } from './MoreCards.jsx';
 import { LabDay } from '../LabLog.jsx';
 import { RecapBody } from '../Life.jsx';
 import { DailyCard } from '../learn/DailyCard.jsx';
@@ -414,6 +415,8 @@ export function CommandCard({ m, onPerson, me, onMove, onBuy, conv }) {
         <CasinoBody m={m} me={me} onMove={onMove} onBuy={onBuy} Name={PersonName} />
       ) : kind === 'team' ? (
         <TeamBody c={m.cmd} by={m.by} onPerson={onPerson} />
+      ) : m.cmd.view ? (
+        <MoreBody c={m.cmd} by={m.by} onPerson={onPerson} />
       ) : (
         <Body c={m.cmd} by={m.by} onPerson={onPerson} />
       )}

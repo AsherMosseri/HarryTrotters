@@ -14,6 +14,8 @@ import { glows } from '../../../functions/shared/market.js';
 import { PetBadge } from '../Pet.jsx';
 
 export const QUICK_REACTIONS = ['👍', '✅', '😂', '❤️', '🔥', '👀'];
+// Commands that post a poll: the poll is the card (Trotbot's name on top).
+const POLL_COMMANDS = ['wyr', 'hottake', 'vs'];
 // Your quick reactions (the picker's Edit, saved on your profile), or the first three.
 const quickOf = (profile) => (Array.isArray(profile?.quickReactions) ? profile.quickReactions.slice(0, QUICK_MAX) : QUICK_REACTIONS.slice(0, 3));
 
@@ -584,7 +586,7 @@ export default function Message({
                 {m.editedAt && feat('editing') && <span className="muted tiny edited"> (edited)</span>}
               </div>
             )}
-            {m.cmd && m.cmd.name !== 'me' && m.cmd.name !== 'wyr' && (
+            {m.cmd && !['me', ...POLL_COMMANDS].includes(m.cmd.name) && (
               <CommandCard
                 m={m}
                 conv={conv}
@@ -594,7 +596,7 @@ export default function Message({
                 onBuy={(n) => api.play({ action: 'run', game: 'lottery', args: [String(n)], conv })}
               />
             )}
-            {m.cmd?.name === 'wyr' && <Trotbot name="wyr" />}
+            {POLL_COMMANDS.includes(m.cmd?.name) && <Trotbot name={m.cmd.name} />}
             {m.poll && feat('polls') && (
               <Poll
                 m={m}

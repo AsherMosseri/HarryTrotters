@@ -1898,6 +1898,11 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
       myShift: () => liveMyShift.current,
       startShift: () => startMyShift(),
       endShift: () => setShiftPanel(true),
+      // For the team commands (/hours, /streak, /milestone, /nextmatch, /roster…).
+      shifts: namedShifts,
+      milestones,
+      matches,
+      subteamsOf: (name) => peopleInfo.get(name)?.subteams || [],
       onShift: () =>
         shifts
           .filter((x) => !x.end)

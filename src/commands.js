@@ -9,12 +9,14 @@
 import { overdueTasks, parseMatch, parseTask, seasonRecord, todayISO } from './teamCommands.js';
 import { blocked, isOff } from '../functions/shared/commandRules.js';
 import { gameArgs } from './components/games/launch.js';
+import { MORE_COMMANDS, runMore } from './moreCommands.js';
 
 export const GROUPS = [
   ['basics', 'Basics'],
   ['text', 'Text fun'],
   ['random', 'Random'],
   ['actions', 'Actions'],
+  ['learn', 'Robotics help'],
   ['economy', 'Jackson coins'],
   ['casino', 'Casino (in #arcade)'],
   ['arcade', 'Games (in #arcade)'],
@@ -91,6 +93,8 @@ export const COMMANDS = [
   { name: 'shift', group: 'team', args: 'who', desc: 'Clock in or out (/shift who: who’s at the lab)' },
   { name: 'match', group: 'team', args: 'auto teleop endgame win #7', desc: 'Log a match to the Match Log (or see the record)' },
   { name: 'standup', group: 'team', args: '', desc: 'Yesterday / today / blockers' },
+  // 3.0: fun, text, robotics help and team lookups (moreCommands.js).
+  ...MORE_COMMANDS,
 ];
 export const commandByName = Object.fromEntries(COMMANDS.map((c) => [c.name, c]));
 
@@ -676,7 +680,7 @@ export async function runCommand({ cmd, args }, ctx) {
       return card({ to: to || '', line }, { mentions: to && !self ? [to] : [] });
     }
     default:
-      return { note: { title: `/${cmd.name} isn’t ready yet` } };
+      return (await runMore({ cmd, args }, ctx, { card, need })) || { note: { title: `/${cmd.name} isn’t ready yet` } };
   }
 }
 
