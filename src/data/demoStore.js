@@ -616,8 +616,13 @@ function seedMarket() {
   state.perks = [idea(0, { limit: 1, per: 'week' }), idea(1), idea(3, { stock: 3 }), idea(6, { approval: false, price: 30 })];
   state.purchases = [];
   state.coins = state.coins || [];
+  // Each seeded buy comes with a bonus that pays for it, so nobody starts the
+  // demo with fewer coins than before.
+  const bonus = (to, amount, at) =>
+    state.coins.push({ id: `c${uid()}`, type: 'grant', to, amount, note: 'Helped at the open house', by: 'Asher Mosseri', at: at - 60000 });
   const buy = (person, item, name, price, at, extra = {}) => {
     const id = uid();
+    bonus(person, price, at);
     state.purchases.push({ id, item, kind: item.split(':')[0], name, price, person, at, ...extra });
     state.coins.push({ id: `c${id}`, ...market.spendEntry(person, item, price, name, at) });
   };
@@ -661,8 +666,10 @@ function seedMarket() {
   state.tournaments = [
     { id: 'tour1', game: 'tetris', title: 'Friday Tetris', entry: 15, pot: 45, seed: 'demo1', better: 'high', status: 'open', opensAt: now - day, endsAt: now + 2 * day, players, winners: [], by: 'Asher Mosseri', at: now - day },
   ];
-  for (const [name, p] of Object.entries(players))
+  for (const [name, p] of Object.entries(players)) {
+    bonus(name, 15, p.joinedAt);
     state.coins.push({ id: `c${uid()}`, type: 'spend', person: name, amount: 15, what: 'tournament', item: 'tour:tour1', label: 'Tournament entry: Friday Tetris', at: p.joinedAt });
+  }
   state.marketSeeded = 1;
 }
 // Tournaments that ended get paid, the way payTournaments does it.

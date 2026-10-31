@@ -202,8 +202,10 @@ export function marketFunctions({ db, coinData, freshCoins, notify, bankRef, per
   }
 
   const payTournaments = onSchedule({ schedule: 'every 10 minutes', timeZone }, async () => {
-    const due = await db.collection('tournaments').where('status', '==', 'open').where('endsAt', '<=', Date.now()).get();
-    for (const d of due.docs) await settle(d.id).catch((e) => logger.error('tournament payout', d.id, e));
+    // Only a few are open at a time; filtering here needs no composite index.
+    const open = await db.collection('tournaments').where('status', '==', 'open').get();
+    const due = open.docs.filter((d) => (d.get('endsAt') || 0) <= Date.now());
+    for (const d of due) await settle(d.id).catch((e) => logger.error('tournament payout', d.id, e));
   });
 
   const marketManage = onCall(OPEN, async (req) => {
