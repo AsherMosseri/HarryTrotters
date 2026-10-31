@@ -22,7 +22,7 @@ import * as arcadeBank from './banks/arcade.js';
 import * as fun from './shared/funGames.js';
 import * as mines from './shared/minesweeper.js';
 import { newSeed } from './shared/rng.js';
-import { MANAGER_NAMES, PASSWORD_MIN, cleanName, isManagerName, knownName, memberOk, onTeam } from './shared/team.js';
+import { MANAGER_NAMES, PASSWORD_MIN, ROSTER, cleanName, isManagerName, knownName, memberOk, onTeam, sameName } from './shared/team.js';
 import { TEAM_NUMBER, fromSchedule, rankOf, scoreOf, seasonOf } from './shared/matches.js';
 import { asksOn } from './shared/checkin.js';
 import { marketFunctions } from './market.js';
@@ -744,7 +744,7 @@ async function dropRequestIfDone(name, rename, team) {
 async function signDeviceIn(uid, name, team, before) {
   // This device already signed in as this name and was let in (say, with
   // the team code before passwords): still them.
-  const pending = !onTeam(name, team) && !(before && !before.pending && before.name === name);
+  const pending = !onTeam(name, team) && !(before && !before.pending && sameName(before.name, name));
   const batch = db.batch();
   batch.set(db.doc(`members/${uid}`), { name, admin: isManagerName(name), via: 'password', joinedAt: Date.now(), ...(pending && { pending: true }) });
   if (!pending) batch.set(db.doc(`people/${uid}`), { name, joinedAt: Date.now() }, { merge: true });
@@ -777,6 +777,8 @@ export const account = onCall({ maxInstances: 5, invoker: 'public' }, async (req
   let name = '';
   // Who's on the team (onTeam), read with the names below.
   const team = { rename, roles: [], people: [] };
+  // A typed name (or a setup ticket's) as the person it is, under their current name.
+  let resolve = (n) => rename(cleanName(n));
   if (typed) {
     const [people, roles, accounts] = await Promise.all([
       db.collection('people').get(),
@@ -785,15 +787,22 @@ export const account = onCall({ maxInstances: 5, invoker: 'public' }, async (req
     ]);
     team.people = people.docs.map((d) => d.data());
     team.roles = roles.docs.map((d) => d.data());
+    // The spellings the team already uses come first (a device that joined as
+    // "katarina jurasic" keeps the name its data is saved under); the
+    // built-in roster only counts for someone who never signed in. Old names
+    // count too, in any capitals ("sam ortiz" is Sammy Ortiz after a rename).
     const names = [
       ...MANAGER_NAMES,
       ...accounts.docs.map((d) => d.get('name')),
       ...people.docs.map((d) => d.get('name')),
       ...roles.docs.map((d) => d.get('name')),
+      ...ROSTER,
     ]
       .filter(Boolean)
       .map(rename);
-    name = rename(knownName(rename(typed), names));
+    const spellings = [...new Set(names)].flatMap((n) => rename.aliases(n));
+    resolve = (n) => rename(knownName(rename(cleanName(n)), spellings));
+    name = resolve(typed);
   }
   const password = String(req.data?.password || '');
   const now = Date.now();
@@ -828,7 +837,7 @@ export const account = onCall({ maxInstances: 5, invoker: 'public' }, async (req
   if (action === 'status') {
     if (!name) return { member: signedIn ? { name: me, admin: isManagerName(me) } : before?.pending ? { name: me, admin: false, pending: true } : null };
     const acc = await accountRef(name).get();
-    return { hasPassword: !!acc.get('hash'), thisDevice: me === name };
+    return { hasPassword: !!acc.get('hash'), thisDevice: sameName(me, name) };
   }
 
   // A first password for a name that has none: from a device already signed
@@ -839,8 +848,10 @@ export const account = onCall({ maxInstances: 5, invoker: 'public' }, async (req
     if (password.length < PASSWORD_MIN) return fail(`Use at least ${PASSWORD_MIN} characters.`);
     const ticketRef = db.doc(`setupTickets/${uid}`);
     const ticket = await ticketRef.get();
-    const viaTicket = ticket.exists && rename(ticket.get('name') || '') === name && now - (ticket.get('at') || 0) < 10 * 60000;
-    if (me !== name && !viaTicket) return fail('Enter the team code to set up this name on a new device.');
+    // Names compare as the same person (any capitals, spaces, old names): the
+    // ticket has the name as typed, and a 2.75 device the name it joined with.
+    const viaTicket = ticket.exists && sameName(resolve(ticket.get('name') || ''), name) && now - (ticket.get('at') || 0) < 10 * 60000;
+    if (!sameName(me, name) && !viaTicket) return fail('Enter the team code to set up this name on a new device.');
     return db.runTransaction(async (tx) => {
       const acc = await tx.get(accountRef(name));
       if (acc.get('hash')) return fail('That name already has a password. Sign in with it.');
