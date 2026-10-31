@@ -693,11 +693,16 @@ export const FX = {
           ctx.beginPath();
           ctx.arc(ex, ey, 3 * grow, 0, TAU);
           ctx.fill();
-          tr.pulse = (tr.pulse + tr.sp * dt) % 1;
+          // The pulse fades in at the edge and out at the end, where the end
+          // pad flashes and dims (it used to vanish the moment a pulse restarted).
+          tr.pulse += tr.sp * dt;
+          if (tr.pulse >= 1) ((tr.pulse %= 1), (tr.flash = 1));
+          tr.flash = Math.max(0, (tr.flash || 0) - dt * 2.5);
           const [px, py] = at(tr, tr.pulse * tr.len * grow);
           ctx.globalCompositeOperation = 'lighter';
-          drawGlow(ctx, '#6ee7b7', px, py, 9, 0.9);
-          if (tr.pulse > 0.94) drawGlow(ctx, '#a7f3d0', ex, ey, 12, (tr.pulse - 0.94) * 16);
+          drawGlow(ctx, '#6ee7b7', px, py, 9, 0.9 * Math.min(1, tr.pulse / 0.08, (1 - tr.pulse) / 0.08));
+          const arriving = tr.pulse > 0.94 ? (tr.pulse - 0.94) * 16 : 0;
+          if (arriving || tr.flash) drawGlow(ctx, '#a7f3d0', ex, ey, 12, Math.max(arriving, tr.flash * 0.96));
           ctx.globalCompositeOperation = 'source-over';
         }
       };

@@ -1398,7 +1398,10 @@ h3.md-h { font-size: 16.5px; }
 .fx-fire span, .fx-bubbles span { top: auto; bottom: -12%; animation-name: fx-rise; }
 .fx-sparkles span { top: calc(var(--i) * 7%); animation-name: fx-twinkle; }
 .fx-confetti span { width: 6px; height: 10px; border-radius: 2px; background: hsl(calc(var(--i) * 47) 90% 60%); }
-@keyframes fx-fall { to { transform: translateY(560px) rotate(240deg); } }
+/* Falls past the bottom of whatever it covers (a card, or the whole app
+   behind a theme), so nothing vanishes mid-screen and pops back at the top. */
+.profile-effect { container-type: size; }
+@keyframes fx-fall { to { transform: translateY(560px) rotate(240deg); transform: translateY(calc(112cqh + 30px)) rotate(240deg); } }
 @keyframes fx-rise { to { transform: translateY(-560px) scale(0.6); opacity: 0; } }
 @keyframes fx-twinkle { 0%, 100% { opacity: 0; transform: scale(0.4); } 50% { opacity: 1; transform: scale(1.1); } }
 @media (prefers-reduced-motion: reduce) { :root:not([data-motion='on']) .profile-effect { display: none; } }
@@ -2080,17 +2083,21 @@ body:has(.bottom-nav):has(.composer) .toast { bottom: calc(150px + env(safe-area
 @keyframes ad-bolt { 0% { opacity: 1; } 33% { opacity: 0; } }
 .adeco .ad-bob { animation: ad-bob 2.4s ease-in-out infinite; }
 @keyframes ad-bob { 50% { transform: translateY(-4px); } }
-.adeco .ad-twinkle { transform-box: fill-box; transform-origin: center; animation: ad-twinkle 1.8s ease-in-out infinite; animation-delay: var(--d, 0s); }
-@keyframes ad-twinkle { 0%, 100% { transform: scale(0.2); opacity: 0.2; } 50% { transform: scale(1); opacity: 1; } }
+.adeco .ad-twinkle { transform-box: fill-box; transform-origin: center; animation: adeco-twinkle 1.8s ease-in-out infinite; animation-delay: var(--d, 0s); }
+@keyframes adeco-twinkle { 0%, 100% { transform: scale(0.2); opacity: 0.2; } 50% { transform: scale(1); opacity: 1; } }
 .adeco .ad-ripple-color { color: var(--accent); }
 .adeco .ad-ripple { transform-origin: 50px 50px; animation: ad-ripple 2.4s ease-out infinite; animation-delay: var(--d, 0s); }
-@keyframes ad-ripple { from { transform: scale(1); opacity: 0.9; } to { transform: scale(1.3); opacity: 0; } }
+/* Each ring fades in as it leaves the avatar, so a new one never pops in. */
+@keyframes ad-ripple { from { transform: scale(1); opacity: 0; } 15% { opacity: 0.9; } to { transform: scale(1.3); opacity: 0; } }
 .adeco .ad-flip { transform-box: fill-box; transform-origin: center; animation: ad-flip 2.2s ease-in-out infinite; animation-delay: var(--d, 0s); }
 @keyframes ad-flip { 50% { transform: scaleX(-1) rotate(25deg); } }
 .adeco .ad-march { animation: ad-march 1.2s linear infinite; }
 @keyframes ad-march { to { stroke-dashoffset: -16; } }
-.adeco .ad-pulse { animation: ad-pulse 2.2s linear infinite; }
-@keyframes ad-pulse { to { stroke-dashoffset: -346; } }
+/* Decorations' keyframes have their own names: the ads' ad-pulse, ad-twinkle
+   and ad-sway (defined later) used to replace them, so the circuit pulse
+   bounced from a corner instead of running round the ring. */
+.adeco .ad-pulse { animation: adeco-pulse 2.2s linear infinite; }
+@keyframes adeco-pulse { to { stroke-dashoffset: -346; } }
 @media (prefers-reduced-motion: reduce) { :root:not([data-motion='on']) .adeco, :root:not([data-motion='on']) .adeco * { animation: none !important; } }
 /* Small avatars: a ring in the decoration's colors instead. */
 .deco-anim::before { inset: calc(var(--s) * -0.08); }
@@ -2208,8 +2215,8 @@ body:has(.bottom-nav):has(.composer) .toast { bottom: calc(150px + env(safe-area
 @keyframes ad-twitch { 0%, 86%, 100% { transform: rotate(0); } 90% { transform: rotate(var(--r, 10deg)); } 94% { transform: rotate(calc(var(--r, 10deg) * -0.4)); } }
 .adeco .ad-flop { animation: ad-flop 3s ease-in-out infinite; }
 @keyframes ad-flop { 50% { transform: rotate(var(--r, 7deg)); } }
-.adeco .ad-sway { animation: ad-sway 3.4s ease-in-out infinite; }
-@keyframes ad-sway { 0%, 100% { transform: rotate(-3deg); } 50% { transform: rotate(4deg); } }
+.adeco .ad-sway { animation: adeco-sway 3.4s ease-in-out infinite; }
+@keyframes adeco-sway { 0%, 100% { transform: rotate(-3deg); } 50% { transform: rotate(4deg); } }
 .adeco .ad-bop { animation: ad-bop 0.9s ease-in-out infinite; }
 @keyframes ad-bop { 50% { transform: translateY(-2px) rotate(-2deg); } }
 .adeco .ad-note { animation: ad-note 1.8s ease-out infinite; animation-delay: var(--d, 0s); }
@@ -2274,7 +2281,10 @@ body:has(.bottom-nav):has(.composer) .toast { bottom: calc(150px + env(safe-area
 .ne-fire { animation: ne-fire 1.6s ease-in-out infinite; filter: drop-shadow(0 0 4px rgba(249, 115, 22, 0.6)); }
 @keyframes ne-fire { 0%, 100% { background-position: 0 0; } 50% { background-position: 0 100%; } }
 .ne-ice { animation: ne-slide 4s linear infinite; filter: drop-shadow(0 0 3px rgba(125, 211, 252, 0.8)); }
-.ne-gold { animation: ne-slide 3s linear infinite; filter: drop-shadow(0 1px 0 #78350f); }
+.ne-gold { animation: ne-slide-wide 3s linear infinite; filter: drop-shadow(0 1px 0 #78350f); }
+/* Gold and Gear are 220% wide: one whole width is -183.33% (ne-slide's -200%
+   overshot it, so the shine jumped each time round). */
+@keyframes ne-slide-wide { to { background-position: -183.3333% 0; } }
 .ne-toon { -webkit-text-stroke: 1.6px #111827; paint-order: stroke fill; filter: drop-shadow(2px 2px 0 var(--nglow, #6366f1)); letter-spacing: 0.02em; }
 .ne-sparkle { animation: ne-glitter 1.6s linear infinite; }
 @keyframes ne-glitter { to { background-position: 14px -14px, -18px 18px, 22px 22px, 0 0; } }
@@ -2956,7 +2966,7 @@ body:has(.bottom-nav):has(.composer) .toast { bottom: calc(150px + env(safe-area
 @keyframes np-gear { to { rotate: 360deg; } }
 
 /* Gear name effect: steel text and a little gear turning after the name. */
-.ne-gear { animation: ne-slide 3.4s linear infinite; filter: drop-shadow(0 1px 0 rgba(15, 23, 42, 0.55)); }
+.ne-gear { animation: ne-slide-wide 3.4s linear infinite; filter: drop-shadow(0 1px 0 rgba(15, 23, 42, 0.55)); }
 .ne-gear::after {
   content: ''; display: inline-block; width: 0.82em; height: 0.82em; margin-left: 0.22em; vertical-align: -0.08em;
   background: var(--nglow, #94a3b8);
