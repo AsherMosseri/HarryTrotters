@@ -22,6 +22,19 @@ export const COIN_DEFAULTS = {
   prices: { hour: 10, today: 25, week: 120, skip: 2 },
 };
 
+// Coins the server pays for games, quizzes, bingo, streaks and the like
+// ('award' entries in the ledger, written only by functions/award.js): at most
+// this many per person per team day from each source. A source missing here
+// pays nothing, so every new way to earn has to be added on purpose.
+export const AWARD_CAPS = {
+  quiz: 30, // learning games (name that part, rules check, fix the bug…)
+  daily: 10, // the daily question
+  bingo: 25, // lab bingo rows
+  predict: 20, // score predictions
+  streak: 20, // streak milestones
+  game: 20, // fun games (Tetris, Minesweeper, Battleship…)
+};
+
 export function coinSettings(raw) {
   // Old settings that no longer do anything (the hourly rate and ad money).
   const rest = { ...(raw || {}) };
@@ -113,6 +126,8 @@ export function ledgerItems(name, ledger = []) {
       out.push({ kind: 'gift-out', at: x.at, amount: -x.amount, icon: '🎁', label: `To ${x.to}${x.note ? `: “${x.note}”` : ''}` });
     else if (x.type === 'gift' && x.to === name)
       out.push({ kind: 'gift-in', at: x.at, amount: x.amount, icon: '🎁', label: `From ${x.from}${x.note ? `: “${x.note}”` : ''}` });
+    else if (x.type === 'award' && x.person === name)
+      out.push({ kind: 'award', at: x.at, amount: x.amount, icon: '★', label: x.label || 'Earned' });
     else if (x.type === 'prize' && x.person === name)
       out.push({ kind: 'prize', at: x.at, amount: x.amount, icon: x.what === 'wheel' ? '🎡' : '🎮', label: x.label || 'Prize' });
     else if (x.type === 'grant' && x.to === name)
