@@ -43,6 +43,9 @@ import { Icon } from './shell/icons.jsx';
 import { loadEmoji } from './chat/emoji.js';
 const loadRobotView = () => import('./RobotView.jsx');
 const RobotView = lazy(loadRobotView);
+// The learning games load when Learn opens.
+const LearnView = lazy(() => import('./learn/Learn.jsx'));
+import { DailyContext } from './learn/DailyCard.jsx';
 import { HelpDialog, WelcomeCard } from './Help.jsx';
 import { VersionLogDialog, WhatsNew } from './VersionLog.jsx';
 import { RequestsDialog } from './Requests.jsx';
@@ -458,6 +461,7 @@ const VIEWS = [
   ['resources', 'Resources'],
   ['team', 'Roster'],
   ['market', 'Market'],
+  ['learn', 'Learn'],
 ];
 
 function matchesFilters(t, filters, me, view) {
@@ -480,13 +484,15 @@ const CHAT_PAGE = 60;
 const EMPTY_FILTERS = { q: '', person: '', subteam: '', priority: '', statuses: [], hideDone: false };
 
 // What components deep in the app read: people (profiles, who's online) and the lab log.
-function Contexts({ people, lab, lottery, controls, market, children }) {
+function Contexts({ people, lab, lottery, controls, market, daily, children }) {
   return (
     <ControlsContext.Provider value={controls}>
       <PeopleContext.Provider value={people}>
         <LabLogContext.Provider value={lab}>
           <LotteryContext.Provider value={lottery}>
-            <MarketContext.Provider value={market}>{children}</MarketContext.Provider>
+            <MarketContext.Provider value={market}>
+              <DailyContext.Provider value={daily}>{children}</DailyContext.Provider>
+            </MarketContext.Provider>
           </LotteryContext.Provider>
         </LabLogContext.Provider>
       </PeopleContext.Provider>
@@ -1470,6 +1476,14 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
       claimBingo: (req) => store.claimBingo(req || {}, actor),
       predict: (req) => store.predict(req, actor).catch((e) => ({ error: e?.message || 'That didn’t work.' })),
       recap: (req) => store.recap(req, actor),
+      // Learn (functions/learn.js): these throw, and the game shows the error.
+      quizNext: (req) => store.quizNext(req, actor),
+      quizAnswer: (req) => store.quizAnswer(req, actor),
+      quizProgress: () => store.quizProgress(actor),
+      quizReport: (req) => store.quizReport(req, actor),
+      autoRun: (req) => store.autoRun(req, actor),
+      subscribeQuizReports: (cb) => store.subscribeQuizReports(cb),
+      handleQuizReport: (id, status) => store.handleQuizReport(id, status, actor).catch(fail),
     }),
     [store, actor, fail, ok, quiet, setFilters, renames],
   );
@@ -1567,6 +1581,14 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
   // Lab log (Controls): required, optional (ending a shift can skip it), or off.
   const owedLog = labLogs && controls.labLog === 'required' ? missingLogDay(actor.name, namedShifts, labLogs) : null;
   const owedDay = owedLog && !previewSkipped.includes(`lablog:${owedLog}`) ? owedLog : null;
+  // The daily question card in #general (learn/DailyCard.jsx).
+  const dailyCtx = useMemo(
+    () => ({
+      answer: (req) => store.dailyAnswer(req, actor),
+      subscribe: (day, cb) => store.subscribeDailyAnswer(day, actor.name, cb),
+    }),
+    [store, actor],
+  );
   const labCtx = useMemo(
     () => ({
       logs: labLogs || [],
@@ -2220,7 +2242,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
     </div>
   );
   return (
-    <Contexts people={peopleCtx} lab={labCtx} lottery={lottery} controls={controls} market={market}>
+    <Contexts people={peopleCtx} lab={labCtx} lottery={lottery} controls={controls} market={market} daily={dailyCtx}>
       <AdsProvider value={ads.value}>
         <div
           className={`app${view === 'chat' || view === 'robot' ? ' chat-mode' : ''}${preview ? ' previewing' : ''}`}
@@ -2591,6 +2613,21 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
                       openConv('arcade');
                     }}
                   />
+                ) : view === 'learn' ? (
+                  <Suspense
+                    fallback={
+                      <main className="content">
+                        <p className="empty">Loading…</p>
+                      </main>
+                    }
+                  >
+                    <LearnView
+                      api={api}
+                      isManager={actor.admin}
+                      onOpenDaily={() => openConv('general')}
+                      dailyToday={(rawChat.general || []).find((m) => m.id === `daily-${teamDay(Date.now())}`) || null}
+                    />
+                  </Suspense>
                 ) : view === 'runs' ? (
                   <RunsView runs={runs} roster={roster} api={api} actor={actor} predictions={predictions} matches={matches} />
                 ) : view === 'team' ? (

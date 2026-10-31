@@ -6,6 +6,7 @@ import { ARCADE_CARDS, ArcadeBody } from './Arcade.jsx';
 import { Die } from './Die.jsx';
 import { LabDay } from '../LabLog.jsx';
 import { RecapBody } from '../Life.jsx';
+import { DailyCard } from '../learn/DailyCard.jsx';
 import { priorityById } from '../../config.js';
 import { daysBetween, todayISO } from '../../teamCommands.js';
 
@@ -20,7 +21,7 @@ export function Trotbot({ name }) {
       </span>
       <b>Trotbot</b>
       <span className="cmd-tag">BOT</span>
-      <span className="muted tiny">/{name}</span>
+      {name && <span className="muted tiny">/{name}</span>}
     </div>
   );
 }
@@ -29,7 +30,7 @@ const Name = ({ name, onPerson }) => (
   <DisplayName as="button" name={name} className="name-btn cmd-name" onClick={onPerson ? (e) => onPerson(name, e) : undefined} />
 );
 
-const TEAM_CARDS = ['task', 'overdue', 'shift', 'match', 'standup', 'labday', 'recap'];
+const TEAM_CARDS = ['task', 'overdue', 'shift', 'match', 'standup', 'labday', 'recap', 'dailyq'];
 const dayText = (iso) => {
   const d = daysBetween(todayISO(), iso);
   if (d === 0) return 'today';
@@ -64,6 +65,8 @@ function TeamBody({ c, by, onPerson }) {
       return <LabDay c={c} onPerson={onPerson} />;
     case 'recap':
       return <RecapBody c={c} onPerson={onPerson} />;
+    case 'dailyq':
+      return <DailyCard c={c} onPerson={onPerson} />;
     case 'task':
       return (
         <div>
@@ -404,7 +407,7 @@ export function CommandCard({ m, onPerson, me, onMove, onBuy }) {
   const PersonName = ({ name }) => <Name name={name} onPerson={onPerson} />;
   return (
     <div className={`cmd-card cmd-card-${n}${kind ? ` cmd-${kind}` : ''}`}>
-      <Trotbot name={n} />
+      <Trotbot name={n === 'dailyq' ? '' : n} />
       {kind === 'arcade' ? (
         <ArcadeBody m={m} me={me} onMove={onMove} Name={PersonName} />
       ) : kind === 'money' ? (

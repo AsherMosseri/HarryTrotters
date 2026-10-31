@@ -23,6 +23,7 @@ import * as market from '../../functions/shared/market.js';
 import { PERK_IDEAS } from '../../functions/shared/market.js';
 import { START_NEED, isSpecies } from '../../functions/shared/pets.js';
 import { demoLife } from './demoLife.js';
+import { demoLearn } from './demoLearn.js';
 
 const KEY = 'ftc32313-demo-v13';
 const listeners = new Set();
@@ -711,6 +712,10 @@ function listen(fn) {
   return () => listeners.delete(fn);
 }
 
+// Learn in demo mode (demoLearn.js plays from demo-only sample questions).
+const learn = demoLearn(() => state, commit, listen);
+learn.ensureDaily();
+
 // A shiftEdits record (the same shape firebaseStore.js writes).
 function addShiftEdit(shift, kind, after, actor, at, requestId) {
   const edit = {
@@ -790,6 +795,7 @@ function startReminders() {
 if ((state.reminders || []).length) startReminders();
 
 export const demoStore = {
+  ...learn,
   mode: 'demo',
 
   onAuth(cb) {

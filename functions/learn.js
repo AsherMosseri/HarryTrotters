@@ -403,7 +403,7 @@ export function learnFunctions({ db, renamer, personId, timeZone = 'America/New_
         byUid: 'trotbot',
         bot: true,
         at: now,
-        cmd: { name: 'daily', day, prev, game: NAMES[q.bank] || q.bank, q: view, answered: 0, firstCorrect: [] },
+        cmd: { name: 'dailyq', day, prev, game: NAMES[q.bank] || q.bank, q: view, answered: 0, firstCorrect: [] },
         mentions: [],
         taskIds: [],
         replyTo: null,

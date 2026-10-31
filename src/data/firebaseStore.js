@@ -180,6 +180,11 @@ const editRecord = (shift, kind, after, actor, at, requestId) => ({
   ...(requestId ? { requestId } : {}),
 });
 
+async function callLearn(name, data) {
+  const call = httpsCallable(getFunctions(app, FUNCTIONS_REGION), name);
+  return (await call(data)).data;
+}
+
 export const firebaseStore = {
   mode: 'firebase',
 
@@ -793,6 +798,46 @@ export const firebaseStore = {
   async ftcEvents(req) {
     const call = httpsCallable(getFunctions(app, FUNCTIONS_REGION), 'ftcEvents');
     return (await call(req)).data;
+  },
+
+  // Learn (functions/learn.js): the server picks, grades and pays. These
+  // throw with the server's message (shown in the game).
+  async quizNext(req) {
+    return callLearn('quizNext', req);
+  },
+  async quizAnswer(req) {
+    return callLearn('quizAnswer', req);
+  },
+  async quizProgress() {
+    return callLearn('quizProgress', {});
+  },
+  async quizReport(req) {
+    return callLearn('quizReport', req);
+  },
+  async autoRun(req) {
+    return callLearn('autoRun', req);
+  },
+  async dailyAnswer(req) {
+    return callLearn('dailyAnswer', req);
+  },
+  // Your answer to a day's question (null until you answer).
+  subscribeDailyAnswer(day, name, cb) {
+    return onSnapshot(
+      doc(db, 'dailyAnswers', `${day}_${personId(name)}`),
+      (snap) => cb(snap.exists() ? snap.data() : null),
+      (e) => (console.warn('daily answer', e), cb(null)),
+    );
+  },
+  // Team management: reports about questions.
+  subscribeQuizReports(cb) {
+    return onSnapshot(
+      query(collection(db, 'quizReports'), where('status', '==', 'open')),
+      (snap) => cb(snap.docs.map(readDoc)),
+      (e) => console.warn('quiz reports', e),
+    );
+  },
+  handleQuizReport(id, status, actor) {
+    return updateDoc(doc(db, 'quizReports', id), { status, handledBy: actor.name, handledAt: Date.now() });
   },
 
   // Chat. A conversation (conv) is a channel id, or 'dm:<id>' for a direct

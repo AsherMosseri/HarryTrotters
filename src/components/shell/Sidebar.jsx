@@ -10,7 +10,7 @@ import horse from '../../assets/horse.webp';
 const GROUPS = [
   [null, ['today', 'tasks', 'milestones', 'shifts']],
   ['Build', ['parts', 'robot', 'checklists', 'runs']],
-  ['Team', ['team', 'resources', 'market']],
+  ['Team', ['team', 'resources', 'learn', 'market']],
 ];
 const LABELS = {
   today: 'Today',
@@ -24,6 +24,7 @@ const LABELS = {
   team: 'Roster',
   resources: 'Resources',
   market: 'Market',
+  learn: 'Learn',
 };
 
 function Row({ icon, label, active, count, strong, onClick, extra }) {
