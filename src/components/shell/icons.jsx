@@ -455,6 +455,21 @@ const PATHS = {
       <path d="M10 3v2.5M10 15.5V18M3 10.5h2.5M14.5 10.5H17M5 5.5l1.8 1.8M13.2 13.7l1.8 1.8M15 5.5l-1.8 1.8M6.8 13.7 5 15.5" />
     </>
   ),
+  // Scout: binoculars; ban: "don't pick"; grip: the drag handle on the pick list.
+  scout: (
+    <>
+      <circle cx="5.6" cy="13.4" r="3.1" />
+      <circle cx="14.4" cy="13.4" r="3.1" />
+      <path d="M4.2 10.8 6 4.5h2l.6 4.5M15.8 10.8 14 4.5h-2l-.6 4.5M8.7 12.6h2.6" />
+    </>
+  ),
+  ban: (
+    <>
+      <circle cx="10" cy="10" r="6.8" />
+      <path d="m5.2 14.8 9.6-9.6" />
+    </>
+  ),
+  grip: <path d="M7.5 5h.01M12.5 5h.01M7.5 10h.01M12.5 10h.01M7.5 15h.01M12.5 15h.01" strokeWidth="2.6" />,
   shuffle: <path d="M3 6h2.6c3.4 0 5.4 8 8.8 8H17m-2-2 2 2-2 2M3 14h2.6c1.2 0 2.2-1 3-2.3M11.5 7.6c.8-.9 1.7-1.6 2.9-1.6H17m-2-2 2 2-2 2" />,
 };
 

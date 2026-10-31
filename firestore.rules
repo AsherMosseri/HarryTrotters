@@ -772,6 +772,67 @@ service cloud.firestore {
         && request.resource.data.get('result', '') in ['', 'win', 'loss', 'tie']);
     }
 
+    // Scouting (the Scout page). scoutTeams/{number}: every team at the event.
+    // The ftcEvents function fills in names and rankings; team management
+    // edits anything; anyone on the team can add a team that's missing and
+    // write its notes. No coins are paid for scouting.
+    match /scoutTeams/{id} {
+      function validTeamDoc(d) {
+        return d.keys().hasOnly(['number', 'name', 'city', 'event', 'source', 'rank', 'notes', 'notesBy', 'notesAt', 'nameHand', 'syncedAt', 'updatedAt', 'updatedBy'])
+          && d.number is int && string(d.number) == id && id.matches('^[1-9][0-9]{0,4}$')
+          && d.get('name', '') is string && d.get('name', '').size() <= 80
+          && d.get('city', '') is string && d.get('city', '').size() <= 60
+          && d.get('event', '') is string && d.get('event', '').size() <= 20
+          && d.get('notes', '') is string && d.get('notes', '').size() <= 1500;
+      }
+      allow read: if isMember();
+      allow create: if (isManager() && validTeamDoc(request.resource.data))
+        || (isMember() && validTeamDoc(request.resource.data) && request.resource.data.get('source', '') == 'typed' && !('rank' in request.resource.data));
+      allow update: if (isManager() && validTeamDoc(request.resource.data))
+        || (isMember() && validTeamDoc(request.resource.data)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['notes', 'notesBy', 'notesAt', 'updatedAt', 'updatedBy']));
+      allow delete: if isManager();
+    }
+    // scoutEntries/{id}: one scout's look at one team in one match. Written
+    // as yourself (createdBy, rename-safe, and your device); you change or
+    // delete your own, team management anyone's. createdAt is the server's time.
+    match /scoutEntries/{id} {
+      function ratingOk(r, k) { return !(k in r) || (r[k] is int && r[k] >= 1 && r[k] <= 5); }
+      function validEntry(d) {
+        return d.keys().hasOnly(['team', 'match', 'ratings', 'tags', 'note', 'event', 'createdBy', 'createdByUid', 'createdAt', 'updatedAt', 'updatedBy'])
+          && d.team is int && d.team > 0 && d.team < 100000
+          && d.get('match', '') is string && d.get('match', '').size() <= 12
+          && d.ratings is map && d.ratings.keys().hasOnly(['auto', 'teleop', 'endgame', 'reliability', 'drive'])
+          && ratingOk(d.ratings, 'auto') && ratingOk(d.ratings, 'teleop') && ratingOk(d.ratings, 'endgame')
+          && ratingOk(d.ratings, 'reliability') && ratingOk(d.ratings, 'drive')
+          && d.tags is list && d.tags.size() <= 12
+          && d.get('note', '') is string && d.get('note', '').size() <= 200
+          && d.get('event', '') is string && d.get('event', '').size() <= 20
+          && d.createdBy is string && d.createdBy.size() > 0 && d.createdBy.size() <= 60;
+      }
+      function mineEntry() { return resource.data.get('createdByUid', '') == request.auth.uid || wasMe(resource.data.createdBy); }
+      allow read: if isMember();
+      allow create: if isMember() && validEntry(request.resource.data) && isMe(request.resource.data.createdBy)
+        && request.resource.data.get('createdByUid', '') == request.auth.uid
+        && request.resource.data.createdAt == request.time && serverTime(request.resource.data, 'updatedAt');
+      allow update: if isMember() && (isManager() || mineEntry()) && validEntry(request.resource.data)
+        && request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.get('createdByUid', '') == resource.data.get('createdByUid', '')
+        && request.resource.data.createdAt == resource.data.createdAt
+        && serverTime(request.resource.data, 'updatedAt');
+      allow delete: if isMember() && (isManager() || mineEntry());
+    }
+    // scoutPicks/main: the pick list for alliance selection (order, teams not
+    // to pick, teams other alliances took). Everyone reads; team management edits.
+    match /scoutPicks/{id} {
+      allow read: if isMember();
+      allow write: if isManager() && id == 'main'
+        && request.resource.data.keys().hasOnly(['order', 'dont', 'taken', 'updatedAt', 'updatedBy'])
+        && request.resource.data.get('order', []) is list && request.resource.data.get('order', []).size() <= 200
+        && request.resource.data.get('dont', []) is list && request.resource.data.get('dont', []).size() <= 200
+        && request.resource.data.get('taken', []) is list && request.resource.data.get('taken', []).size() <= 200;
+    }
+
     // Notifications (the bell). Only the Cloud Functions create them; anyone on
     // the team can mark them read or clear them.
     match /inbox/{person}/items/{id} {

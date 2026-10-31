@@ -24,6 +24,7 @@ import * as mines from './shared/minesweeper.js';
 import { newSeed } from './shared/rng.js';
 import { MANAGER_NAMES, PASSWORD_MIN, ROSTER, cleanName, isManagerName, knownName, memberOk, onTeam, sameName } from './shared/team.js';
 import { TEAM_NUMBER, fromSchedule, rankOf, scoreOf, seasonOf } from './shared/matches.js';
+import { rankingFromApi, teamFromApi } from './shared/scout.js';
 import { asksOn } from './shared/checkin.js';
 import { marketFunctions } from './market.js';
 import { lifeFunctions } from './life.js';
@@ -1926,6 +1927,74 @@ export const ftcEvents = onCall(
         city: [e.city, e.stateprov].filter(Boolean).join(', '),
       }));
       return { events: events.sort((a, b) => a.start.localeCompare(b.start)) };
+    }
+
+    // Scouting (the Scout page): every team at the event and the rankings,
+    // saved on scoutTeams. Notes and hand-typed names stay; only: 'rankings'
+    // refreshes just the standings (one request).
+    if (action === 'scout') {
+      const code = String(req.data?.event || '')
+        .trim()
+        .toUpperCase();
+      if (!/^[A-Z0-9]{2,20}$/.test(code)) throw new HttpsError('invalid-argument', 'Type the event code first (like USNYNYQ1).');
+      const onlyRanks = req.data?.only === 'rankings';
+      const teams = [];
+      let pagesLeft = 8;
+      for (let page = 1, total = 1; !onlyRanks && page <= total && pagesLeft-- > 0; page++) {
+        const data = await ftcGet(`/${season}/teams?eventCode=${code}&page=${page}`, auth);
+        total = Number(data?.pageTotal) || 1;
+        for (const t of data?.teams || []) {
+          const team = teamFromApi(t);
+          if (team) teams.push(team);
+        }
+      }
+      // Standings aren't out until the first qualification match is played;
+      // a failure here shouldn't lose the team list.
+      let ranks = [];
+      let rankNote = '';
+      try {
+        ranks = ((await ftcGet(`/${season}/rankings/${code}`, auth))?.rankings || []).map((r) => ({ ...rankingFromApi(r), name: String(r.teamName || '').slice(0, 80) })).filter((r) => r.number);
+      } catch (e) {
+        if (onlyRanks) throw e;
+        rankNote = 'Got the teams, but not the rankings.';
+      }
+      if (!teams.length && !ranks.length)
+        return { error: `FTC Events has no teams for ${code} yet. Check the event code, or add teams by hand.` };
+      const old = new Map((await db.collection('scoutTeams').get()).docs.map((d) => [d.id, d.data()]));
+      const rankOfTeam = new Map(ranks.map((r) => [r.number, r.rank]));
+      const all = new Map(ranks.map((r) => [r.number, { number: r.number, name: r.name, city: '' }]));
+      for (const t of teams) all.set(t.number, { ...all.get(t.number), ...t });
+      // A refresh of just the standings still clears the rank of a team that dropped off them.
+      if (onlyRanks)
+        for (const [id, was] of old) if (was.rank && !all.has(Number(id))) all.set(Number(id), { number: Number(id), name: '', city: '' });
+      const now = Date.now();
+      let batch = db.batch();
+      let ops = 0;
+      for (const t of all.values()) {
+        const was = old.get(String(t.number));
+        const doc = { number: t.number, event: code, syncedAt: now };
+        // A name fixed by hand (or no name from FTC Events) stays.
+        if (t.name && !was?.nameHand) doc.name = t.name;
+        if (t.city) doc.city = t.city;
+        if (!was) doc.source = 'api';
+        if (rankOfTeam.has(t.number)) doc.rank = rankOfTeam.get(t.number);
+        else if (!onlyRanks || was?.rank) doc.rank = FieldValue.delete();
+        batch.set(db.doc(`scoutTeams/${t.number}`), doc, { merge: true });
+        if (++ops >= 400) {
+          await batch.commit();
+          batch = db.batch();
+          ops = 0;
+        }
+      }
+      batch.set(db.doc('settings/team'), { scoutSyncedAt: now }, { merge: true });
+      await batch.commit();
+      return {
+        ok: true,
+        teams: onlyRanks ? Math.max(old.size, rankOfTeam.size) : all.size,
+        ranked: rankOfTeam.size,
+        added: [...all.keys()].filter((n) => !old.has(String(n))).length,
+        note: rankNote,
+      };
     }
 
     if (action !== 'sync') throw new HttpsError('invalid-argument', 'Unknown action.');

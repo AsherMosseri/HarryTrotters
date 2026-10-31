@@ -19,6 +19,7 @@ export const TAB_ICONS = {
   team: 'team',
   market: 'market',
   learn: 'learn',
+  scout: 'scout',
 };
 // The tab bar's names where the page has a plainer one.
 // (Table is a Tasks layout; it's its own tab only when Board is switched off.)
