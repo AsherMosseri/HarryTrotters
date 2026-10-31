@@ -398,6 +398,13 @@ function demoLabLog(shifts, tasks) {
       chips: ['asm-mounted', 'asm-screws'],
       with: ['Jackson Lucks'],
     },
+    'Sophia Bermudez|0': {
+      areas: ['cad'],
+      tasks: [['Finish intake roller CAD', 'done']],
+      note: 'Modeled a part, exported for printing. The roller plates are ready to cut.',
+      chips: ['cad-part', 'cad-print'],
+      with: ['Michael Meidan'],
+    },
     'Jackson Lucks|0': {
       areas: ['electrical', 'assembly'],
       tasks: [
@@ -602,6 +609,39 @@ function seedDemoMatches() {
     const list = STARTER_CHECKLISTS.find(isQueueChecklist);
     state.checklists = [...(state.checklists || []), { id: uid(), title: list.title, items: starterItems(list), createdAt: Date.now() }];
   }
+}
+
+// Six sample batteries: one on the robot (put on for the last match played),
+// two charged (one rested longer), one charging, one waiting, one retired.
+function seedDemoBatteries() {
+  const min = 60000;
+  const now = Date.now();
+  const hist = (...steps) => steps.map(([ago, by, status, match]) => ({ at: now - ago * min, by, status, ...(match ? { match } : {}) }));
+  const make = (label, color, order, steps) => {
+    const history = hist(...steps);
+    const last = history.at(-1);
+    return {
+      id: `bat${label}`,
+      label,
+      color,
+      order,
+      status: last.status,
+      statusAt: last.at,
+      statusBy: last.by,
+      match: last.status === 'robot' ? last.match || '' : '',
+      history,
+      createdAt: now - 20 * 86400000,
+      createdBy: 'Asher Mosseri',
+    };
+  };
+  return [
+    make('1', 'red', 1, [[300, 'Jackson Lucks', 'charged'], [150, 'Jackson Lucks', 'robot', 'Q2'], [100, 'Sebastian Tolbert', 'needs'], [60, 'Jackson Lucks', 'charging'], [25, 'Jackson Lucks', 'charged']]),
+    make('2', 'blue', 2, [[400, 'Cooper Mlezcko', 'charged'], [75, 'Sebastian Tolbert', 'robot', 'Q6']]),
+    make('3', 'green', 3, [[500, 'Cooper Mlezcko', 'charged']]),
+    make('4', 'yellow', 4, [[240, 'Jackson Lucks', 'robot', 'Q1'], [190, 'Jackson Lucks', 'needs'], [45, 'Cooper Mlezcko', 'charging']]),
+    make('5', 'purple', 5, [[200, 'Sebastian Tolbert', 'needs']]),
+    make('6', 'gray', 6, [[600, 'Asher Mosseri', 'charged'], [30, 'Asher Mosseri', 'retired']]),
+  ];
 }
 
 let state;
@@ -2009,6 +2049,31 @@ export const demoStore = {
       : [...(state.runs || []), { id: runId, ...newRunDefaults(run), createdAt: Date.now(), createdBy: actor.name }];
     state.matches = (state.matches || []).map((m) => (m.id === matchId ? { ...m, ours: { ...ours, runId }, result, updatedBy: actor.name } : m));
     life.runLogged(state.runs.find((r) => r.id === runId));
+    commit();
+  },
+  // Robot batteries: six sample packs, some used in the sample matches.
+  subscribeBatteries(cb) {
+    if (!state.batteries) {
+      state.batteries = seedDemoBatteries();
+      commit();
+    }
+    return listen(() => cb([...(state.batteries || [])]));
+  },
+  async addBattery(data) {
+    state.batteries = [...(state.batteries || []), { id: uid(), ...data }];
+    commit();
+  },
+  async changeBatteries(changes) {
+    const by = new Map(changes.map((c) => [c.id, c.patch]));
+    state.batteries = (state.batteries || []).map((b) => (by.has(b.id) ? { ...b, ...by.get(b.id) } : b));
+    commit();
+  },
+  async updateBattery(id, patch) {
+    state.batteries = (state.batteries || []).map((b) => (b.id === id ? { ...b, ...patch } : b));
+    commit();
+  },
+  async deleteBattery(id) {
+    state.batteries = (state.batteries || []).filter((b) => b.id !== id);
     commit();
   },
   async setChecklistQueue(id, queue) {

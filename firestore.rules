@@ -772,6 +772,36 @@ service cloud.firestore {
         && request.resource.data.get('result', '') in ['', 'win', 'loss', 'tie']);
     }
 
+    // Robot batteries (src/batteries.js): numbered packs with a status and a
+    // short history of changes. Anyone on the team changes a status (put one
+    // on the robot, charging, charged) and it records who; team management
+    // adds, renames, retires and deletes them. Retired ones only they bring back.
+    match /batteries/{id} {
+      function validBattery(d) {
+        return d.keys().hasOnly(['label', 'color', 'order', 'status', 'statusAt', 'statusBy', 'match', 'history', 'createdAt', 'createdBy'])
+          && d.label is string && d.label.size() > 0 && d.label.size() <= 20
+          && d.get('color', '') in ['', 'red', 'orange', 'yellow', 'green', 'blue', 'purple', 'gray']
+          && d.status in ['charged', 'robot', 'charging', 'needs', 'retired']
+          && d.statusAt is int && d.statusBy is string && d.statusBy.size() > 0 && d.statusBy.size() <= 60
+          && d.get('match', '') is string && d.get('match', '').size() <= 20
+          && d.get('order', 0) is int
+          && d.get('history', []) is list && d.get('history', []).size() <= 40;
+      }
+      // Whoever changes the status or the history signs it with their own name.
+      function signedBy(d) {
+        let changed = d.diff(resource.data).affectedKeys();
+        return (!changed.hasAny(['statusBy']) || isMe(d.statusBy))
+          && (!changed.hasAny(['history']) || d.history.size() == 0 || isMe(d.history[d.history.size() - 1].by));
+      }
+      allow read: if isMember();
+      allow create: if isManager() && validBattery(request.resource.data) && isMe(request.resource.data.statusBy)
+        && isMe(request.resource.data.createdBy);
+      allow delete: if isManager();
+      allow update: if isMember() && validBattery(request.resource.data) && signedBy(request.resource.data)
+        && (isManager() || (resource.data.status != 'retired' && request.resource.data.status != 'retired'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'statusAt', 'statusBy', 'match', 'history'])));
+    }
+
     // Notifications (the bell). Only the Cloud Functions create them; anyone on
     // the team can mark them read or clear them.
     match /inbox/{person}/items/{id} {

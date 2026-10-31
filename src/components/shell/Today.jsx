@@ -69,6 +69,7 @@ export default function Today({
   competition,
   settings = {},
   matches = [],
+  batteries = [],
   checklists = [],
   roster = [],
   joinRequests = [],
@@ -104,6 +105,7 @@ export default function Today({
         actor={actor}
         settings={settings}
         matches={matches}
+        batteries={batteries}
         checklists={checklists}
         roster={roster}
         competition={competition}

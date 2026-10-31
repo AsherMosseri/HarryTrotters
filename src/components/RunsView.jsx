@@ -4,6 +4,7 @@ import { Avatar, CloseIcon, Overlay, PlusIcon } from './common.jsx';
 import { useEscape } from '../util.js';
 import { confirmDialog } from './Dialogs.jsx';
 import { GuessCard } from './Life.jsx';
+import { BatteriesSection } from './Batteries.jsx';
 import { winnerLine } from '../../functions/shared/predict.js';
 
 const PERIODS = [
@@ -337,7 +338,7 @@ function RunDialog({ run, roster, onClose, onSave, onDelete }) {
   );
 }
 
-export default function RunsView({ runs, roster, api, actor, predictions = [], matches = [] }) {
+export default function RunsView({ runs, roster, api, actor, predictions = [], matches = [], batteries = [] }) {
   const [filter, setFilter] = useState('');
   // Score guesses, by the run that settled them (shown under its total).
   const guessOf = useMemo(() => new Map(predictions.filter((p) => p.status === 'done' && p.runId).map((p) => [p.runId, p])), [predictions]);
@@ -372,6 +373,8 @@ export default function RunsView({ runs, roster, api, actor, predictions = [], m
       </div>
 
       {actor && <GuessCard predictions={predictions} matches={matches} actor={actor} api={api} />}
+
+      <BatteriesSection batteries={batteries} matches={matches} api={api} isManager={!!actor?.admin} />
 
       {runs.length ? (
         <>

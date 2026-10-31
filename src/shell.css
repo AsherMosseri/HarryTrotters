@@ -2806,3 +2806,126 @@ button.pm-row:hover { background: color-mix(in srgb, var(--text) 4%, transparent
 .new-app-pw-row { display: flex; align-items: center; gap: 14px; margin-top: 8px; }
 .new-app-done { display: flex; align-items: flex-start; gap: 10px; margin: 14px 0 4px; text-align: left; }
 .new-app-done svg { flex: none; margin-top: 1px; color: var(--accent); }
+
+/* ---------- Robot batteries (Batteries.jsx) ----------
+   A strip of big tiles on the pit screen and cards on the Match log page.
+   Each status has a word and a color; the number is the big thing. */
+.bat-sec, .bat-sheet { --bs: var(--muted); --bat-charging: #e69a00; --bat-robot: var(--accent); --bat-btn: var(--accent); --bat-warn-ink: #b7791f; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) :is(.bat-sec, .bat-sheet) { --bat-charging: #ffb020; --bat-robot: #7aa7ff; --bat-btn: #2a4f8f; --bat-warn-ink: #ffb020; }
+}
+:root[data-theme='dark'] :is(.bat-sec, .bat-sheet) { --bat-charging: #ffb020; --bat-robot: #7aa7ff; --bat-btn: #2a4f8f; --bat-warn-ink: #ffb020; }
+:is(.bat-sec, .bat-sheet) .s-charged { --bs: var(--st-done); }
+:is(.bat-sec, .bat-sheet) .s-robot { --bs: var(--bat-robot); }
+:is(.bat-sec, .bat-sheet) .s-charging { --bs: var(--bat-charging); }
+:is(.bat-sec, .bat-sheet) .s-needs { --bs: var(--danger); }
+:is(.bat-sec, .bat-sheet) .s-retired { --bs: var(--muted); }
+
+.bat-dot { width: 10px; height: 10px; border-radius: 50%; flex: none; background: var(--dot, var(--muted)); box-shadow: 0 0 0 1px color-mix(in srgb, var(--text) 25%, transparent); }
+.bat-c-red { --dot: #e5484d; }
+.bat-c-orange { --dot: #f08a24; }
+.bat-c-yellow { --dot: #f2c200; }
+.bat-c-green { --dot: #2fa866; }
+.bat-c-blue { --dot: #3b82f6; }
+.bat-c-purple { --dot: #8b5cf6; }
+.bat-c-gray { --dot: #8b909c; }
+
+.bat-strip { list-style: none; margin: 10px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 8px; }
+.bat-tile {
+  position: relative; width: 100%; min-height: 88px; padding: 12px 8px 10px; border-radius: 11px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  border: 1px solid var(--border); border-top: 4px solid var(--bs); background: var(--surface); color: var(--text); font: inherit;
+}
+.bat-tile .bat-dot { position: absolute; top: 8px; right: 8px; }
+.bat-num { font-size: 32px; font-weight: 700; line-height: 1; letter-spacing: -0.04em; }
+.bat-state { font-size: 12.5px; font-weight: 700; color: var(--bs); text-align: center; line-height: 1.15; }
+.bat-tile.s-retired { opacity: 0.6; }
+.bat-tile.s-robot { background: color-mix(in srgb, var(--accent) 8%, var(--surface)); }
+.bat-tile.next { box-shadow: inset 0 0 0 2px var(--st-done); }
+.bat-for-match { font-size: 13px; font-weight: 700; }
+.bat-next { font-size: 10.5px; font-weight: 750; text-transform: uppercase; letter-spacing: 0.07em; color: var(--st-done); }
+.bat-tile:active, .bat-card:active, .bat-act:active { transform: scale(0.97); }
+
+.bat-status { margin-top: 10px; display: flex; flex-direction: column; gap: 4px; }
+.bat-status p { margin: 0; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 15px; }
+.bat-status .icon { flex: none; color: var(--muted); }
+.bat-status p.bat-warn { padding: 8px 10px; border-radius: 8px; font-weight: 650; color: var(--text); background: color-mix(in srgb, #ffb020 16%, var(--surface)); border: 1px solid color-mix(in srgb, #ffb020 55%, var(--border)); }
+.bat-status p.bat-warn .icon { color: var(--bat-warn-ink); }
+.bat-warn.small { margin: 0; color: var(--bat-warn-ink); font-weight: 650; }
+.bat-hint.small { margin: 0; color: var(--muted); }
+
+.bat-cards { list-style: none; margin: 10px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+.bat-card {
+  position: relative; width: 100%; height: 100%; text-align: left; padding: 12px 14px; border-radius: 12px; display: flex; flex-direction: column; gap: 4px;
+  border: 1px solid var(--border); border-left: 5px solid var(--bs); background: var(--surface); color: var(--text); font: inherit;
+}
+.bat-card.s-retired { opacity: 0.65; }
+.bat-card.next { box-shadow: inset 0 0 0 2px var(--st-done); }
+.bat-card-top { display: flex; align-items: center; gap: 8px; }
+.bat-card .bat-num { font-size: 28px; }
+.bat-card-line { font-size: 13.5px; }
+.bat-card .bat-next { position: absolute; right: 12px; bottom: 10px; }
+.bat-chip {
+  margin-left: auto; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; color: var(--bs);
+  background: color-mix(in srgb, var(--bs) 13%, transparent);
+}
+.bat-old { margin-top: 10px; }
+
+/* One battery's sheet. */
+.bat-sheet, .bat-form { width: min(460px, 100%); }
+.bat-sheet-title { display: flex; align-items: center; gap: 8px; }
+.bat-sheet-num { font-size: 26px; letter-spacing: -0.03em; }
+.bat-sheet-state { margin: 0; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 14px; }
+.bat-sheet-state .bat-chip { margin-left: 0; font-size: 13px; padding: 3px 10px; }
+.bat-for { display: flex; flex-direction: column; gap: 4px; }
+.bat-for > span { font-size: 11.5px; font-weight: 750; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); }
+.bat-for .input { height: 44px; font-size: 16px; }
+.bat-acts { display: flex; flex-direction: column; gap: 8px; }
+.bat-act {
+  min-height: 56px; display: flex; align-items: center; gap: 12px; padding: 0 16px; border-radius: 11px; text-align: left;
+  border: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit; font-size: 17px; font-weight: 650;
+}
+.bat-act.primary { background: var(--bat-btn); border-color: var(--bat-btn); color: #fff; }
+.bat-hist { display: flex; gap: 10px; align-items: baseline; font-size: 14.5px; }
+.bat-hist-h { font-size: 11.5px; font-weight: 750; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); }
+.bat-log { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; font-size: 13.5px; border-top: 1px solid var(--hairline, var(--border)); }
+.bat-log li { display: grid; grid-template-columns: 92px 1fr auto; gap: 8px; padding: 5px 0; border-bottom: 1px solid var(--hairline, var(--border)); }
+.bat-log-at { color: var(--muted); font-size: 12.5px; }
+.bat-mgr { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 4px; }
+.bat-mgr .btn { min-height: 40px; }
+.bat-colors { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.bat-swatch {
+  width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; color: #fff;
+  border: 2px solid transparent; background: var(--dot, transparent); box-shadow: 0 0 0 1px var(--border);
+}
+.bat-swatch.bat-c-none { --dot: var(--surface-2); color: var(--text); background-image: linear-gradient(135deg, transparent 46%, var(--muted) 46% 54%, transparent 54%); }
+.bat-swatch.on { border-color: var(--surface); box-shadow: 0 0 0 2px var(--text); }
+
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion='on']) :is(.bat-tile, .bat-card, .bat-act):active { transform: none; }
+}
+:root[data-motion='off'] :is(.bat-tile, .bat-card, .bat-act):active { transform: none; }
+
+/* ---------- Export for the notebook (NotebookExport.jsx) ---------- */
+.dialog.nb-dialog { width: min(720px, 100%); }
+.nb-intro { margin: 0; }
+.nb-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 12px; }
+.nb-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.nb-field.wide { grid-column: 1 / -1; }
+.nb-field .input { height: 44px; font-size: 16px; }
+.nb-field .segmented button { min-height: 40px; padding: 0 14px; font-size: 14.5px; }
+.nb-sum { font-size: 14px; color: var(--muted); }
+.nb-sum b { color: var(--text); }
+.nb-out { width: 100%; min-height: 260px; height: 38vh; resize: vertical; padding: 12px 14px; font-size: 13px; line-height: 1.55; white-space: pre-wrap; }
+.nb-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.nb-actions .btn { min-height: 42px; }
+.nb-note { flex-basis: 100%; min-height: 1.2em; }
+@media (min-width: 700px) { .nb-note { flex-basis: auto; margin-left: 4px; } }
+@media (max-width: 520px) { .nb-field.full-sm { grid-column: 1 / -1; } .nb-out { height: 34vh; min-height: 200px; } .nb-field .input[type='date'] { padding-inline: 8px; font-size: 15px; } }
+@media (max-width: 760px) {
+  .bat-strip { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .bat-tile { min-height: 76px; }
+  .bat-cards { grid-template-columns: minmax(0, 1fr); }
+  .bat-log li { grid-template-columns: 78px 1fr auto; }
+}
+.bat-count { margin-left: auto; font-size: 14px; font-weight: 600; }
+.bat-form .mf-field { flex: none; }

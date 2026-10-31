@@ -5,6 +5,7 @@ import { addDays, mondayOf, parseDay, toISO, todayISO } from '../milestones.js';
 import { firstName } from '../util.js';
 import { Avatar, AvatarStack, CloseIcon, Overlay, PlusIcon } from './common.jsx';
 import { CheckinCard, CheckinDialog, scheduleText } from './Checkin.jsx';
+import NotebookExport from './NotebookExport.jsx';
 import { hoursLabel, hoursOf, msByPerson, msOf } from '../../functions/shared/hours.js';
 import { teamDay } from '../../functions/shared/coins.js';
 import { cleanSkips, nextSchoolDay, scheduledOn } from '../../functions/shared/checkin.js';
@@ -892,11 +893,12 @@ export default function ShiftsView({
   requests = [],
   edits = [],
   runs = [],
+  milestones = [],
 }) {
   const now = useNow(30000);
   const isManager = actor.admin;
   const me = actor.name;
-  const [dialog, setDialog] = useState(null); // 'clockin' | 'plan' | 'checkin' | { shift }
+  const [dialog, setDialog] = useState(null); // 'clockin' | 'plan' | 'checkin' | 'notebook' | { shift }
   const [hoursPeriod, setHoursPeriod] = useState('all');
   const [period, setPeriod] = useState('week');
   const [who, setWho] = useState('');
@@ -990,6 +992,9 @@ export default function ShiftsView({
           <h1>Shifts</h1>
         </div>
         <span className="spacer" />
+        <button className="btn" onClick={() => setDialog('notebook')}>
+          <Icon name="doc" size={16} /> Export for the notebook
+        </button>
         {isManager && (
           <button className="btn" onClick={() => setDialog('checkin')}>
             Lab check-in
@@ -1372,6 +1377,18 @@ export default function ShiftsView({
             await api.startShifts(people, Date.now());
             setDialog(null);
           }}
+        />
+      )}
+      {dialog === 'notebook' && (
+        <NotebookExport
+          api={api}
+          actor={actor}
+          roster={roster}
+          shifts={all}
+          tasks={tasks || []}
+          milestones={milestones}
+          rename={rename}
+          onClose={() => setDialog(null)}
         />
       )}
       {dialog === 'checkin' && (
