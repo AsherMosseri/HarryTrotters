@@ -18,6 +18,7 @@ import { AWARD_CAPS, teamDay } from './shared/coins.js';
 import { isSchoolDay } from './shared/school.js';
 import { timelineItems, timelineQuestion, whoItems, whoQuestion } from './shared/teamQuiz.js';
 import { AUTO_TIERS, simulate } from './shared/autoPath.js';
+import { memberOk } from './shared/team.js';
 
 export const QUIZ_BANKS = ['parts', 'rules', 'strategy', 'wiring', 'spot', 'code', 'gear'];
 export const TEAM_GAMES = ['who', 'timeline'];
@@ -45,7 +46,7 @@ export function learnFunctions({ db, renamer, personId, timeZone = 'America/New_
     const uid = req.auth?.uid;
     if (!uid) throw new HttpsError('unauthenticated', 'Sign in first.');
     const member = await db.doc(`members/${uid}`).get();
-    if (!member.exists || member.get('via') !== 'password') throw new HttpsError('permission-denied', 'Sign in first.');
+    if (!memberOk(member.data())) throw new HttpsError('permission-denied', 'Sign in first.');
     const rename = await renamer();
     const me = rename(member.get('name') || '');
     if (!me) throw new HttpsError('permission-denied', 'Sign in first.');

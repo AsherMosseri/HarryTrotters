@@ -10,7 +10,7 @@ import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { defineSecret } from 'firebase-functions/params';
 import { logger } from 'firebase-functions';
 import { initializeApp } from 'firebase-admin/app';
-import { FieldPath, getFirestore } from 'firebase-admin/firestore';
+import { FieldPath, FieldValue, getFirestore } from 'firebase-admin/firestore';
 import { getMessaging } from 'firebase-admin/messaging';
 import { fetchPage, firstLink, readPreview } from './preview.js';
 import { coinSettings, coinsByName, giftEntry, prizeEntry, wallet } from './shared/coins.js';
@@ -21,7 +21,7 @@ import { awardCoins } from './award.js';
 import * as fun from './shared/funGames.js';
 import { LEVELS as MINE_LEVELS } from './shared/minesweeper.js';
 import { attemptSeed, newSeed } from './shared/rng.js';
-import { MANAGER_NAMES, PASSWORD_MIN, cleanName, isManagerName, knownName } from './shared/team.js';
+import { MANAGER_NAMES, PASSWORD_MIN, cleanName, isManagerName, knownName, memberOk, onTeam } from './shared/team.js';
 import { TEAM_NUMBER, fromSchedule, rankOf, scoreOf, seasonOf } from './shared/matches.js';
 import { asksOn } from './shared/checkin.js';
 import { marketFunctions } from './market.js';
@@ -713,17 +713,56 @@ export const onRename = onDocumentWritten('settings/names', async (event) => {
 // (phones can't read or write it). A device counts as signed in once this
 // writes its members/{uid} doc with via: 'password'; the rules only let
 // those devices in, and only this sets who's team management (MANAGER_NAMES).
+// A name new to the team (shared/team.js onTeam) signs in as pending: it
+// can't read or do anything until team management lets it in (approve), and
+// joinRequests/{personId} { name, at } lists it for them.
 const accountRef = (name) => db.doc(`accounts/${personId(name)}`);
 const hashOf = (password, salt) => scryptSync(String(password), salt, 64).toString('hex');
 const LOCK_AFTER = 6;
 const LOCK_MS = 10 * 60000;
+const requestRef = (name) => db.doc(`joinRequests/${personId(name)}`);
 
-async function signDeviceIn(uid, name) {
+// Devices still waiting under this name.
+async function pendingDevices(name, rename) {
+  const snap = await db.collection('members').where('pending', '==', true).get();
+  return snap.docs.filter((d) => rename(d.get('name') || '') === name);
+}
+
+// A name nobody waits under any more: no request, and (as it never got onto
+// the team) no password either, so the name is free again.
+async function dropRequestIfDone(name, rename, team) {
+  if (!name || (await pendingDevices(name, rename)).length) return;
+  await requestRef(name).delete();
+  if (onTeam(name, team)) return;
+  const signedIn = await db.collection('members').get();
+  if (signedIn.docs.some((d) => rename(d.get('name') || '') === name)) return;
+  await accountRef(name).delete();
+  await db.doc(`resetRequests/${personId(name)}`).delete();
+}
+
+async function signDeviceIn(uid, name, team, before) {
+  // This device already signed in as this name and was let in (say, with
+  // the team code before passwords): still them.
+  const pending = !onTeam(name, team) && !(before && !before.pending && before.name === name);
   const batch = db.batch();
-  batch.set(db.doc(`members/${uid}`), { name, admin: isManagerName(name), via: 'password', joinedAt: Date.now() });
-  batch.set(db.doc(`people/${uid}`), { name, joinedAt: Date.now() }, { merge: true });
+  batch.set(db.doc(`members/${uid}`), { name, admin: isManagerName(name), via: 'password', joinedAt: Date.now(), ...(pending && { pending: true }) });
+  if (!pending) batch.set(db.doc(`people/${uid}`), { name, joinedAt: Date.now() }, { merge: true });
+  const asked = pending && !(await requestRef(name).get()).exists;
+  if (asked) batch.set(requestRef(name), { name, at: Date.now() });
   await batch.commit();
-  return { name, admin: isManagerName(name), via: 'password' };
+  // This device was waiting under another name before.
+  if (before?.pending && before.name !== name) await dropRequestIfDone(before.name, team.rename, team);
+  if (asked)
+    await notify(
+      MANAGER_NAMES.map((to) => ({
+        to,
+        type: 'join',
+        title: `${name} wants to join`,
+        body: 'They’re new to the team. Let them in or turn them away on the Roster.',
+        open: 'view:team',
+      })),
+    );
+  return { name, admin: isManagerName(name), via: 'password', ...(pending && { pending: true }) };
 }
 
 export const account = onCall({ maxInstances: 5, invoker: 'public' }, async (req) => {
@@ -735,12 +774,16 @@ export const account = onCall({ maxInstances: 5, invoker: 'public' }, async (req
   // capitals, spaces, dots) is that person, never a second copy.
   const typed = cleanName(req.data?.name).slice(0, 60);
   let name = '';
+  // Who's on the team (onTeam), read with the names below.
+  const team = { rename, roles: [], people: [] };
   if (typed) {
     const [people, roles, accounts] = await Promise.all([
       db.collection('people').get(),
       db.collection('roles').get(),
       db.collection('accounts').get(),
     ]);
+    team.people = people.docs.map((d) => d.data());
+    team.roles = roles.docs.map((d) => d.data());
     const names = [
       ...MANAGER_NAMES,
       ...accounts.docs.map((d) => d.get('name')),
@@ -775,12 +818,14 @@ export const account = onCall({ maxInstances: 5, invoker: 'public' }, async (req
   const memberSnap = await db.doc(`members/${uid}`).get();
   const me = memberSnap.exists ? rename(memberSnap.get('name') || '') : '';
   if (me !== name) await follow(me);
-  const signedIn = memberSnap.exists && memberSnap.get('via') === 'password';
+  // Signed in and let in (a device waiting for team management isn't).
+  const signedIn = memberOk(memberSnap.data());
+  const before = memberSnap.exists ? { name: me, pending: memberSnap.get('pending') === true } : null;
   const fail = (message) => ({ error: message });
 
   // Does this name have a password yet? (The sign-in screen asks.)
   if (action === 'status') {
-    if (!name) return { member: signedIn ? { name: me, admin: isManagerName(me) } : null };
+    if (!name) return { member: signedIn ? { name: me, admin: isManagerName(me) } : before?.pending ? { name: me, admin: false, pending: true } : null };
     const acc = await accountRef(name).get();
     return { hasPassword: !!acc.get('hash'), thisDevice: me === name };
   }
@@ -802,7 +847,7 @@ export const account = onCall({ maxInstances: 5, invoker: 'public' }, async (req
       tx.set(accountRef(name), { name, salt, hash: hashOf(password, salt), setAt: now, lastSignIn: now, fails: 0, lockedUntil: 0 });
       if (ticket.exists) tx.delete(ticketRef);
       return { ok: true };
-    }).then(async (r) => (r.ok ? { ok: true, member: await signDeviceIn(uid, name) } : r));
+    }).then(async (r) => (r.ok ? { ok: true, member: await signDeviceIn(uid, name, team, before) } : r));
   }
 
   if (action === 'signIn') {
@@ -820,7 +865,7 @@ export const account = onCall({ maxInstances: 5, invoker: 'public' }, async (req
       return fail(fails >= LOCK_AFTER ? 'Too many tries. Try again in 10 min.' : 'That password isn’t right.');
     }
     await ref.update({ fails: 0, lockedUntil: 0, lastSignIn: now });
-    return { ok: true, member: await signDeviceIn(uid, name) };
+    return { ok: true, member: await signDeviceIn(uid, name, team, before) };
   }
 
   // Change your own password (signed in, knowing the old one).
@@ -859,6 +904,47 @@ export const account = onCall({ maxInstances: 5, invoker: 'public' }, async (req
     const batch = db.batch();
     for (const d of devices.docs) if (rename(d.get('name') || '') === me && d.id !== uid) batch.delete(d.ref);
     await batch.commit();
+    return { ok: true };
+  }
+
+  // A device waiting to be let in gives up on that name (to pick another).
+  if (action === 'withdraw') {
+    if (!before?.pending) return { ok: true };
+    await memberSnap.ref.delete();
+    if (!typed) {
+      const [people, roles] = await Promise.all([db.collection('people').get(), db.collection('roles').get()]);
+      team.people = people.docs.map((d) => d.data());
+      team.roles = roles.docs.map((d) => d.data());
+    }
+    await dropRequestIfDone(me, rename, team);
+    return { ok: true };
+  }
+
+  // Team management: let a new name in (it joins the team, on the Roster),
+  // or turn it away (its waiting devices are signed out, and the name is
+  // free again).
+  if (action === 'approve' || action === 'turnAway') {
+    if (!signedIn || memberSnap.get('admin') !== true) throw new HttpsError('permission-denied', 'Only team management can do that.');
+    if (!name) return fail('Who?');
+    const [ask, devices] = await Promise.all([requestRef(name).get(), pendingDevices(name, rename)]);
+    if (!ask.exists && !devices.length) return fail(`${first(name)} isn’t waiting any more.`);
+    const batch = db.batch();
+    if (action === 'approve') {
+      for (const d of devices) {
+        batch.update(d.ref, { pending: FieldValue.delete(), approvedBy: me, approvedAt: now });
+        batch.set(db.doc(`people/${d.id}`), { name, joinedAt: now }, { merge: true });
+      }
+      // On the Roster (and back on it if team management removed them before).
+      batch.set(db.doc(`roles/${personId(name)}`), { name, removed: false, updatedAt: FieldValue.serverTimestamp(), updatedBy: me }, { merge: true });
+      batch.delete(requestRef(name));
+      await batch.commit();
+      await notify([{ to: name, type: 'join', title: 'You’re in', body: `${first(me)} let you in. Welcome to the team!`, open: 'view:today', by: me }]);
+      return { ok: true };
+    }
+    for (const d of devices) batch.delete(d.ref);
+    batch.delete(requestRef(name));
+    await batch.commit();
+    await dropRequestIfDone(name, rename, team);
     return { ok: true };
   }
 
@@ -1121,7 +1207,7 @@ export const play = onCall({ maxInstances: 5, invoker: 'public' }, async (req) =
   const uid = req.auth?.uid;
   if (!uid) throw new HttpsError('unauthenticated', 'Sign in first.');
   const member = await db.doc(`members/${uid}`).get();
-  if (!member.exists || member.get('via') !== 'password') throw new HttpsError('permission-denied', 'Sign in first.');
+  if (!memberOk(member.data())) throw new HttpsError('permission-denied', 'Sign in first.');
   const data = await coinData();
   const me = data.rename(member.get('name'));
   const { action, game, conv = '', args = [], msgId, move, replyTo = null } = req.data || {};
@@ -1336,7 +1422,7 @@ async function caller(req) {
   const uid = req.auth?.uid;
   if (!uid) throw new HttpsError('unauthenticated', 'Sign in first.');
   const member = await db.doc(`members/${uid}`).get();
-  if (!member.exists || member.get('via') !== 'password') throw new HttpsError('permission-denied', 'Sign in first.');
+  if (!memberOk(member.data())) throw new HttpsError('permission-denied', 'Sign in first.');
   const rename = await renamer();
   return { uid, me: rename(member.get('name')), rename };
 }
@@ -1633,7 +1719,7 @@ export const ftcEvents = onCall(
     const uid = req.auth?.uid;
     if (!uid) throw new HttpsError('unauthenticated', 'Sign in first.');
     const member = await db.doc(`members/${uid}`).get();
-    if (!member.exists || member.get('via') !== 'password' || member.get('admin') !== true)
+    if (!memberOk(member.data()) || member.get('admin') !== true)
       throw new HttpsError('permission-denied', 'Only team management can pull the schedule.');
     const user = (FTC_API_USER.value() || '').trim();
     const key = (FTC_API_KEY.value() || '').trim();

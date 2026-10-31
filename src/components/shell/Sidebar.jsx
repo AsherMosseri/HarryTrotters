@@ -127,6 +127,7 @@ export default function Sidebar({
   onChatAsk, // managers: new channel, channel settings
   isManager,
   myOpen,
+  joining = 0, // managers: new names waiting to be let in (Roster)
   actor,
   dmsOn,
   topRight,
@@ -173,6 +174,7 @@ export default function Sidebar({
               title={LABELS[id]}
             >
               <Icon name={id} size={20} />
+              {id === 'team' && joining > 0 && <span className="sb-rail-badge">{joining}</span>}
             </button>
           ))}
           {chatOn && currentConv && (
@@ -235,7 +237,8 @@ export default function Sidebar({
                   icon={<Icon name={id} />}
                   label={LABELS[id]}
                   active={page === id}
-                  count={id === 'tasks' ? myOpen : 0}
+                  count={id === 'tasks' ? myOpen : id === 'team' ? joining : 0}
+                  strong={id === 'team' && joining > 0}
                   onClick={() => setPage(id)}
                 />
               ))}

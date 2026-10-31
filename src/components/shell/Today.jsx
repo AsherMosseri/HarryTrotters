@@ -71,6 +71,7 @@ export default function Today({
   matches = [],
   checklists = [],
   roster = [],
+  joinRequests = [],
   api,
   shifts,
   runs = [],
@@ -114,7 +115,7 @@ export default function Today({
     );
   return (
     <UsualToday
-      {...{ actor, tasks, milestones, competition, shifts, runs, myShift, convs, unread, chat, on, onOpenTask, onOpenConv, onPage, onNewTask, roster }}
+      {...{ actor, tasks, milestones, competition, shifts, runs, myShift, convs, unread, chat, on, onOpenTask, onOpenConv, onPage, onNewTask, roster, joinRequests }}
       {...{ onStartShift, onOpenShift, onPerson, onEditProfile, people, today, api }}
       pitButton={
         compOn ? (
@@ -156,6 +157,7 @@ function UsualToday({
   api,
   pitButton,
   roster = [],
+  joinRequests = [],
 }) {
   const lab = useContext(LabLogContext);
   const all = tasks || [];
@@ -184,6 +186,13 @@ function UsualToday({
   const others = atLab.filter((s) => s.person !== actor.name).map((s) => first(s.person));
   const unreadCount = waiting.reduce((n, w) => n + (w.u.count || 0), 0);
   const lines = [
+    // Team management: new names waiting to be let in (Roster).
+    actor.admin &&
+      joinRequests.length > 0 && {
+        tone: 'warn',
+        text: joinRequests.length === 1 ? `${joinRequests[0].name} wants to join the team` : `${joinRequests.length} new people want to join the team`,
+        go: () => onPage('team'),
+      },
     on.includes('tasks') &&
       (overdue === 1
         ? { tone: 'bad', text: `${firstOverdue.title || 'A task'} is overdue`, go: () => onOpenTask(firstOverdue.id) }

@@ -185,6 +185,14 @@ async function callLearn(name, data) {
   return (await call(data)).data;
 }
 
+// A members/{uid} doc as the app uses it (pending: a new name waiting for
+// team management).
+function memberOf(snap) {
+  if (!snap.exists()) return null;
+  const d = snap.data();
+  return { name: d.name, admin: d.admin === true, via: d.via || '', ...(d.pending === true && { pending: true }) };
+}
+
 export const firebaseStore = {
   mode: 'firebase',
 
@@ -199,12 +207,21 @@ export const firebaseStore = {
 
   async getMember(uid) {
     try {
-      const snap = await getDoc(doc(membersCol, uid));
-      return snap.exists() ? { name: snap.data().name, admin: snap.data().admin === true, via: snap.data().via || '' } : null;
+      return memberOf(await getDoc(doc(membersCol, uid)));
     } catch (err) {
       if (err.code === 'permission-denied') return null;
       throw err;
     }
+  },
+  // A device waiting for team management watches its own members doc: the
+  // pending mark goes away when they let it in, the doc when they turn it away.
+  subscribeMember(uid, cb, onError) {
+    return onSnapshot(doc(membersCol, uid), (snap) => cb(memberOf(snap)), onError);
+  },
+  // New names waiting to be let in (team management only; the account
+  // function's approve / turnAway answers them).
+  subscribeJoinRequests(cb, onError) {
+    return onSnapshot(collection(db, 'joinRequests'), (snap) => cb(snap.docs.map(readDoc).sort((a, b) => (a.at || 0) - (b.at || 0))), onError);
   },
 
   // Accounts (functions/index.js account): status, create, signIn, change,

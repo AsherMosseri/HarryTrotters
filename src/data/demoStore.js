@@ -610,6 +610,11 @@ try {
   state = seed();
 }
 if (!state.marketSeeded) seedMarket();
+// Someone new waiting for team management to let them in (Roster, Today).
+if (!state.joinSeeded) {
+  state.joinRequests = [{ id: 'riley-chen', name: 'Riley Chen', at: Date.now() - 25 * 60000 }];
+  state.joinSeeded = 1;
+}
 
 // The market and pets in the demo: a few perks, Asher's dog, a shout-out, a
 // perk waiting for approval and an open tournament (the real ones are made
@@ -829,13 +834,31 @@ export const demoStore = {
   },
   async getMember() {
     // ?demo=member previews the app as a regular teammate; ?demo=signin shows
-    // the sign-in screen (Asher "has" a password there, everyone else makes one).
+    // the sign-in screen (Asher "has" a password there, everyone else makes one);
+    // ?demo=pending, a new name waiting for team management to let it in.
     const as = new URLSearchParams(location.search).get('demo');
     if (as === 'signin' && !sessionStorage.getItem('demo-signed-in')) return null;
+    if (as === 'pending') return { name: 'Riley Chen', admin: false, via: 'password', pending: true };
     const asMember = as === 'member';
     return asMember ? { name: 'Cooper Mlezcko', admin: false, via: 'password' } : { name: 'Asher Mosseri', admin: true, via: 'password' };
   },
+  subscribeMember(uid, cb) {
+    this.getMember().then(cb);
+    return () => {};
+  },
+  subscribeJoinRequests(cb) {
+    return listen(() => cb([...(state.joinRequests || [])]));
+  },
   async account({ action, name, password }) {
+    // Letting a new name in puts them on the Roster; turning them away just
+    // drops the request (the way functions/index.js does it).
+    if (action === 'approve' || action === 'turnAway') {
+      state.joinRequests = (state.joinRequests || []).filter((r) => r.name !== name);
+      if (action === 'approve')
+        state.roles = [...(state.roles || []).filter((r) => r.id !== personId(name)), { id: personId(name), name, removed: false, updatedAt: Date.now(), updatedBy: REQUESTS_TO }];
+      commit();
+      return { ok: true };
+    }
     if (action === 'answerReset') {
       state.resetRequest = null;
       commit();

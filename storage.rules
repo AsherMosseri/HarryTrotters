@@ -1,14 +1,16 @@
 rules_version = '2';
 // Cloud Storage rules for task photos. Paste into Firebase console →
 // Storage → Rules. Only devices signed in with a password (they have a
-// members/{uid} doc in Firestore with via: 'password') can see, add, or
-// delete photos.
+// members/{uid} doc in Firestore with via: 'password', and aren't waiting
+// to be let in) can see, add, or delete photos.
 service firebase.storage {
   match /b/{bucket}/o {
     function isMember() {
       return request.auth != null
         && firestore.exists(/databases/(default)/documents/members/$(request.auth.uid))
-        && firestore.get(/databases/(default)/documents/members/$(request.auth.uid)).data.get('via', '') == 'password';
+        && firestore.get(/databases/(default)/documents/members/$(request.auth.uid)).data.get('via', '') == 'password'
+        // Not a new name still waiting for team management to let it in.
+        && firestore.get(/databases/(default)/documents/members/$(request.auth.uid)).data.get('pending', false) != true;
     }
 
     // Robot CAD exports (.glb / .gltf). Only managers delete them.

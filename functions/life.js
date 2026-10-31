@@ -12,7 +12,7 @@ import { logger } from 'firebase-functions';
 import { awardCoins } from './award.js';
 import { AWARD_CAPS, teamDay } from './shared/coins.js';
 import { addDay } from './shared/streaks.js';
-import { nameKey } from './shared/team.js';
+import { memberOk, nameKey } from './shared/team.js';
 import { bingoAwards, bingoCard, bingoWeek, dailyAnswersIn } from './shared/bingo.js';
 import { buildRecap, recapWeek } from './shared/recap.js';
 import { cleanScore, guessProblem, isLive, matchRoundId, predictKey, ROUND_TTL, runTotal, settle } from './shared/predict.js';
@@ -33,7 +33,7 @@ export function lifeFunctions({ db, renamer }) {
     const uid = req.auth?.uid;
     if (!uid) throw new HttpsError('unauthenticated', 'Sign in first.');
     const m = await db.doc(`members/${uid}`).get();
-    if (!m.exists || m.get('via') !== 'password') throw new HttpsError('permission-denied', 'Sign in first.');
+    if (!memberOk(m.data())) throw new HttpsError('permission-denied', 'Sign in first.');
     const rename = await renamer();
     return { uid, name: rename(m.get('name')), admin: m.get('admin') === true, rename };
   }

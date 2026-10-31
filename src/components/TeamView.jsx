@@ -18,8 +18,9 @@ import { Overlay, PlusIcon } from './common.jsx';
 import { personId } from '../data/diff.js';
 import { todayISO } from '../milestones.js';
 import { Avatar, CloseIcon } from './common.jsx';
-import { useEscape } from '../util.js';
+import { relTime, useEscape } from '../util.js';
 import { confirmDialog } from './Dialogs.jsx';
+import { Icon } from './shell/icons.jsx';
 
 // Team Management sits under the team name with the subteams below it;
 // Secretary is a support role that hangs off to the side of Team Management.
@@ -187,7 +188,60 @@ function MemberChip({ p, onEdit, onPerson }) {
   );
 }
 
-export default function TeamView({ roster, roles, tasks, api, isManager, rename, onPerson }) {
+// Team management: new names waiting to be let in (they can't see or do
+// anything until then). Approve puts them on the Roster; Turn away signs
+// them out and frees the name.
+function JoinRequests({ requests, api }) {
+  const [busy, setBusy] = useState('');
+  const answer = async (r, approve) => {
+    if (
+      !approve &&
+      !(await confirmDialog({
+        title: `Turn ${r.name} away?`,
+        body: 'They’re signed out and the name is free again. They can ask again with the team code.',
+        okLabel: 'Turn away',
+        danger: true,
+      }))
+    )
+      return;
+    setBusy(r.id);
+    await api.answerJoin(r.name, approve);
+    setBusy('');
+  };
+  return (
+    <section className="join-reqs" aria-label="Waiting to join">
+      <div className="sec-head">
+        <h2>
+          Waiting to join <span className="mono">{requests.length}</span>
+        </h2>
+      </div>
+      <ul>
+        {requests.map((r) => (
+          <li key={r.id} className="join-req">
+            <Avatar name={r.name} size={34} />
+            <div className="join-req-who">
+              <b>{r.name}</b>
+              <span>
+                New name · signed in <span className="mono">{relTime(r.at)}</span>
+              </span>
+            </div>
+            <div className="join-req-btns">
+              <button className="btn" disabled={busy === r.id} onClick={() => answer(r, false)}>
+                Turn away
+              </button>
+              <button className="btn primary" disabled={busy === r.id} onClick={() => answer(r, true)}>
+                <Icon name="check" size={16} /> Approve
+              </button>
+            </div>
+          </li>
+        ))}
+      </ul>
+      <p className="muted small">Approve only people you know. Until then they can’t see or do anything in the app.</p>
+    </section>
+  );
+}
+
+export default function TeamView({ roster, joinRequests = [], roles, tasks, api, isManager, rename, onPerson }) {
   const [editing, setEditing] = useState(null);
   const today = todayISO();
 
@@ -233,6 +287,7 @@ export default function TeamView({ roster, roles, tasks, api, isManager, rename,
 
   return (
     <main className="content team">
+      {isManager && joinRequests.length > 0 && <JoinRequests requests={joinRequests} api={api} />}
       <section className="org">
         <div className="org-root">
           <b>{TEAM_NAME}</b>

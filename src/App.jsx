@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { loadStore } from './data/store.js';
 import { REQUESTS_TO, TEAM_NAME, isManagerName, makeRenamer } from './config.js';
-import { GetNewApp, InstallScreen, LoadingScreen, SignInScreen } from './components/Gate.jsx';
+import { GetNewApp, InstallScreen, LoadingScreen, SignInScreen, WaitingScreen } from './components/Gate.jsx';
 import { installNeeded, oldHomeApp } from './data/push.js';
 import { isDemo } from './data/store.js';
 import { NEXT } from './next.js';
@@ -75,7 +75,7 @@ export default function App() {
       (m) => {
         if (!alive) return;
         saveMember(user.uid, m);
-        setMember((prev) => (prev && m && prev.name === m.name && prev.admin === m.admin && prev.via === m.via ? prev : m));
+        setMember((prev) => (prev && m && prev.name === m.name && prev.admin === m.admin && prev.via === m.via && !!prev.pending === !!m.pending ? prev : m));
       },
       // Offline or a slow connection: keep going as who this device joined as.
       (e) => alive && !saved && setError(e.message || String(e)),
@@ -84,6 +84,27 @@ export default function App() {
       alive = false;
     };
   }, [store, user]);
+
+  // A new name waiting for team management: watch this device's members doc,
+  // so the app opens the moment they let it in (or goes back to Sign in if
+  // they turn it away).
+  const pending = !!(user && member?.via === 'password' && member.pending);
+  const [notice, setNotice] = useState('');
+  const leaving = useRef(false);
+  useEffect(() => {
+    if (!store || !user || !pending || !store.subscribeMember) return;
+    const was = member.name;
+    return store.subscribeMember(
+      user.uid,
+      (m) => {
+        if (m?.pending) return;
+        saveMember(user.uid, m);
+        if (!m && !leaving.current) setNotice(`Team management didn’t let ${was} in. Pick your name, or ask them.`);
+        setMember(m);
+      },
+      (e) => console.warn('member', e),
+    );
+  }, [store, user, pending]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!store || !user) return;
@@ -121,7 +142,7 @@ export default function App() {
   const passwordsLive = probe ? probed : true;
   const signedIn = member && (member.via === 'password' || passwordsLive === false);
   const actor = useMemo(
-    () => (user && signedIn ? { uid: user.uid, name: rename(member.name), admin: member.admin } : null),
+    () => (user && signedIn && !member.pending ? { uid: user.uid, name: rename(member.name), admin: member.admin } : null),
     [user, member, signedIn, rename],
   );
 
@@ -145,15 +166,32 @@ export default function App() {
   if (install) return <InstallScreen {...install} />;
   if (error) return <LoadingScreen error={error} />;
   if (!store || !user || member === undefined) return <LoadingScreen step={!store ? 1 : !user ? 2 : 3} />;
+  if (pending)
+    return (
+      <WaitingScreen
+        name={rename(member.name)}
+        onLeave={async () => {
+          leaving.current = true;
+          // Give up the name (the server drops the request), then start over.
+          await store.account({ action: 'withdraw' }).catch(() => {});
+          saveMember(user.uid, null);
+          if (isDemo) location.search = '?demo=signin';
+          else await store.leave();
+        }}
+      />
+    );
   if (!actor)
     return (
       <SignInScreen
         rename={rename}
+        notice={notice}
         current={member?.name ? rename(member.name) : ''}
         account={(data) => store.account(data)}
         saveTicket={(name, code) => store.saveSetupTicket(user.uid, name, code)}
         onSignedIn={(m) => {
           saveMember(user.uid, m);
+          leaving.current = false;
+          setNotice('');
           setMember(m);
         }}
       />

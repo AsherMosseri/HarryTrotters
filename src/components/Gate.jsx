@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { TEAM_NAME, TEAM_NICKNAME, ROSTER, PASSWORD_MIN, cleanName, sameName } from '../config.js';
+import { TEAM_NAME, TEAM_NICKNAME, ROSTER, MANAGER_NAMES, PASSWORD_MIN, cleanName, sameName } from '../config.js';
 import { Avatar } from './common.jsx';
 import { homeAppUrl } from '../data/push.js';
 import { promptDialog } from './Dialogs.jsx';
@@ -252,11 +252,47 @@ export function InstallScreen({ device, browser }) {
 
 const OTHER = '__other';
 
+// A name new to the team, waiting for team management to let it in. Nothing
+// else loads (the server refuses it anyway); App watches this device's
+// members doc, so the app opens by itself the moment they do.
+export function WaitingScreen({ name, onLeave }) {
+  const [busy, setBusy] = useState(false);
+  const managers = MANAGER_NAMES.map((n) => n.split(' ')[0]).join(' or ');
+  return (
+    <Shell>
+      <div className="wait-who">
+        <Avatar name={name} size={48} />
+        <span>
+          Signed in as <b>{name}</b>
+        </span>
+      </div>
+      <h1>Waiting for team management to let you in</h1>
+      <p className="muted">
+        {name.split(' ')[0]} isn’t on the team yet, so {managers} has to let you in first. This opens by itself as soon as they do.
+      </p>
+      <p className="wait-status" role="status">
+        <span className="wait-dot" aria-hidden="true" />
+        Waiting
+      </p>
+      <button
+        className="link-btn"
+        disabled={busy}
+        onClick={() => {
+          setBusy(true);
+          Promise.resolve(onLeave()).catch(() => setBusy(false));
+        }}
+      >
+        {busy ? 'Signing out…' : 'Not you? Pick a different name'}
+      </button>
+    </Shell>
+  );
+}
+
 // Signing in: pick your name, then your password. A name with no password
 // yet gets one now: right away on a device that was already signed in as that
 // person (before passwords), or with the team code on a new device.
 // account(data) calls the account function; it returns { ok, member } or { error }.
-export function SignInScreen({ rename, account, saveTicket, current, onSignedIn }) {
+export function SignInScreen({ rename, account, saveTicket, current, notice, onSignedIn }) {
   const names = [...new Set(ROSTER.map(rename))];
   const [picked, setPicked] = useState(current && names.includes(current) ? current : current ? OTHER : '');
   const [other, setOther] = useState(current && !names.includes(current) ? current : '');
@@ -329,6 +365,11 @@ export function SignInScreen({ rename, account, saveTicket, current, onSignedIn 
           ? `${TEAM_NICKNAME} uses passwords now, so nobody else can sign in as you. Make one for ${current.split(' ')[0]}. You’ll use it on any new device.`
           : 'Pick your name and enter your password.'}
       </p>
+      {notice && (
+        <p className="gate-notice" role="status">
+          {notice}
+        </p>
+      )}
       <form className="join-form" onSubmit={submit}>
         <div className="join-names">
           {names.map((n) => (

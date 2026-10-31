@@ -15,7 +15,10 @@ export const TEAM_NICKNAME = 'Harry Trotters';
 // Team managers. Joining under one of these names also needs that person's
 // manager code (checked by firestore.rules), and unlocks editing the org chart,
 // adding and removing people, deleting milestones, and changing the competition date.
-export { MANAGER_NAMES, isManagerName, PASSWORD_MIN, cleanName, knownName, sameName } from '../functions/shared/team.js';
+// ROSTER: the names shown on the sign-in screen and in the assignee picker.
+// People the manager adds on the Team tab, and anyone team management lets
+// in, are added to it.
+export { MANAGER_NAMES, isManagerName, PASSWORD_MIN, cleanName, knownName, sameName, ROSTER } from '../functions/shared/team.js';
 import { MANAGER_NAMES } from '../functions/shared/team.js';
 // Old spellings still stored on devices or tasks, mapped to the right name.
 // Renames made on the Team tab are stored in the database (settings/names).
@@ -50,22 +53,6 @@ export const REQUESTS_TO = 'Asher Mosseri';
 
 // The Robot (3D) tab is in preview: only these people see it for now.
 export const ROBOT_TAB_PEOPLE = ['Asher Mosseri'];
-
-
-// Names shown on the join screen and in the assignee picker. People the manager
-// adds on the Team tab, and anyone who joins as "Someone else", are added too.
-export const ROSTER = [
-  'Asher Mosseri',
-  'Sebastian Tolbert',
-  'Jackson Lucks',
-  'Cooper Mlezcko',
-  'Michael Meidan',
-  'Matthew Kuehl',
-  'Katarina Jurasic',
-  'Sophia Bermudez',
-  'Shrey Kumar',
-  'Ira Kumar',
-];
 
 export const STATUSES = [
   { id: 'backlog', label: 'Backlog', color: 'var(--st-backlog)' },

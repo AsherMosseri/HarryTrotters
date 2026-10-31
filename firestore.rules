@@ -11,14 +11,22 @@ service cloud.firestore {
     function memberPath() { return /databases/$(database)/documents/members/$(request.auth.uid); }
     // A device signed in with a password (the account function writes these;
     // older code-only sign-ins don't count until they set or enter a password).
-    function isMember() { return signedIn() && exists(memberPath()) && get(memberPath()).data.get('via', '') == 'password'; }
+    // A name new to the team is pending until team management lets it in, and
+    // can't read or write anything here till then. Older members docs have no
+    // pending field: they're in.
+    function isMember() {
+      return signedIn() && exists(memberPath()) && get(memberPath()).data.get('via', '') == 'password'
+        && get(memberPath()).data.get('pending', false) != true;
+    }
     function isManager() { return isMember() && get(memberPath()).data.get('admin', false) == true; }
     function validName(data) {
       return data.name is string && data.name.size() > 0 && data.name.size() <= 60;
     }
 
     // One doc per signed-in device, written only by the account function
-    // (which also decides who's team management). Only that device reads it.
+    // (which also decides who's team management, and who's still waiting to
+    // be let in). Only that device reads it (a waiting device watches it, so
+    // the app opens the moment it's let in).
     match /members/{uid} {
       allow read, delete: if signedIn() && request.auth.uid == uid;
       allow create, update: if false;
@@ -43,12 +51,20 @@ service cloud.firestore {
     match /accounts/{id} {
       allow read, write: if false;
     }
+    // New names waiting for team management to let them in (or turn them
+    // away, both through the account function).
+    match /joinRequests/{id} {
+      allow read: if isManager();
+      allow write: if false;
+    }
 
     // Public name list for the assignee picker; must match the member's name.
+    // A name waiting to be let in isn't on it (it would count as on the team).
     match /people/{uid} {
       allow read: if isMember();
       allow create, update: if signedIn() && request.auth.uid == uid
         && existsAfter(/databases/$(database)/documents/members/$(uid))
+        && getAfter(/databases/$(database)/documents/members/$(uid)).data.get('pending', false) != true
         && request.resource.data.name == getAfter(/databases/$(database)/documents/members/$(uid)).data.name;
       allow delete: if signedIn() && request.auth.uid == uid;
     }

@@ -722,6 +722,15 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
   useEffect(() => store.subscribePeople(setPeople, loadFail('the team list')), [store, loadFail]);
   useEffect(() => store.subscribeMilestones(setMilestones, loadFail('milestones')), [store, loadFail]);
   useEffect(() => store.subscribeRoles(setRoles, loadFail('the org chart')), [store, loadFail]);
+  // New names waiting for team management to let them in (Roster, Today).
+  const [joinRequests, setJoinRequests] = useState([]);
+  useEffect(() => {
+    if (!actor.admin || !store.subscribeJoinRequests) {
+      setJoinRequests([]);
+      return;
+    }
+    return store.subscribeJoinRequests(setJoinRequests, (e) => console.warn('join requests', e));
+  }, [store, actor.admin]);
   useEffect(() => store.subscribeSettings(setSettings, loadFail('settings')), [store, loadFail]);
   useEffect(() => store.subscribeParts(setParts, loadFail('parts')), [store, loadFail]);
   useEffect(() => store.subscribeChecklists(setChecklists, loadFail('checklists')), [store, loadFail]);
@@ -1259,6 +1268,17 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
           )
           .catch(fail),
       saveRole: (data) => store.saveRole(personId(data.name), data, actor).catch(fail),
+      // Team management: let a new name in, or turn it away (the account function).
+      answerJoin: async (name, approve) => {
+        try {
+          const r = await store.account({ action: approve ? 'approve' : 'turnAway', name });
+          if (r?.error) throw new Error(r.error);
+          return true;
+        } catch (e) {
+          fail(e);
+          return false;
+        }
+      },
       renamePerson: (oldName, newName, role) => {
         // Point earlier names for this person at the new one too.
         const updated = Object.fromEntries(Object.entries(renames).map(([from, to]) => [from, to === oldName ? newName : to]));
@@ -2100,6 +2120,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
           }}
           isManager={actor.admin}
           myOpen={myOpenTasks.length}
+          joining={joinRequests.length}
           actor={actor}
           dmsOn={controls.isOn('dms')}
           topRight={
@@ -2436,6 +2457,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
                     matches={matches}
                     checklists={checklists}
                     roster={roster}
+                    joinRequests={joinRequests}
                     api={api}
                     shifts={namedShifts}
                     runs={runs}
@@ -2651,6 +2673,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
                 ) : view === 'team' ? (
                   <TeamView
                     roster={roster}
+                    joinRequests={joinRequests}
                     roles={roles}
                     tasks={tasks}
                     api={api}

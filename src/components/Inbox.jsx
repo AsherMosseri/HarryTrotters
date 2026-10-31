@@ -15,6 +15,7 @@ const ICONS = {
   shutdown: 'lock',
   shift: 'shifts',
   checkin: 'flag',
+  join: 'person',
   // Ads and coupons get a tag, not the product's emoji.
   ad: 'tag',
 };

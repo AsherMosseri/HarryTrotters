@@ -2743,3 +2743,26 @@ button.pm-row:hover { background: color-mix(in srgb, var(--text) 4%, transparent
 .mc-violation { font-weight: 600; color: #b45309; }
 .mc-cheer { font-family: var(--font-display); font-size: 24px; font-weight: 700; line-height: 1.2; }
 .mc-shout { display: flex; gap: 10px; align-items: center; }
+
+/* ---------- new names waiting for team management (F3) ---------- */
+/* The waiting screen: who you're signed in as, and a quiet pulse. */
+.wait-who { display: flex; align-items: center; gap: 12px; font-size: 15px; color: var(--muted); }
+.wait-who b { color: var(--text); font-weight: 650; }
+.wait-status { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: var(--muted); }
+.wait-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex: none; }
+:root[data-anim~='move'] .wait-dot { animation: wait-pulse 1.6s ease-in-out infinite; }
+@keyframes wait-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.3; transform: scale(0.75); } }
+.gate-notice { padding: 10px 12px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--border); font-size: 14px; }
+
+/* Roster: waiting to join (team management only). */
+.join-reqs { display: flex; flex-direction: column; gap: 6px; margin-bottom: 18px; }
+.join-reqs .sec-head { padding-bottom: 5px; border-bottom: 1.5px solid var(--text); }
+.join-reqs .sec-head h2 { font-size: 12.5px; font-weight: 750; text-transform: uppercase; letter-spacing: 0.08em; }
+.join-reqs .sec-head h2 .mono { color: var(--muted); margin-left: 4px; }
+.join-reqs ul { list-style: none; margin: 0; padding: 0; }
+.join-req { display: flex; align-items: center; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--hairline); flex-wrap: wrap; }
+.join-req-who { display: flex; flex-direction: column; min-width: 0; flex: 1 1 160px; line-height: 1.3; }
+.join-req-who b { font-weight: 600; }
+.join-req-who > span { font-size: 14px; color: var(--muted); }
+.join-req-btns { display: flex; gap: 8px; margin-left: auto; }
+.join-req-btns .btn { min-height: 38px; }

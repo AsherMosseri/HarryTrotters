@@ -22,6 +22,7 @@ import { logger } from 'firebase-functions';
 import { FieldPath } from 'firebase-admin/firestore';
 import * as market from './shared/market.js';
 import { START_NEED, isSpecies } from './shared/pets.js';
+import { memberOk } from './shared/team.js';
 
 const OPEN = { maxInstances: 5, invoker: 'public' };
 
@@ -34,7 +35,7 @@ export function marketFunctions({ db, coinData, freshCoins, notify, bankRef, per
     const uid = req.auth?.uid;
     if (!uid) throw new HttpsError('unauthenticated', 'Sign in first.');
     const member = await db.doc(`members/${uid}`).get();
-    if (!member.exists || member.get('via') !== 'password') throw new HttpsError('permission-denied', 'Sign in first.');
+    if (!memberOk(member.data())) throw new HttpsError('permission-denied', 'Sign in first.');
     const data = await coinData();
     const me = data.rename(member.get('name'));
     return { uid, me, admin: member.get('admin') === true, data, aliases: data.rename.aliases(me).slice(0, 30) };
