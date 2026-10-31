@@ -103,6 +103,10 @@ function callable(name, { timeout = 30000, offline } = {}) {
     } catch (e) {
       // No answer at all (the same codes the server uses for its own bugs, so only when offline).
       if (!isOnline() && ['functions/internal', 'functions/unavailable', 'functions/deadline-exceeded'].includes(e?.code)) throw needsInternet(offline);
+      // A function that isn't live yet (not found), or one that failed without saying why
+      // ("internal"), which is what the first minutes after a deploy look like.
+      if (e?.code === 'functions/not-found' || (e?.code === 'functions/internal' && /^internal(\s*\[\d+\])?$/i.test(String(e.message || ''))))
+        throw Object.assign(new Error('This part isn’t available yet. Try again in a minute.'), { code: e.code });
       // Online but no answer (a slow connection, or the minutes of a deploy).
       if (['functions/unavailable', 'functions/deadline-exceeded'].includes(e?.code))
         throw Object.assign(new Error('Can’t reach the server right now. Try again in a minute.'), { code: e.code });

@@ -291,20 +291,28 @@ function UsualToday({
           )}
           {on.includes('shifts') && (
             <button className="pit-stats" onClick={() => onPage('shifts')} title="Team this week, against last week">
-              <span>
-                Team this week <b className="mono">{weekHours.toFixed(1)} h</b>
-                {hourDiff !== 0 && (
-                  <span className={hourDiff > 0 ? 'ss-up' : 'ss-down'}>
-                    {' '}
-                    {hourDiff > 0 ? 'up' : 'down'} <span className="mono">{Math.abs(hourDiff)}</span>
-                  </span>
-                )}
+              <span className="ps-item">
+                <span className="ps-label">Team this week</span>
+                <span className="ps-val">
+                  <b className="mono">{weekHours.toFixed(1)} h</b>
+                  {hourDiff !== 0 && (
+                    <span className={hourDiff > 0 ? 'ss-up' : 'ss-down'}>
+                      {hourDiff > 0 ? 'up' : 'down'} <span className="mono">{Math.abs(hourDiff)}</span>
+                    </span>
+                  )}
+                </span>
               </span>
-              <span>
-                <b className="mono">{stats.tasks.week}</b> {stats.tasks.week === 1 ? 'task' : 'tasks'} done
+              <span className="ps-item">
+                <span className="ps-label">{stats.tasks.week === 1 ? 'Task done' : 'Tasks done'}</span>
+                <span className="ps-val">
+                  <b className="mono">{stats.tasks.week}</b>
+                </span>
               </span>
-              <span>
-                <b className="mono">{stats.runs.week}</b> practice {stats.runs.week === 1 ? 'run' : 'runs'}
+              <span className="ps-item">
+                <span className="ps-label">{stats.runs.week === 1 ? 'Practice run' : 'Practice runs'}</span>
+                <span className="ps-val">
+                  <b className="mono">{stats.runs.week}</b>
+                </span>
               </span>
             </button>
           )}
