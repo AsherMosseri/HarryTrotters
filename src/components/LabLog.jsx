@@ -42,6 +42,7 @@ const firstName = (n) => (n || '').split(' ')[0];
 const secs = (ms) => `0:${String(Math.max(1, Math.round((ms || 0) / 1000))).padStart(2, '0')}`;
 const span = (ms) => {
   const m = Math.max(0, Math.round(ms / 60000));
+  if (m < 1) return 'under a minute';
   return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')} min`;
 };
 const otherKey = (area) => `other:${area}`;
@@ -157,9 +158,15 @@ export function LabLogDialog({
     ...pickList.map((p) => p.area),
     ...[...suggested.keys()].map((id) => taskArea(byId.get(id))),
   ]);
-  const steps = ['areas', 'tasks', ...(pickList.length ? ['how'] : []), 'note'];
-  const stepId = steps[Math.min(step, steps.length - 1)];
-  const atLast = step >= steps.length - 1;
+  // Four steps; "How did it go?" is passed over when no task is picked.
+  const steps = ['areas', 'tasks', 'how', 'note'];
+  const stepId = steps[step];
+  const atLast = step === steps.length - 1;
+  const go = (dir) => {
+    let to = step + dir;
+    if (steps[to] === 'how' && !pickList.length) to += dir;
+    setStep(Math.max(0, Math.min(steps.length - 1, to)));
+  };
   const canSave = areas.length > 0 || pickList.length > 0;
 
   useEffect(() => {
@@ -284,7 +291,8 @@ export function LabLogDialog({
               </span>
               <h2>Quick visit</h2>
               <p className="muted">
-                You’ve been here <span className="mono">{span(shiftMs)}</span>. Nothing to log for that.
+                You’ve been here {shiftMs < 60000 ? 'under a minute' : <span className="mono">{span(shiftMs)}</span>}. Nothing to log for
+                that.
               </p>
             </div>
             {err && <div className="casino-error">{err}</div>}
@@ -623,7 +631,7 @@ export function LabLogDialog({
 
           <div className="ll-foot">
             {step > 0 ? (
-              <button type="button" className="btn ll-back" onClick={() => setStep(step - 1)} disabled={!!busy} aria-label="Back">
+              <button type="button" className="btn ll-back" onClick={() => go(-1)} disabled={!!busy} aria-label="Back">
                 <Icon name="chevron" size={18} className="ll-back-icon" />
               </button>
             ) : mode === 'end' && onSkip ? (
@@ -640,7 +648,7 @@ export function LabLogDialog({
               {busy === 'save' ? 'Saving…' : 'Done'}
             </button>
             {!atLast && (
-              <button type="button" className="btn primary ll-next" disabled={!canSave || !!busy} onClick={() => setStep(step + 1)}>
+              <button type="button" className="btn primary ll-next" disabled={!canSave || !!busy} onClick={() => go(1)}>
                 Next
                 <Icon name="chevron" size={18} />
               </button>

@@ -1583,13 +1583,16 @@ button.pm-row:hover { background: color-mix(in srgb, var(--text) 4%, transparent
   .ll-outcomes { grid-template-columns: repeat(4, 1fr); }
   .ll-outcome { flex-direction: column; gap: 3px; min-height: 64px; font-size: 14px; }
 }
-/* Phones: the whole screen, clear of the notch and the home bar. */
-@media (max-width: 600px) {
+/* Phones: the whole screen, clear of the notch and the home bar; the quick
+   visit and the payoff are sheets from the bottom. */
+@media (max-width: 760px) {
   .panel-backdrop.center.ll-backdrop { padding: 0; align-items: stretch; }
   .panel-backdrop.center > .dialog.ll-sheet:not(.ll-quick) { width: 100%; height: var(--vvh, 100dvh); border-radius: 0; box-shadow: none; }
   .ll-sheet:not(.ll-quick) .ll-head { padding-top: max(14px, env(safe-area-inset-top)); }
-  .panel-backdrop.center.ll-backdrop:has(.ll-quick), .panel-backdrop.center.ll-backdrop:has(.ll-payoff) { align-items: flex-end; padding: 0; }
-  .panel-backdrop.center > .dialog.ll-quick, .panel-backdrop.center > .dialog.ll-payoff { width: 100%; border-radius: 20px 20px 0 0; padding-bottom: max(20px, env(safe-area-inset-bottom)); }
+  .panel-backdrop.center.ll-backdrop:has(> .ll-quick, > .ll-payoff) { align-items: flex-end; background: rgb(10 12 20 / 40%); }
+  .panel-backdrop.center > .dialog.ll-quick, .panel-backdrop.center > .dialog.ll-payoff {
+    width: 100%; height: auto; max-height: 100%; border-radius: 20px 20px 0 0; padding-bottom: max(20px, env(safe-area-inset-bottom));
+  }
   .ll-body { padding: 14px 16px 18px; }
   .ll-titles h2 { font-size: 22px; }
 }
