@@ -37,6 +37,8 @@ import TrashDialog from './TrashDialog.jsx';
 import RunsView from './RunsView.jsx';
 import ChatView from './ChatView.jsx';
 import Sidebar from './shell/Sidebar.jsx';
+import ConnectionPill from './shell/ConnectionPill.jsx';
+import { noteFor } from '../connection.js';
 import Today from './shell/Today.jsx';
 import { Icon } from './shell/icons.jsx';
 // The 3D viewer pulls in three.js, so it loads only when the Robot tab opens.
@@ -1391,16 +1393,16 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
         store
           .play(req, actor, { balanceOf: (n) => cmdData.current.wallet(n).balance, roster: cmdData.current.roster })
           .then((r) => (setServerSkew(r?.serverNow), r))
-          .catch((e) => ({ note: { title: 'Trotbot couldn’t do that', body: e.message || String(e) } })),
+          .catch((e) => ({ note: noteFor(e, 'Trotbot couldn’t do that') })),
       // Tetris and Minesweeper: the funGame function starts and checks each game.
       funGame: (req) =>
         store
           .funGame(req, actor, { balanceOf: (n) => cmdData.current.wallet(n).balance, roster: cmdData.current.roster })
           .then((r) => (setServerSkew(r?.serverNow), r))
           // failed: it never got an answer (a Minesweeper tournament tap is sent again).
-          .catch((e) => ({ note: { title: 'Trotbot couldn’t do that', body: e.message || String(e) }, failed: true })),
+          .catch((e) => ({ note: noteFor(e, 'Trotbot couldn’t do that'), failed: true })),
       submitTournamentScore: (req) =>
-        store.submitTournamentScore(req, actor).catch((e) => ({ note: { title: 'That score didn’t go in', body: e.message || String(e) } })),
+        store.submitTournamentScore(req, actor).catch((e) => ({ note: noteFor(e, 'That score didn’t go in') })),
       // Tournaments come from the market (store.subscribeTournaments).
       subscribeTournaments: (cb) => (store.subscribeTournaments ? store.subscribeTournaments(cb) : () => {}),
       setRaceLive: (race, data) => store.setRaceLive(race, data, actor).catch(() => {}),
@@ -2392,6 +2394,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
                   </button>
                 </header>
               ) : null}
+              {phone && <ConnectionPill className="conn-phone" />}
               {isOwner && shutdown?.on && (
                 <div className="shutdown-banner" role="status">
                   <span>

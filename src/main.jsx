@@ -9,11 +9,13 @@ import './shell.css';
 import { installEmojiKeyFix } from './emojiKeyFix.js';
 import { installKeyboardFit, installNoPageZoom } from './keyboard.js';
 import { installAnim } from './motion.js';
+import { registerOffline } from './offline.js';
 
 installEmojiKeyFix();
 installKeyboardFit();
 installNoPageZoom();
 installAnim();
+registerOffline();
 
 window.addEventListener('vite:preloadError', (e) => {
   if (reloadOnceForNewVersion()) e.preventDefault();

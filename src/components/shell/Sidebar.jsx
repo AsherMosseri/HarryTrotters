@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Icon } from './icons.jsx';
 import { Avatar } from '../common.jsx';
+import ConnectionPill from './ConnectionPill.jsx';
 import { TEAM_NAME, TEAM_NICKNAME } from '../../config.js';
 import horse from '../../assets/horse.webp';
 
@@ -162,6 +163,7 @@ export default function Sidebar({
           </button>
         </div>
         <div className="sb-rail-tools">
+          <ConnectionPill compact />
           {shiftRow}
           {topRight}
         </div>
@@ -224,6 +226,7 @@ export default function Sidebar({
       </div>
       {/* Under the top band, so the band stays the chat header's height and
           their dividing lines meet. */}
+      <ConnectionPill />
       {shiftRow && <div className="sb-shift-row">{shiftRow}</div>}
       <nav className="sb-scroll" aria-label="Pages" ref={navRef}>
         {GROUPS.map(([title, ids]) => {

@@ -23,8 +23,15 @@ function Shell({ children }) {
 // 3 checking the team; the bar fills as each one finishes, and if one takes
 // a while it says which, with a way to reload.
 const STEPS = ['Opening', 'Loading the app', 'Signing in', 'Checking the team'];
-export function LoadingScreen({ error, step = 1 }) {
+export function LoadingScreen({ error, step = 1, offline = false }) {
   const [slow, setSlow] = useState(false);
+  // A first sign-in with no internet: open on its own as soon as it's back.
+  useEffect(() => {
+    if (!offline) return;
+    const go = () => location.reload();
+    window.addEventListener('online', go);
+    return () => window.removeEventListener('online', go);
+  }, [offline]);
   useEffect(() => {
     setSlow(false);
     const t = setTimeout(() => setSlow(true), 10000);
@@ -38,10 +45,10 @@ export function LoadingScreen({ error, step = 1 }) {
         <p>{TEAM_NAME}</p>
         {error ? (
           <div className="splash-error">
-            <b>Something went wrong</b>
+            <b>{offline ? 'Needs internet' : 'Something went wrong'}</b>
             <span>{error}</span>
             <button className="btn primary" onClick={() => location.reload()}>
-              Reload
+              {offline ? 'Try again' : 'Reload'}
             </button>
           </div>
         ) : (

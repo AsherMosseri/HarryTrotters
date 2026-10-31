@@ -3231,3 +3231,21 @@ button.pm-row:hover { background: color-mix(in srgb, var(--text) 4%, transparent
   .sc-trow .sc-score { display: none; }
   .sc-take { padding: 0 12px; font-size: 15px; min-height: 48px; }
 }
+/* ---------- Offline (3.0 D3) ----------
+   A calm pill when the app can't reach the server: in the sidebar under the
+   team name, a slim row under the phone's title bar, and just the icon in the
+   folded sidebar. "Back online" shows for a few seconds. No motion. */
+.conn-pill {
+  display: flex; align-items: center; gap: 7px; flex: none; margin: 6px 10px 0; padding: 6px 11px; border-radius: 999px;
+  font-size: 13px; font-weight: 600; line-height: 1.2; background: var(--surface-2); color: var(--text); border: 1px solid var(--hairline);
+}
+.conn-pill .icon { flex: none; }
+.conn-pill.off .icon { color: var(--muted); }
+.conn-pill.back { color: #15803d; background: color-mix(in srgb, #22c55e 12%, var(--surface-2)); border-color: color-mix(in srgb, #22c55e 30%, transparent); }
+.conn-pill.compact { margin: 0 0 4px; width: 34px; height: 34px; padding: 0; justify-content: center; border-radius: 10px; }
+.conn-pill .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.conn-pill.conn-phone { align-self: center; margin: 4px 0 2px; font-size: 12.5px; padding: 4px 11px; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .conn-pill.back { color: #4ade80; }
+}
+:root[data-theme='dark'] .conn-pill.back { color: #4ade80; }

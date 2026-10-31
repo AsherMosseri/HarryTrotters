@@ -255,6 +255,13 @@ const PATHS = {
     </>
   ),
   check: <path d="m4.5 10.5 3.5 3.5 7.5-8" />,
+  // No internet: a cloud with a line through it.
+  cloudOff: (
+    <>
+      <path d="M7.4 5.2a4.6 4.6 0 0 1 8 2.9 3.3 3.3 0 0 1 1.4 5.6M13.8 15.5H6.6a3.9 3.9 0 0 1-.9-7.7" />
+      <path d="m3 3 14 14" />
+    </>
+  ),
   chevronDown: <path d="m5 7.5 5 5 5-5" />,
   chevronUp: <path d="m5 12.5 5-5 5 5" />,
   // Opens somewhere else (a link to another site).

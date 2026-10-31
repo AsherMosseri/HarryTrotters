@@ -2,6 +2,7 @@ import { useEffect, useState, useSyncExternalStore } from 'react';
 import { VersionLogDialog } from './VersionLog.jsx';
 import { Overlay } from './common.jsx';
 import { NEXT } from '../next.js';
+import { checkWorkerNow } from '../offline.js';
 
 const CHECK_EVERY = 60 * 1000;
 
@@ -81,10 +82,12 @@ export default function UpdateGate({ children }) {
       if (data.version === __BUILD_ID__) {
         if (data.code && data.code !== __CODE_ID__) {
           quiet = data.code;
+          checkWorkerNow();
           if (NEXT) setCodeReady(data.code);
         }
         return;
       }
+      checkWorkerNow();
       setNewVersion(data.version);
       setPlain(!!data.plain);
       if (Array.isArray(data.changelog)) setInfo({ release: data.release, changelog: data.changelog });

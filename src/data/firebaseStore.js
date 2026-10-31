@@ -4,17 +4,18 @@ import {
   initializeFirestore,
   persistentLocalCache,
   persistentMultipleTabManager,
+  CACHE_SIZE_UNLIMITED,
   collection,
   doc,
   getDoc,
   getDocFromServer,
   onSnapshot,
   serverTimestamp,
-  writeBatch,
+  writeBatch as fsWriteBatch,
   increment,
-  deleteDoc,
-  setDoc,
-  updateDoc,
+  deleteDoc as fsDeleteDoc,
+  setDoc as fsSetDoc,
+  updateDoc as fsUpdateDoc,
   deleteField,
   arrayUnion,
   arrayRemove,
@@ -26,7 +27,14 @@ import {
   FieldPath,
   where,
 } from 'firebase/firestore';
-import { getStorage, ref as fileRef, uploadBytes, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
+import {
+  getStorage,
+  ref as fileRef,
+  uploadBytes as fsUploadBytes,
+  uploadBytesResumable as fsUploadBytesResumable,
+  getDownloadURL,
+  deleteObject as fsDeleteObject,
+} from 'firebase/storage';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { FUNCTIONS_REGION, firebaseConfig, VAPID_KEY } from '../config.js';
 import { pushSupport } from './push.js';
@@ -41,14 +49,93 @@ import {
   personId,
 } from './diff.js';
 import { NEXT } from '../next.js';
+import { swOptions } from '../offline.js';
+import { browserIsOnline, isOnline, needsInternet, setServerReachable } from '../connection.js';
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const storage = getStorage(app);
-// Offline cache keeps the board usable on spotty lab Wi-Fi.
+// The offline copy of the team's data (IndexedDB, shared by every tab): the
+// last-known schedule, tasks, checklists and chat stay readable with no
+// internet, and writes made offline wait there and send when it's back. The
+// cache is never trimmed, so what was loaded at the venue is still there.
 const db = initializeFirestore(app, {
-  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager(), cacheSizeBytes: CACHE_SIZE_UNLIMITED }),
 });
+
+// Writes land in the offline copy at once, but the server's "done" only comes
+// with a connection. With none (or Wi-Fi that's connected but dead) a screen
+// that waits for it would wait forever, so once the write is safely queued we
+// carry on. A late refusal from the rules just takes the change back out.
+const SAVE_WAIT = 6000;
+function queued(p) {
+  p.catch(() => {});
+  return Promise.race([p, new Promise((r) => setTimeout(r, isOnline() ? SAVE_WAIT : 0))]);
+}
+const setDoc = (...a) => queued(fsSetDoc(...a));
+const updateDoc = (...a) => queued(fsUpdateDoc(...a));
+const deleteDoc = (...a) => queued(fsDeleteDoc(...a));
+function writeBatch(...a) {
+  const batch = fsWriteBatch(...a);
+  const commit = batch.commit.bind(batch);
+  batch.commit = () => queued(commit());
+  return batch;
+}
+
+// Pictures, files and anything else that goes through Storage can't wait in
+// the offline copy: say so right away instead of hanging.
+const UPLOAD_OFFLINE = 'Needs internet to upload. Try again when you’re back online.';
+const uploadBytes = (...a) => (browserIsOnline() ? fsUploadBytes(...a) : Promise.reject(needsInternet(UPLOAD_OFFLINE)));
+const deleteObject = (...a) => (browserIsOnline() ? fsDeleteObject(...a) : Promise.reject(needsInternet()));
+function uploadBytesResumable(...a) {
+  if (!browserIsOnline()) throw needsInternet(UPLOAD_OFFLINE);
+  return fsUploadBytesResumable(...a);
+}
+
+// Server functions (coins, games, market, accounts…) only work online. Offline
+// they say so plainly at once instead of spinning.
+function callable(name, { timeout = 30000, offline } = {}) {
+  const call = httpsCallable(getFunctions(app, FUNCTIONS_REGION), name, { timeout });
+  return async (data) => {
+    if (!browserIsOnline()) throw needsInternet(offline);
+    try {
+      return await call(data);
+    } catch (e) {
+      // No answer at all (the same codes the server uses for its own bugs, so only when offline).
+      if (!isOnline() && ['functions/internal', 'functions/unavailable', 'functions/deadline-exceeded'].includes(e?.code)) throw needsInternet(offline);
+      // Online but no answer (a slow connection, or the minutes of a deploy).
+      if (['functions/unavailable', 'functions/deadline-exceeded'].includes(e?.code))
+        throw Object.assign(new Error('Can’t reach the server right now. Try again in a minute.'), { code: e.code });
+      throw e;
+    }
+  };
+}
+
+// Whether Firestore's live listener is really talking to the server: a
+// listener on a small public doc reports "from cache" once it isn't. Starts
+// when the device is signed in.
+let watchingServer = false;
+function watchServer() {
+  if (watchingServer) return;
+  watchingServer = true;
+  let seen = false; // heard from the server at least once
+  let timer = null;
+  onSnapshot(
+    namesDoc,
+    { includeMetadataChanges: true },
+    (snap) => {
+      clearTimeout(timer);
+      if (!snap.metadata.fromCache) {
+        seen = true;
+        return setServerReachable(true);
+      }
+      // The first answer is often the cached copy while the server connects.
+      if (seen) setServerReachable(false);
+      else timer = setTimeout(() => setServerReachable(false), 5000);
+    },
+    () => {},
+  );
+}
 
 const tasksCol = collection(db, 'tasks');
 // members/{uid}: who a device is signed in as (written by the account function
@@ -95,7 +182,7 @@ const PUSH_TOKEN_KEY = 'ftc32313-push-token';
 // Registers the service worker and gets this device's push address (token).
 async function pushToken() {
   const { getMessaging, getToken } = await import('firebase/messaging');
-  const reg = await navigator.serviceWorker.register('./sw.js', { scope: './' });
+  const reg = await navigator.serviceWorker.register('./sw.js', swOptions);
   await navigator.serviceWorker.ready;
   const opts = { serviceWorkerRegistration: reg, ...(VAPID_KEY ? { vapidKey: VAPID_KEY } : {}) };
   try {
@@ -182,8 +269,7 @@ const editRecord = (shift, kind, after, actor, at, requestId) => ({
 });
 
 async function callLearn(name, data) {
-  const call = httpsCallable(getFunctions(app, FUNCTIONS_REGION), name);
-  return (await call(data)).data;
+  return (await callable(name)(data)).data;
 }
 
 // A members/{uid} doc as the app uses it (pending: a new name waiting for
@@ -201,8 +287,10 @@ export const firebaseStore = {
   // password (the account function) is what actually grants access.
   onAuth(cb, onError) {
     return onAuthStateChanged(auth, (user) => {
-      if (user) cb({ uid: user.uid });
-      else signInAnonymously(auth).catch(onError);
+      if (user) {
+        watchServer();
+        cb({ uid: user.uid });
+      } else signInAnonymously(auth).catch(onError);
     });
   },
 
@@ -228,13 +316,13 @@ export const firebaseStore = {
   // Accounts (functions/index.js account): status, create, signIn, change,
   // list, reset. Returns { ok, member } or { error } (or what was asked for).
   async account(data) {
-    const call = httpsCallable(getFunctions(app, FUNCTIONS_REGION), 'account');
+    const call = callable('account', { offline: 'Needs internet. Connect to Wi‑Fi and try again.' });
     try {
       return (await call(data)).data;
     } catch (e) {
-      // No answer from the server (offline, or the minutes during a deploy
-      // before the account function is up): say so instead of "internal".
-      if (['functions/internal', 'functions/unavailable', 'functions/not-found', 'functions/deadline-exceeded'].includes(e?.code))
+      // No answer from the server (the minutes during a deploy before the
+      // account function is up): say so instead of "internal".
+      if (['functions/internal', 'functions/not-found'].includes(e?.code))
         throw Object.assign(new Error('Can’t reach the server right now. Try again in a minute.'), { code: e.code });
       throw e;
     }
@@ -597,8 +685,7 @@ export const firebaseStore = {
     );
   },
   async market(fn, data) {
-    const call = httpsCallable(getFunctions(app, FUNCTIONS_REGION), fn);
-    return (await call(data)).data;
+    return (await callable(fn)(data)).data;
   },
   // What happens after an ad's booking / order (see adOrders.js); only yours.
   subscribeAdOrders(name, cb) {
@@ -872,13 +959,13 @@ export const firebaseStore = {
   // 'cancel', … }) and the weekly recap (team management: { action:
   // 'preview' | 'post' | 'skip' | 'unskip' }).
   async claimBingo(req) {
-    return (await httpsCallable(getFunctions(app, FUNCTIONS_REGION), 'claimBingo')(req || {})).data;
+    return (await callable('claimBingo')(req || {})).data;
   },
   async predict(req) {
-    return (await httpsCallable(getFunctions(app, FUNCTIONS_REGION), 'predict')(req)).data;
+    return (await callable('predict')(req)).data;
   },
   async recap(req) {
-    return (await httpsCallable(getFunctions(app, FUNCTIONS_REGION), 'recap')(req)).data;
+    return (await callable('recap')(req)).data;
   },
   // Prediction rounds from the last two weeks (only the server writes them).
   subscribePredictions(cb, onError) {
@@ -888,8 +975,7 @@ export const firebaseStore = {
   // FTC Events API (functions/index.js ftcEvents): { action: 'events' } or
   // { action: 'sync', event }. Team management only.
   async ftcEvents(req) {
-    const call = httpsCallable(getFunctions(app, FUNCTIONS_REGION), 'ftcEvents');
-    return (await call(req)).data;
+    return (await callable('ftcEvents', { timeout: 60000 })(req)).data;
   },
 
   // Learn (functions/learn.js): the server picks, grades and pays. These
@@ -1141,18 +1227,15 @@ export const firebaseStore = {
   // The casino and economy (slash commands): the play function rolls,
   // checks balances, and posts the result. Returns { ok } or { note }.
   async play(req) {
-    const call = httpsCallable(getFunctions(app, FUNCTIONS_REGION), 'play');
-    return (await call(req)).data;
+    return (await callable('play')(req)).data;
   },
   // Tetris and Minesweeper (functions/shared/funGames.js): the funGame
   // function starts a game (the seed) and finishes it (replays the moves).
   async funGame(req) {
-    const call = httpsCallable(getFunctions(app, FUNCTIONS_REGION), 'funGame');
-    return (await call(req)).data;
+    return (await callable('funGame')(req)).data;
   },
   async submitTournamentScore(req) {
-    const call = httpsCallable(getFunctions(app, FUNCTIONS_REGION), 'submitTournamentScore');
-    return (await call(req)).data;
+    return (await callable('submitTournamentScore')(req)).data;
   },
   // A race's live picture of each player's board (raceLive/{race}_{uid}).
   setRaceLive(race, data, actor) {
