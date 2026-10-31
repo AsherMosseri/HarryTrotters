@@ -147,7 +147,7 @@ export function GetNewApp() {
           </span>
         </li>
       </ol>
-      <p className="muted small">Then open the new app. You’ll pick your name and set up your password there.</p>
+      <p className="muted small">Then open the new app. You’ll pick your name and set up your password there. If you don’t have a password yet, it asks for the team code once.</p>
     </Shell>
   );
 }
