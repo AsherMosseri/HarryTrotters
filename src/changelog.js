@@ -52,6 +52,11 @@ export const CHANGELOG = [
       {
         title: 'Competition',
         items: [
+          'Works with no internet after you’ve opened it once online: the pit screen, checklists, score pad, Match log, Tasks and Today. Changes you make offline send by themselves when you’re back, and a small note shows when you’re offline.',
+          'Before each of our matches the drive team gets a “time to queue” notification, and Today has a “Before the event” card. After a score you can make fix tasks for what went wrong.',
+          'Batteries strip on the pit screen: put a battery on the robot, charge it, and see which one is next up. The Match log page keeps each battery’s history.',
+          'New Scout page: every team at the event with rankings, quick scouting from the stands, team notes, and a pick list for alliance selection.',
+          'Export for the notebook (on Shifts): your lab log by week, ready for the engineering notebook.',
           'On competition day Today turns into a pit screen: our next match, alliance color, partners and a countdown.',
           'A "Before queueing" checklist with a big countdown for the drive team, and a number pad to enter our score after each match.',
           'Team management can type in the match schedule or pull it from FTC Events.',
