@@ -1357,6 +1357,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
       react: (channel, id, emoji, on) => store.react(channel, id, emoji, actor, on).catch(fail),
       removeReaction: (channel, id, emoji) => store.removeReaction(channel, id, emoji).catch(fail),
       removeSuperReaction: (channel, id, emoji) => store.removeSuperReaction(channel, id, emoji).catch(fail),
+      subscribeSince: (channel, at, cb) => store.subscribeSince(channel, at, cb, quiet('chat')),
       loadOlderMessages: (channel, beforeAt) =>
         store.loadOlderMessages(channel, beforeAt, CHAT_PAGE).catch((e) => {
           fail(e);
@@ -1396,7 +1397,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
       // The caller shows what came back (or went wrong) next to the button.
       ftcEvents: (req) => store.ftcEvents(req),
     }),
-    [store, actor, fail, ok, setFilters, renames],
+    [store, actor, fail, ok, quiet, setFilters, renames],
   );
 
   const filtered = useMemo(

@@ -60,7 +60,7 @@ export function MembersPanel({ names, onPerson, onClose }) {
 export function PinsPanel({ conv, api, ctx, onJump, onClose, canUnpin }) {
   const [pins, setPins] = useState(null);
   useEffect(() => api.subscribePins(conv.key, (list) => setPins(list.filter((m) => !m.deleted))), [api, conv.key]);
-  const sorted = (pins || []).sort((a, b) => (b.pinnedAt || 0) - (a.pinnedAt || 0));
+  const sorted = [...(pins || [])].sort((a, b) => (b.pinnedAt || 0) - (a.pinnedAt || 0));
   return (
     <PanelShell title={`Pinned in ${conv.label}`} onClose={onClose}>
       {pins === null && <p className="muted small">Loading…</p>}
