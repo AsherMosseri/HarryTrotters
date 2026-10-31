@@ -744,7 +744,10 @@ async function dropRequestIfDone(name, rename, team) {
 async function signDeviceIn(uid, name, team, before) {
   // This device already signed in as this name and was let in (say, with
   // the team code before passwords): still them.
-  const pending = !onTeam(name, team) && !(before && !before.pending && sameName(before.name, name));
+  // Removed on the Roster: waits for team management like a new name, even
+  // on a device that was signed in before (they let them back in).
+  const removed = team.roles.some((r) => r?.removed && sameName(team.rename(r.name || ''), name));
+  const pending = !onTeam(name, team) && (removed || !(before && !before.pending && sameName(before.name, name)));
   const batch = db.batch();
   batch.set(db.doc(`members/${uid}`), { name, admin: isManagerName(name), via: 'password', joinedAt: Date.now(), ...(pending && { pending: true }) });
   if (!pending) batch.set(db.doc(`people/${uid}`), { name, joinedAt: Date.now() }, { merge: true });
@@ -765,6 +768,30 @@ async function signDeviceIn(uid, name, team, before) {
     );
   return { name, admin: isManagerName(name), via: 'password', ...(pending && { pending: true }) };
 }
+
+// Removed on the Roster: every device signed in under that name waits for
+// team management again (the waiting screen, and a request on the Roster).
+// Putting them back on the Roster, or Approve, lets those devices in again.
+export const onRoleChange = onDocumentWritten('roles/{id}', async (event) => {
+  const was = event.data?.before?.data()?.removed === true;
+  const after = event.data?.after?.data();
+  const is = after?.removed === true;
+  if (was === is || !after?.name) return;
+  const rename = await renamer();
+  const name = rename(after.name);
+  if (isManagerName(name)) return;
+  const devices = (await db.collection('members').get()).docs.filter((d) => sameName(rename(d.get('name') || ''), name));
+  const batch = db.batch();
+  if (is) {
+    for (const d of devices) if (d.get('pending') !== true) batch.update(d.ref, { pending: true });
+    if (devices.length) batch.set(requestRef(name), { name, at: Date.now(), removed: true });
+  } else {
+    for (const d of devices) if (d.get('pending') === true) batch.update(d.ref, { pending: FieldValue.delete() });
+    batch.delete(requestRef(name));
+  }
+  await batch.commit();
+  logger.info(is ? 'removed: devices wait' : 'back on the team', name, devices.length);
+});
 
 export const account = onCall({ maxInstances: 5, invoker: 'public' }, async (req) => {
   const uid = req.auth?.uid;
