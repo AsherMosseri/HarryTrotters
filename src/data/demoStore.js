@@ -1489,6 +1489,9 @@ export const demoStore = {
       .sort((a, b) => a.at - b.at)
       .slice(-count);
   },
+  subscribeSince(conv, at, cb) {
+    return listen(() => cb([...((state.chat || {})[conv] || [])].filter((m) => m.at >= at).sort((a, b) => a.at - b.at)));
+  },
   async recentMessages(conv, count) {
     return [...((state.chat || {})[conv] || [])].sort((a, b) => b.at - a.at).slice(0, count);
   },

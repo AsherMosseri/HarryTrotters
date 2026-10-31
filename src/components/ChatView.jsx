@@ -198,6 +198,16 @@ export default function ChatView({
       if (slid.length) setOlder((o) => (o.key === conv.key ? { ...o, msgs: mergeMessages(o.msgs, slid) } : o));
     }
   }
+  // Older pages are fetched once, so they also get a live copy from the oldest
+  // one loaded on: without it, pinning (or reacting to, or voting on) an older
+  // message changed nothing on screen, and the pin button kept saying Pin.
+  const oldestAt = older.key === conv.key && older.msgs.length ? older.msgs[0].at : null;
+  const [since, setSince] = useState({ key: null, at: null, msgs: NONE });
+  useEffect(() => {
+    if (oldestAt == null) return;
+    const key = conv.key;
+    return api.subscribeSince(key, oldestAt, (msgs) => setSince({ key, at: oldestAt, msgs }));
+  }, [api, conv.key, oldestAt]);
   const renameNow = usePeople()?.rename;
   // Older pages load here, so they get people's current names here too. A
   // message shows once: from the live window when it's there. Older ones the
@@ -205,10 +215,16 @@ export default function ChatView({
   // and with the whole conversation in the window, the pages aren't needed.
   const all = useMemo(() => {
     const ids = new Set(live.map((m) => m.id));
+    const fresh = since.key === conv.key && since.at === oldestAt ? new Map(since.msgs.map((m) => [m.id, m])) : null;
     const kept =
-      older.key === conv.key && live.length >= PAGE ? older.msgs.filter((m) => !ids.has(m.id) && m.at < live[0].at) : NONE;
+      older.key === conv.key && live.length >= PAGE
+        ? older.msgs
+            .filter((m) => !ids.has(m.id) && m.at < live[0].at)
+            // The live copy wins; one it no longer has was removed for good.
+            .flatMap((m) => (!fresh ? [m] : fresh.has(m.id) ? [fresh.get(m.id)] : []))
+        : NONE;
     return [...kept, ...live].map((m) => (renameNow ? renameMessage(m, renameNow) : m));
-  }, [older, live, conv.key, renameNow]);
+  }, [older, live, since, oldestAt, conv.key, renameNow]);
   const byId = useMemo(() => new Map(all.map((m) => [m.id, m])), [all]);
   const ads = useAds();
   const adSpots = chatAdSpots(ads, all.length);

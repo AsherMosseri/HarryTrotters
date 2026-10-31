@@ -13,6 +13,7 @@ import { SUBTEAMS } from '../config.js';
 import { Coin, Coins, CoinsAdmin } from './Coins.jsx';
 import { reducedMotion, useEscape } from '../util.js';
 import { CloseIcon, Overlay } from './common.jsx';
+import { confirmDialog, promptDialog } from './Dialogs.jsx';
 
 // Pretend ads (see ads.js). Asher controls everything on the 📺 Ads page; the
 // settings live in settings.ads so they reach every device right away.
@@ -1859,7 +1860,17 @@ export function AdsSettings({
                 <h4>People</h4>
                 <PeopleStats roster={roster} stats={peopleStats} ledger={ledger} />
                 <p className="muted small">Views count from every device and are sent about once a minute.</p>
-                <button className="link-btn danger small" onClick={() => confirm('Reset the earnings and counts?') && onResetStats()}>
+                <button
+                  className="link-btn danger small"
+                  onClick={async () =>
+                    (await confirmDialog({
+                      title: 'Reset the earnings and counts?',
+                      body: 'They start again from zero. This can’t be undone.',
+                      okLabel: 'Reset',
+                      danger: true,
+                    })) && onResetStats()
+                  }
+                >
                   Reset earnings
                 </button>
               </>
@@ -2612,8 +2623,13 @@ function SubmissionsTab({ cfg, set, submissions, onReview, onDelete }) {
                               </button>
                               <button
                                 className="btn"
-                                onClick={() => {
-                                  const note = prompt('Why not? (optional, they’ll see this)', '');
+                                onClick={async () => {
+                                  const note = await promptDialog({
+                                    title: `Reject ${sub.brand}?`,
+                                    label: 'Why not? (optional, they’ll see this)',
+                                    okLabel: 'Reject',
+                                    maxLength: 140,
+                                  });
                                   if (note !== null) onReview(sub, { status: 'rejected', note: note.slice(0, 140) });
                                 }}
                               >
@@ -2626,7 +2642,12 @@ function SubmissionsTab({ cfg, set, submissions, onReview, onDelete }) {
                               End early
                             </button>
                           )}
-                          <button className="link-btn danger small" onClick={() => confirm(`Delete ${sub.brand}?`) && onDelete(sub)}>
+                          <button
+                            className="link-btn danger small"
+                            onClick={async () =>
+                              (await confirmDialog({ title: `Delete ${sub.brand}?`, okLabel: 'Delete', danger: true })) && onDelete(sub)
+                            }
+                          >
                             Delete
                           </button>
                         </div>

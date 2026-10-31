@@ -748,6 +748,12 @@ export const firebaseStore = {
     return snap.docs.map(readDoc).reverse();
   },
 
+  // Everything from `at` on, live: older pages on screen keep up with pins,
+  // reactions, votes and edits like the newest messages do.
+  subscribeSince(conv, at, cb, onError) {
+    return onSnapshot(query(convCol(conv), where('at', '>=', at), orderBy('at')), (snap) => cb(snap.docs.map(readDoc)), onError);
+  },
+
   // The newest `count` messages, for search.
   async recentMessages(conv, count) {
     const snap = await getDocs(query(convCol(conv), orderBy('at', 'desc'), limit(count)));

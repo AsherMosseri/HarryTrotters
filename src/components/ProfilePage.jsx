@@ -9,6 +9,7 @@ import { Avatar, CloseIcon, DisplayName, Overlay, StatusDot, usePeople } from '.
 import { ProfileEffect, SubteamBadges, SubteamIcon } from './People.jsx';
 import { hoursOf, mergedMs } from '../../functions/shared/hours.js';
 import { streaksOf } from '../../functions/shared/streaks.js';
+import CountUp from './CountUp.jsx';
 
 // Hours are added up the same way as the Shifts page (shared/hours.js).
 const fmtHours = (ms) => hoursOf(ms).toFixed(1);
@@ -236,19 +237,27 @@ export default function ProfilePage({
                 <div className="pp-body">
                   <div className="pp-stats">
                     <div>
-                      <b>{fmtHours(weekHours)}</b>
+                      <b>
+                        <CountUp value={hoursOf(weekHours)} format={(h) => h.toFixed(1)} />
+                      </b>
                       <span>hours this week</span>
                     </div>
                     <div>
-                      <b>{fmtHours(seasonHours)}</b>
+                      <b>
+                        <CountUp value={hoursOf(seasonHours)} format={(h) => h.toFixed(1)} />
+                      </b>
                       <span>hours this season</span>
                     </div>
                     <div>
-                      <b>{done.length}</b>
+                      <b>
+                        <CountUp value={done.length} />
+                      </b>
                       <span>tasks done</span>
                     </div>
                     <div>
-                      <b>{open.length}</b>
+                      <b>
+                        <CountUp value={open.length} />
+                      </b>
                       <span>open tasks</span>
                     </div>
                     <div title="School days in a row with a shift. Days without school don’t break it.">

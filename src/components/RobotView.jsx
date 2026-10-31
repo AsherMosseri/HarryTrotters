@@ -4,6 +4,7 @@ import { RobotScene } from '../robot/scene.js';
 import { loadModel, diffModels } from '../robot/model.js';
 import { relTime, useEscape } from '../util.js';
 import { AutoTextarea, CloseIcon, Overlay, PlusIcon, StatusDot } from './common.jsx';
+import { confirmDialog, promptDialog } from './Dialogs.jsx';
 
 // Models are kept per version so switching back is instant. A model object can
 // only be shown in one viewport at a time, so compare loads its own copy.
@@ -544,8 +545,13 @@ export default function RobotView({ robot, tasks, parts, actor, isManager, api, 
         {isManager && version && (
           <button
             className="link-btn danger"
-            onClick={() =>
-              confirm(`Delete “${version.name}” and its pins and layouts? This can't be undone.`) &&
+            onClick={async () =>
+              (await confirmDialog({
+                title: `Delete “${version.name}”?`,
+                body: 'Its pins and layouts go with it. This can’t be undone.',
+                okLabel: 'Delete',
+                danger: true,
+              })) &&
               api.deleteRobotVersion(
                 version,
                 robot.pins.filter((p) => p.versionId === version.id),
@@ -673,7 +679,13 @@ export default function RobotView({ robot, tasks, parts, actor, isManager, api, 
                         </button>
                       )}
                       {(p.byUid === actor.uid || isManager) && (
-                        <button className="link-btn danger" onClick={() => confirm('Delete this pin?') && api.deleteRobotPin(p.id)}>
+                        <button
+                          className="link-btn danger"
+                          onClick={async () =>
+                            (await confirmDialog({ title: 'Delete this pin?', okLabel: 'Delete', danger: true })) &&
+                            api.deleteRobotPin(p.id)
+                          }
+                        >
                           Delete
                         </button>
                       )}
@@ -742,8 +754,8 @@ export default function RobotView({ robot, tasks, parts, actor, isManager, api, 
                   <div className="row gap wrap">
                     <button
                       className="btn primary"
-                      onClick={() => {
-                        const name = prompt('Name this layout', 'Idea: ');
+                      onClick={async () => {
+                        const name = await promptDialog({ title: 'Name this layout', initial: 'Idea: ', okLabel: 'Save', maxLength: 80 });
                         if (!name?.trim()) return;
                         api.saveRobotLayout({
                           versionId: version.id,
@@ -792,7 +804,10 @@ export default function RobotView({ robot, tasks, parts, actor, isManager, api, 
                   {(l.byUid === actor.uid || isManager) && (
                     <button
                       className="link-btn danger"
-                      onClick={() => confirm(`Delete layout “${l.name}”?`) && api.deleteRobotLayout(l.id)}
+                      onClick={async () =>
+                        (await confirmDialog({ title: `Delete the layout “${l.name}”?`, okLabel: 'Delete', danger: true })) &&
+                        api.deleteRobotLayout(l.id)
+                      }
                     >
                       Delete
                     </button>

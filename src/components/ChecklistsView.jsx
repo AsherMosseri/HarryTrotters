@@ -3,6 +3,8 @@ import { STARTER_CHECKLISTS, starterItems } from '../checklists.js';
 import { itemId } from '../data/diff.js';
 import { fullTime } from '../util.js';
 import { CloseIcon, DraftInput, PlusIcon } from './common.jsx';
+import { confirmDialog } from './Dialogs.jsx';
+import { useFlip } from '../motion.js';
 
 function ChecklistCard({ list, api, isManager, fresh }) {
   const [text, setText] = useState('');
@@ -15,6 +17,9 @@ function ChecklistCard({ list, api, isManager, fresh }) {
   }, [fresh]);
   const items = Object.values(list.items || {}).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   const done = items.filter((i) => i.done).length;
+  // Items ease in, and the rest slide to make room (Moving things).
+  const listRef = useRef(null);
+  useFlip(listRef, list.items);
 
   const add = (e) => {
     e.preventDefault();
@@ -41,9 +46,9 @@ function ChecklistCard({ list, api, isManager, fresh }) {
       <div className="ms-progress-bar" style={{ '--c': done === items.length && items.length ? 'var(--st-done)' : 'var(--accent)' }}>
         <span style={{ width: `${items.length ? (done / items.length) * 100 : 0}%` }} />
       </div>
-      <ul className="check-items">
+      <ul className="check-items" ref={listRef}>
         {items.map((i) => (
-          <li key={i.id} className={i.done ? 'done' : ''}>
+          <li key={i.id} data-flip={i.id} className={i.done ? 'done' : ''}>
             <label>
               <input type="checkbox" checked={!!i.done} onChange={(e) => api.toggleChecklistItem(list, i, e.target.checked)} />
               <span className="check-text">{i.text}</span>
@@ -64,13 +69,29 @@ function ChecklistCard({ list, api, isManager, fresh }) {
       </form>
       <footer className="row gap">
         {done > 0 && (
-          <button className="link-btn" onClick={() => confirm(`Uncheck everything in “${list.title}”?`) && api.uncheckAll(list, items)}>
+          <button
+            className="link-btn"
+            onClick={async () =>
+              (await confirmDialog({ title: `Uncheck everything in “${list.title}”?`, okLabel: 'Uncheck all' })) &&
+              api.uncheckAll(list, items)
+            }
+          >
             Uncheck all
           </button>
         )}
         <span className="spacer" />
         {isManager && (
-          <button className="link-btn danger" onClick={() => confirm(`Delete the “${list.title}” checklist?`) && api.deleteChecklist(list)}>
+          <button
+            className="link-btn danger"
+            onClick={async () =>
+              (await confirmDialog({
+                title: `Delete the “${list.title}” checklist?`,
+                body: 'This can’t be undone.',
+                okLabel: 'Delete',
+                danger: true,
+              })) && api.deleteChecklist(list)
+            }
+          >
             Delete checklist
           </button>
         )}

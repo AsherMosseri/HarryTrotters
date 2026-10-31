@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { Avatar, usePeople } from '../common.jsx';
 import robot from '../../assets/robot-dance.webp';
 import { Icon } from './icons.jsx';
@@ -10,6 +11,8 @@ import { competitionOn } from '../../../functions/shared/matches.js';
 import PitScreen from './PitScreen.jsx';
 import { hoursOf } from '../../../functions/shared/hours.js';
 import { seasonStats } from '../../../functions/shared/stats.js';
+import { useFlip } from '../../motion.js';
+import CountUp from '../CountUp.jsx';
 
 // The first page, like a pit board: the countdown and the robot up top with a
 // few plain lines on what needs you, then your tasks, what's due, who's at the
@@ -33,7 +36,7 @@ function TaskRow({ task, onOpen, showWho }) {
   const due = dueInfo(task.dueDate, task.status);
   const st = statusOf[task.status];
   return (
-    <li>
+    <li data-flip={task.id}>
       <button className="t-row" onClick={() => onOpen(task.id)}>
         <span className={`t-mark s-${task.status}`} style={{ '--c': st?.color }} title={st?.label} aria-label={st?.label} />
         <span className="t-main">
@@ -147,6 +150,9 @@ function UsualToday({
   pitButton,
 }) {
   const all = tasks || [];
+  // Rows ease in and out and slide into place as tasks change (Moving things).
+  const gridRef = useRef(null);
+  useFlip(gridRef, tasks);
   const mine = all
     .filter((t) => t.status !== 'done' && (t.assignees || []).includes(actor.name))
     .sort((a, b) => (a.dueDate || '9999').localeCompare(b.dueDate || '9999') || (RANK[a.status] ?? 9) - (RANK[b.status] ?? 9));
@@ -209,7 +215,7 @@ function UsualToday({
           </p>
           {left >= 0 ? (
             <div className="pit-count">
-              <span className="pit-num">{left === 0 ? '0' : left}</span>
+              <CountUp className="pit-num" value={left} />
               <span className="pit-num-label">
                 {left === 0 ? `${competition.name} is today` : `${left === 1 ? 'day' : 'days'} to ${competition.name}`}
                 <small>{parseDay(competition.date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</small>
@@ -275,7 +281,7 @@ function UsualToday({
         </button>
       )}
 
-      <div className="today-grid">
+      <div className="today-grid" ref={gridRef}>
         <div className="today-col">
           {on.includes('tasks') && (
             <section className="today-sec">

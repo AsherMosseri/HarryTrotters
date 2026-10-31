@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { fullTime } from '../util.js';
 import { Overlay } from './common.jsx';
+import { confirmDialog } from './Dialogs.jsx';
 
 // Full-screen photo viewer for task and chat photos. onDelete is optional.
 export default function PhotoViewer({ photos, index, onIndex, onClose, onDelete }) {
@@ -46,7 +47,13 @@ export default function PhotoViewer({ photos, index, onIndex, onClose, onDelete 
             Full size
           </a>
           {onDelete && (
-            <button className="btn ghost danger-text" onClick={() => confirm('Delete this photo?') && onDelete(photo)}>
+            <button
+              className="btn ghost danger-text"
+              onClick={async () =>
+                (await confirmDialog({ title: 'Delete this photo?', body: 'This can’t be undone.', okLabel: 'Delete', danger: true })) &&
+                onDelete(photo)
+              }
+            >
               Delete
             </button>
           )}

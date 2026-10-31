@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { shortDate, todayISO } from '../milestones.js';
 import { Avatar, CloseIcon, Overlay, PlusIcon } from './common.jsx';
 import { useEscape } from '../util.js';
+import { confirmDialog } from './Dialogs.jsx';
 
 const PERIODS = [
   { key: 'auto', label: 'Auto' },
@@ -485,7 +486,8 @@ export default function RunsView({ runs, roster, api }) {
           onDelete={
             editing.id
               ? async () => {
-                  if (!confirm('Delete this run?')) return;
+                  if (!(await confirmDialog({ title: 'Delete this run?', body: 'This can’t be undone.', okLabel: 'Delete', danger: true })))
+                    return;
                   const r = editing;
                   setEditing(null);
                   await api.deleteRun(r);

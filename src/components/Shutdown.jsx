@@ -3,6 +3,7 @@ import { AutoTextarea, Avatar, CloseIcon, Overlay } from './common.jsx';
 import { REQUESTS_TO } from '../config.js';
 import { useEscape } from '../util.js';
 import { useQuietUpdates } from './UpdateGate.jsx';
+import { confirmDialog } from './Dialogs.jsx';
 
 // Asher can shut the app down for everyone else (settings/shutdown). They see
 // a full screen with his message and a plain-text chat with him
@@ -150,7 +151,13 @@ export function ShutdownScreen({ shutdown, store, actor }) {
     <div className="gate shutdown-gate">
       <button
         className="btn small-btn shutdown-switch"
-        onClick={() => confirm('Switch user? You’ll sign in again with a name and password.') && store.leave()}
+        onClick={async () =>
+          (await confirmDialog({
+            title: 'Switch user?',
+            body: 'You’ll sign in again with a name and password.',
+            okLabel: 'Switch user',
+          })) && store.leave()
+        }
       >
         Switch user
       </button>

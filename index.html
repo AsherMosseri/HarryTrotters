@@ -21,6 +21,19 @@
         var motion = JSON.parse(localStorage.getItem('motion'));
         if (motion === 'on' || motion === 'off') document.documentElement.setAttribute('data-motion', motion);
       } catch (e) {}
+      // Which kinds of animation play (src/motion.js, applyAnim): none with
+      // Animations off or Reduce Motion on (Match device), else each one whose
+      // own switch is on.
+      try {
+        var m = JSON.parse(localStorage.getItem('motion') || '"auto"');
+        var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+        var areas = [];
+        if (m === 'on' || (m !== 'off' && !reduce))
+          ['celebrate', 'move', 'pages', 'taps'].forEach(function (a) {
+            if (localStorage.getItem('anim-' + a) !== 'false') areas.push(a);
+          });
+        document.documentElement.setAttribute('data-anim', areas.join(' '));
+      } catch (e) {}
     </script>
     <!-- Display name fonts (Edit profile → Style). Each font file loads only when someone uses it, and the
          list loads without holding up the first paint (media="print" until it arrives). -->

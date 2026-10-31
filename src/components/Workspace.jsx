@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   CHANNELS,
   COMPETITION,
@@ -18,6 +18,7 @@ import { PALETTES, presetTheme } from '../nitro.js';
 import { daysBetween, mondayOf, parseDay, todayISO } from '../milestones.js';
 import { newTaskDefaults, personId } from '../data/diff.js';
 import { preparePhoto, useEscape, useLocalStorage, useMedia } from '../util.js';
+import { ANIM_AREAS, applyAnim, celebrate, animOn } from '../motion.js';
 import { Avatar, CloseIcon, Overlay, PeopleContext } from './common.jsx';
 import { ProfileCard, ProfileEditor } from './People.jsx';
 import ProfilePage from './ProfilePage.jsx';
@@ -82,6 +83,7 @@ import { coinSettings, coinsByName, wallet } from '../coins.js';
 import { hoursOf, mergedMs } from '../../functions/shared/hours.js';
 import { teamDay } from '../../functions/shared/coins.js';
 import { streaksOf } from '../../functions/shared/streaks.js';
+import { confirmDialog } from './Dialogs.jsx';
 
 // Versions were renumbered once (2.0 became 1.9, 2.1 became 2.0, and so
 // on). Move this device's "last seen" version along so What's new doesn't
@@ -305,10 +307,32 @@ function AppearanceDialog({ themeMenuProps, onClose }) {
   // Animations: name effects, decorations, profile effects, borders… "On"
   // plays them even when the iPad's Reduce Motion is on.
   const [motion, setMotion] = useLocalStorage('motion', 'auto');
+  // Each kind of animation can be switched off on its own (motion.js).
+  const [celebrateOn, setCelebrateOn] = useLocalStorage('anim-celebrate', true);
+  const [moveOn, setMoveOn] = useLocalStorage('anim-move', true);
+  const [pagesOn, setPagesOn] = useLocalStorage('anim-pages', true);
+  const [tapsOn, setTapsOn] = useLocalStorage('anim-taps', true);
+  const areas = {
+    celebrate: [celebrateOn, setCelebrateOn],
+    move: [moveOn, setMoveOn],
+    pages: [pagesOn, setPagesOn],
+    taps: [tapsOn, setTapsOn],
+  };
   useEffect(() => {
     if (motion === 'auto') delete document.documentElement.dataset.motion;
     else document.documentElement.dataset.motion = motion;
-  }, [motion]);
+    // useLocalStorage saves in its own effect; save here first so applyAnim reads the new choices.
+    const saved = { motion, 'anim-celebrate': celebrateOn, 'anim-move': moveOn, 'anim-pages': pagesOn, 'anim-taps': tapsOn };
+    for (const [k, v] of Object.entries(saved))
+      try {
+        localStorage.setItem(k, JSON.stringify(v));
+      } catch {
+        /* ignore */
+      }
+    applyAnim();
+  }, [motion, celebrateOn, moveOn, pagesOn, tapsOn]);
+  const deviceReduce = useMedia('(prefers-reduced-motion: reduce)');
+  const allOff = motion === 'off' || (motion === 'auto' && deviceReduce);
   return (
     <Overlay>
       <div className="panel-backdrop center" onClick={onClose}>
@@ -335,6 +359,26 @@ function AppearanceDialog({ themeMenuProps, onClose }) {
                 </button>
               ))}
             </div>
+          </div>
+          {/* The four kinds, each with its own switch (greyed out while Animations is off). */}
+          <div className={`anim-areas${allOff ? ' all-off' : ''}`}>
+            {ANIM_AREAS.map(([id, label, note]) => (
+              <label key={id} className="anim-area">
+                <span className="grow">
+                  <b>{label}</b>
+                  <span className="muted small">{note}</span>
+                </span>
+                <span className="switch">
+                  <input
+                    type="checkbox"
+                    checked={areas[id][0] !== false}
+                    disabled={allOff}
+                    onChange={(e) => areas[id][1](e.target.checked)}
+                  />
+                  <span />
+                </span>
+              </label>
+            ))}
           </div>
         </div>
       </div>
@@ -568,6 +612,21 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
   const [filtersOpen, setFiltersOpen] = useState(false);
   const view = views.some(([id]) => id === savedView) ? savedView : views[0][0];
   const taskView = view === 'board' || view === 'table';
+  // Page changes (Appearance): the new page fades and slides up a little.
+  const scrollRef = useRef(null);
+  const shownView = useRef(view);
+  useLayoutEffect(() => {
+    if (shownView.current === view) return;
+    shownView.current = view;
+    if (animOn('pages'))
+      scrollRef.current?.animate(
+        [
+          { opacity: 0, transform: 'translateY(8px)' },
+          { opacity: 1, transform: 'none' },
+        ],
+        { duration: 200, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' },
+      );
+  }, [view]);
   const [phoneSheet, setPhoneSheet] = useState(null); // 'me' | 'more' | 'filters'
   const closeSheet = useCallback(() => setPhoneSheet(null), []);
   // The on-screen keyboard: see keyboard.js (installed in main.jsx).
@@ -1140,6 +1199,8 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
       },
       update: (task, patch) => {
         touchTask.current(task.id);
+        // Finishing a task: a little burst where you tapped (Celebrations).
+        if (patch.status === 'done' && task.status !== 'done') celebrate();
         return store.updateTask(task.id, patch, actor, task).catch(fail);
       },
       remove: async (task) => {
@@ -1357,6 +1418,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
       react: (channel, id, emoji, on) => store.react(channel, id, emoji, actor, on).catch(fail),
       removeReaction: (channel, id, emoji) => store.removeReaction(channel, id, emoji).catch(fail),
       removeSuperReaction: (channel, id, emoji) => store.removeSuperReaction(channel, id, emoji).catch(fail),
+      subscribeSince: (channel, at, cb) => store.subscribeSince(channel, at, cb, quiet('chat')),
       loadOlderMessages: (channel, beforeAt) =>
         store.loadOlderMessages(channel, beforeAt, CHAT_PAGE).catch((e) => {
           fail(e);
@@ -1396,7 +1458,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
       // The caller shows what came back (or went wrong) next to the button.
       ftcEvents: (req) => store.ftcEvents(req),
     }),
-    [store, actor, fail, ok, setFilters, renames],
+    [store, actor, fail, ok, quiet, setFilters, renames],
   );
 
   const filtered = useMemo(
@@ -2080,7 +2142,13 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
       </div>
       <button
         className="link-btn me-switch"
-        onClick={() => confirm('Switch user? You’ll sign in again with a name and password.') && store.leave()}
+        onClick={async () =>
+          (await confirmDialog({
+            title: 'Switch user?',
+            body: 'You’ll sign in again with a name and password.',
+            okLabel: 'Switch user',
+          })) && store.leave()
+        }
       >
         Switch user
       </button>
@@ -2161,7 +2229,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
               <TakeoverStrip />
               <AdBanner position="top" />
               {/* Only this area scrolls; the header stays put above it. */}
-              <div className="app-scroll">
+              <div className="app-scroll" ref={scrollRef}>
                 {pageHead}
                 {taskView && announcement && (
                   <div className="announce-banner" role="status">

@@ -6,6 +6,7 @@ import { KIND_NOUN, clip, progress } from '../adOrders.js';
 import { adStyle } from './Ads.jsx';
 import { ChatScene, Scene } from './AdFlow.jsx';
 import { FLOWS, flowFor } from '../adFlows.js';
+import { confirmDialog } from './Dialogs.jsx';
 
 // What happens after an ad's booking / order / submission / subscription
 // (planned in adOrders.js): a tracker for each one, and a list of them all.
@@ -372,12 +373,12 @@ export function OrderTracker({ order, ad, onClose, onCancel, onAgain }) {
         : kind === 'submit'
           ? `Your submission to ${order.brand}`
           : `${order.brand} subscription`;
-  const cancel = () => {
+  const cancel = async () => {
     const ask = {
       order: `Cancel your ${order.item}? ${order.brand} will be sad.`,
       book: `Cancel your ${order.item}? ${order.brand} cleared their whole schedule for you.`,
     }[kind];
-    if (!ask || confirm(ask)) onCancel();
+    if (!ask || (await confirmDialog({ title: ask, okLabel: 'Cancel it', cancelLabel: 'Keep it', danger: true }))) onCancel();
   };
   return (
     <Overlay>

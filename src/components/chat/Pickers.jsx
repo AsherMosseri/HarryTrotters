@@ -4,6 +4,7 @@ import { AutoTextarea, CloseIcon, Overlay, PlusIcon } from '../common.jsx';
 import { GROUPS, emojiList, firstEmoji, loadEmoji, recentEmoji, searchEmoji, rememberEmoji } from './emoji.js';
 import { isTouch } from '../../util.js';
 import { Icon } from '../shell/icons.jsx';
+import { confirmDialog } from '../Dialogs.jsx';
 
 // The emoji groups' tabs, as line icons (in GROUPS order).
 const GROUP_ICONS = ['smile', 'person', 'leaf', 'food', 'car', 'ball', 'bulb', 'heart', 'flag'];
@@ -291,7 +292,17 @@ export function EmojiManager({ teamEmoji, api, onClose }) {
                 <img className="custom-emoji big" src={e.url} alt="" />
                 <span className="grow">:{e.name}:</span>
                 <span className="muted small">{e.by?.split(' ')[0]}</span>
-                <button className="link-btn danger-text" onClick={() => confirm(`Delete :${e.name}:?`) && api.deleteEmoji(e)}>
+                <button
+                  className="link-btn danger-text"
+                  onClick={async () =>
+                    (await confirmDialog({
+                      title: `Delete :${e.name}:?`,
+                      body: 'It stops showing in messages and reactions.',
+                      okLabel: 'Delete',
+                      danger: true,
+                    })) && api.deleteEmoji(e)
+                  }
+                >
                   Delete
                 </button>
               </div>
@@ -701,7 +712,10 @@ export function StickerManager({ stickers, api, onClose }) {
                 <span className="tiny">{s.name}</span>
                 <button
                   className="link-btn danger-text tiny"
-                  onClick={() => confirm(`Delete the "${s.name}" sticker?`) && api.deleteSticker(s)}
+                  onClick={async () =>
+                    (await confirmDialog({ title: `Delete the “${s.name}” sticker?`, okLabel: 'Delete', danger: true })) &&
+                    api.deleteSticker(s)
+                  }
                 >
                   Delete
                 </button>

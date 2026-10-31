@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { REQUESTS_TO } from '../config.js';
 import { firstName, relTime } from '../util.js';
 import { Avatar, CloseIcon, DisplayName, Overlay } from './common.jsx';
+import { confirmDialog } from './Dialogs.jsx';
 
 export const REQUEST_STATUSES = [
   { id: 'new', label: 'New', icon: '' },
@@ -168,7 +169,10 @@ function RequestItem({ r, actor, api, focused, onMakeTask }) {
         {canDelete && (
           <button
             className="link-btn small danger"
-            onClick={() => confirm('Delete this idea?') && api.deleteRequest(r.id)}
+            onClick={async () =>
+              (await confirmDialog({ title: 'Delete this idea?', body: 'Its votes go with it.', okLabel: 'Delete', danger: true })) &&
+              api.deleteRequest(r.id)
+            }
             aria-label="Delete idea"
           >
             Delete

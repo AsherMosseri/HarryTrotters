@@ -14,6 +14,7 @@ import {
 } from '../milestones.js';
 import { Avatar, AvatarStack, CloseIcon, DraftInput, Overlay, PlusIcon, StatusDot } from './common.jsx';
 import { useEscape } from '../util.js';
+import { confirmDialog } from './Dialogs.jsx';
 
 const colorOf = (subteam) => SUBTEAM_COLORS[subteam] || 'var(--accent)';
 
@@ -231,8 +232,15 @@ function MilestonePanel({ item, roster, api, isManager, onClose, onOpenTask, onA
             {isManager && (
               <button
                 className="link-btn danger"
-                onClick={() => {
-                  if (confirm(`Delete milestone “${m.title}”? Its tasks stay on the board, just unlinked.`)) {
+                onClick={async () => {
+                  if (
+                    await confirmDialog({
+                      title: `Delete the milestone “${m.title}”?`,
+                      body: 'Its tasks stay on the board, just unlinked.',
+                      okLabel: 'Delete',
+                      danger: true,
+                    })
+                  ) {
                     api.deleteMilestone(m, progress.tasks);
                     onClose();
                   }

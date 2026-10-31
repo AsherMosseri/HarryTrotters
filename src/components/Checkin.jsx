@@ -6,6 +6,7 @@ import { AutoTextarea, Avatar, CloseIcon, Overlay } from './common.jsx';
 import { sameName } from '../../functions/shared/team.js';
 import { teamDay } from '../../functions/shared/coins.js';
 import { cleanSkips, upcomingDays } from '../../functions/shared/checkin.js';
+import { confirmDialog } from './Dialogs.jsx';
 
 export const SLOTS = [
   { id: 'lunch', label: 'Lunch', icon: '' },
@@ -153,7 +154,10 @@ export function CheckinCard({ checkin, roster, gradeOf, me, isManager, rename, o
             className="icon-btn small"
             title="Delete this check-in"
             aria-label="Delete check-in"
-            onClick={() => confirm('Delete this check-in?') && onDelete()}
+            onClick={async () =>
+              (await confirmDialog({ title: 'Delete this check-in?', body: 'Its answers go with it.', okLabel: 'Delete', danger: true })) &&
+              onDelete()
+            }
           >
             <CloseIcon />
           </button>
