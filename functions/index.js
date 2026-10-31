@@ -17,6 +17,7 @@ import * as casino from './shared/casino.js';
 import * as arcade from './shared/arcade.js';
 import { blocked, serverGroup } from './shared/commandRules.js';
 import { MANAGER_NAMES, PASSWORD_MIN, cleanName, isManagerName, knownName } from './shared/team.js';
+import { asksOn } from './shared/checkin.js';
 
 // Functions run next to the database. The deploy workflow writes location.json
 // from the database's location; nam5 (the US multi-region) pairs with us-central1.
@@ -352,6 +353,44 @@ export const onCheckin = onDocumentCreated('checkins/{id}', async (event) => {
   );
 });
 
+// Asking to add a missed shift or make one longer (Shifts): team management
+// hears about it, and the person hears back when it's approved or declined.
+export const onShiftRequest = onDocumentWritten('shiftRequests/{id}', async (event) => {
+  const before = event.data?.before?.data();
+  const r = event.data?.after?.data();
+  if (!r) return;
+  const rename = await renamer();
+  const person = rename(r.person || '');
+  const when = `${formatDate(nyDay(r.start))} · ${clock(r.start)}–${clock(r.end)}`;
+  if (!before) {
+    const managers = new Set(MANAGER_NAMES.map(rename));
+    managers.delete(person);
+    await notify(
+      [...managers].map((to) => ({
+        to,
+        type: 'shift',
+        title: r.kind === 'add' ? `${first(person)} asks to add a shift` : `${first(person)} asks to make a shift longer`,
+        body: `${when}. Approve or decline it in Shifts.`,
+        open: 'view:shifts',
+        by: person,
+      })),
+    );
+  } else if (before.status === 'pending' && (r.status === 'approved' || r.status === 'declined')) {
+    const by = rename(r.decidedBy || '');
+    if (by === person) return;
+    await notify([
+      {
+        to: person,
+        type: 'shift',
+        title: `${first(by)} ${r.status} your ${r.kind === 'add' ? 'missed shift' : 'longer shift'}`,
+        body: when,
+        open: 'view:shifts',
+        by,
+      },
+    ]);
+  }
+});
+
 // Shifts, every 15 minutes:
 // - clocked in 4+ hours: "Still at the lab?" (once per shift)
 // - still running from before today (New York time): ended at the person's
@@ -486,15 +525,16 @@ export const shiftChecks = onSchedule({ schedule: 'every 15 minutes', timeZone: 
 });
 
 // Lab check-ins on a schedule (Shifts → Lab check-in → Repeat): on the chosen
-// days, at the chosen time (New York time), once a day. Skipped when the day
-// already has a check-in, and if it's more than 6 hours past the time (so a
-// late deploy doesn't ask at night). onCheckin then notifies everyone.
+// days or every school day (shared/checkin.js, shared/school.js), at the
+// chosen time (New York time), once a day, except days team management
+// skipped. Skipped when the day already has a check-in, and if it's more than
+// 6 hours past the time (so a late deploy doesn't ask at night). onCheckin
+// then notifies everyone.
 export const scheduledCheckin = onSchedule({ schedule: 'every 15 minutes', timeZone: TIME_ZONE }, async () => {
   const s = (await db.doc('settings/team').get()).get('checkinSchedule');
   if (!s?.on || !(s.slots || []).length || !/^\d\d:\d\d$/.test(s.time || '')) return;
   const today = localDate(0);
-  const weekday = new Date(`${today}T12:00:00Z`).getUTCDay();
-  if (!(s.days || []).includes(weekday)) return;
+  if (!asksOn(s, today)) return;
   const at = zonedMs(today, s.time);
   const now = Date.now();
   if (now < at || now > at + 6 * HOUR) return;
@@ -866,17 +906,16 @@ export const account = onCall({ maxInstances: 5, invoker: 'public' }, async (req
 // app adds it to what they earned (functions/shared/coins.js). The rules
 // and odds are in functions/shared/casino.js (demo mode runs the same file).
 
-// Tasks, shifts, and ad numbers change slowly (and only ever add coins); keep
+// Tasks and shifts change slowly (and only ever add coins); keep
 // them for 20 seconds so a run of bets doesn't reread the whole database every
 // time. Spending and gifts are read fresh for each balance (balanceOf).
 let coinCache = { at: 0, data: null };
 async function coinData() {
   if (coinCache.data && Date.now() - coinCache.at < 20000) return coinCache.data;
   const rename = await renamer();
-  const [tasks, shifts, adStats, team] = await Promise.all([
+  const [tasks, shifts, team] = await Promise.all([
     db.collection('tasks').get(),
     db.collection('shifts').get(),
-    db.collection('adStats').get(),
     db.doc('settings/team').get(),
   ]);
   // Same as the app: assignees by their current names, deleted tasks left out.
@@ -892,7 +931,6 @@ async function coinData() {
     rename,
     tasks: taskList,
     shifts: coinsByName({ shifts: shifts.docs.map((d) => d.data()) }, rename).shifts,
-    adStats: Object.fromEntries(adStats.docs.map((d) => [d.id, d.data()])),
     cfg: coinSettings(team.get('coins')),
     gameCap: team.get('ads')?.games?.cap ?? 10,
   };
@@ -916,7 +954,7 @@ async function freshCoins(name, bank, data) {
   for (const q of found) for (const d of q.docs) ledger.set(d.id, d.data());
   const banks = [{ ...bank, name }, ...old.filter((d) => d.exists).map((d) => d.data())];
   const mine = coinsByName({ ledger: [...ledger.values()], bank: banks }, data.rename);
-  return { balance: wallet(name, { ...data, ...mine, owner: name === REQUESTS_TO }).balance, ledger: mine.ledger };
+  return { balance: wallet(name, { ...data, ...mine }).balance, ledger: mine.ledger };
 }
 const nyDay = (ms) => new Date(ms).toLocaleDateString('en-CA', { timeZone: TIME_ZONE });
 
