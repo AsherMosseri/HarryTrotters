@@ -1,13 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
 import { loadStore } from './data/store.js';
 import { REQUESTS_TO, TEAM_NAME, isManagerName, makeRenamer } from './config.js';
-import { InstallScreen, LoadingScreen, SignInScreen } from './components/Gate.jsx';
-import { installNeeded } from './data/push.js';
+import { GetNewApp, InstallScreen, LoadingScreen, SignInScreen } from './components/Gate.jsx';
+import { installNeeded, oldHomeApp } from './data/push.js';
 import { isDemo } from './data/store.js';
 import { NEXT } from './next.js';
 
 // Checked once: the Home Screen app is a separate launch, so this never changes mid-visit.
 const install = isDemo ? null : installNeeded();
+// An iPhone/iPad Home Screen app added before 3.0 (the test copy is exempt);
+// ?demo=newapp previews the screen.
+const demoMode = new URLSearchParams(location.search).get('demo');
+const oldApp = demoMode === 'newapp' || (!isDemo && !NEXT && oldHomeApp());
 import Workspace from './components/Workspace.jsx';
 import { ShutdownScreen, useShutdown } from './components/Shutdown.jsx';
 import { PreviewBar, lookOnly } from './components/Preview.jsx';
@@ -48,7 +52,7 @@ export default function App() {
   const rename = useMemo(() => makeRenamer(renames), [renames]);
 
   useEffect(() => {
-    if (install) return;
+    if (install || oldApp) return;
     loadStore().then(setStore, (e) => setError(String(e)));
   }, []);
 
@@ -137,6 +141,7 @@ export default function App() {
   }, [actor, owner, preview]);
   const viewStore = useMemo(() => (store && owner && preview ? lookOnly(store) : store), [store, owner, preview]);
 
+  if (oldApp) return <GetNewApp />;
   if (install) return <InstallScreen {...install} />;
   if (error) return <LoadingScreen error={error} />;
   if (!store || !user || member === undefined) return <LoadingScreen step={!store ? 1 : !user ? 2 : 3} />;

@@ -2,7 +2,7 @@
   "name": "FTC 32313 Task Board",
   "short_name": "32313 Tasks",
   "description": "Tasks, milestones, parts, and checklists for FTC team 32313 Harry Trotters.",
-  "start_url": "./",
+  "start_url": "./?home=3",
   "scope": "./",
   "display": "standalone",
   "background_color": "#f5f6fa",

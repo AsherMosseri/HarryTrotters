@@ -1204,3 +1204,15 @@ button, [role='button'] { -webkit-user-select: none; user-select: none; -webkit-
   :root:not([data-motion='on']) :is(.adeco.adeco-spin, .deco-ring.ring-glow::after, .deco-neon::after) { animation: none !important; }
 }
 :root[data-motion='off'] :is(.adeco.adeco-spin, .deco-ring.ring-glow::after, .deco-neon::after) { animation: none !important; }
+
+/* 3.0: the old Home Screen app sends you to add the new one. */
+.new-app-steps li + li { margin-top: 14px; }
+.new-app-steps .muted.small { display: block; }
+.new-app-open { display: flex; width: max-content; margin: 10px 0 6px; text-decoration: none; }
+.new-app-link { word-break: break-all; }
+.new-app-steps .new-app-icon { display: flex; width: max-content; margin-top: 10px; }
+.new-app-icon { display: inline-flex; flex-direction: column; align-items: center; gap: 4px; font-size: 12px; font-weight: 500; color: var(--muted); }
+.new-app-icon img { width: 60px; height: 60px; border-radius: 14px; box-shadow: 0 2px 8px rgb(14 26 46 / 18%); }
+.new-app-icon.old img { filter: saturate(0.9); }
+.new-app-delete { display: flex; align-items: center; gap: 12px; margin: 4px 0 0; padding: 10px 12px; border-radius: 10px; background: var(--surface-2); font-size: 14.5px; }
+.new-app-delete .new-app-icon img { width: 44px; height: 44px; border-radius: 10px; }

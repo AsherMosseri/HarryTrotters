@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { TEAM_NAME, TEAM_NICKNAME, ROSTER, PASSWORD_MIN, cleanName, sameName } from '../config.js';
 import { Avatar } from './common.jsx';
+import { homeAppUrl } from '../data/push.js';
 
 function Shell({ children }) {
   return (
@@ -94,9 +95,71 @@ function ShareIcon() {
 
 // On iPhone and iPad the board only runs as the Home Screen app, so everyone
 // can get notifications. Shown in Safari (or another browser) until then.
+// 3.0: an old Home Screen app (added before 3.0) sends you to add the new one
+// from Safari, then to delete itself. iOS never updates an added app's icon,
+// and the new app is where you set up your password.
+export function GetNewApp() {
+  const [copied, setCopied] = useState(false);
+  const link = homeAppUrl({ add: '3' });
+  return (
+    <Shell>
+      <h1>Get the new app</h1>
+      <p className="muted">
+        3.0 is here, with a new look and a new icon. Your {TEAM_NAME} app has to be added to your Home Screen again to get it. It takes a
+        minute.
+      </p>
+      <ol className="install-steps new-app-steps">
+        <li>
+          <b>Open the website in Safari.</b>
+          <a className="btn primary new-app-open" href={`x-safari-${link}`}>
+            Open in Safari
+          </a>
+          <span className="muted small">
+            Didn’t open? Open Safari and go to <b className="new-app-link">{link.replace(/^https?:\/\//, '').replace(/\?.*$/, '')}</b>{' '}
+            <button
+              className="link-btn small"
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(link);
+                  setCopied(true);
+                } catch {
+                  /* the address is shown above */
+                }
+              }}
+            >
+              {copied ? 'Copied' : 'Copy link'}
+            </button>
+          </span>
+        </li>
+        <li>
+          <b>Add it to your Home Screen.</b> Safari shows you how. This is the new icon:
+          <span className="new-app-icon">
+            <img src="icon-192.png" alt="" />
+            <span>32313 Tasks</span>
+          </span>
+        </li>
+        <li>
+          <b>Delete this old app.</b> On your Home Screen, press and hold this icon, tap <b>Remove App</b>, then <b>Delete App</b>:
+          <span className="new-app-icon old">
+            <img src="old-icon.png" alt="" />
+            <span>32313 Tasks</span>
+          </span>
+        </li>
+      </ol>
+      <p className="muted small">Then open the new app. You’ll pick your name and set up your password there.</p>
+    </Shell>
+  );
+}
+
 export function InstallScreen({ device, browser }) {
   const [copied, setCopied] = useState(false);
   const link = `${location.origin}${location.pathname}`;
+  // Here from an old Home Screen app (3.0): remind them to delete it after.
+  const [fromOld] = useState(() => new URLSearchParams(location.search).has('add'));
+  // Whatever gets added from this page opens as the new 3.0 app.
+  useEffect(() => {
+    if (browser === 'safari' || browser === 'chrome') history.replaceState(null, '', homeAppUrl());
+  }, [browser]);
   const steps =
     browser === 'safari'
       ? [
@@ -117,7 +180,7 @@ export function InstallScreen({ device, browser }) {
             If you see <b>Open as Web App</b>, leave it on. Then tap <b>Add</b>.
           </>,
           <>
-            Go to your Home Screen and open <b>32313 Tasks</b>. You’ll pick your name and enter the team code there.
+            Go to your Home Screen and open <b>32313 Tasks</b>. You’ll pick your name and set up your password there.
           </>,
         ]
       : browser === 'chrome'
@@ -129,7 +192,7 @@ export function InstallScreen({ device, browser }) {
               Tap <b>Add to Home Screen</b> (scroll down or tap <b>View More</b> if needed), then <b>Add</b>.
             </>,
             <>
-              Go to your Home Screen and open <b>32313 Tasks</b>. You’ll pick your name and enter the team code there.
+              Go to your Home Screen and open <b>32313 Tasks</b>. You’ll pick your name and set up your password there.
             </>,
           ]
         : [
@@ -150,6 +213,16 @@ export function InstallScreen({ device, browser }) {
           <li key={i}>{s}</li>
         ))}
       </ol>
+      {fromOld && (
+        <p className="new-app-delete">
+          <span className="new-app-icon old">
+            <img src="old-icon.png" alt="" />
+          </span>
+          <span>
+            Then delete the old app: press and hold this icon on your Home Screen, tap <b>Remove App</b>, then <b>Delete App</b>.
+          </span>
+        </p>
+      )}
       {browser !== 'safari' && (
         <button
           className="btn"
