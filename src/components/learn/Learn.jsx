@@ -57,7 +57,7 @@ function Choices({ q, result, busy, onPick }) {
   return (
     <div className={`lq-choices${tf ? ' tf' : ''}${q.choices.some((c) => c.length > 60) ? ' long' : ''}`}>
       {q.choices.map((c, i) => {
-        const st = result ? (i === result.answer ? ' right' : i === result.given ? ' wrong' : ' dim') : '';
+        const st = result ? (i === result.answer ? ' is-right' : i === result.given ? ' is-wrong' : ' dim') : '';
         return (
           <button key={i} className={`lq-choice${st}`} onClick={() => onPick(i)} disabled={!!result || busy}>
             {!tf && !people && <span className="lq-choice-n mono">{String.fromCharCode(65 + i)}</span>}
@@ -75,7 +75,7 @@ function Feedback({ result, q, onNext, onReport, reported, busy }) {
   const right = result.correct;
   const capped = right && !result.coins && result.today && result.today.paid >= result.today.cap;
   return (
-    <div className={`lq-feedback ${right ? 'right' : 'wrong'}`} role="status">
+    <div className={`lq-feedback ${right ? 'is-right' : 'is-wrong'}`} role="status">
       <div className="lq-fb-head">
         <span className="lq-fb-icon">
           <Icon name={right ? 'check' : 'cross'} size={20} />
@@ -83,7 +83,7 @@ function Feedback({ result, q, onNext, onReport, reported, busy }) {
         <b>{right ? 'Right' : 'Not quite'}</b>
         {result.coins > 0 && (
           <span className="chip lq-chip-coin">
-            <Icon name="coin" size={13} /> +<span className="mono">{result.coins}</span>
+            <Icon name="coin" size={13} /> <span className="mono">+{result.coins}</span>
           </span>
         )}
         {right && !result.coins && (
@@ -274,7 +274,7 @@ function Game({ game, api, onBack, onProgress, today, setToday }) {
           {q && !result && (
             <div className="lq-skip">
               {q.difficulty && (
-                <span className="lq-diff mono" title="Difficulty">
+                <span className="lq-level mono" title="Difficulty">
                   {'●'.repeat(q.difficulty)}
                   <span className="muted">{'●'.repeat(Math.max(0, 3 - q.difficulty))}</span>
                 </span>

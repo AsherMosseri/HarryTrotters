@@ -51,7 +51,7 @@ export function DailyCard({ c, onPerson }) {
       {q.lines && <CodeView lines={q.lines} lang={q.lang} readOnly result={done && mine.bugLine != null ? { bugLine: mine.bugLine } : null} />}
       <div className={`lq-choices small${tf ? ' tf' : ''}`}>
         {(q.choices || []).map((ch, i) => {
-          const st = done ? (i === mine.answer ? ' right' : i === mine.given ? ' wrong' : ' dim') : '';
+          const st = done ? (i === mine.answer ? ' is-right' : i === mine.given ? ' is-wrong' : ' dim') : '';
           return (
             <button key={i} className={`lq-choice${st}`} disabled={done || !open || busy || mine === undefined} onClick={() => choose(i)}>
               {!tf && <span className="lq-choice-n mono">{String.fromCharCode(65 + i)}</span>}
@@ -63,7 +63,7 @@ export function DailyCard({ c, onPerson }) {
       </div>
       {error && <p className="lq-error">{error}</p>}
       {done && (
-        <div className={`lq-daily-reveal ${mine.correct ? 'right' : 'wrong'}`}>
+        <div className={`lq-daily-reveal ${mine.correct ? 'is-right' : 'is-wrong'}`}>
           <div className="lq-fb-head">
             <span className="lq-fb-icon">
               <Icon name={mine.correct ? 'check' : 'cross'} size={16} />
@@ -71,7 +71,7 @@ export function DailyCard({ c, onPerson }) {
             <b>{mine.correct ? (mine.rank && mine.rank <= 3 ? `Right, #${mine.rank} today` : 'Right') : 'Not quite'}</b>
             {mine.coins > 0 && (
               <span className="chip lq-chip-coin">
-                <Icon name="coin" size={13} /> +<span className="mono">{mine.coins}</span>
+                <Icon name="coin" size={13} /> <span className="mono">+{mine.coins}</span>
               </span>
             )}
             <span className="lq-streak on small" title="Daily streak (school days)">

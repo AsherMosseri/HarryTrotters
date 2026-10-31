@@ -13,7 +13,7 @@ import { PART_TYPES } from '../../electrical.js';
 export function ManualText({ text }) {
   const parts = String(text).split(/(\b[A-Z][A-Z0-9'’-]{2,}(?:\s+[A-Z][A-Z0-9'’-]{1,})*\b)/g);
   return parts.map((p, i) =>
-    i % 2 && !/^(TU07|AWG|USB|RS485|XT30|JST|LED|PWM|UVC|ATM|FTC|REV|IMU|RPM|ID)$/.test(p) ? (
+    i % 2 && !/^(TU07|AWG|USB|RS485|XT30|JST|LED|PWM|UVC|ATM|FTC|REV|IMU|RPM|ID|[GRETHI]\d{3}[A-Z.]*)$/.test(p) ? (
       <span key={i} className="lq-term">
         {p}
       </span>
@@ -38,7 +38,7 @@ export function Citation({ source }) {
 
 const tfStatement = (prompt) => {
   const m = String(prompt).match(/^True or false:\s*(.*)$/i);
-  return m ? m[1] : null;
+  return m ? m[1].charAt(0).toUpperCase() + m[1].slice(1) : null;
 };
 export const isTrueFalse = (q) => q.kind === 'choice' && q.choices?.length === 2 && q.choices[0] === 'True' && q.choices[1] === 'False';
 
@@ -121,7 +121,7 @@ function gearPath(teeth, r) {
   }
   return `M${pts.map((p) => p.map((v) => v.toFixed(1)).join(',')).join('L')}Z`;
 }
-function Gear({ x, y, teeth, r, label, spin, dir = 1, hub = true }) {
+function Gear({ x, y, teeth, r, label, spin, dir = 1, hub = true, ly, anchor }) {
   return (
     <g transform={`translate(${x} ${y})`}>
       <g className={spin ? `lq-spin${dir < 0 ? ' rev' : ''}` : ''} style={spin ? { animationDuration: `${spin}s` } : undefined}>
@@ -130,7 +130,9 @@ function Gear({ x, y, teeth, r, label, spin, dir = 1, hub = true }) {
         {hub && <path d={`M0 ${-r * 0.6}V${-r * 0.3}`} className="lq-gear-mark" />}
       </g>
       {label && (
-        <text y={r + 16} textAnchor="middle" className="lq-svg-label">
+        // Side by side gears: the left label ends at its gear's middle and
+        // the right one starts at its own, so they never run together.
+        <text y={ly ?? r + 16} x={anchor === 'end' ? 4 : anchor === 'start' ? -4 : 0} textAnchor={anchor || 'middle'} className="lq-svg-label">
           {label}
         </text>
       )}
@@ -190,12 +192,14 @@ export function GearVisual({ q }) {
   let body;
   if (teeth) {
     const [a, b] = [Number(teeth[1]), Number(teeth[2])];
-    const ra = 14 + a * 0.9;
-    const rb = 14 + b * 0.9;
+    const ra = Math.min(52, 10 + a * 1.3);
+    const rb = Math.min(52, 10 + b * 1.3);
+    const ly = Math.max(ra, rb) + 16;
+    const x0 = 150 - (ra + rb - 4) / 2;
     body = (
       <>
-        <Gear x={150 - rb * 0.5} y={78} teeth={a} r={ra} label={`${a}T driver`} spin={3} />
-        <Gear x={150 - rb * 0.5 + ra + rb - 4} y={78} teeth={b} r={rb} label={`${b}T driven`} spin={slow((3 * b) / a)} dir={-1} />
+        <Gear x={x0} y={70} teeth={a} r={ra} label={`${a}T driver`} spin={3} ly={ly} anchor="end" />
+        <Gear x={x0 + ra + rb - 4} y={70} teeth={b} r={rb} label={`${b}T driven`} spin={slow((3 * b) / a)} dir={-1} ly={ly} anchor="start" />
       </>
     );
   } else if (key === 'two-stage' && ratios.length >= 2) {
@@ -208,7 +212,7 @@ export function GearVisual({ q }) {
         <Gear x={56 + 20 + 20 * Math.min(a, 2.6) - 4 + 14 + 14 * Math.min(b, 3) - 4} y={74} teeth={12 * b} r={14 * Math.min(b, 3)} spin={slow(2.4 * a * b)} label={`${b}:1`} />
       </>
     );
-  } else if (mm) {
+  } else if (mm || key === 'ticks-rev' || !(ratios[0] || up)) {
     const r = ratios[0];
     body = (
       <>
@@ -223,7 +227,7 @@ export function GearVisual({ q }) {
         ) : (
           <path d="M92 76h40" className="lq-shaft" />
         )}
-        <Wheel x={200} y={76} r={Math.min(56, mm / 2.3)} label={`${mm} mm wheel`} spin={4} />
+        <Wheel x={200} y={76} r={mm ? Math.min(56, mm / 2.3) : 44} label={mm ? `${mm} mm wheel` : 'wheel'} spin={4} />
       </>
     );
   } else if (key === 'ultraplanetary') {
@@ -244,19 +248,18 @@ export function GearVisual({ q }) {
       </>
     );
   } else {
-    const r = ratios[0] || up || 2;
-    const small = 18;
-    const big = Math.min(58, small * r);
+    const r = ratios[0] || up;
+    const small = 20;
+    const big = Math.min(54, small * r);
     const isUp = !!up;
+    const ra = isUp ? big : small;
+    const rb = isUp ? small : big;
+    const x0 = 150 - (ra + rb - 4) / 2;
+    const ly = big + 16;
     body = (
       <>
-        <Gear x={110} y={78} teeth={isUp ? 12 * r : 12} r={isUp ? big : small} label={isUp ? 'motor' : 'motor pinion'} spin={2.6} />
-        <Gear x={110 + small + big - 4} y={78} teeth={isUp ? 12 : 12 * r} r={isUp ? small : big} label={isUp ? 'output (faster)' : 'output'} spin={slow(isUp ? 2.6 / r : 2.6 * r)} dir={-1} />
-        {rpm && (
-          <text x={110} y={22} textAnchor="middle" className="lq-svg-mono">
-            {rpm} RPM in
-          </text>
-        )}
+        <Gear x={x0} y={70} teeth={isUp ? 12 * r : 12} r={ra} label={rpm ? `${rpm} RPM in` : 'motor'} spin={2.6} ly={ly} anchor="end" />
+        <Gear x={x0 + ra + rb - 4} y={70} teeth={isUp ? 12 : 12 * r} r={rb} label={`${isUp ? `1:${r}` : `${r}:1`} out`} spin={slow(isUp ? 2.6 / r : 2.6 * r)} dir={-1} ly={ly} anchor="start" />
       </>
     );
   }
@@ -298,7 +301,7 @@ export function HubPuzzle({ q, result, busy, onPick }) {
       <div className="lq-hub" style={{ aspectRatio: `${hub.w} / ${hub.h}` }}>
         <img src={hub.photo} alt={hub.name} draggable="false" />
         {hub.ports.map((p) => {
-          const state = result ? (right.has(p.id) ? ' right' : result.given === p.id ? ' wrong' : '') : sel === p.id ? ' on' : '';
+          const state = result ? (right.has(p.id) ? ' is-right' : result.given === p.id ? ' is-wrong' : '') : sel === p.id ? ' on' : '';
           return (
             <button
               key={p.id}
@@ -327,17 +330,22 @@ export function HubPuzzle({ q, result, busy, onPick }) {
 // ---------- spot the problem (G4) ----------
 // An inspection board: a line drawing of what the scene is about and four
 // numbered tags to tap. The scene itself is written out under it.
+// Which drawing fits the subject (checked in this order); anything left is
+// about the robot as a whole (size, signs, lights, mechanisms).
 const SCENES = [
-  ['battery', /battery|fuse|charg|switch|power pack|xt30 straight|main power/i],
-  ['hub', /hub|encoder|port|servo plug|sensor|webcam|potentiometer|touch|rs485|diagnostic|metal box/i],
-  ['wires', /wir|cable|zip|splice|pinch/i],
-  ['chain', /chain|sprocket|belt|pulley/i],
-  ['gears', /gear|pinion|mesh/i],
-  ['wheel', /./],
+  ['battery', /battery|power wire|main switch|no switch|fuse|charging|usb power/i],
+  ['wheel', /drive wheel|arm hub|shaft|wheel hub|mecanum|odometry/i],
+  ['chain', /chain|sprocket|belt/i],
+  ['gears', /gear\b|gear |pinion|motor mount|gear mesh|gear spacing/i],
+  ['wires', /wiring|splice|cable|zip ties/i],
+  ['slide', /slide/i],
+  ['gripper', /claw|intake|wrist|grease|long screw/i],
+  ['hub', /encoder|hub|sensor|servo plug|potentiometer|metal box|diagnostic|webcam|port/i],
+  ['robot', /./],
 ];
 function sceneKind(q) {
-  const text = `${q.prompt} ${q.scene || ''}`;
-  return SCENES.find(([, re]) => re.test(text))[0];
+  const subject = String(q.prompt).replace(/:\s*tap the problem\.?$/i, '');
+  return SCENES.find(([, re]) => re.test(subject))[0];
 }
 function SceneArt({ kind }) {
   switch (kind) {
@@ -398,6 +406,44 @@ function SceneArt({ kind }) {
           <path d="M100 58L240 44M100 110c50 18 90 22 140 30" strokeDasharray="4 3" />
         </g>
       );
+    case 'robot':
+      return (
+        <g>
+          <rect x="96" y="44" width="150" height="80" rx="6" />
+          <rect x="80" y="56" width="16" height="24" rx="3" />
+          <rect x="80" y="92" width="16" height="24" rx="3" />
+          <rect x="246" y="56" width="16" height="24" rx="3" />
+          <rect x="246" y="92" width="16" height="24" rx="3" />
+          <rect x="130" y="100" width="82" height="18" rx="2" />
+          <text x="171" y="113" textAnchor="middle" className="lq-art-text">
+            32313
+          </text>
+          <path d="M171 44V22h40M211 22l14 10" />
+          <circle cx="120" cy="64" r="6" />
+          <path d="M222 58h14v28h-14z" strokeDasharray="4 3" />
+        </g>
+      );
+    case 'slide':
+      return (
+        <g>
+          <rect x="140" y="30" width="22" height="120" rx="3" />
+          <rect x="166" y="14" width="18" height="112" rx="3" />
+          <rect x="188" y="40" width="40" height="22" rx="3" />
+          <circle cx="175" cy="20" r="6" />
+          <path d="M175 26v112M151 150h70" strokeDasharray="5 4" />
+          <rect x="226" y="132" width="32" height="22" rx="4" />
+        </g>
+      );
+    case 'gripper':
+      return (
+        <g>
+          <rect x="98" y="62" width="48" height="40" rx="5" />
+          <circle cx="146" cy="82" r="7" />
+          <path d="M146 82h30M176 82l44-30h24M176 82l44 30h24M244 52v10M244 112v-10" />
+          <circle cx="254" cy="82" r="10" strokeDasharray="4 3" />
+          <path d="M70 82h28" />
+        </g>
+      );
     case 'gears':
       return (
         <g>
@@ -423,11 +469,12 @@ function SceneArt({ kind }) {
       );
   }
 }
+// Leader lines run from each tag (two above the drawing, two below) to the drawing.
 const LEADS = [
-  [62, 34],
-  [278, 34],
-  [62, 132],
-  [278, 132],
+  [80, 0],
+  [260, 0],
+  [80, 168],
+  [260, 168],
 ];
 const AIMS = [
   [130, 70],
@@ -455,7 +502,7 @@ export function SpotScene({ q, result, busy, onPick }) {
           ))}
         </svg>
         {q.choices.map((c, i) => {
-          const st = result ? (i === result.answer ? ' right' : i === result.given ? ' wrong' : ' dim') : '';
+          const st = result ? (i === result.answer ? ' is-right' : i === result.given ? ' is-wrong' : ' dim') : '';
           return (
             <button key={i} className={`lq-tag t${i}${st}`} onClick={() => onPick(i)} disabled={!!result || busy}>
               <span className="lq-tag-n mono">{i + 1}</span>
@@ -511,7 +558,7 @@ export function CodeView({ lines, lang, pick, onPick, result, readOnly }) {
       </div>
       <ol className="lq-code-lines">
         {lines.map((l, i) => {
-          const st = result ? (i === result.bugLine ? ' bug' : i === result.given ? ' wrong' : '') : pick === i ? ' on' : '';
+          const st = result ? (i === result.bugLine ? ' bug' : i === result.given ? ' is-wrong' : '') : pick === i ? ' on' : '';
           return (
             <li key={i}>
               <button className={`lq-line${st}`} onClick={() => onPick?.(i)} disabled={!!result || readOnly}>
@@ -600,7 +647,7 @@ export function Timeline({ q, result, busy, onSubmit }) {
           const it = byId[id];
           const ok = result && result.given?.[i] === id;
           return (
-            <li key={id} className={`lq-tl-item${result ? (ok ? ' right' : ' wrong') : ''}`}>
+            <li key={id} className={`lq-tl-item${result ? (ok ? ' is-right' : ' is-wrong') : ''}`}>
               <span className="lq-tl-dot" />
               <span className="lq-tl-main">
                 <span className="lq-kicker">

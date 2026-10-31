@@ -263,7 +263,7 @@ export default function AutoPlanner({ api, onResult }) {
             {run.newBest && run.score > 0 && <span className="chip lq-chip-good">New best</span>}
             {run.coins > 0 && (
               <span className="chip lq-chip-coin">
-                <Icon name="coin" size={13} /> +<span className="mono">{run.coins}</span>
+                <Icon name="coin" size={13} /> <span className="mono">+{run.coins}</span>
               </span>
             )}
           </p>
