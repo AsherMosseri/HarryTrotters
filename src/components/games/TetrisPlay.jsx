@@ -133,7 +133,17 @@ export default function TetrisPlay({ opts, bot, other, canPause, onLock, onEnd }
   const wrapRef = useRef(null);
   const [cell, setCell] = useState(24);
   const cellRef = useRef(24);
-  const [hud, setHud] = useState({ score: 0, lines: 0, level: g.level, frame: 0, next: g.queue.slice(0, 5), hold: 0, held: false, botLines: 0, botDone: false });
+  const [hud, setHud] = useState({
+    score: 0,
+    lines: 0,
+    level: g.level,
+    frame: 0,
+    next: g.queue.slice(0, 5),
+    hold: 0,
+    held: false,
+    botLines: 0,
+    botDone: false,
+  });
   const [label, setLabel] = useState(null);
   const [isPaused, setPaused] = useState(false);
   const lastSeen = useRef(null);
@@ -385,7 +395,8 @@ export default function TetrisPlay({ opts, bot, other, canPause, onLock, onEnd }
     const dt = performance.now() - s.t;
     if (dt < 260 && dy > 1.5 * c && Math.abs(dx) < 1.5 * c) press(T.IN.hard);
     else if (dt < 300 && dy < -1.5 * c && Math.abs(dx) < 1.5 * c) press(T.IN.hold);
-    else if (!s.moved && Math.abs(dx) < c * 0.5 && Math.abs(dy) < c * 0.5 && dt < 350) press(e.clientX - e.currentTarget.getBoundingClientRect().left < (T.W * c) / 3 ? T.IN.ccw : T.IN.cw);
+    else if (!s.moved && Math.abs(dx) < c * 0.5 && Math.abs(dy) < c * 0.5 && dt < 350)
+      press(e.clientX - e.currentTarget.getBoundingClientRect().left < (T.W * c) / 3 ? T.IN.ccw : T.IN.cw);
   };
 
   // Hold-to-repeat buttons.
@@ -416,7 +427,9 @@ export default function TetrisPlay({ opts, bot, other, canPause, onLock, onEnd }
   const stop = () =>
     canPause
       ? setPause(true)
-      : confirmDialog({ title: 'Give up this game?', body: 'It counts as not finishing.', okLabel: 'Give up', danger: true }).then((ok) => ok && quit());
+      : confirmDialog({ title: 'Give up this game?', body: 'It counts as not finishing.', okLabel: 'Give up', danger: true }).then(
+          (ok) => ok && quit(),
+        );
 
   return (
     <div className={`tet${touch ? ' touch' : ''}`}>
@@ -505,8 +518,21 @@ export default function TetrisPlay({ opts, bot, other, canPause, onLock, onEnd }
         {!bot && !other && (
           <ul className="tet-keys muted tiny">
             {(touch
-              ? [['Tap', 'turn'], ['Drag', 'move'], ['Flick ↓', 'drop'], ['Flick ↑', 'hold']]
-              : [['← →', 'move'], ['↑ X', 'turn'], ['Z', 'turn back'], ['↓', 'soft drop'], ['Space', 'drop'], ['C', 'hold'], ['Esc', 'pause']]
+              ? [
+                  ['Tap', 'turn'],
+                  ['Drag', 'move'],
+                  ['Flick ↓', 'drop'],
+                  ['Flick ↑', 'hold'],
+                ]
+              : [
+                  ['← →', 'move'],
+                  ['↑ X', 'turn'],
+                  ['Z', 'turn back'],
+                  ['↓', 'soft drop'],
+                  ['Space', 'drop'],
+                  ['C', 'hold'],
+                  ['Esc', 'pause'],
+                ]
             ).map(([k, v]) => (
               <li key={k}>
                 <kbd>{k}</kbd> {v}
@@ -523,13 +549,34 @@ export default function TetrisPlay({ opts, bot, other, canPause, onLock, onEnd }
         <button className="tet-btn" aria-label={canPause ? 'Pause' : 'Give up'} onClick={stop}>
           <Icon name={canPause ? 'pause' : 'flag'} size={20} />
         </button>
-        <button className="tet-btn" aria-label="Left" {...hold(() => holdDir('left', true), () => holdDir('left', false))}>
+        <button
+          className="tet-btn"
+          aria-label="Left"
+          {...hold(
+            () => holdDir('left', true),
+            () => holdDir('left', false),
+          )}
+        >
           <Icon name="left" size={26} />
         </button>
-        <button className="tet-btn" aria-label="Soft drop" {...hold(() => holdSoft(true), () => holdSoft(false))}>
+        <button
+          className="tet-btn"
+          aria-label="Soft drop"
+          {...hold(
+            () => holdSoft(true),
+            () => holdSoft(false),
+          )}
+        >
           <Icon name="down" size={26} />
         </button>
-        <button className="tet-btn" aria-label="Right" {...hold(() => holdDir('right', true), () => holdDir('right', false))}>
+        <button
+          className="tet-btn"
+          aria-label="Right"
+          {...hold(
+            () => holdDir('right', true),
+            () => holdDir('right', false),
+          )}
+        >
           <Icon name="right" size={26} />
         </button>
       </div>

@@ -32,7 +32,7 @@ export const REV = [
   { name: 'REV HD Hex, 40:1 gearbox', rpm: 150, ticks: 1120 },
   { name: 'REV Core Hex', rpm: 125, ticks: 288 },
 ];
-export const ULTRA = { '3': 84 / 29, '4': 76 / 21, '5': 68 / 13 };
+export const ULTRA = { 3: 84 / 29, 4: 76 / 21, 5: 68 / 13 };
 
 // "312", "435rpm", "yj 117" → a Yellow Jacket; "core", "hd 40" → REV; or null.
 export function findMotor(text) {
@@ -115,9 +115,38 @@ export const WIRE_RULES = [
 
 // Each unit as a multiple of its kind's base unit (m, kg, N·m, m/s, rad, W, s).
 const UNITS = {
-  length: { mm: 0.001, cm: 0.01, m: 1, km: 1000, in: 0.0254, inch: 0.0254, inches: 0.0254, '"': 0.0254, ft: 0.3048, feet: 0.3048, foot: 0.3048, yd: 0.9144, mi: 1609.344, tile: 0.6096, tiles: 0.6096 },
+  length: {
+    mm: 0.001,
+    cm: 0.01,
+    m: 1,
+    km: 1000,
+    in: 0.0254,
+    inch: 0.0254,
+    inches: 0.0254,
+    '"': 0.0254,
+    ft: 0.3048,
+    feet: 0.3048,
+    foot: 0.3048,
+    yd: 0.9144,
+    mi: 1609.344,
+    tile: 0.6096,
+    tiles: 0.6096,
+  },
   mass: { g: 0.001, kg: 1, lb: 0.45359237, lbs: 0.45359237, oz: 0.028349523125 },
-  torque: { nm: 1, 'n-m': 1, 'n·m': 1, kgcm: 0.0980665, 'kg-cm': 0.0980665, 'kgf-cm': 0.0980665, ozin: 0.0070615518, 'oz-in': 0.0070615518, inlb: 0.112984829, 'in-lb': 0.112984829, ftlb: 1.35581795, 'ft-lb': 1.35581795 },
+  torque: {
+    nm: 1,
+    'n-m': 1,
+    'n·m': 1,
+    kgcm: 0.0980665,
+    'kg-cm': 0.0980665,
+    'kgf-cm': 0.0980665,
+    ozin: 0.0070615518,
+    'oz-in': 0.0070615518,
+    inlb: 0.112984829,
+    'in-lb': 0.112984829,
+    ftlb: 1.35581795,
+    'ft-lb': 1.35581795,
+  },
   speed: { 'm/s': 1, 'ft/s': 0.3048, 'in/s': 0.0254, mph: 0.44704, 'km/h': 1 / 3.6, kph: 1 / 3.6 },
   angle: { deg: Math.PI / 180, degrees: Math.PI / 180, rad: 1, radians: 1, rev: 2 * Math.PI, revs: 2 * Math.PI, rotations: 2 * Math.PI },
   power: { w: 1, kw: 1000, hp: 745.699872 },
@@ -237,10 +266,51 @@ export const nice = (n) => (Math.abs(n) >= 1e6 || (Math.abs(n) < 1e-3 && n !== 0
 // ---------- text fun ----------
 
 export const MORSE = {
-  a: '.-', b: '-...', c: '-.-.', d: '-..', e: '.', f: '..-.', g: '--.', h: '....', i: '..', j: '.---', k: '-.-', l: '.-..', m: '--',
-  n: '-.', o: '---', p: '.--.', q: '--.-', r: '.-.', s: '...', t: '-', u: '..-', v: '...-', w: '.--', x: '-..-', y: '-.--', z: '--..',
-  0: '-----', 1: '.----', 2: '..---', 3: '...--', 4: '....-', 5: '.....', 6: '-....', 7: '--...', 8: '---..', 9: '----.',
-  '.': '.-.-.-', ',': '--..--', '?': '..--..', '!': '-.-.--', '/': '-..-.', '-': '-....-', '(': '-.--.', ')': '-.--.-', '@': '.--.-.',
+  a: '.-',
+  b: '-...',
+  c: '-.-.',
+  d: '-..',
+  e: '.',
+  f: '..-.',
+  g: '--.',
+  h: '....',
+  i: '..',
+  j: '.---',
+  k: '-.-',
+  l: '.-..',
+  m: '--',
+  n: '-.',
+  o: '---',
+  p: '.--.',
+  q: '--.-',
+  r: '.-.',
+  s: '...',
+  t: '-',
+  u: '..-',
+  v: '...-',
+  w: '.--',
+  x: '-..-',
+  y: '-.--',
+  z: '--..',
+  0: '-----',
+  1: '.----',
+  2: '..---',
+  3: '...--',
+  4: '....-',
+  5: '.....',
+  6: '-....',
+  7: '--...',
+  8: '---..',
+  9: '----.',
+  '.': '.-.-.-',
+  ',': '--..--',
+  '?': '..--..',
+  '!': '-.-.--',
+  '/': '-..-.',
+  '-': '-....-',
+  '(': '-.--.',
+  ')': '-.--.-',
+  '@': '.--.-.',
 };
 const FROM_MORSE = Object.fromEntries(Object.entries(MORSE).map(([k, v]) => [v, k]));
 export function morse(text) {
@@ -248,27 +318,93 @@ export function morse(text) {
   if (/^[.\-\s/]+$/.test(t))
     return t
       .split(/\s*\/\s*|\s{3,}/)
-      .map((w) => w.split(/\s+/).map((c) => FROM_MORSE[c] || '?').join(''))
+      .map((w) =>
+        w
+          .split(/\s+/)
+          .map((c) => FROM_MORSE[c] || '?')
+          .join(''),
+      )
       .join(' ')
       .toUpperCase();
   return t
     .toLowerCase()
     .split(/\s+/)
-    .map((w) => [...w].map((c) => MORSE[c]).filter(Boolean).join(' '))
+    .map((w) =>
+      [...w]
+        .map((c) => MORSE[c])
+        .filter(Boolean)
+        .join(' '),
+    )
     .join(' / ');
 }
 export function binary(text) {
   const t = text.trim();
   if (/^[01\s]+$/.test(t) && t.replace(/\s/g, '').length % 8 === 0)
-    return new TextDecoder().decode(new Uint8Array(t.replace(/\s/g, '').match(/.{8}/g).map((b) => parseInt(b, 2))));
+    return new TextDecoder().decode(
+      new Uint8Array(
+        t
+          .replace(/\s/g, '')
+          .match(/.{8}/g)
+          .map((b) => parseInt(b, 2)),
+      ),
+    );
   return [...new TextEncoder().encode(t)].map((b) => b.toString(2).padStart(8, '0')).join(' ');
 }
 const FLIP = {
-  a: 'ɐ', b: 'q', c: 'ɔ', d: 'p', e: 'ǝ', f: 'ɟ', g: 'ƃ', h: 'ɥ', i: 'ᴉ', j: 'ɾ', k: 'ʞ', l: 'l', m: 'ɯ', n: 'u', o: 'o', p: 'd', q: 'b',
-  r: 'ɹ', s: 's', t: 'ʇ', u: 'n', v: 'ʌ', w: 'ʍ', x: 'x', y: 'ʎ', z: 'z', 1: 'Ɩ', 2: 'ᄅ', 3: 'Ɛ', 4: 'ㄣ', 5: 'ϛ', 6: '9', 7: 'ㄥ', 8: '8',
-  9: '6', 0: '0', '.': '˙', ',': "'", '?': '¿', '!': '¡', "'": ',', '(': ')', ')': '(', '[': ']', ']': '[', '<': '>', '>': '<', _: '‾',
+  a: 'ɐ',
+  b: 'q',
+  c: 'ɔ',
+  d: 'p',
+  e: 'ǝ',
+  f: 'ɟ',
+  g: 'ƃ',
+  h: 'ɥ',
+  i: 'ᴉ',
+  j: 'ɾ',
+  k: 'ʞ',
+  l: 'l',
+  m: 'ɯ',
+  n: 'u',
+  o: 'o',
+  p: 'd',
+  q: 'b',
+  r: 'ɹ',
+  s: 's',
+  t: 'ʇ',
+  u: 'n',
+  v: 'ʌ',
+  w: 'ʍ',
+  x: 'x',
+  y: 'ʎ',
+  z: 'z',
+  1: 'Ɩ',
+  2: 'ᄅ',
+  3: 'Ɛ',
+  4: 'ㄣ',
+  5: 'ϛ',
+  6: '9',
+  7: 'ㄥ',
+  8: '8',
+  9: '6',
+  0: '0',
+  '.': '˙',
+  ',': "'",
+  '?': '¿',
+  '!': '¡',
+  "'": ',',
+  '(': ')',
+  ')': '(',
+  '[': ']',
+  ']': '[',
+  '<': '>',
+  '>': '<',
+  _: '‾',
 };
-export const upsideDown = (text) => [...text.toLowerCase()].map((c) => FLIP[c] ?? c).reverse().join('');
+export const upsideDown = (text) =>
+  [...text.toLowerCase()]
+    .map((c) => FLIP[c] ?? c)
+    .reverse()
+    .join('');
 export const reverse = (text) => [...text].reverse().join('');
 
 // ---------- the game (BIOBUZZ) ----------
@@ -324,7 +460,10 @@ export const SIZE = {
 export const MOTOR_RULES = {
   rows: [
     ['How many (R503, p. 131)', 'at most 8 motors and 8 servos, counting every configuration'],
-    ['Which motors (R501, p. 129)', 'only the listed 12V DC motors: goBILDA Yellow Jacket 5201-5204 and 5000 series, REV HD Hex and Core Hex, AndyMark NeveRest, TETRIX MAX and TorqueNADO, Studica Maverick, NFR Yuksel, SWYFT Spike, WATTOS Stingray'],
+    [
+      'Which motors (R501, p. 129)',
+      'only the listed 12V DC motors: goBILDA Yellow Jacket 5201-5204 and 5000 series, REV HD Hex and Core Hex, AndyMark NeveRest, TETRIX MAX and TorqueNADO, Studica Maverick, NFR Yuksel, SWYFT Spike, WATTOS Stingray',
+    ],
     ['Servos (R502, p. 130)', 'at most 8 W of output power and 4 A stall current at 6V (linear servos: 1 A)'],
     ['Changes (R504, p. 131)', 'don’t modify actuators unless the rules say you can'],
     ['Power (R505, p. 131)', 'every actuator is controlled and powered through approved devices'],
@@ -332,8 +471,14 @@ export const MOTOR_RULES = {
 };
 export const BATTERY = {
   rows: [
-    ['The rule (R601, p. 132)', 'exactly 1 approved 12V NiMH main battery, unaltered except the fuse (a COTS 20A ATM mini blade) and the connector'],
-    ['Allowed packs', 'AndyMark am-5290, goBILDA 3100-0012-0020, Matrix 14-0014, REV REV-31-1302, Studica 70025, TETRIX W39057, WATTOS WT-NMH1230'],
+    [
+      'The rule (R601, p. 132)',
+      'exactly 1 approved 12V NiMH main battery, unaltered except the fuse (a COTS 20A ATM mini blade) and the connector',
+    ],
+    [
+      'Allowed packs',
+      'AndyMark am-5290, goBILDA 3100-0012-0020, Matrix 14-0014, REV REV-31-1302, Studica 70025, TETRIX W39057, WATTOS WT-NMH1230',
+    ],
     ['Main switch (R603, p. 132)', 'the battery connects through the Main Power Switch'],
     ['Cells', '10 NiMH cells × 1.2 V = 12 V nominal'],
   ],

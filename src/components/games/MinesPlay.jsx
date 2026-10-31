@@ -191,10 +191,28 @@ export default function MinesPlay({ opts, bot, other, onChange, onEnd }) {
               const mine = g.mines?.[i];
               const n = open && !mine ? g.numbers[i] : 0;
               const show = done && mine;
-              const cls = open ? (i === g.boom ? 'boom' : `open n${n}`) : flag ? (done && !mine ? 'flag wrong' : 'flag') : show ? (g.won ? 'flag' : 'mine') : '';
+              const cls = open
+                ? i === g.boom
+                  ? 'boom'
+                  : `open n${n}`
+                : flag
+                  ? done && !mine
+                    ? 'flag wrong'
+                    : 'flag'
+                  : show
+                    ? g.won
+                      ? 'flag'
+                      : 'mine'
+                    : '';
               return (
                 <span key={i} data-i={i} className={`ms-cell ${cls}${i === g.start && !open ? ' start' : ''}`} role="gridcell">
-                  {open && n > 0 ? n : i === g.boom || (show && !g.won && !flag) ? <Icon name="mine" size={Math.round(cell * 0.6)} /> : flag || (show && g.won) ? <Icon name="flag" size={Math.round(cell * 0.55)} /> : null}
+                  {open && n > 0 ? (
+                    n
+                  ) : i === g.boom || (show && !g.won && !flag) ? (
+                    <Icon name="mine" size={Math.round(cell * 0.6)} />
+                  ) : flag || (show && g.won) ? (
+                    <Icon name="flag" size={Math.round(cell * 0.55)} />
+                  ) : null}
                 </span>
               );
             })}
@@ -209,7 +227,13 @@ export default function MinesPlay({ opts, bot, other, onChange, onEnd }) {
                 h={g.h}
                 cell={g.w > 16 ? 4 : 6}
                 label="Trotbot"
-                sub={bot.game.won ? `Done · ${M.clockText(bot.game.ms)}` : bot.game.lost ? 'Hit a mine' : `${Math.round((100 * bot.game.opened) / M.safeCells(bot.game))}%`}
+                sub={
+                  bot.game.won
+                    ? `Done · ${M.clockText(bot.game.ms)}`
+                    : bot.game.lost
+                      ? 'Hit a mine'
+                      : `${Math.round((100 * bot.game.opened) / M.safeCells(bot.game))}%`
+                }
               />
             )}
             {other && (

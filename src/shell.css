@@ -2709,6 +2709,7 @@ button.pm-row:hover { background: color-mix(in srgb, var(--text) 4%, transparent
 .mc-rows td { padding: 4px 8px 4px 0; vertical-align: top; border-top: 1px solid var(--border); }
 .mc-rows tr:first-child td { border-top: 0; }
 .mc-rows td.mc-key { font-weight: 600; white-space: nowrap; width: 1%; padding-right: 12px; }
+.mc-rows td.mono { white-space: nowrap; }
 @media (max-width: 520px) { .mc-rows td.mc-key { white-space: normal; width: 38%; } }
 .mc-code {
   margin: 0; padding: 10px 12px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--border);

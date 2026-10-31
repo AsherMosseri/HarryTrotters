@@ -68,7 +68,9 @@ export function RaceCard({ name, g, me, act, Name, now, conv, msgId }) {
     <div className="arc-race">
       <Versus g={g} Name={Name} />
       <div className="small muted">
-        {tetris ? 'Same pieces. First to clear 40 lines wins.' : `Same ${LEVELS[g.level || 'beginner'].label.toLowerCase()} board. Fastest clear wins.`}
+        {tetris
+          ? 'Same pieces. First to clear 40 lines wins.'
+          : `Same ${LEVELS[g.level || 'beginner'].label.toLowerCase()} board. Fastest clear wins.`}
       </div>
       {g.status === 'open' && <Invite g={g} me={me} act={act} game={name} now={now} />}
       {g.status !== 'open' && (
@@ -278,7 +280,9 @@ export function Battleship({ g, me, act, Name, now }) {
     });
   };
   const myTurn = g.status === 'playing' && g.turn === me;
-  const shotText = (x) => x && `${first(x.by)}: ${String.fromCharCode(65 + Math.floor(x.i / N))}${(x.i % N) + 1} ${x.hit ? (x.sunk ? `sank the ${x.sunk}!` : 'hit!') : 'miss'}`;
+  const shotText = (x) =>
+    x &&
+    `${first(x.by)}: ${String.fromCharCode(65 + Math.floor(x.i / N))}${(x.i % N) + 1} ${x.hit ? (x.sunk ? `sank the ${x.sunk}!` : 'hit!') : 'miss'}`;
   return (
     <div className="arc-bs">
       <Versus g={g} Name={Name} />
@@ -289,7 +293,8 @@ export function Battleship({ g, me, act, Name, now }) {
         ) : (
           <div className="arc-wait">
             <span className="small">
-              {player ? `Ships placed. Waiting for ${first(other)}…` : 'Placing ships…'} <span className="muted mono">{clock(g.placeBy - now)}</span>
+              {player ? `Ships placed. Waiting for ${first(other)}…` : 'Placing ships…'}{' '}
+              <span className="muted mono">{clock(g.placeBy - now)}</span>
             </span>
             {player && (
               <button className="link-btn small" onClick={() => act('resign')}>
@@ -349,4 +354,3 @@ export function Battleship({ g, me, act, Name, now }) {
     </div>
   );
 }
-

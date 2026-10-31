@@ -129,30 +129,30 @@ function People({ c, onPerson }) {
       {c.groups.map((group, gi) => {
         const g = group.names || group;
         return (
-        <div key={gi} className="mc-group">
-          {(c.labels || c.groups.length > 1) && (
-            <div className="mc-cap">
-              {c.labels ? c.labels[gi] : `Team ${gi + 1}`} <span className="mono">{c.labels ? g.length : ''}</span>
-            </div>
-          )}
-          {g.length ? (
-            <ol className={`mc-list${c.numbered ? ' numbered' : ''}`}>
-              {g.map((n) => (
-                <li key={n}>
-                  <Avatar name={n} size={22} /> <Name name={n} onPerson={onPerson} />
-                  {c.side?.[n] && <span className="mono small muted mc-side">{c.side[n]}</span>}
-                  {c.since?.[n] && (
-                    <span className="small muted mc-side">
-                      since {new Date(c.since[n]).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
-                    </span>
-                  )}
-                </li>
-              ))}
-            </ol>
-          ) : (
-            <div className="muted small">Nobody yet</div>
-          )}
-        </div>
+          <div key={gi} className="mc-group">
+            {(c.labels || c.groups.length > 1) && (
+              <div className="mc-cap">
+                {c.labels ? c.labels[gi] : `Team ${gi + 1}`} <span className="mono">{c.labels ? g.length : ''}</span>
+              </div>
+            )}
+            {g.length ? (
+              <ol className={`mc-list${c.numbered ? ' numbered' : ''}`}>
+                {g.map((n) => (
+                  <li key={n}>
+                    <Avatar name={n} size={22} /> <Name name={n} onPerson={onPerson} />
+                    {c.side?.[n] && <span className="mono small muted mc-side">{c.side[n]}</span>}
+                    {c.since?.[n] && (
+                      <span className="small muted mc-side">
+                        since {new Date(c.since[n]).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <div className="muted small">Nobody yet</div>
+            )}
+          </div>
         );
       })}
     </div>

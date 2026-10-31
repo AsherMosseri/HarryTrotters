@@ -44,7 +44,12 @@ export const RACE_PRIZE = 3;
 export function gameOpts(s) {
   if (s.game === 'tetris') {
     const mode = s.mode === 'marathon' ? 'marathon' : s.mode === 'ultra' || s.mode === 'tournament' ? 'ultra' : 'sprint';
-    return { seed: s.seed, mode, level: s.mode === 'marathon' ? s.level || 1 : 1, frames: s.mode === 'tournament' ? tetris.TOURNAMENT_FRAMES : 0 };
+    return {
+      seed: s.seed,
+      mode,
+      level: s.mode === 'marathon' ? s.level || 1 : 1,
+      frames: s.mode === 'tournament' ? tetris.TOURNAMENT_FRAMES : 0,
+    };
   }
   return { seed: s.seed, level: mines.LEVELS[s.level] ? s.level : 'beginner', kind: s.mode === 'solo' ? 'classic' : 'shared' };
 }

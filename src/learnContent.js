@@ -154,7 +154,22 @@ while (opModeIsActive()) {
     'Start with only P; add D if it overshoots, and a small constant (feedforward) if gravity pulls it down.',
   ],
 };
-export const JAVA_ALIASES = { rtp: 'runtoposition', 'run-to-position': 'runtoposition', drive: 'mecanum', opmode: 'teleop', linear: 'teleop', sensor: 'sensors', color: 'sensors', distance: 'sensors', touch: 'sensors', heading: 'imu', gyro: 'imu', cr: 'crservo', flywheel: 'velocity', loop: 'bulk' };
+export const JAVA_ALIASES = {
+  rtp: 'runtoposition',
+  'run-to-position': 'runtoposition',
+  drive: 'mecanum',
+  opmode: 'teleop',
+  linear: 'teleop',
+  sensor: 'sensors',
+  color: 'sensors',
+  distance: 'sensors',
+  touch: 'sensors',
+  heading: 'imu',
+  gyro: 'imu',
+  cr: 'crservo',
+  flywheel: 'velocity',
+  loop: 'bulk',
+};
 
 // /explain <thing>: [title, explanation]
 export const EXPLAIN = {
@@ -264,7 +279,10 @@ export const TIPS = [
   ['wiring', 'Label both ends of every cable. When something stops working in the pit, you’ll know which port it goes to in seconds.'],
   ['wiring', 'Tug-test every connector before a match. A loose JST on an encoder is the classic “auto worked yesterday” bug.'],
   ['wiring', 'Main power wires are 18 AWG or bigger, servo and LED wires 22 AWG or bigger, signal wires 28 AWG or bigger (R609, p. 134).'],
-  ['wiring', 'The 12V and 5V power wires must be color-coded: red, yellow, white, brown or black-with-stripe for +, black or blue for − (R610, p. 135).'],
+  [
+    'wiring',
+    'The 12V and 5V power wires must be color-coded: red, yellow, white, brown or black-with-stripe for +, black or blue for − (R610, p. 135).',
+  ],
   ['wiring', 'Strain-relieve power cables near the hub so a bump pulls on a zip tie, not on the connector.'],
   ['wiring', 'Keep wires away from anything that moves. Run them along the frame and through cable chain on lifts.'],
   ['wiring', 'Never replace a fuse with a bigger one or a self-resetting one (R604, p. 133).'],

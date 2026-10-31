@@ -33,7 +33,9 @@ export default function GameHost({ api, actor, roster, isOn = () => true }) {
 function FunGame({ start, api, actor, roster, isOn, onClose }) {
   const [game, setGame] = useState(start.game || 'tetris');
   // What's being played: { mode, level, speed, race, tournament } (null: the picker).
-  const [pick, setPick] = useState(start.mode ? { mode: start.mode, level: start.level, speed: start.speed, race: start.race, tournament: start.tournament } : null);
+  const [pick, setPick] = useState(
+    start.mode ? { mode: start.mode, level: start.level, speed: start.speed, race: start.race, tournament: start.tournament } : null,
+  );
   const [phase, setPhase] = useState(start.mode ? 'count' : 'pick');
   const [session, setSession] = useState(null);
   const [result, setResult] = useState(null);
@@ -59,7 +61,15 @@ function FunGame({ start, api, actor, roster, isOn, onClose }) {
 
   // After the countdown: ask the server for the game (its seed).
   const launch = async () => {
-    const r = await api.funGame({ action: 'start', game, mode: pick.mode, level: pick.level, speed: pick.speed, race: pick.race, tournament: pick.tournament });
+    const r = await api.funGame({
+      action: 'start',
+      game,
+      mode: pick.mode,
+      level: pick.level,
+      speed: pick.speed,
+      race: pick.race,
+      tournament: pick.tournament,
+    });
     if (!r?.ok) {
       setError(r?.note ? `${r.note.title}${r.note.body ? ` ${r.note.body}` : ''}` : 'That didn’t start. Try again.');
       setPhase(start.mode && round <= 1 && !pick.tournament ? 'error' : 'pick');
@@ -98,7 +108,18 @@ function FunGame({ start, api, actor, roster, isOn, onClose }) {
           )}
         </div>
         {phase === 'pick' && (
-          <Picker game={game} setGame={setGame} api={api} actor={actor} roster={roster} isOn={isOn} onPlay={begin} error={error} onClose={onClose} conv={start.conv} />
+          <Picker
+            game={game}
+            setGame={setGame}
+            api={api}
+            actor={actor}
+            roster={roster}
+            isOn={isOn}
+            onPlay={begin}
+            error={error}
+            onClose={onClose}
+            conv={start.conv}
+          />
         )}
         {phase === 'error' && (
           <div className="fun-msg">
@@ -191,12 +212,25 @@ function Picker({ game, setGame, api, actor, roster, isOn, onPlay, error, onClos
           ['sprint', 'Sprint', 'Clear 40 lines as fast as you can.', coinsOn && '2 coins'],
           ['ultra', 'Ultra', 'Most points in 2 minutes.', coinsOn && 'Up to 3 coins'],
         ]
-      : [['solo', 'Solo', 'Your first tap is always safe.', coinsOn && (level === 'beginner' ? 'Practice' : `${level === 'expert' ? 5 : 2} coins for a win`)]];
+      : [
+          [
+            'solo',
+            'Solo',
+            'Your first tap is always safe.',
+            coinsOn && (level === 'beginner' ? 'Practice' : `${level === 'expert' ? 5 : 2} coins for a win`),
+          ],
+        ];
   return (
     <div className="fun-pick">
       <div className="segmented fun-games" role="tablist">
         {fun.GAMES.map((g) => (
-          <button key={g} role="tab" aria-selected={game === g} className={`plain-seg${game === g ? ' on' : ''}`} onClick={() => setGame(g)}>
+          <button
+            key={g}
+            role="tab"
+            aria-selected={game === g}
+            className={`plain-seg${game === g ? ' on' : ''}`}
+            onClick={() => setGame(g)}
+          >
             <Icon name={g === 'tetris' ? 'blocks' : 'mine'} /> {fun.GAME_LABEL[g]}
           </button>
         ))}
@@ -208,7 +242,8 @@ function Picker({ game, setGame, api, actor, roster, isOn, onPlay, error, onClos
           <div className="chips">
             {LEVEL_KEYS.map((k) => (
               <button key={k} className={`chip${level === k ? ' on' : ''}`} onClick={() => setLevel(k)}>
-                {M.LEVELS[k].label} <span className="muted mono">
+                {M.LEVELS[k].label}{' '}
+                <span className="muted mono">
                   {M.LEVELS[k].w}×{M.LEVELS[k].h}
                 </span>
               </button>
@@ -260,7 +295,9 @@ function Picker({ game, setGame, api, actor, roster, isOn, onPlay, error, onClos
       </section>
       <section className="fun-sec">
         <h3 className="fun-cap">Race a teammate</h3>
-        <p className="muted small">You both get the same {game === 'tetris' ? 'pieces' : 'board'} and see each other’s progress live. The winner gets 3 coins.</p>
+        <p className="muted small">
+          You both get the same {game === 'tetris' ? 'pieces' : 'board'} and see each other’s progress live. The winner gets 3 coins.
+        </p>
         <div className="fun-people">
           {others.map((n) => (
             <button key={n} className={`fun-person${rival === n ? ' on' : ''}`} onClick={() => setRival(n)} aria-pressed={rival === n}>
@@ -279,7 +316,14 @@ function Picker({ game, setGame, api, actor, roster, isOn, onPlay, error, onClos
       <section className="fun-sec">
         <h3 className="fun-cap">Tournaments</h3>
         {mine.length ? (
-          mine.map((t) => <TournamentRow key={t.id} t={t} me={actor.name} onPlay={() => onPlay({ mode: 'tournament', tournament: t.id, level: t.level })} />)
+          mine.map((t) => (
+            <TournamentRow
+              key={t.id}
+              t={t}
+              me={actor.name}
+              onPlay={() => onPlay({ mode: 'tournament', tournament: t.id, level: t.level })}
+            />
+          ))
         ) : (
           <p className="muted small">No {fun.GAME_LABEL[game]} tournament right now. Team management starts them in the market.</p>
         )}
@@ -308,7 +352,8 @@ function TournamentRow({ t, me, onPlay }) {
       <div className="grow">
         <b>{t.title}</b>
         <div className="muted small">
-          Pot <span className="mono">{t.pot || 0}</span> coins · ends in <span className="mono">{hours >= 48 ? `${Math.round(hours / 24)} days` : `${hours} h`}</span>
+          Pot <span className="mono">{t.pot || 0}</span> coins · ends in{' '}
+          <span className="mono">{hours >= 48 ? `${Math.round(hours / 24)} days` : `${hours} h`}</span>
           {joined && (
             <>
               {' '}
@@ -369,7 +414,12 @@ function Play({ game, session, pick, api, actor, onEnd }) {
   const end = (r) => {
     if (race) {
       const s = r.summary;
-      send(game === 'tetris' ? { game, board: '', score: s.score, lines: s.lines, cells: 0, over: s.over, done: true } : { game, board: '', score: 0, lines: 0, cells: s.cells, over: s.lost, done: true }, true);
+      send(
+        game === 'tetris'
+          ? { game, board: '', score: s.score, lines: s.lines, cells: 0, over: s.over, done: true }
+          : { game, board: '', score: 0, lines: 0, cells: s.cells, over: s.lost, done: true },
+        true,
+      );
     }
     onEnd(r);
   };

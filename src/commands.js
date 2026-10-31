@@ -110,7 +110,8 @@ export function parseCommand(text) {
 export function matchCommands(typed, cfg) {
   const q = typed.toLowerCase();
   const on = COMMANDS.filter((c) => !isOff(c.name, cfg));
-  const starts = on.filter((c) => c.name.startsWith(q));
+  // The exact name first, so "/due" + Enter is /due, not /duel.
+  const starts = on.filter((c) => c.name.startsWith(q)).sort((a, b) => (b.name === q) - (a.name === q));
   const inside = q
     ? on.filter(
         (c) =>

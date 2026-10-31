@@ -87,8 +87,7 @@ const fmt = (n, p = 1) => R.round(n, p).toLocaleString('en-US');
 function namesIn(text, roster) {
   const t = ` ${text.toLowerCase()} `;
   const out = [];
-  for (const n of [...roster].sort((a, b) => b.length - a.length))
-    if (t.includes(`@${n.toLowerCase()}`) && !out.includes(n)) out.push(n);
+  for (const n of [...roster].sort((a, b) => b.length - a.length)) if (t.includes(`@${n.toLowerCase()}`) && !out.includes(n)) out.push(n);
   for (const w of t.replace(/@\S+(\s\S+)?/g, ' ').split(/[\s,]+/)) {
     const n = w && roster.find((r) => r.toLowerCase().split(' ')[0] === w);
     if (n && !out.includes(n)) out.push(n);
@@ -99,7 +98,9 @@ const subteamIn = (text) => SUBTEAMS.find((s) => s.toLowerCase().startsWith(text
 
 // "2m30s", "90s", "5m", "1:30", "10" (minutes) → ms.
 export function parseDuration(text) {
-  const t = String(text || '').trim().toLowerCase();
+  const t = String(text || '')
+    .trim()
+    .toLowerCase();
   const clock = /^(\d{1,2}):(\d{2})$/.exec(t);
   if (clock) return (+clock[1] * 60 + +clock[2]) * 1000;
   if (/^\d+$/.test(t)) return +t * 60000;
@@ -141,7 +142,14 @@ export async function runMore({ cmd, args }, ctx, { card: post, need }) {
   const shifts = ctx.shifts || [];
   const tasks = (ctx.tasks || []).filter((t) => !t.deletedAt);
   const open = tasks.filter((t) => t.status !== 'done');
-  const taskRow = (t) => ({ id: t.id, title: t.title || 'Untitled', due: t.dueDate || '', who: t.assignees || [], status: t.status, reason: t.blockedReason || '' });
+  const taskRow = (t) => ({
+    id: t.id,
+    title: t.title || 'Untitled',
+    due: t.dueDate || '',
+    who: t.assignees || [],
+    status: t.status,
+    reason: t.blockedReason || '',
+  });
 
   switch (cmd.name) {
     // ---------- fun ----------
@@ -201,7 +209,13 @@ export async function runMore({ cmd, args }, ctx, { card: post, need }) {
         if (side === 'H') h++;
         else t++;
       }
-      return info(`Best of ${n}: ${h > t ? 'Heads' : 'Tails'} wins`, { flips, rows: [['Heads', String(h)], ['Tails', String(t)]] });
+      return info(`Best of ${n}: ${h > t ? 'Heads' : 'Tails'} wins`, {
+        flips,
+        rows: [
+          ['Heads', String(h)],
+          ['Tails', String(t)],
+        ],
+      });
     }
     case 'pick':
     case 'teams':
@@ -213,7 +227,13 @@ export async function runMore({ cmd, args }, ctx, { card: post, need }) {
       if (cmd.name !== 'pick' && named.length < 2 && !here.length)
         return note('Who?', `Name at least two people (/${cmd.name} @Cooper @Sophia…), or use it when people are at the lab.`);
       if (!pool.length) pool = roster.filter((n) => n !== me);
-      const from = sub ? `from ${sub}` : named.length >= 2 ? 'from the people named' : here.length ? 'from who’s at the lab' : 'from the team';
+      const from = sub
+        ? `from ${sub}`
+        : named.length >= 2
+          ? 'from the people named'
+          : here.length
+            ? 'from who’s at the lab'
+            : 'from the team';
       if (cmd.name === 'pick') {
         const who = pick(pool);
         return card({ view: 'people', title: `I pick ${first(who)}`, groups: [[who]], sub: from }, { mentions: who !== me ? [who] : [] });
@@ -227,7 +247,8 @@ export async function runMore({ cmd, args }, ctx, { card: post, need }) {
     case 'timer': {
       const m = /^(\S+)\s*(.*)$/.exec(args.trim());
       const ms = m && parseDuration(m[1]);
-      if (!ms || ms < 5000 || ms > 4 * 3600000) return note('How long?', 'Try: /timer 2m30s drive practice · /timer 90s · /timer 10 (minutes). Up to 4 hours.');
+      if (!ms || ms < 5000 || ms > 4 * 3600000)
+        return note('How long?', 'Try: /timer 2m30s drive practice · /timer 90s · /timer 10 (minutes). Up to 4 hours.');
       return card({ view: 'timer', endsAt: now + ms, ms, label: (m[2] || '').slice(0, 60) });
     }
 
@@ -253,7 +274,8 @@ export async function runMore({ cmd, args }, ctx, { card: post, need }) {
       if (m) {
         const id = `${m[1].toUpperCase()}${m[2]}`;
         const r = RULES.find((x) => x.id === id);
-        if (!r) return note(`There’s no ${id} in the ${MANUAL.name}`, 'Rule numbers look like G407, R102 or E101. Try /rule pin to search.');
+        if (!r)
+          return note(`There’s no ${id} in the ${MANUAL.name}`, 'Rule numbers look like G407, R102 or E101. Try /rule pin to search.');
         return card({ view: 'rule', id: r.id, title: r.title, text: r.text, page: r.page, section: r.section });
       }
       // Search titles first, then the text.
@@ -277,7 +299,11 @@ export async function runMore({ cmd, args }, ctx, { card: post, need }) {
         GLOSSARY.find((x) => x.term === q || x.term.split('/').includes(q)) ||
         GLOSSARY.find((x) => x.term.startsWith(q)) ||
         GLOSSARY.find((x) => x.term.includes(q));
-      if (!g) return note(`“${args}” isn’t in the glossary`, `Defined terms are in capitals in the manual (ALLIANCE, PIN, CONTROL…). Try /rule ${args} to search the rules.`);
+      if (!g)
+        return note(
+          `“${args}” isn’t in the glossary`,
+          `Defined terms are in capitals in the manual (ALLIANCE, PIN, CONTROL…). Try /rule ${args} to search the rules.`,
+        );
       return info(g.term, { lines: [g.def[0].toUpperCase() + g.def.slice(1)], cite: `${MANUAL.name}, Glossary, p. ${g.page}` });
     }
     case 'scoring':
@@ -295,7 +321,11 @@ export async function runMore({ cmd, args }, ctx, { card: post, need }) {
     case 'size':
       return info('Robot size', { rows: R.SIZE.rows, cite: R.MANUAL_NAME });
     case 'motors':
-      return info('Motors and servos', { rows: R.MOTOR_RULES.rows, cite: R.MANUAL_NAME, lines: ['Ticks and speeds for a motor: /ticks 312'] });
+      return info('Motors and servos', {
+        rows: R.MOTOR_RULES.rows,
+        cite: R.MANUAL_NAME,
+        lines: ['Ticks and speeds for a motor: /ticks 312'],
+      });
     case 'battery':
       return info('The robot battery', {
         rows: R.BATTERY.rows,
@@ -313,8 +343,12 @@ export async function runMore({ cmd, args }, ctx, { card: post, need }) {
         ...(awg && {
           lines: [
             `${awg.mm} mm across, ${fmt(awg.ohm, 3)} Ω per 1000 ft (${fmt(awg.ohm * 3.2808, 2)} Ω per km) of copper.`,
-            `A 1 ft run at 10 A loses about ${fmt(((awg.ohm / 1000) * 2 * 10), 3)} V (out and back).`,
-            g <= 18 ? 'Big enough for main power and motors.' : g <= 22 ? 'OK for servos, LEDs and circuits on a 10A fuse or less; too small for motor power.' : 'Signal wiring only.',
+            `A 1 ft run at 10 A loses about ${fmt((awg.ohm / 1000) * 2 * 10, 3)} V (out and back).`,
+            g <= 18
+              ? 'Big enough for main power and motors.'
+              : g <= 22
+                ? 'OK for servos, LEDs and circuits on a 10A fuse or less; too small for motor power.'
+                : 'Signal wiring only.',
           ],
         }),
         rows,
@@ -329,7 +363,10 @@ export async function runMore({ cmd, args }, ctx, { card: post, need }) {
       const wheel = R.parseLength(args);
       if (!motor)
         return info('Encoder ticks per output turn', {
-          rows: [...R.YELLOW_JACKET.map((m) => [`goBILDA ${m.rpm} RPM (${m.ratio})`, String(m.ticks)]), ...R.REV.map((m) => [m.name, String(m.ticks)])],
+          rows: [
+            ...R.YELLOW_JACKET.map((m) => [`goBILDA ${m.rpm} RPM (${m.ratio})`, String(m.ticks)]),
+            ...R.REV.map((m) => [m.name, String(m.ticks)]),
+          ],
           lines: ['Add a wheel for ticks per inch: /ticks 312 96mm'],
         });
       const rows = [
@@ -348,9 +385,13 @@ export async function runMore({ cmd, args }, ctx, { card: post, need }) {
       const motor = R.findMotor(args.replace(/\d+(?:\.\d+)?\s*:\s*\d+(?:\.\d+)?/, ''));
       const ratio = R.parseRatio(args);
       const wheel = R.parseLength(args);
-      if (!ratio) return note('What ratio?', 'Try: /gear 312 2:1 · /gear 20t 60t · /gear 435 1:1.5 96mm (2:1 means the output turns half as fast)');
+      if (!ratio)
+        return note('What ratio?', 'Try: /gear 312 2:1 · /gear 20t 60t · /gear 435 1:1.5 96mm (2:1 means the output turns half as fast)');
       const rows = [
-        ['Ratio', `${ratio.text} = ${fmt(ratio.ratio, 3)}:1 ${ratio.ratio > 1 ? '(a reduction: slower, stronger)' : ratio.ratio < 1 ? '(an overdrive: faster, weaker)' : '(same speed)'}`],
+        [
+          'Ratio',
+          `${ratio.text} = ${fmt(ratio.ratio, 3)}:1 ${ratio.ratio > 1 ? '(a reduction: slower, stronger)' : ratio.ratio < 1 ? '(an overdrive: faster, weaker)' : '(same speed)'}`,
+        ],
         ['Torque', `× ${fmt(ratio.ratio, 3)} (before friction)`],
         ['Speed', `÷ ${fmt(ratio.ratio, 3)}`],
       ];
@@ -419,7 +460,10 @@ export async function runMore({ cmd, args }, ctx, { card: post, need }) {
       if (!args) return need('a calculation');
       const r = R.calc(args);
       if (r.error) return note('Can’t calculate that', r.error);
-      return info('Calculator', { big: `${args.slice(0, 80)} = ${R.nice(r.value)}`, lines: /sin|cos|tan/.test(args) ? ['Angles are in degrees.'] : [] });
+      return info('Calculator', {
+        big: `${args.slice(0, 80)} = ${R.nice(r.value)}`,
+        lines: /sin|cos|tan/.test(args) ? ['Angles are in degrees.'] : [],
+      });
     }
     case 'java': {
       const k = args.trim().toLowerCase().replace(/\s+/g, '');
@@ -429,9 +473,22 @@ export async function runMore({ cmd, args }, ctx, { card: post, need }) {
       return info(title, { code, lang: 'java', lines: [line] });
     }
     case 'explain': {
-      const k = args.trim().toLowerCase().replace(/^dcmotor\.(runmode\.)?|^zeropowerbehavior\./, '');
-      const key = EXPLAIN[k.replace(/\s+/g, '_')] ? k.replace(/\s+/g, '_') : EXPLAIN[k] ? k : EXPLAIN_ALIASES[k] || EXPLAIN_ALIASES[k.replace(/_/g, ' ')];
-      if (!key) return note('Explain what?', `I can explain: ${Object.values(EXPLAIN).map(([t]) => t).join(', ')}`);
+      const k = args
+        .trim()
+        .toLowerCase()
+        .replace(/^dcmotor\.(runmode\.)?|^zeropowerbehavior\./, '');
+      const key = EXPLAIN[k.replace(/\s+/g, '_')]
+        ? k.replace(/\s+/g, '_')
+        : EXPLAIN[k]
+          ? k
+          : EXPLAIN_ALIASES[k] || EXPLAIN_ALIASES[k.replace(/_/g, ' ')];
+      if (!key)
+        return note(
+          'Explain what?',
+          `I can explain: ${Object.values(EXPLAIN)
+            .map(([t]) => t)
+            .join(', ')}`,
+        );
       const [title, text] = EXPLAIN[key];
       return info(title, { lines: [text] });
     }
@@ -470,9 +527,21 @@ export async function runMore({ cmd, args }, ctx, { card: post, need }) {
       }
       const today = teamMidnight(teamDay(now));
       const week = teamMidnight(weekStart(teamDay(now)));
-      const h = (from) => hoursOf(mergedMs(mine.filter((s) => s.start >= from), now));
+      const h = (from) =>
+        hoursOf(
+          mergedMs(
+            mine.filter((s) => s.start >= from),
+            now,
+          ),
+        );
       const ranks = roster
-        .map((n) => ({ n, ms: mergedMs(shifts.filter((s) => s.person === n && s.start >= week), now) }))
+        .map((n) => ({
+          n,
+          ms: mergedMs(
+            shifts.filter((s) => s.person === n && s.start >= week),
+            now,
+          ),
+        }))
         .sort((a, b) => b.ms - a.ms);
       const rank = ranks.findIndex((x) => x.n === who) + 1;
       return info(`${first(who)}’s hours`, {
@@ -487,19 +556,34 @@ export async function runMore({ cmd, args }, ctx, { card: post, need }) {
     case 'top': {
       const week = teamMidnight(weekStart(teamDay(now)));
       const list = roster
-        .map((n) => ({ n, ms: mergedMs(shifts.filter((s) => s.person === n && s.start >= week), now) }))
+        .map((n) => ({
+          n,
+          ms: mergedMs(
+            shifts.filter((s) => s.person === n && s.start >= week),
+            now,
+          ),
+        }))
         .filter((x) => x.ms > 0)
         .sort((a, b) => b.ms - a.ms)
         .slice(0, 10);
       if (!list.length) return info('Lab hours this week', { lines: ['Nobody’s logged time this week yet. Be the first: /shift'] });
-      return card({ view: 'people', title: 'Most lab hours this week', numbered: true, groups: [list.map((x) => x.n)], side: Object.fromEntries(list.map((x) => [x.n, `${hoursOf(x.ms)} h`])) });
+      return card({
+        view: 'people',
+        title: 'Most lab hours this week',
+        numbered: true,
+        groups: [list.map((x) => x.n)],
+        side: Object.fromEntries(list.map((x) => [x.n, `${hoursOf(x.ms)} h`])),
+      });
     }
     case 'stats': {
       const s = seasonStats({ shifts, tasks, runs: ctx.runs?.() || [], now });
       const hr = (ms) => hoursOf(ms);
       return info('Season so far', {
         rows: [
-          ['Team hours', `${hr(s.hours.week)} this week · ${versusLastWeek(R.round(hr(s.hours.week) - hr(s.hours.last), 1))} · ${hr(s.hours.season)} this season`],
+          [
+            'Team hours',
+            `${hr(s.hours.week)} this week · ${versusLastWeek(R.round(hr(s.hours.week) - hr(s.hours.last), 1))} · ${hr(s.hours.season)} this season`,
+          ],
           ['Tasks finished', `${s.tasks.week} this week · ${versusLastWeek(s.tasks.week - s.tasks.last)} · ${s.tasks.season} this season`],
           ['Practice runs', `${s.runs.week} this week · ${versusLastWeek(s.runs.week - s.runs.last)} · ${s.runs.season} this season`],
         ],
@@ -507,11 +591,17 @@ export async function runMore({ cmd, args }, ctx, { card: post, need }) {
     }
     case 'nextmatch': {
       const m = nextMatch(ctx.matches || [], now);
-      if (!m) return info('Next match', { lines: ['No match schedule yet. It comes from FTC Events, or team management types it in at the event.'] });
+      if (!m)
+        return info('Next match', {
+          lines: ['No match schedule yet. It comes from FTC Events, or team management types it in at the event.'],
+        });
       const mins = Math.round((m.time - now) / 60000);
       return info(`Next match: ${m.label || ''}`, {
         rows: [
-          ['When', `${new Date(m.time).toLocaleString(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit' })}${mins > 0 ? ` (in ${mins >= 120 ? `${Math.round(mins / 60)} h` : `${mins} min`})` : ' (now)'}`],
+          [
+            'When',
+            `${new Date(m.time).toLocaleString(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit' })}${mins > 0 ? ` (in ${mins >= 120 ? `${Math.round(mins / 60)} h` : `${mins} min`})` : ' (now)'}`,
+          ],
           ...(m.alliance ? [['Alliance', m.alliance === 'red' ? 'Red' : m.alliance === 'blue' ? 'Blue' : m.alliance]] : []),
           ...(m.partners?.length ? [['With', m.partners.join(', ')]] : []),
           ...(m.opponents?.length ? [['Against', m.opponents.join(', ')]] : []),
@@ -530,7 +620,10 @@ export async function runMore({ cmd, args }, ctx, { card: post, need }) {
       return info('Coming up', {
         rows: list.map((m) => {
           const d = daysBetween(today, m.end || m.start);
-          return [m.title || 'Untitled', `${d === 0 ? 'today' : d === 1 ? 'tomorrow' : `in ${d} days`}${m.subteam ? ` · ${m.subteam}` : ''}`];
+          return [
+            m.title || 'Untitled',
+            `${d === 0 ? 'today' : d === 1 ? 'tomorrow' : `in ${d} days`}${m.subteam ? ` · ${m.subteam}` : ''}`,
+          ];
         }),
       });
     }
@@ -541,21 +634,46 @@ export async function runMore({ cmd, args }, ctx, { card: post, need }) {
       const list = open
         .filter((t) => t.dueDate && t.dueDate >= today && t.dueDate <= until && (!mineOnly || (t.assignees || []).includes(me)))
         .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
-      return card({ view: 'tasks', title: list.length ? `${list.length} due in the next 7 days${mineOnly ? ' (yours)' : ''}` : 'Nothing due in the next 7 days', list: list.slice(0, 12).map(taskRow), more: Math.max(0, list.length - 12) });
+      return card({
+        view: 'tasks',
+        title: list.length ? `${list.length} due in the next 7 days${mineOnly ? ' (yours)' : ''}` : 'Nothing due in the next 7 days',
+        list: list.slice(0, 12).map(taskRow),
+        more: Math.max(0, list.length - 12),
+      });
     }
     case 'tasks': {
       const who = args ? namesIn(args, roster)[0] : me;
       if (!who) return note(`Who’s “${args}”?`, 'Try: /tasks @name');
-      const list = open.filter((t) => (t.assignees || []).includes(who)).sort((a, b) => (a.dueDate || '9999').localeCompare(b.dueDate || '9999'));
-      return card({ view: 'tasks', title: list.length ? `${first(who)} has ${list.length} open task${list.length > 1 ? 's' : ''}` : `${first(who)} has no open tasks`, list: list.slice(0, 12).map(taskRow), more: Math.max(0, list.length - 12) });
+      const list = open
+        .filter((t) => (t.assignees || []).includes(who))
+        .sort((a, b) => (a.dueDate || '9999').localeCompare(b.dueDate || '9999'));
+      return card({
+        view: 'tasks',
+        title: list.length ? `${first(who)} has ${list.length} open task${list.length > 1 ? 's' : ''}` : `${first(who)} has no open tasks`,
+        list: list.slice(0, 12).map(taskRow),
+        more: Math.max(0, list.length - 12),
+      });
     }
     case 'unassigned': {
       const list = open.filter((t) => !(t.assignees || []).length);
-      return card({ view: 'tasks', title: list.length ? `${list.length} open task${list.length > 1 ? 's' : ''} with nobody on it` : 'Every open task has someone on it', list: list.slice(0, 12).map(taskRow), more: Math.max(0, list.length - 12) });
+      return card({
+        view: 'tasks',
+        title: list.length
+          ? `${list.length} open task${list.length > 1 ? 's' : ''} with nobody on it`
+          : 'Every open task has someone on it',
+        list: list.slice(0, 12).map(taskRow),
+        more: Math.max(0, list.length - 12),
+      });
     }
     case 'blocked': {
       const list = open.filter((t) => t.status === 'blocked');
-      return card({ view: 'tasks', title: list.length ? `${list.length} stuck task${list.length > 1 ? 's' : ''}` : 'Nothing is stuck', list: list.slice(0, 12).map(taskRow), more: Math.max(0, list.length - 12), reasons: true });
+      return card({
+        view: 'tasks',
+        title: list.length ? `${list.length} stuck task${list.length > 1 ? 's' : ''}` : 'Nothing is stuck',
+        list: list.slice(0, 12).map(taskRow),
+        more: Math.max(0, list.length - 12),
+        reasons: true,
+      });
     }
     case 'roster': {
       const sub = args ? subteamIn(args) : null;
