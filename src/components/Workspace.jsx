@@ -80,6 +80,7 @@ import { setServerSkew } from '../serverTime.js';
 import { AdBlockWall, GameDialog, PrizeWheel, VideoAd } from './AdGames.jsx';
 import { coinSettings, coinsByName, wallet } from '../coins.js';
 import { hoursOf, mergedMs } from '../../functions/shared/hours.js';
+import { streaksOf } from '../../functions/shared/streaks.js';
 
 // Versions were renumbered once (2.0 became 1.9, 2.1 became 2.0, and so
 // on). Move this device's "last seen" version along so What's new doesn't
@@ -2193,6 +2194,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
                     milestones={milestones}
                     competition={{ name: COMPETITION.name, date: competitionDate }}
                     shifts={namedShifts}
+                    runs={runs}
                     myShift={myShift}
                     convs={convs}
                     unread={unread}
@@ -2591,6 +2593,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
                     name={profileFor}
                     actor={actor}
                     tasks={tasks || []}
+                    streak={streaksOf(profileFor, namedShifts)}
                     onClose={() => {
                       const n = profileFor;
                       setProfileFor(null);

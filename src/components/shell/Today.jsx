@@ -4,6 +4,8 @@ import { Icon } from './icons.jsx';
 import { STATUSES } from '../../config.js';
 import { dueInfo } from '../../util.js';
 import { daysBetween, milestoneProgress, parseDay, todayISO } from '../../milestones.js';
+import { hoursOf } from '../../../functions/shared/hours.js';
+import { seasonStats } from '../../../functions/shared/stats.js';
 
 // The first page, like a pit board: the countdown and the robot up top with a
 // few plain lines on what needs you, then your tasks, what's due, who's at the
@@ -55,6 +57,7 @@ export default function Today({
   milestones,
   competition,
   shifts,
+  runs = [],
   myShift,
   convs,
   unread,
@@ -119,6 +122,10 @@ export default function Today({
       },
   ].filter(Boolean);
   const noPhoto = people && !people.photoOf(actor.name);
+  // The team's week, small, under the board (the full strip is on Shifts).
+  const stats = seasonStats({ shifts, tasks: all, runs });
+  const weekHours = hoursOf(stats.hours.week);
+  const hourDiff = Math.round((weekHours - hoursOf(stats.hours.last)) * 10) / 10;
 
   return (
     <main className="content today">
@@ -161,6 +168,25 @@ export default function Today({
                 </button>
               )}
             </div>
+          )}
+          {on.includes('shifts') && (
+            <button className="pit-stats" onClick={() => onPage('shifts')} title="Team this week, against last week">
+              <span>
+                Team this week <b className="mono">{weekHours.toFixed(1)} h</b>
+                {hourDiff !== 0 && (
+                  <span className={hourDiff > 0 ? 'ss-up' : 'ss-down'}>
+                    {' '}
+                    {hourDiff > 0 ? 'up' : 'down'} <span className="mono">{Math.abs(hourDiff)}</span>
+                  </span>
+                )}
+              </span>
+              <span>
+                <b className="mono">{stats.tasks.week}</b> {stats.tasks.week === 1 ? 'task' : 'tasks'} done
+              </span>
+              <span>
+                <b className="mono">{stats.runs.week}</b> practice {stats.runs.week === 1 ? 'run' : 'runs'}
+              </span>
+            </button>
           )}
         </div>
         <img className="pit-robot" src={robot} alt="" aria-hidden="true" />

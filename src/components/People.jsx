@@ -218,7 +218,7 @@ export function SubteamBadges({ subteams = [], className = '' }) {
 // overriding the saved profile). Discord-style: the profile colors fill the
 // whole card, the avatar sits in a cutout in the banner with the status in a
 // bubble beside it, and the effect plays over everything.
-function CardBody({ name, look, actor, tasks, children, replayKey }) {
+function CardBody({ name, look, actor, tasks, streak, children, replayKey }) {
   const people = usePeople();
   const info = people?.infoOf(name) || {};
   const profile = { ...(people?.profileOf(name) || {}), ...look };
@@ -318,6 +318,12 @@ function CardBody({ name, look, actor, tasks, children, replayKey }) {
               : 'None'}
           </p>
         </div>
+        {streak && (
+          <div className="profile-section">
+            <h3>Streaks</h3>
+            <StreakLine streak={streak} />
+          </div>
+        )}
         {children}
       </div>
       <ProfileEffect id={profile.effect} custom={profile.effectCustom} replayKey={replayKey} />
@@ -325,7 +331,22 @@ function CardBody({ name, look, actor, tasks, children, replayKey }) {
   );
 }
 
-export function ProfileCard({ name, actor, tasks, onClose, onMessage, onEdit, onFull }) {
+// Shift streaks (shared/streaks.js): school days in a row, weeks in a row.
+export function StreakLine({ streak }) {
+  return (
+    <p className="streak-line" title="Days without school don’t break the daily streak">
+      <span>
+        <b className="mono">{streak.daily}</b> school {streak.daily === 1 ? 'day' : 'days'}
+      </span>
+      <span>
+        <b className="mono">{streak.weekly}</b> {streak.weekly === 1 ? 'week' : 'weeks'}
+      </span>
+      <span className="muted">in a row at the lab</span>
+    </p>
+  );
+}
+
+export function ProfileCard({ name, actor, tasks, streak, onClose, onMessage, onEdit, onFull }) {
   useEscape(onClose);
   const people = usePeople();
   const me = name === actor.name;
@@ -343,7 +364,7 @@ export function ProfileCard({ name, actor, tasks, onClose, onMessage, onEdit, on
           <button className="icon-btn profile-close" onClick={onClose} aria-label="Close">
             <CloseIcon />
           </button>
-          <CardBody name={name} actor={actor} tasks={tasks}>
+          <CardBody name={name} actor={actor} tasks={tasks} streak={streak}>
             {onFull && (
               <button className="link-btn small pc-full" onClick={onFull}>
                 View full profile <Icon name="chevron" size={14} />

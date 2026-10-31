@@ -69,7 +69,8 @@ const SECTIONS = [
       'Tapped it by mistake? Tap Undo, or Cancel shift in the first 15 minutes.',
       'Shifts tab: who’s at the lab now, the schedule (tap I’m in or Can’t), everyone’s hours, and the log of past shifts.',
       'You get a reminder after 4 hours on shift and an hour before a shift you said you’d come to. A shift left running past midnight ends at the last time you used the app (marked auto-ended).',
-      'Edit your own past shifts’ notes, subteam, and tasks. Team management fixes times.',
+      'Edit your own past shifts: delete one, or make it shorter, and it saves right away. Making one longer, or adding a shift you forgot to clock, goes to team management to approve first (it shows “waiting for approval” until then). Every change is written down.',
+      'Streaks: school days in a row with a shift (days without school never break it) and weeks in a row. They’re on your profile and the Shifts tab, next to the team’s season numbers.',
       'Lab check-in: when team management asks who’s going to the lab, the app asks you when you open it. Answer Yes or No for lunch and after school; change it later in the Shifts tab.',
       'Required polls work the same way: a poll in #announcements that everyone has to answer pops up until you vote (or write your answer).',
       'Drafts: anything you type and don’t send stays in that channel’s box until you come back. Return (Enter) sends; Shift+Return starts a new line.',
@@ -147,8 +148,8 @@ const MANAGER_TIPS = [
   'Channels: ＋ next to Channels adds one; ⋯ on a channel in the sidebar (⚙ in Chat on a phone) renames it, sets its topic and subteam color, moves it up or down, or deletes it.',
   'Team emoji: open the emoji picker and tap ＋ under Team emoji to add your own (:name:), or remove them. Stickers: open stickers and tap ＋.',
   'Lab log: ending your shift asks what you did (a note, the tasks you worked on, photos, blockers, and next time). It’s required, and it shows up in #lab-log, where Trotbot keeps one post per lab day with everyone’s logs and hours. Edit yours from that post. If a shift ends without a log (you forgot to clock out), the app asks the next time you open it.',
-  'Shifts: Lab check-in asks everyone who’s going to the lab (lunch / after school). Lunch is split by middle and high school lunch using each person’s grade, which you set on the Roster (Edit). Repeat makes it ask by itself every weekday, or on the days you pick, at a set time. In #announcements, polls can be set so everyone has to answer.',
-  'Shifts: Clock in… several people at once, End anyone’s shift, Plan a shift (once or weekly), set the season hours goal, add a missed shift, fix or delete any shift, and Export CSV.',
+  'Shifts: Lab check-in asks everyone who’s going to the lab (lunch / after school). Lunch is split by middle and high school lunch using each person’s grade, which you set on the Roster (Edit). Repeat makes it ask by itself every school day (at 12:00 AM unless you change it), every weekday, or on the days you pick. Tap upcoming days to skip them, or use Not today / Not tomorrow on the Shifts tab (each with Undo). In #announcements, polls can be set so everyone has to answer.',
+  'Shifts: Clock in… several people at once, End anyone’s shift, Plan a shift (once or weekly), set the season hours goal, add a missed shift, fix or delete any shift, approve or decline people’s requests for longer or missed shifts, see every shift change, and Export CSV.',
   'DMs: you can read every DM (under Team messages in the sidebar, or Team DMs on a phone) but can’t post in other people’s. You can change anyone’s profile picture and custom status from their profile (Edit profile → Status).',
 ];
 

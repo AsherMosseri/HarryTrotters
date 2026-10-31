@@ -58,3 +58,13 @@ export function streaksOf(name, shifts, now = Date.now()) {
 
 // "3 school days", "1 week"
 export const streakLabel = (n, unit) => `${n} ${unit}${n === 1 ? '' : 's'}`;
+
+// Short lines for the lab log's "nice work" screen, e.g.
+// ["4 school days in a row at the lab", "6 weeks in a row"]. Empty when
+// there's no streak worth a line.
+export function streakLines({ daily, weekly }) {
+  const out = [];
+  if (daily > 1) out.push(`${streakLabel(daily, 'school day')} in a row at the lab`);
+  if (weekly > 1) out.push(`${streakLabel(weekly, 'week')} in a row`);
+  return out;
+}
