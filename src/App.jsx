@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { loadStore } from './data/store.js';
 import { REQUESTS_TO, TEAM_NAME, isManagerName, makeRenamer } from './config.js';
 import { GetNewApp, InstallScreen, LoadingScreen, SignInScreen, WaitingScreen } from './components/Gate.jsx';
@@ -11,7 +11,7 @@ const install = isDemo ? null : installNeeded();
 // An iPhone/iPad Home Screen app added before 3.0 (the test copy is exempt);
 // ?demo=newapp previews the screen.
 const demoMode = new URLSearchParams(location.search).get('demo');
-const oldApp = demoMode === 'newapp' || (!isDemo && !NEXT && oldHomeApp());
+const oldApp = demoMode?.startsWith('newapp') || (!isDemo && !NEXT && oldHomeApp());
 import Workspace from './components/Workspace.jsx';
 import { ShutdownScreen, useShutdown } from './components/Shutdown.jsx';
 import { PreviewBar, lookOnly } from './components/Preview.jsx';
@@ -52,7 +52,9 @@ export default function App() {
   const rename = useMemo(() => makeRenamer(renames), [renames]);
 
   useEffect(() => {
-    if (install || oldApp) return;
+    // The old Home Screen app loads too: it makes the person's password
+    // (GetNewApp) while it's still signed in as them.
+    if (install) return;
     loadStore().then(setStore, (e) => setError(String(e)));
   }, []);
 
@@ -160,9 +162,11 @@ export default function App() {
     const name = preview.as || actor.name;
     return { uid: actor.uid, name, admin: preview.as ? isManagerName(name) : false, preview: true };
   }, [actor, owner, preview]);
+  const oldAppAccount = useCallback((data) => store.account(data), [store]);
   const viewStore = useMemo(() => (store && owner && preview ? lookOnly(store) : store), [store, owner, preview]);
 
-  if (oldApp) return <GetNewApp />;
+  if (oldApp)
+    return <GetNewApp member={error ? null : member} account={store?.account ? oldAppAccount : null} rename={rename} />;
   if (install) return <InstallScreen {...install} />;
   if (error) return <LoadingScreen error={error} />;
   if (!store || !user || member === undefined) return <LoadingScreen step={!store ? 1 : !user ? 2 : 3} />;

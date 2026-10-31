@@ -887,6 +887,11 @@ export const demoStore = {
     const as = new URLSearchParams(location.search).get('demo');
     if (as === 'signin' && !sessionStorage.getItem('demo-signed-in')) return null;
     if (as === 'pending') return { name: 'Riley Chen', admin: false, via: 'password', pending: true };
+    // ?demo=newapp: an old Home Screen app still signed in with the team code
+    // (Cooper, no password yet); ?demo=newapp-pw: Asher, who has one;
+    // ?demo=newapp-offline: the server can't be reached.
+    if (as === 'newapp' || as === 'newapp-offline') return { name: 'Cooper Mlezcko', admin: false, via: '' };
+    if (as === 'newapp-pw') return { name: 'Asher Mosseri', admin: true, via: '' };
     const asMember = as === 'member';
     return asMember ? { name: 'Cooper Mlezcko', admin: false, via: 'password' } : { name: 'Asher Mosseri', admin: true, via: 'password' };
   },
@@ -898,6 +903,8 @@ export const demoStore = {
     return listen(() => cb([...(state.joinRequests || [])]));
   },
   async account({ action, name, password }) {
+    if (new URLSearchParams(location.search).get('demo') === 'newapp-offline')
+      throw new Error('Can’t reach the server right now. Try again in a minute.');
     // Letting a new name in puts them on the Roster; turning them away just
     // drops the request (the way functions/index.js does it).
     if (action === 'approve' || action === 'turnAway') {
@@ -917,7 +924,8 @@ export const demoStore = {
       commit();
       return { ok: true, asked: true };
     }
-    if (action === 'status') return { hasPassword: name === 'Asher Mosseri', thisDevice: false };
+    if (action === 'status')
+      return { hasPassword: name === 'Asher Mosseri', thisDevice: new URLSearchParams(location.search).get('demo')?.startsWith('newapp') === true };
     if (action === 'signIn' && password !== 'trotters1') return { error: 'That password isn’t right.' };
     if (action === 'signIn' || action === 'create') {
       sessionStorage.setItem('demo-signed-in', '1');

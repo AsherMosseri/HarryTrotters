@@ -3,6 +3,7 @@ import { TEAM_NAME, TEAM_NICKNAME, ROSTER, MANAGER_NAMES, PASSWORD_MIN, cleanNam
 import { Avatar } from './common.jsx';
 import { homeAppUrl } from '../data/push.js';
 import { promptDialog } from './Dialogs.jsx';
+import { Icon } from './shell/icons.jsx';
 
 function Shell({ children }) {
   return (
@@ -94,14 +95,65 @@ function ShareIcon() {
   );
 }
 
-// On iPhone and iPad the board only runs as the Home Screen app, so everyone
-// can get notifications. Shown in Safari (or another browser) until then.
-// 3.0: an old Home Screen app (added before 3.0) sends you to add the new one
-// from Safari, then to delete itself. iOS never updates an added app's icon,
-// and the new app is where you set up your password.
-export function GetNewApp() {
-  const [copied, setCopied] = useState(false);
-  const link = homeAppUrl({ add: '3' });
+// 3.0: an old Home Screen app (added before 3.0) sends you to add the new
+// one from Safari, then to delete itself (iOS never updates an added app's
+// icon). The new app has its own storage, so to the server it's a new
+// device. This old one is still signed in as you from before passwords, so
+// it makes your password first, and the new app only asks for it (no team
+// code). member: this device's members doc (undefined while checking);
+// account: the account function; rename: current names.
+export function GetNewApp({ member, account, rename = (n) => n }) {
+  // checking | need | has | made | none (nothing to do here) | skip | error
+  const [step, setStep] = useState('checking');
+  const [error, setError] = useState('');
+  const [password, setPassword] = useState('');
+  const [again, setAgain] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [waiting, setWaiting] = useState(false);
+  const [tries, setTries] = useState(0);
+  const first = (member?.name ? rename(member.name) : '').split(' ')[0];
+
+  useEffect(() => {
+    if (member === undefined) return;
+    // Never signed in here, or a new name still waiting: the new app does it all.
+    if (!member || member.pending || !account) {
+      setStep('none');
+      return;
+    }
+    let alive = true;
+    setStep('checking');
+    setError('');
+    account({ action: 'status', name: member.name }).then(
+      (r) => alive && setStep(r?.hasPassword ? 'has' : r?.thisDevice ? 'need' : 'none'),
+      (e) => {
+        if (!alive) return;
+        setError(e?.message || String(e));
+        setStep('error');
+      },
+    );
+    return () => {
+      alive = false;
+    };
+  }, [member, account, tries]);
+
+  const ready = password.length >= PASSWORD_MIN && password === again;
+  const create = async (e) => {
+    e.preventDefault();
+    if (!ready || busy) return;
+    setBusy(true);
+    setError('');
+    try {
+      const r = await account({ action: 'create', name: member.name, password });
+      if (r?.error) throw new Error(r.error);
+      // Someone removed from the Roster still waits for team management.
+      setWaiting(!!r?.member?.pending);
+      setStep('made');
+    } catch (ex) {
+      setError(ex?.message || String(ex));
+    }
+    setBusy(false);
+  };
+
   return (
     <Shell>
       <h1>Get the new app</h1>
@@ -109,48 +161,121 @@ export function GetNewApp() {
         3.0 is here, with a new look and a new icon. Your {TEAM_NAME} app has to be added to your Home Screen again to get it. It takes a
         minute.
       </p>
-      <ol className="install-steps new-app-steps">
-        <li>
-          <b>Open the website in Safari.</b>
-          <a className="btn primary new-app-open" href={`x-safari-${link}`}>
-            Open in Safari
-          </a>
-          <span className="muted small">
-            Didn’t open? Open Safari and go to <b className="new-app-link">{link.replace(/^https?:\/\//, '').replace(/\?.*$/, '')}</b>{' '}
-            <button
-              className="link-btn small"
-              onClick={async () => {
-                try {
-                  await navigator.clipboard.writeText(link);
-                  setCopied(true);
-                } catch {
-                  /* the address is shown above */
-                }
-              }}
-            >
-              {copied ? 'Copied' : 'Copy link'}
+      {step === 'checking' && <p className="muted small">Checking who this app is signed in as…</p>}
+      {step === 'error' && (
+        <div className="new-app-pw">
+          <p className="form-error">{error}</p>
+          <div className="new-app-pw-row">
+            <button className="btn primary" onClick={() => setTries((n) => n + 1)}>
+              Try again
             </button>
+            <button className="link-btn small" onClick={() => setStep('skip')}>
+              Skip for now
+            </button>
+          </div>
+        </div>
+      )}
+      {step === 'need' && (
+        <form className="join-form new-app-pw" onSubmit={create}>
+          <h2 className="new-app-pw-title">First, make your password</h2>
+          <p className="muted small">
+            {TEAM_NICKNAME} uses passwords now. Make one for {first} here, while this app still knows it’s you. In the new app you’ll pick your name
+            and type it.
+          </p>
+          <input
+            className="input"
+            type="password"
+            autoCapitalize="none"
+            autoComplete="new-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder={`New password (at least ${PASSWORD_MIN} characters)`}
+          />
+          <input
+            className="input"
+            type="password"
+            autoCapitalize="none"
+            autoComplete="new-password"
+            value={again}
+            onChange={(e) => setAgain(e.target.value)}
+            placeholder="Same password again"
+          />
+          {again && password !== again && <p className="form-error">The two passwords don’t match.</p>}
+          {error && <p className="form-error">{error}</p>}
+          <button className="btn primary" disabled={busy || !ready}>
+            {busy ? 'Saving…' : 'Make my password'}
+          </button>
+          <button type="button" className="link-btn small" onClick={() => setStep('skip')}>
+            Skip: make it in the new app with the team code
+          </button>
+        </form>
+      )}
+      {(step === 'has' || step === 'made') && (
+        <p className="gate-notice new-app-done" role="status">
+          <Icon name="check" size={18} />
+          <span>
+            {step === 'has' ? `You already have a password, ${first}.` : 'Your password is made.'}{' '}
+            {waiting ? 'Team management has to let you back in before you can use the app.' : `In the new app, pick ${first} and type it.`}
           </span>
-        </li>
-        <li>
-          <b>Add it to your Home Screen.</b> Safari shows you how. This is the new icon:
-          <span className="new-app-icon">
-            <img src="icon-192.png" alt="" />
-            <span>32313 Tasks</span>
-          </span>
-        </li>
-        <li>
-          <b>Delete this old app.</b> On your Home Screen, press and hold this icon, tap <b>Remove App</b>, then <b>Delete App</b>:
-          <span className="new-app-icon old">
-            <img src="old-icon.png" alt="" />
-            <span>32313 Tasks</span>
-          </span>
-        </li>
-      </ol>
-      <p className="muted small">Then open the new app. You’ll pick your name and set up your password there. If you don’t have a password yet, it asks for the team code once.</p>
+        </p>
+      )}
+      {!['checking', 'need', 'error'].includes(step) && <NewAppSteps />}
+      {(step === 'none' || step === 'skip') && (
+        <p className="muted small">
+          Then open the new app. You’ll pick your name and set up your password there. Without a password yet, it asks for the team code once.
+        </p>
+      )}
     </Shell>
   );
 }
+
+function NewAppSteps() {
+  const [copied, setCopied] = useState(false);
+  const link = homeAppUrl({ add: '3' });
+  return (
+    <ol className="install-steps new-app-steps">
+      <li>
+        <b>Open the website in Safari.</b>
+        <a className="btn primary new-app-open" href={`x-safari-${link}`}>
+          Open in Safari
+        </a>
+        <span className="muted small">
+          Didn’t open? Open Safari and go to <b className="new-app-link">{link.replace(/^https?:\/\//, '').replace(/\?.*$/, '')}</b>{' '}
+          <button
+            className="link-btn small"
+            onClick={async () => {
+              try {
+                await navigator.clipboard.writeText(link);
+                setCopied(true);
+              } catch {
+                /* the address is shown above */
+              }
+            }}
+          >
+            {copied ? 'Copied' : 'Copy link'}
+          </button>
+        </span>
+      </li>
+      <li>
+        <b>Add it to your Home Screen.</b> Safari shows you how. This is the new icon:
+        <span className="new-app-icon">
+          <img src="icon-192.png" alt="" />
+          <span>32313 Tasks</span>
+        </span>
+      </li>
+      <li>
+        <b>Delete this old app.</b> On your Home Screen, press and hold this icon, tap <b>Remove App</b>, then <b>Delete App</b>:
+        <span className="new-app-icon old">
+          <img src="old-icon.png" alt="" />
+          <span>32313 Tasks</span>
+        </span>
+      </li>
+    </ol>
+  );
+}
+
+// On iPhone and iPad the board only runs as the Home Screen app, so everyone
+// can get notifications. Shown in Safari (or another browser) until then.
 
 export function InstallScreen({ device, browser }) {
   const [copied, setCopied] = useState(false);
