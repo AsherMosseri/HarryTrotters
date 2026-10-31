@@ -77,6 +77,40 @@ const SECTIONS = [
     ],
   ],
   [
+    'Lab log',
+    [
+      'Ending a shift asks what you did, mostly with taps: your areas (the only required step), the tasks you worked on and how each went. Finished can move a task to Done, and Stuck can mark it Blocked.',
+      'Tasks you touched today are already picked. Add a short line (the chips suggest what the team writes most), a photo, a voice note (hold to talk) and who you worked with. Same as last time fills in your last log.',
+      'Under 15 minutes at the lab? Tap Quick visit, nothing to log. Each lab day gets one card in #lab-log with everyone’s logs.',
+    ],
+  ],
+  [
+    'Competition',
+    [
+      'On competition day Today becomes the pit screen: our next match, alliance color, partners and a countdown.',
+      'Before queueing: a checklist with a big countdown for the drive team. It starts from the match time (or by hand) and resets every match.',
+      'After a match, tap in our score on the number pad; it goes straight into the Match Log.',
+      'Guess the score: before a practice run or match, guess our total (in the Match Log or on the pit screen). The closest guess wins coins. Whoever logs the run can’t win it.',
+    ],
+  ],
+  [
+    'Learn',
+    [
+      'Ten games to learn the robot and the game: Name that part, Rules check, Strategy, Wiring puzzle, Spot the problem, Fix the bug, Gear ratios, the Auto path planner, and quizzes from the team’s own work.',
+      'Every answer comes with an explanation (and the rule and page). Something wrong with a question? Tap Report a problem.',
+      'The daily question is posted in #general at 7 AM on school days. Answer on the card; the first right answers get the most coins.',
+      'Just for fun: Tetris and Minesweeper, alone, against Trotbot, or racing a teammate. Battleship is in #arcade (/battleship).',
+    ],
+  ],
+  [
+    'Market',
+    [
+      'Spend Jackson coins on pet care, real perks, chat extras for a day, and tournament entries. Perks wait for team management to approve them; a decline gives your coins back.',
+      'Pets: adopt one if you want. It grows with your time at the lab, needs food and fun, and shows on your profile and next to your name.',
+      'Tournaments: pay the entry and play in the app; the best Tetris or Minesweeper score wins the pot. Every score is checked by the server, and runs that look too fast wait for team management.',
+    ],
+  ],
+  [
     'Match Log',
     [
       'After each practice run or match, log Auto, TeleOp, and Endgame points.',
@@ -128,11 +162,12 @@ const SECTIONS = [
     'Your account',
     [
       'Sign in with your name and your own password; each device stays signed in. Change it from your menu → Change password. Forgot it? Ask Asher to reset it.',
-      'Switch user (in your menu) signs this device out so someone else can use it. You’ll need the code again.',
-      'Your menu (your name at the bottom of the sidebar, or your picture on a phone) picks light, dark, or automatic, and a color theme (Sunset, Ocean, Forest…) for this device.',
-      'Custom… in that menu makes your own theme: any colors (even moving), a picture, GIF, or emoji pattern behind the app, and floating emoji or GIFs. Surprise me picks for you, and My profile matches your profile.',
-      'Edit tabs in that menu: drag the tabs into your order. It follows you to every device; on a phone, your first four are the tab bar.',
-      'Jackson coins: 15 for each task you were given that gets done (when someone else made it; up to 5 tasks a day) and 4 an hour at the lab (1 for every full 15 minutes, added up per day), up to 10 hours a day. Your balance, history, Send, and the leaderboard are in your menu.',
+      'Switch user (in your menu) signs this device out so someone else can use it. Signing back in needs your password.',
+      'New to the team? After you set up your name, team management lets you in; the app opens by itself as soon as they do.',
+      'Appearance (in your menu: your name at the bottom of the sidebar, or your picture on a phone) picks light, dark, or automatic, a color theme, Calm chat, and Animations for this device.',
+      'Custom… in Appearance makes your own theme: any colors (even moving), a picture, GIF, or emoji pattern behind the app, and floating emoji or GIFs. Surprise me picks for you, and My profile matches your profile.',
+      'Edit tabs (in your menu on a phone): drag the tabs into your order. It follows you to every device; on a phone, your first four are the tab bar.',
+      'Jackson coins: 15 for each task you were given that gets done (when someone else made it; up to 5 tasks a day) and 4 an hour at the lab (1 for every full 15 minutes, added up per day), up to 10 hours a day. Games, trivia, and /daily pay up to 20 a day together, plus lab bingo, streak milestones, and the daily question. Your balance, history, Send, and the leaderboard are in your menu; spend them in the Market.',
       'New friends showing up around the app? Their buttons take bookings, orders, and submissions. Want a spot of your own? Tap “Get your spot here” on one of them. Need a break? Look for the button that clears them away for a while.',
       'Orders & bookings (in your menu): what you ordered or booked from them, with tracking. Each one asks its own questions, and when it’s delivered or it’s time, you get a notification (quietly at night) and something to do: open it, play it, or answer back.',
       'When the site is updated, you’ll be asked to tap Update now.',
@@ -141,7 +176,10 @@ const SECTIONS = [
 ];
 
 const MANAGER_TIPS = [
-  'Roster: Edit anyone’s role, subteams, responsibilities, and name. Add or remove people.',
+  'Roster: Edit anyone’s role, subteams, responsibilities, and name. Add or remove people. Someone new who signs in waits at the top under Waiting to join until you tap Approve (or Turn away).',
+  'Market: add perks (or pick from the ideas), approve or decline purchases, and start tournaments. In a tournament’s results you can void anyone’s result, and Clear or Void runs that need a check.',
+  'Competition mode (on Today): turn it on for an event or scrimmage, pick the event and drive team, and type in the match schedule or pull it from FTC Events.',
+  'Weekly recap: Trotbot posts it in #general on Sundays at 6 PM. Preview it on Today, post it early, or skip a week. Questions people report are listed on Learn for you to check.',
   'Milestones: Change the competition date, and delete milestones.',
   'Delete checklists, and permanently delete tasks from Recently deleted.',
   'Chat: post in #announcements (everyone gets a notification), use @everyone, delete any message, and remove reactions (the crossed-out face on a message).',
@@ -254,7 +292,7 @@ const SECTION_TABS = {
   'Robot (3D)': 'robot',
 };
 const LINE_FEATURES = [
-  [/^Casino and coins|^Games in #arcade|^Jackson coins/, 'coins'],
+  [/^Casino and coins|^Games in #arcade|^Jackson coins|^Spend Jackson coins|^Pets:|^Tournaments:|^Guess the score|^Market:/, 'coins'],
   [/^Lab check-in|Lab check-in asks/, 'checkins'],
   [/^Required polls/, 'requiredPolls'],
   [/^Tap Aa/, 'formatting'],
@@ -301,7 +339,10 @@ export function HelpDialog({ isManager, showRobot, onClose, onVersionLog, onRequ
           <TipList />
           <Rules />
           <div className="help-sections">
-            {SECTIONS.filter(([title]) => (showRobot || title !== 'Robot (3D)') && controls.tabOn(SECTION_TABS[title])).map(
+            {SECTIONS.filter(
+              ([title, items]) =>
+                (showRobot || title !== 'Robot (3D)') && controls.tabOn(SECTION_TABS[title]) && items.some((t) => helpShows(t, controls)),
+            ).map(
               ([title, items]) => (
                 <details key={title}>
                   <summary>{title}</summary>
