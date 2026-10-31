@@ -339,8 +339,6 @@ function PlanDialog({ onDone, onClose }) {
   );
 }
 
-// A shift's times: "Tue, Oct 27 · 3:00 PM–5:30 PM".
-const spanText = (start, end) => `${dayLabel(toISO(new Date(start)))} · ${clock(start)}–${end ? clock(end) : 'now'}`;
 // Requests to add a shift reach back at most this far (matches firestore.rules).
 const REQUEST_DAYS = 60;
 
@@ -592,16 +590,19 @@ function ShiftRequests({ requests, shiftsById, isManager, me, rename, api }) {
                   <b>{isManager ? person : r.kind === 'add' ? 'Add a missed shift' : 'Make a shift longer'}</b>
                   {isManager && <span className="muted small">{r.kind === 'add' ? 'asks to add a missed shift' : 'asks to make a shift longer'}</span>}
                 </div>
-                <span className="small block">
+                <span className="small block shift-req-when">
+                  {dayLabel(toISO(new Date(r.start)))} ·{' '}
                   {r.kind === 'extend' && (
                     <>
-                      <span className="mono muted">
+                      <s className="muted mono">
                         {clock(r.oldStart)}–{clock(r.oldEnd)}
-                      </span>
-                      {' → '}
+                      </s>{' '}
+                      →{' '}
                     </>
                   )}
-                  <span className="mono">{spanText(r.start, r.end)}</span>
+                  <b className="mono">
+                    {clock(r.start)}–{clock(r.end)}
+                  </b>
                   <span className="muted mono"> · {hoursLabel(r.end - r.start)}</span>
                 </span>
                 {r.note && <p className="shift-note">{r.note}</p>}
@@ -944,10 +945,7 @@ export default function ShiftsView({
       if (!shift.id) done = await api.addShift(patch);
       else if (patch.start !== saved.start || patch.end !== saved.end || patch.person !== shift.person)
         done = await api.editShift(saved, { ...patch, person: patch.person === shift.person ? saved.person : patch.person }, 'edit');
-      else {
-        const { person, ...rest } = patch; // eslint-disable-line no-unused-vars
-        done = (await api.updateShift(shift.id, rest)) !== false;
-      }
+      else done = (await api.updateShift(shift.id, { ...patch, person: saved.person })) !== false;
     } else if (!shift.id) {
       done = await api.requestShift({ kind: 'add', person: me, ...patch });
     } else {

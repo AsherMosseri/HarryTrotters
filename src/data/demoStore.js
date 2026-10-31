@@ -536,6 +536,7 @@ function demoScheduledCheckin() {
     ...(state.checkins || []),
     { id: `auto-${today}`, date: today, question: s.question || 'Who’s going to the lab today?', slots: s.slots, answers: {}, by: s.by || 'Team management', auto: true, at: Date.now() },
   ];
+  commit();
 }
 const clockMs = (hhmm) => {
   const [h, m] = String(hhmm || '00:00').split(':').map(Number);
