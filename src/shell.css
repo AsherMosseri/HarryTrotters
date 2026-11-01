@@ -3298,3 +3298,9 @@ button.pm-row:hover { background: color-mix(in srgb, var(--text) 4%, transparent
 .pit-stats .ps-item { padding: 0 16px; }
 .pit-stats .ps-item:first-child { padding-left: 0; }
 .pit-stats .ps-val:has(.ss-up, .ss-down) { flex-direction: column; align-items: flex-start; gap: 5px; }
+
+/* Phone header: the status bar color strip (.status-bar-band) covers the top 11px
+   of the screen, and a decorated profile picture (ears, hats, comets) and its badge
+   reach up to about 19px above the picture, so they were cut off under the strip.
+   Leave room for both. */
+.phone-top { padding-top: max(30px, env(safe-area-inset-top)); }
