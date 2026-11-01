@@ -35,6 +35,7 @@ export const CHANGELOG = [
           'Sign in with your name and your own password; nobody can sign in as someone else. Change it in your menu.',
           'A new name has to be let in by team management before it can see or do anything. Names already on the team sign in as usual.',
           'No two people can have the same name, and a rename updates everywhere at once: old messages, polls, lab logs, tasks, shifts and coins.',
+          'Removing someone from the Roster signs them out everywhere and deletes their password. Their messages, tasks, shifts and coins stay. If they sign in again, they wait for you to let them back in.',
         ],
       },
       {
