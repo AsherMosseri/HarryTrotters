@@ -893,9 +893,10 @@ async function removeSignIn(name, rename, since = 0) {
     presence: await dropDocs(uids.map((u) => db.doc(`presence/${u}`))),
     setupTickets: await dropDocs(uids.map((u) => db.doc(`setupTickets/${u}`))),
     raceLive: await dropDocs(boards),
-    accounts: await dropDocs(ids.map((id) => db.doc(`accounts/${id}`))),
     resetRequests: await dropDocs(ids.map((id) => db.doc(`resetRequests/${id}`))),
-    // A request from someone who already signed in again stays.
+    // Someone who already signed in again (waiting to be let in) keeps the new
+    // password and request they just made.
+    accounts: waiting.size ? 0 : await dropDocs(ids.map((id) => db.doc(`accounts/${id}`))),
     joinRequests: waiting.size ? 0 : await dropDocs(ids.map((id) => db.doc(`joinRequests/${id}`))),
   };
   // Why each device lost its sign-in (the account function's status reads it).
