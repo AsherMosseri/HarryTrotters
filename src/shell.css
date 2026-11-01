@@ -3304,3 +3304,19 @@ button.pm-row:hover { background: color-mix(in srgb, var(--text) 4%, transparent
    reach up to about 19px above the picture, so they were cut off under the strip.
    Leave room for both. */
 .phone-top { padding-top: max(30px, env(safe-area-inset-top)); }
+
+/* Color themes on a phone: the top bar, the strip above it, and the full-screen
+   pop-ups take the theme's tinted page instead of staying the plain surface color
+   (which showed as a navy band over a crimson page, and a navy Appearance screen). */
+:root[data-palette] .phone-top { background: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; }
+:root[data-palette] .status-bar-band { background: color-mix(in srgb, var(--p1) var(--tint, 16%), var(--bg)); }
+@media (max-width: 760px) {
+  :root[data-palette] .panel-backdrop.center:not(:has(> .dialog.profile-card)) {
+    background: var(--theme-grad, linear-gradient(160deg, color-mix(in srgb, var(--p1) var(--tint, 16%), var(--bg)), color-mix(in srgb, var(--p2) var(--tint, 16%), var(--bg))));
+  }
+  :root[data-palette] .panel-backdrop.center:not(:has(> .dialog.profile-card)) > .dialog { background: transparent; box-shadow: none; }
+  /* The sticky title bar of those pop-ups: the page's top tint, so scrolled things still hide behind it. */
+  :root[data-palette] .panel-backdrop.center > .dialog > .panel-head:first-child,
+  :root[data-palette] .dialog.profile-editor > .panel-head,
+  :root[data-palette] .dialog.theme-studio > .panel-head { background: color-mix(in srgb, var(--p1) var(--tint, 16%), var(--bg)); }
+}
