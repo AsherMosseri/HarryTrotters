@@ -19,7 +19,7 @@ import { mergedMs } from './hours.js';
 // 2.75 did: perHourBefore an hour, rounded down per day, each shift counted
 // on the day it started, every finished task paid. The lead sets this to the
 // launch day when 3.0 goes out.
-export const RATES_FROM = '2026-11-02';
+export const RATES_FROM = '2026-11-01';
 
 export const COIN_DEFAULTS = {
   perTask: 15,

@@ -5,7 +5,7 @@
 export const CHANGELOG = [
   {
     version: '3.0',
-    date: '2026-11-02',
+    date: '2026-11-01',
     title: 'Harry Trotters 3.0',
     // The short list (the update prompt shows these); `sections` is the full list.
     items: [
