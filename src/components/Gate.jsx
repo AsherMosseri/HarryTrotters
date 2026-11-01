@@ -123,6 +123,7 @@ export function GetNewApp({ member, account, rename = (n) => n }) {
   useEffect(() => {
     if (member === undefined) return;
     // Never signed in here, or a new name still waiting: the new app does it all.
+    // (Someone team management removed gets no password from here: step 'removed'.)
     if (!member || member.pending || !account) {
       setStep('none');
       return;
@@ -131,7 +132,7 @@ export function GetNewApp({ member, account, rename = (n) => n }) {
     setStep('checking');
     setError('');
     account({ action: 'status', name: member.name }).then(
-      (r) => alive && setStep(r?.hasPassword ? 'has' : r?.thisDevice ? 'need' : 'none'),
+      (r) => alive && setStep(r?.removed ? 'removed' : r?.hasPassword ? 'has' : r?.thisDevice ? 'need' : 'none'),
       (e) => {
         if (!alive) return;
         setError(e?.message || String(e));
@@ -216,6 +217,12 @@ export function GetNewApp({ member, account, rename = (n) => n }) {
             Skip: make it in the new app with the team code
           </button>
         </form>
+      )}
+      {step === 'removed' && (
+        <p className="gate-notice new-app-done" role="status">
+          <Icon name="lock" size={18} />
+          <span>Team management has to let you back in before you can use the app. Ask them, then set up the new app below.</span>
+        </p>
       )}
       {(step === 'has' || step === 'made') && (
         <p className="gate-notice new-app-done" role="status">
@@ -500,6 +507,11 @@ export function SignInScreen({ rename, account, saveTicket, current, notice, onS
       {notice && (
         <p className="gate-notice" role="status">
           {notice}
+        </p>
+      )}
+      {step?.removed && (
+        <p className="gate-notice" role="status">
+          {name.split(' ')[0]} isn’t on the team right now. Sign in with the team code and a new password, then wait for team management to let you back in.
         </p>
       )}
       <form className="join-form" onSubmit={submit}>

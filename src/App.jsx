@@ -73,6 +73,39 @@ export default function App() {
     );
   }, [store]);
 
+  // Every signed-in device watches its own members doc. A waiting device (a
+  // new name) opens the moment team management lets it in, and goes back to
+  // Sign in if they turn it away. A device that was let in goes back to Sign
+  // in when its doc is deleted (the person was removed from the team).
+  const pending = !!(user && member?.via === 'password' && member.pending);
+  const watching = !!(user && member?.via === 'password');
+  const [notice, setNotice] = useState('');
+  const leaving = useRef(false);
+  const kicking = useRef(false);
+  const current = useRef(member);
+  current.current = member;
+  // This device's sign-in is gone on the server. Clear what it remembers and
+  // go to Sign in, with a note if it was because the person was removed.
+  const kickOut = useCallback(
+    async (uid) => {
+      if (leaving.current || kicking.current) return;
+      kicking.current = true;
+      // Nothing half-working in the meantime.
+      setMember(undefined);
+      let removed = false;
+      try {
+        const asked = await Promise.race([store.account({ action: 'status' }), new Promise((_, no) => setTimeout(no, 5000))]);
+        removed = asked?.removed === true;
+      } catch {
+        /* no answer: Sign in without a reason */
+      }
+      saveMember(uid, null);
+      store.forgetDevice?.();
+      setNotice(removed ? 'You were removed from the team. If that’s a mistake, ask team management.' : '');
+      setMember(null);
+    },
+    [store],
+  );
   useEffect(() => {
     if (!store || !user) return;
     let alive = true;
@@ -80,6 +113,9 @@ export default function App() {
     store.getMember(user.uid).then(
       (m) => {
         if (!alive) return;
+        // The app opened from the remembered sign-in, and the server no longer
+        // has this device: it was signed out (say, the person was removed).
+        if (!m && saved) return kickOut(user.uid);
         saveMember(user.uid, m);
         setMember((prev) => (prev && m && prev.name === m.name && prev.admin === m.admin && prev.via === m.via && !!prev.pending === !!m.pending ? prev : m));
       },
@@ -89,28 +125,43 @@ export default function App() {
     return () => {
       alive = false;
     };
-  }, [store, user]);
+  }, [store, user]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // A new name waiting for team management: watch this device's members doc,
-  // so the app opens the moment they let it in (or goes back to Sign in if
-  // they turn it away).
-  const pending = !!(user && member?.via === 'password' && member.pending);
-  const [notice, setNotice] = useState('');
-  const leaving = useRef(false);
   useEffect(() => {
-    if (!store || !user || !pending || !store.subscribeMember) return;
-    const was = member.name;
+    if (!store || !user || !watching || !store.subscribeMember) return;
+    const was = current.current?.name;
     return store.subscribeMember(
       user.uid,
-      (m) => {
-        if (m?.pending) return;
+      (m, meta) => {
+        if (!m) {
+          // From the saved copy, not the server (offline, or the server hasn't answered): can't tell yet.
+          if (meta?.cached || leaving.current) return;
+          if (current.current?.pending) {
+            saveMember(user.uid, null);
+            setNotice(`Team management didn’t let ${was} in. Pick your name, or ask them.`);
+            return setMember(null);
+          }
+          return kickOut(user.uid);
+        }
+        const now = current.current;
+        if (now && m.name === now.name && m.admin === now.admin && m.via === now.via && !!m.pending === !!now.pending) return;
         saveMember(user.uid, m);
-        if (!m && !leaving.current) setNotice(`Team management didn’t let ${was} in. Pick your name, or ask them.`);
         setMember(m);
       },
       (e) => console.warn('member', e),
     );
-  }, [store, user, pending]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [store, user, watching, kickOut]);
+  // Reads refused (Workspace tells us): the server may have signed this device
+  // out. Ask once in a while; if so, go to Sign in instead of a half-working app.
+  const checking = useRef(0);
+  const onDenied = useCallback(() => {
+    if (!store || !user || Date.now() - checking.current < 5000) return;
+    checking.current = Date.now();
+    store.getMember(user.uid).then(
+      (m) => (!m ? kickOut(user.uid) : undefined),
+      () => {},
+    );
+  }, [store, user, kickOut]);
 
   useEffect(() => {
     if (!store || !user) return;
@@ -199,6 +250,7 @@ export default function App() {
         onSignedIn={(m) => {
           saveMember(user.uid, m);
           leaving.current = false;
+          kicking.current = false;
           setNotice('');
           setMember(m);
         }}
@@ -227,6 +279,7 @@ export default function App() {
       rename={rename}
       renames={renames}
       shutdown={shutdown}
+      onDenied={onDenied}
       onPreview={owner ? setPreview : undefined}
       preview={owner ? preview : null}
       onExitPreview={exitPreview}
