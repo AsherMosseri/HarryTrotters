@@ -695,7 +695,7 @@ export const queueAlert = onSchedule({ schedule: 'every 1 minutes', timeZone: TI
   const now = Date.now();
   const settings = (await db.doc('settings/team').get()).data() || {};
   // Cheap exit: competition mode off, so no need to read the schedule.
-  if (!competitionOn(settings.compMode, teamDay(now), settings.competitionDate || DEFAULT_COMPETITION_DATE)) return;
+  if (!competitionOn(settings.compMode, teamDay(now), settings.competitionDate || DEFAULT_COMPETITION_DATE, settings.compModeAt, now)) return;
   const matches = (await db.collection('matches').get()).docs.map((d) => ({ id: d.id, ...d.data() }));
   const due = queueAlertsDue({ matches, settings, now, today: teamDay(now) });
   if (!due.length) return;

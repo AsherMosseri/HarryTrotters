@@ -18,6 +18,7 @@ import {
   roundKey,
   sortMatches,
   typedMatch,
+  compModeNow,
 } from '../../../functions/shared/matches.js';
 
 // Today on competition day: a pit screen for the drive team. The next match
@@ -473,7 +474,7 @@ function Setup({ settings, competitionDate, roster, api }) {
     setCode(event.code || '');
     setName(event.name || '');
   }, [event.code, event.name]);
-  const mode = settings.compMode || 'auto';
+  const mode = compModeNow(settings);
   const team = settings.driveTeam || {};
   const lead = Number(settings.queueLead) || QUEUE_LEAD;
   const saveEvent = () => {
@@ -497,10 +498,10 @@ function Setup({ settings, competitionDate, roster, api }) {
         <div className="segmented" role="radiogroup" aria-label="Competition mode">
           {[
             ['auto', `On ${dateLabel}`],
-            ['on', 'On now'],
+            ['on', 'On for a day'],
             ['off', 'Off'],
           ].map(([id, label]) => (
-            <button key={id} role="radio" aria-checked={mode === id} className={`plain-seg${mode === id ? ' on' : ''}`} onClick={() => api.saveSettings({ compMode: id })}>
+            <button key={id} role="radio" aria-checked={mode === id} className={`plain-seg${mode === id ? ' on' : ''}`} onClick={() => api.saveSettings({ compMode: id, compModeAt: id === 'on' ? Date.now() : 0 })}>
               {label}
             </button>
           ))}

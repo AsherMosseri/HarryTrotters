@@ -193,13 +193,19 @@ export function roundKey(match, hand = null) {
   return hand?.round?.startsWith('hand-') ? hand.round : 'free';
 }
 
-// Competition mode: on by hand, off by hand, or on during the competition
-// day (team time).
-export function competitionOn(mode, today, competitionDate) {
-  if (mode === 'on') return true;
+// Competition mode: on during the competition day (team time), off by hand,
+// or "On now" by hand, which lasts a day (onAt is when it was switched on) so
+// a test can't be left on by accident. An "On now" that ran out, or was saved
+// without a time, goes back to following the competition day.
+export const COMP_ON_FOR = 24 * 3600000;
+export function competitionOn(mode, today, competitionDate, onAt = 0, now = Date.now()) {
   if (mode === 'off') return false;
+  if (mode === 'on' && onAt && now - onAt < COMP_ON_FOR) return true;
   return !!competitionDate && today === competitionDate;
 }
+// The mode as it stands now: "on" only while its day lasts, else "auto".
+export const compModeNow = (settings = {}, now = Date.now()) =>
+  settings.compMode === 'on' && !(settings.compModeAt && now - settings.compModeAt < COMP_ON_FOR) ? 'auto' : settings.compMode || 'auto';
 
 // The matches for one event (all of them while no event code is set); a match
 // typed in without an event counts for any.
@@ -225,7 +231,7 @@ export const queueLeadOf = (settings) => Math.max(1, Math.min(60, Number(setting
 // (the same rule that turns Today into the pit screen), and nothing without
 // a match time. `today` is the team's day for `now`.
 export function queueAlertsDue({ matches, settings = {}, now, today }) {
-  if (!competitionOn(settings.compMode, today, settings.competitionDate || DEFAULT_COMPETITION_DATE)) return [];
+  if (!competitionOn(settings.compMode, today, settings.competitionDate || DEFAULT_COMPETITION_DATE, settings.compModeAt, now)) return [];
   const lead = queueLeadOf(settings);
   return sortMatches(eventMatches(matches, settings.compEvent?.code))
     .filter((m) => m.time && !m.ours && !m.result && !m.score && m.time > now && queueTime(m, lead) <= now)

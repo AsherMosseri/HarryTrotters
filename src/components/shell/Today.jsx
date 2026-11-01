@@ -101,7 +101,7 @@ export default function Today({
   // Competition mode (on the competition day, team time, or switched on by
   // team management) turns this page into the pit screen. Anyone can step
   // back to the usual page on their own device for the rest of the day.
-  const compOn = competitionOn(settings.compMode, teamDay(Date.now()), competition.date);
+  const compOn = competitionOn(settings.compMode, teamDay(Date.now()), competition.date, settings.compModeAt);
   const [usualOn, setUsualOn] = useLocalStorage('pit-usual-day', '');
   const usual = usualOn === teamDay(Date.now());
   if (compOn && !usual)
@@ -131,7 +131,7 @@ export default function Today({
             <Icon name="trophy" size={16} /> Pit screen
           </button>
         ) : actor.admin && api ? (
-          <button className="pit-btn on" onClick={() => api.saveSettings({ compMode: 'on' })}>
+          <button className="pit-btn on" onClick={() => api.saveSettings({ compMode: 'on', compModeAt: Date.now() })}>
             <Icon name="trophy" size={16} /> Competition mode
           </button>
         ) : null

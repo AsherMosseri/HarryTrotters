@@ -567,12 +567,26 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
   const [welcomed, setWelcomed] = useLocalStorage('welcome-seen-v1', false);
   // "What's new" shows once per device after an update (not on a brand-new device).
   const [seenVersion, setSeenVersion] = useLocalStorage('seen-version', null);
+  // 3.0 is the big one: everyone sees its whole log the first time they're in the new app, even on a brand-new device.
+  const [seenLog30, setSeenLog30] = useLocalStorage('seen-log-3.0', false);
+  const first30 = VERSION === '3.0' && !seenLog30;
   const [showLog, setShowLog] = useState(false);
   useEffect(() => {
     if (!welcomed && seenVersion !== VERSION) setSeenVersion(VERSION);
   }, [welcomed, seenVersion, setSeenVersion]);
-  const whatsNew =
-    welcomed && seenVersion && seenVersion !== VERSION ? versionsSince(seenVersion) : welcomed && !seenVersion ? versionsSince(null) : null;
+  const whatsNew = !welcomed
+    ? null
+    : first30
+      ? versionsSince(null)
+      : seenVersion && seenVersion !== VERSION
+        ? versionsSince(seenVersion)
+        : !seenVersion
+          ? versionsSince(null)
+          : null;
+  const seenNew = () => {
+    setSeenVersion(VERSION);
+    setSeenLog30(true);
+  };
   const [showHelp, setShowHelp] = useState(false);
   // The page on screen. Each launch starts on Today; a quiet reload (an update)
   // keeps the page you were on.
@@ -2858,9 +2872,9 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
                 {whatsNew?.length > 0 && !showLog && (
                   <WhatsNew
                     versions={whatsNew}
-                    onClose={() => setSeenVersion(VERSION)}
+                    onClose={seenNew}
                     onFullLog={() => {
-                      setSeenVersion(VERSION);
+                      seenNew();
                       setShowLog(true);
                     }}
                     onRequest={api.addRequest}
