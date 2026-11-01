@@ -19,10 +19,11 @@ function Shell({ children }) {
 }
 
 // The splash while the app starts (index.html shows the same one before the
-// code loads), or what went wrong. step: 1 loading the app, 2 signing in,
-// 3 checking the team; the bar fills as each one finishes, and if one takes
-// a while it says which, with a way to reload.
-const STEPS = ['Opening', 'Loading the app', 'Signing in', 'Checking the team'];
+// code loads), or what went wrong. step: 1 loading the app, 2 connecting
+// (the device's quiet link to the server; it happens on every start, signed
+// in or not, so it never says "signing in"), 3 getting ready; the bar fills as
+// each one finishes, and if one takes a while it says which, with a way to reload.
+const STEPS = ['Opening', 'Loading the app', 'Connecting', 'Getting ready'];
 export function LoadingScreen({ error, step = 1, offline = false }) {
   const [slow, setSlow] = useState(false);
   // A first sign-in with no internet: open on its own as soon as it's back.
