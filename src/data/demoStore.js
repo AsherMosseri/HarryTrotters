@@ -1008,6 +1008,8 @@ export const demoStore = {
     // ?demo=pending, a new name waiting for team management to let it in.
     const as = new URLSearchParams(location.search).get('demo');
     if (as === 'signin' && !sessionStorage.getItem('demo-signed-in')) return null;
+    // Removed from the team (the preview's stand-in for the server deleting this device's sign-in).
+    if (localStorage.getItem('demo-removed') === '1') return null;
     if (as === 'pending') return { name: 'Riley Chen', admin: false, via: 'password', pending: true };
     // ?demo=newapp: an old Home Screen app still signed in with the team code
     // (Cooper, no password yet); ?demo=newapp-pw: Asher, who has one;
@@ -1017,10 +1019,15 @@ export const demoStore = {
     const asMember = as === 'member';
     return asMember ? { name: 'Cooper Mlezcko', admin: false, via: 'password' } : { name: 'Asher Mosseri', admin: true, via: 'password' };
   },
+  // Says so when this device's sign-in is gone: a test sets demo-removed in
+  // localStorage and sends a demo-member-check event (or reopens the app).
   subscribeMember(uid, cb) {
-    this.getMember().then(cb);
-    return () => {};
+    const check = () => localStorage.getItem('demo-removed') === '1' && cb(null, { cached: false });
+    check();
+    window.addEventListener('demo-member-check', check);
+    return () => window.removeEventListener('demo-member-check', check);
   },
+  forgetDevice() {},
   subscribeJoinRequests(cb) {
     return listen(() => cb([...(state.joinRequests || [])]));
   },
@@ -1046,11 +1053,13 @@ export const demoStore = {
       commit();
       return { ok: true, asked: true };
     }
+    if (action === 'status' && !name) return { member: null, ...(localStorage.getItem('demo-removed') === '1' && { removed: true }) };
     if (action === 'status')
       return { hasPassword: name === 'Asher Mosseri', thisDevice: new URLSearchParams(location.search).get('demo')?.startsWith('newapp') === true };
     if (action === 'signIn' && password !== 'trotters1') return { error: 'That password isn’t right.' };
     if (action === 'signIn' || action === 'create') {
       sessionStorage.setItem('demo-signed-in', '1');
+      localStorage.removeItem('demo-removed');
       return { ok: true, member: { name, admin: name === 'Asher Mosseri', via: 'password' } };
     }
     if (action === 'list')

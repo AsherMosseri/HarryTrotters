@@ -804,14 +804,17 @@ async function dropRequestIfDone(name, rename, team) {
   await db.doc(`resetRequests/${personId(name)}`).delete();
 }
 
+// Taken off the Roster by team management (and not put back).
+const isRemoved = (name, team) => !onTeam(name, team) && team.roles.some((r) => r?.removed && sameName(team.rename(r.name || ''), name));
+
 async function signDeviceIn(uid, name, team, before) {
   // This device already signed in as this name and was let in (say, with
   // the team code before passwords): still them.
   // Removed on the Roster: waits for team management like a new name, even
   // on a device that was signed in before (they let them back in).
-  const removed = team.roles.some((r) => r?.removed && sameName(team.rename(r.name || ''), name));
-  const pending = !onTeam(name, team) && (removed || !(before && !before.pending && sameName(before.name, name)));
+  const pending = !onTeam(name, team) && (isRemoved(name, team) || !(before && !before.pending && sameName(before.name, name)));
   const batch = db.batch();
+  batch.delete(db.doc(`signedOut/${uid}`));
   batch.set(db.doc(`members/${uid}`), { name, admin: isManagerName(name), via: 'password', joinedAt: Date.now(), ...(pending && { pending: true }) });
   if (!pending) batch.set(db.doc(`people/${uid}`), { name, joinedAt: Date.now() }, { merge: true });
   const asked = pending && !(await requestRef(name).get()).exists;
@@ -832,9 +835,77 @@ async function signDeviceIn(uid, name, team, before) {
   return { name, admin: isManagerName(name), via: 'password', ...(pending && { pending: true }) };
 }
 
-// Removed on the Roster: every device signed in under that name waits for
-// team management again (the waiting screen, and a request on the Roster).
-// Putting them back on the Roster, or Approve, lets those devices in again.
+// Removed on the Roster: the person's sign-in is deleted, so every device
+// signed in as them goes back to the Sign in page (the app watches its own
+// members doc), and their password is gone. Nothing they made is touched:
+// messages, tasks, shifts, lab logs, coins, chat, profile and the Roster entry
+// stay. If they sign in again (team code and a new password) the name counts
+// as new, so team management sees them under Waiting to join.
+//
+// Deleted: accounts (password), resetRequests, joinRequests, members (every
+// device under that name or an old spelling of it), their people docs, push
+// tokens, presence, setup tickets and live race boards of those devices. Each
+// kicked device gets a signedOut/{uid} note so it can say why.
+const chunks = (list, n) => Array.from({ length: Math.ceil(list.length / n) }, (_, i) => list.slice(i * n, i * n + n));
+
+// Deletes whichever of these docs exist (so running twice is harmless) and
+// says how many there were.
+async function dropDocs(refs) {
+  let dropped = 0;
+  for (const part of chunks([...new Map(refs.map((r) => [r.path, r])).values()], 300)) {
+    const found = (await db.getAll(...part)).filter((d) => d.exists);
+    const batch = db.batch();
+    for (const d of found) batch.delete(d.ref);
+    if (found.length) await batch.commit();
+    dropped += found.length;
+  }
+  return dropped;
+}
+
+// since: ms when the removal was saved. A device that signed in again after
+// that (waiting for approval) is not part of the removal, so a late or
+// repeated run of this can't sign out someone who already came back.
+async function removeSignIn(name, rename, since = 0) {
+  const [memberSnap, peopleSnap] = await Promise.all([db.collection('members').get(), db.collection('people').get()]);
+  const mine = (d) => sameName(rename(d.get('name') || ''), name);
+  const cameBack = (d) => d.get('pending') === true && Number(d.get('joinedAt')) > since;
+  const devices = memberSnap.docs.filter((d) => mine(d) && !cameBack(d));
+  // Devices signed in as somebody else now: never theirs, whatever else says.
+  const others = new Set(memberSnap.docs.filter((d) => !mine(d)).map((d) => d.id));
+  const waiting = new Set(memberSnap.docs.filter((d) => mine(d) && cameBack(d)).map((d) => d.id));
+  const people = peopleSnap.docs.filter((d) => sameName(rename(d.get('name') || ''), name) && !others.has(d.id) && !waiting.has(d.id));
+  const uids = [...new Set([...devices.map((d) => d.id), ...people.map((d) => d.id)])];
+
+  const tokens = new Map();
+  for (const part of chunks(uids, 30)) for (const t of (await db.collection('pushTokens').where('uid', 'in', part).get()).docs) tokens.set(t.id, t.ref);
+  // Tokens saved under their name whose device has since left (no members doc).
+  const spellings = rename.aliases(name).slice(0, 30);
+  for (const t of (await db.collection('pushTokens').where('person', 'in', spellings).get()).docs)
+    if (!others.has(t.get('uid')) && !waiting.has(t.get('uid'))) tokens.set(t.id, t.ref);
+  const boards = [];
+  for (const part of chunks(uids, 30)) for (const b of (await db.collection('raceLive').where('uid', 'in', part).get()).docs) boards.push(b.ref);
+
+  const ids = [...new Set([name, ...spellings].map(personId))];
+  const counts = {
+    members: await dropDocs(devices.map((d) => d.ref)),
+    people: await dropDocs(people.map((d) => d.ref)),
+    pushTokens: await dropDocs([...tokens.values()]),
+    presence: await dropDocs(uids.map((u) => db.doc(`presence/${u}`))),
+    setupTickets: await dropDocs(uids.map((u) => db.doc(`setupTickets/${u}`))),
+    raceLive: await dropDocs(boards),
+    resetRequests: await dropDocs(ids.map((id) => db.doc(`resetRequests/${id}`))),
+    // Someone who already signed in again (waiting to be let in) keeps the new
+    // password and request they just made.
+    accounts: waiting.size ? 0 : await dropDocs(ids.map((id) => db.doc(`accounts/${id}`))),
+    joinRequests: waiting.size ? 0 : await dropDocs(ids.map((id) => db.doc(`joinRequests/${id}`))),
+  };
+  // Why each device lost its sign-in (the account function's status reads it).
+  const batch = db.batch();
+  for (const d of devices) batch.set(db.doc(`signedOut/${d.id}`), { reason: 'removed', name, at: Date.now() });
+  if (devices.length) await batch.commit();
+  return counts;
+}
+
 export const onRoleChange = onDocumentWritten('roles/{id}', async (event) => {
   const was = event.data?.before?.data()?.removed === true;
   const after = event.data?.after?.data();
@@ -843,17 +914,23 @@ export const onRoleChange = onDocumentWritten('roles/{id}', async (event) => {
   const rename = await renamer();
   const name = rename(after.name);
   if (isManagerName(name)) return;
-  const devices = (await db.collection('members').get()).docs.filter((d) => sameName(rename(d.get('name') || ''), name));
-  const batch = db.batch();
   if (is) {
-    for (const d of devices) if (d.get('pending') !== true) batch.update(d.ref, { pending: true });
-    if (devices.length) batch.set(requestRef(name), { name, at: Date.now(), removed: true });
-  } else {
-    for (const d of devices) if (d.get('pending') === true) batch.update(d.ref, { pending: FieldValue.delete() });
-    batch.delete(requestRef(name));
+    // Still removed now? (Put back since this was queued: leave them be.)
+    if ((await event.data.after.ref.get()).get('removed') !== true) return;
+    const counts = await removeSignIn(name, rename, event.data.after.updateTime?.toMillis?.() || 0);
+    logger.info('removed: sign-in deleted', name, JSON.stringify(counts));
+    return;
   }
+  // Back on the Roster (or added): anyone waiting under this name is in.
+  const waiting = await pendingDevices(name, rename);
+  const batch = db.batch();
+  for (const d of waiting) {
+    batch.update(d.ref, { pending: FieldValue.delete() });
+    batch.set(db.doc(`people/${d.id}`), { name, joinedAt: Date.now() }, { merge: true });
+  }
+  batch.delete(requestRef(name));
   await batch.commit();
-  logger.info(is ? 'removed: devices wait' : 'back on the team', name, devices.length);
+  logger.info('back on the team', name, waiting.length);
 });
 
 export const account = onCall({ maxInstances: 5, invoker: 'public' }, async (req) => {
@@ -925,9 +1002,18 @@ export const account = onCall({ maxInstances: 5, invoker: 'public' }, async (req
 
   // Does this name have a password yet? (The sign-in screen asks.)
   if (action === 'status') {
-    if (!name) return { member: signedIn ? { name: me, admin: isManagerName(me) } : before?.pending ? { name: me, admin: false, pending: true } : null };
+    if (!name) {
+      if (signedIn) return { member: { name: me, admin: isManagerName(me) } };
+      if (before?.pending) return { member: { name: me, admin: false, pending: true } };
+      // Signed out by the server: say why (a device that was removed).
+      const gone = await db.doc(`signedOut/${uid}`).get();
+      return { member: null, ...(gone.get('reason') === 'removed' && { removed: true }) };
+    }
     const acc = await accountRef(name).get();
-    return { hasPassword: !!acc.get('hash'), thisDevice: sameName(me, name) };
+    // A removed name isn't "this device" even on a device still signed in as
+    // them from before: it needs the team code, and then waits to be let back in.
+    const removed = isRemoved(name, team);
+    return { hasPassword: !!acc.get('hash'), thisDevice: !removed && sameName(me, name), ...(removed && { removed: true }) };
   }
 
   // A first password for a name that has none: from a device already signed
@@ -941,6 +1027,9 @@ export const account = onCall({ maxInstances: 5, invoker: 'public' }, async (req
     // Names compare as the same person (any capitals, spaces, old names): the
     // ticket has the name as typed, and a 2.75 device the name it joined with.
     const viaTicket = ticket.exists && sameName(resolve(ticket.get('name') || ''), name) && now - (ticket.get('at') || 0) < 10 * 60000;
+    // Taken off the Roster: no password from an old signed-in device; with the
+    // team code they ask to join again and wait for team management.
+    if (!viaTicket && isRemoved(name, team)) return fail('Team management has to let you back in before you can use the app.');
     if (!sameName(me, name) && !viaTicket) return fail('Enter the team code to set up this name on a new device.');
     return db.runTransaction(async (tx) => {
       const acc = await tx.get(accountRef(name));

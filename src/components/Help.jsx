@@ -186,7 +186,7 @@ const SECTIONS = [
 ];
 
 const MANAGER_TIPS = [
-  'Roster: Edit anyone’s role, subteams, responsibilities, and name. Add or remove people. Someone new who signs in waits at the top under Waiting to join until you tap Approve (or Turn away).',
+  'Roster: Edit anyone’s role, subteams, responsibilities, and name. Add or remove people. Removing someone signs them out everywhere and deletes their password; their messages, tasks, shifts and coins stay. Someone new (or removed) who signs in waits at the top under Waiting to join until you tap Approve (or Turn away).',
   'Market: add perks (or pick from the ideas), approve or decline purchases, and start tournaments. In a tournament’s results you can void anyone’s result, and Clear or Void runs that need a check.',
   'Competition mode (on Today): turn it on for an event or scrimmage, pick the event and drive team, and type in the match schedule or pull it from FTC Events.',
   'Weekly recap: Trotbot posts it in #general on Sundays at 6 PM. Preview it on Today, post it early, or skip a week. Questions people report are listed on Learn for you to check.',

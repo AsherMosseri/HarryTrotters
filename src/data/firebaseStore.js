@@ -306,10 +306,17 @@ export const firebaseStore = {
       throw err;
     }
   },
-  // A device waiting for team management watches its own members doc: the
-  // pending mark goes away when they let it in, the doc when they turn it away.
+  // Every signed-in device watches its own members doc: a waiting device sees
+  // the pending mark go away when they let it in, and the doc goes when team
+  // management turns it away or removes the person. cb(member, { cached }):
+  // cached is true for an answer from the device's saved copy, which can't
+  // tell that the doc is gone (offline, or the server hasn't answered yet).
   subscribeMember(uid, cb, onError) {
-    return onSnapshot(doc(membersCol, uid), (snap) => cb(memberOf(snap)), onError);
+    return onSnapshot(doc(membersCol, uid), (snap) => cb(memberOf(snap), { cached: snap.metadata.fromCache }), onError);
+  },
+  // This device was signed out by the server: stop pushes it would get.
+  forgetDevice() {
+    saveToken('');
   },
   // New names waiting to be let in (team management only; the account
   // function's approve / turnAway answers them).

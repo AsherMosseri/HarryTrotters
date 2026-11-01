@@ -390,7 +390,7 @@ export default function TeamView({ roster, joinRequests = [], roles, tasks, api,
                   if (
                     !(await confirmDialog({
                       title: `Remove ${editing.name} from the team?`,
-                      body: 'Their tasks stay, but they disappear from the org chart and pickers, and they can’t use the app until you let them back in.',
+                      body: 'They’re signed out everywhere and their password is deleted. They leave the org chart and pickers, but their messages, tasks, shifts and coins stay. If they sign in again, they wait for you to let them in.',
                       okLabel: 'Remove',
                       danger: true,
                     }))

@@ -51,6 +51,11 @@ service cloud.firestore {
     match /accounts/{id} {
       allow read, write: if false;
     }
+    // Why a device lost its sign-in (removed from the team): the account
+    // function writes and reads it.
+    match /signedOut/{id} {
+      allow read, write: if false;
+    }
     // New names waiting for team management to let them in (or turn them
     // away, both through the account function).
     match /joinRequests/{id} {

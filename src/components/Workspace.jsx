@@ -509,7 +509,7 @@ function Contexts({ people, lab, lottery, controls, market, daily, children }) {
   );
 }
 
-export default function Workspace({ store, actor, rename, renames, shutdown, onPreview, preview, onExitPreview }) {
+export default function Workspace({ store, actor, rename, renames, shutdown, onPreview, preview, onExitPreview, onDenied }) {
   const [rawTasks, setRawTasks] = useState(null);
   const [people, setPeople] = useState([]);
   const [rawMilestones, setMilestones] = useState([]);
@@ -703,6 +703,9 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
       // Previewing as someone: their private things can't load for you; that's fine.
       if (actor.preview) return console.warn(what, e);
       console.error(what, e);
+      // A refused read may mean this device was signed out (removed from the
+      // team): the app checks with the server and goes to Sign in if so.
+      if (e?.code === 'permission-denied') onDenied?.();
       const why =
         e?.code === 'permission-denied' ? 'the database rules need updating (ask team management)' : e?.message || 'unknown error';
       loadFailures.current.set(what, why);
@@ -723,6 +726,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
         },
         (e) => {
           console.error('tasks', e);
+          if (e?.code === 'permission-denied') onDenied?.();
           setTasksError(
             e?.code === 'permission-denied'
               ? "This device isn't allowed to read tasks. Tap Switch and join again."
