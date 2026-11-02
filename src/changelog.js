@@ -9,7 +9,7 @@ export const CHANGELOG = [
     title: 'Steadier iPad, a panda, and /me',
     items: [
       'Fixed: on iPad the page could get stuck a little off to one side, with a white bar at the bottom that bounced every time you swiped. The page itself can’t scroll now, only what’s inside it.',
-      'New pet: the panda. Adopt one from the Market.',
+      'New pets: the panda and the proboscis monkey (a team request). Adopt one from the Market.',
       'Drafts: what you’ve typed and not sent is kept per channel and per DM, and a small pencil next to its name in the channel list (or “draft” in the phone’s channel picker) shows where one is waiting.',
       '/me now reads like an action: “/me waves” shows “Asher waves” in italics with a mark on the left, instead of just the word “waves”.',
       'Competition mode’s “On now” is “On for a day” and switches itself off after 24 hours.',

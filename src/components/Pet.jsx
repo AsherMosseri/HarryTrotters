@@ -19,6 +19,8 @@ const LOOK = {
   owl: { body: '#ab8665', dark: '#6c4f37', belly: '#ecdac2', nose: '#f2b33d' },
   frog: { body: '#84c770', dark: '#4b8f3e', belly: '#e0f2cc', nose: INK },
   // Black and white: black ears, eye patches, nose and legs (dark), and a soft gray outline.
+  // Proboscis monkey: orange-brown, a paler face and belly, and the big drooping nose.
+  monkey: { body: '#c9793a', dark: '#8c4f22', belly: '#f2d3ad', nose: '#e8896b' },
   panda: { body: '#f7f6f2', dark: '#2b2b31', belly: '#ffffff', nose: '#2b2b31', line: '#a9a9b3' },
 };
 const SCALE = { baby: 0.78, young: 0.9, grown: 1 };
@@ -77,6 +79,13 @@ function Back({ species, c }) {
         <ellipse cx="54.6" cy="38.2" rx="3.2" ry="4.2" transform="rotate(38 54.6 38.2)" fill={c.belly} />
       </g>
     );
+  if (species === 'monkey')
+    return (
+      <g className="pet-tail">
+        <path d="M44.5 52 C57 55 59 40 52 36" stroke={c.dark} strokeWidth="5.6" fill="none" strokeLinecap="round" />
+        <path d="M44.5 52 C57 55 59 40 52 36" stroke={c.body} strokeWidth="3" fill="none" strokeLinecap="round" />
+      </g>
+    );
   if (species === 'panda')
     return (
       <>
@@ -115,6 +124,15 @@ function Ears({ species, c }) {
         <path d="M45 22 L46 6.5 L34 14.5 Z" fill={c.body} {...line} />
         <path d="M21 17.5 L20.5 11 L26 14.8 Z" fill={c.dark} opacity="0.7" />
         <path d="M43 17.5 L43.5 11 L38 14.8 Z" fill={c.dark} opacity="0.7" />
+      </>
+    );
+  if (species === 'monkey')
+    return (
+      <>
+        <circle cx="16.6" cy="27.5" r="5" fill={c.body} {...line} />
+        <circle cx="47.4" cy="27.5" r="5" fill={c.body} {...line} />
+        <circle cx="16.8" cy="27.5" r="2.6" fill={c.belly} />
+        <circle cx="47.2" cy="27.5" r="2.6" fill={c.belly} />
       </>
     );
   if (species === 'panda')
@@ -160,6 +178,16 @@ function Front({ species, c }) {
       </>
     );
   if (species === 'bunny') return <ellipse cx="32" cy="31" rx="1.7" ry="1.2" fill={c.nose} />;
+  if (species === 'monkey')
+    return (
+      <>
+        <ellipse cx="32" cy="30.5" rx="10.5" ry="9.6" fill={c.belly} />
+        <path d="M26 30.2 Q24.8 42.6 32 43.4 Q39.2 42.6 38 30.2 Q32 27 26 30.2 Z" fill={c.nose} stroke={c.dark} strokeWidth="1" strokeLinejoin="round" />
+        <path d="M29.6 38.6 Q32 40.6 34.4 38.6" stroke={c.dark} strokeWidth="1" fill="none" strokeLinecap="round" opacity="0.6" />
+        <circle cx="30" cy="36" r="0.9" fill={c.dark} opacity="0.75" />
+        <circle cx="34" cy="36" r="0.9" fill={c.dark} opacity="0.75" />
+      </>
+    );
   if (species === 'panda')
     return (
       <>
@@ -237,7 +265,7 @@ export function PetArt({ species = 'cat', mood = 'ok', stage = 'young', size = 6
           <Eyes mood={mood} ink={species === 'panda' ? '#fff' : INK} />
         </g>
         <Cheeks />
-        <Mouth mood={mood} y={species === 'dog' ? 35 : 34.5} />
+        {species !== 'monkey' && <Mouth mood={mood} y={species === 'dog' ? 35 : 34.5} />}
       </>
     );
   }
