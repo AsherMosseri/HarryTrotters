@@ -2,6 +2,7 @@
 // management saved on the Team tab, else the defaults in config.js.
 import { DEFAULT_GRADE, GRADE_DEFAULTS, ORG_DEFAULTS, SUBTEAM_COLORS } from './config.js';
 import { personId } from './data/diff.js';
+import { pollTally } from '../functions/shared/polls.js';
 
 export function buildPeopleInfo(roster, roles, rename) {
   const saved = Object.fromEntries(roles.map((r) => [r.id, r]));
@@ -86,11 +87,9 @@ function renameVotes(votes, rename) {
 }
 
 // A poll's votes that still count: its current choices, plus written answers
-// when it takes them. Votes for a choice taken out in an edit stay stored
-// but don't count.
-export function pollVotes(m) {
-  const votes = m.votes || {};
-  const keep = new Set((m.poll?.options || []).map((o) => o.id));
-  if (m.poll?.kind === 'text' || m.poll?.write) keep.add('text');
-  return Object.fromEntries(Object.entries(votes).filter(([k]) => keep.has(k)));
-}
+// when it takes them. Votes for a choice taken out in an edit stay stored but
+// don't count, and neither do votes that break the poll's pick rule (see
+// functions/shared/polls.js, where results are worked out for every place
+// that shows or checks them).
+export { pollTally, hasAnswered, myPicks } from '../functions/shared/polls.js';
+export const pollVotes = (m, opts) => pollTally(m, opts).votes;

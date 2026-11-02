@@ -13,7 +13,7 @@ import {
   TEAM_STARTED,
   PASSWORD_MIN,
 } from '../config.js';
-import { ONLINE_MS, TYPING_MS, activeStatus, buildPeopleInfo, buildProfiles, pollVotes, renameMessage, sentByMe } from '../people.js';
+import { ONLINE_MS, TYPING_MS, activeStatus, buildPeopleInfo, buildProfiles, hasAnswered, renameMessage, sentByMe } from '../people.js';
 import { PALETTES, presetTheme } from '../nitro.js';
 import { daysBetween, mondayOf, parseDay, todayISO } from '../milestones.js';
 import { newTaskDefaults, personId } from '../data/diff.js';
@@ -1206,7 +1206,6 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
   // A required poll in #announcements this person hasn't voted on yet (asked
   // when they open the app, like a lab check-in).
   const pendingPoll = useMemo(() => {
-    const me = personId(actor.name);
     if (!controls.isOn('requiredPolls') || !controls.isOn('polls') || !controls.channelOn('announcements')) return null;
     return (chat.announcements || []).find(
       (m) =>
@@ -1214,7 +1213,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
         !m.poll.closed &&
         !m.deleted &&
         rename(m.by || '') !== actor.name &&
-        !Object.values(pollVotes(m)).some((v) => v?.[me]) &&
+        !hasAnswered(m, actor.name, rename) &&
         !previewSkipped.includes(`poll:${m.id}`),
     );
   }, [chat, actor.name, rename, controls, previewSkipped]);
@@ -1448,7 +1447,9 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
         typingSent.current = Date.now();
         store.setPresence(actor, { typing: conv, typingAt: Date.now(), at: Date.now() }).catch(() => {});
       },
-      vote: (conv, msg, optionId, on) => store.vote(conv, msg, optionId, actor, on).catch(fail),
+      vote: (conv, msg, optionId, on) => store.vote(conv, msg, optionId, actor, on, rename).catch(fail),
+      // A whole vote at once (pick-N polls, the required-poll screen): true once saved.
+      votePicks: (conv, msg, ids) => ok(store.votePicks(conv, msg, ids, actor, rename)),
       answerPoll: (conv, msg, text) => store.answerPoll(conv, msg, text.trim().slice(0, 1000), actor).catch(fail),
       pin: (conv, id, on) => store.pin(conv, id, on, actor).catch(fail),
       subscribePins: (conv, cb) => store.subscribePins(conv, cb, fail),
@@ -1599,7 +1600,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
       subscribeQuizReports: (cb) => store.subscribeQuizReports(cb),
       handleQuizReport: (id, status) => store.handleQuizReport(id, status, actor).catch(fail),
     }),
-    [store, actor, fail, ok, quiet, setFilters, renames],
+    [store, actor, fail, ok, quiet, setFilters, renames, rename],
   );
 
   const filtered = useMemo(
@@ -2932,10 +2933,9 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
                   <PollGate
                     msg={pendingPoll}
                     rename={rename}
+                    me={actor.name}
                     onSkip={skipInPreview?.(`poll:${pendingPoll.id}`)}
-                    onVote={async (ids) => {
-                      for (const id of ids) await api.vote('announcements', pendingPoll, id, true);
-                    }}
+                    onVote={(ids) => api.votePicks('announcements', pendingPoll, ids)}
                     onAnswer={(text) => api.answerPoll('announcements', pendingPoll, text)}
                   />
                 )}

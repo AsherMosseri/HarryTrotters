@@ -3834,3 +3834,60 @@ html.kb-short .quick-edit > b { display: none; }
 html.kb-short .quick-edit .quick-row { padding-top: 6px; padding-bottom: 0; }
 /* iPad with a keyboard attached (just the suggestion bar): the chat side panel stays above it too. */
 html.kb-bar .chat-side-body { padding-bottom: calc(8px + var(--kb-bar, 0px)); }
+
+/* ---------- polls: people, pick-N, results ---------- */
+.poll-list { display: flex; flex-direction: column; gap: 6px; }
+.poll-list.scroll { max-height: 372px; overflow-y: auto; padding-right: 2px; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+.poll-list.scroll:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 8px; }
+.poll-opt { min-height: 44px; }
+.poll-opt .grow { min-width: 0; }
+.poll-opt > b { font-family: var(--mono); font-variant-numeric: tabular-nums; min-width: 1ch; text-align: right; }
+.poll-pct { flex: none; width: 4ch; text-align: right; font-size: 12px; color: var(--muted); font-weight: 500; }
+.poll-opt:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+/* Pick-N rows read as checkboxes. */
+.poll-opt.pick .poll-check { width: 20px; height: 20px; flex: none; border-radius: 5px; border: 2px solid var(--border); display: grid; place-items: center; font-size: 13px; line-height: 1; color: #fff; background: var(--surface); }
+.poll-opt.pick.mine .poll-check { background: var(--accent); border-color: var(--accent); }
+.poll-opt.mine { background: color-mix(in srgb, var(--accent) 7%, var(--surface)); }
+.poll-opt.lead { border-color: color-mix(in srgb, var(--accent) 55%, var(--border)); }
+.poll-opt:disabled:not(.mine) { opacity: 0.75; }
+.poll-lead { display: inline-block; margin-left: 8px; padding: 1px 7px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; vertical-align: 1px; }
+.poll-opt .avatar { flex: none; }
+.poll-people .poll-opt { padding-left: 10px; }
+.poll-pickbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.poll-pickbar .btn { min-height: 44px; padding: 0 14px; }
+.poll-counter { color: var(--muted); font-variant-numeric: tabular-nums; min-width: 0; flex: 1 1 140px; }
+.poll-result { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border-radius: 10px; background: var(--accent-soft); }
+.poll-result b { overflow-wrap: anywhere; }
+.pollgate-options.scroll { max-height: 44vh; overflow-y: auto; overscroll-behavior: contain; padding-right: 2px; }
+.pollgate-opt { min-height: 48px; }
+.pollgate-opt:disabled { opacity: 0.6; cursor: default; }
+.pollgate-opt .avatar { flex: none; }
+.checkin-card .poll-counter { text-align: center; }
+/* The poll maker */
+.poll-dialog { max-height: calc(100dvh - 24px); overflow-y: auto; }
+.poll-sec-label { text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; padding: 0; }
+.poll-people-src, .poll-pick { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; border: 0; min-width: 0; }
+.poll-pick legend { padding: 0; margin-bottom: 6px; }
+.poll-dialog .segmented button { min-height: 40px; }
+.poll-stepper { display: inline-flex; align-items: center; gap: 4px; align-self: flex-start; }
+.stepper-btn { width: 44px; height: 44px; min-height: 44px; padding: 0; justify-content: center; font-size: 20px; line-height: 1; }
+.stepper-n { min-width: 3ch; text-align: center; font-size: 20px; font-weight: 700; }
+.people-pick { display: flex; flex-direction: column; gap: 8px; }
+.people-pick-list { display: flex; flex-direction: column; max-height: 232px; overflow-y: auto; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); overscroll-behavior: contain; }
+.people-row { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 4px 12px; cursor: pointer; border-bottom: 1px solid var(--border); }
+.people-row:last-child { border-bottom: 0; }
+.people-row.on { background: var(--accent-soft); }
+.people-row input { width: 20px; height: 20px; flex: none; accent-color: var(--accent); }
+.poll-problem { margin: -2px 0 0; }
+.poll-dialog .link-btn { min-height: 32px; }
+/* A poll in a narrow chat (phones): rows give the name more room. */
+
+@media (max-width: 520px) {
+  .poll-opt { gap: 6px; padding: 8px; }
+  .poll-opt .poll-voters > :nth-child(n + 3) { display: none; }
+  .poll-opt .poll-voters > * { margin-left: -7px; }
+  .poll-pct { width: 3.6ch; font-size: 11px; }
+}
+.poll-dialog .segmented { width: 100%; }
+.poll-dialog .segmented button[aria-checked='true'] { background: var(--accent-soft); color: var(--accent); font-weight: 600; box-shadow: inset 0 0 0 1.5px var(--accent); }
+.poll-dialog .segmented button:disabled { opacity: 0.5; }

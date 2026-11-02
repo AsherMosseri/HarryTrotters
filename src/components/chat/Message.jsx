@@ -8,7 +8,9 @@ import { isJumbo, renderRich } from './format.jsx';
 import { EmojiPicker, PollDialog, QUICK_MAX } from './Pickers.jsx';
 import { CUSTOM_RE } from './emoji.js';
 import { isCoinCommand, useControls } from '../../controls.js';
-import { pollVotes, sentByMe } from '../../people.js';
+import { myPicks, pollTally, sentByMe } from '../../people.js';
+import { optionLabel, pickBounds, pickRule, pollHeadline, usesVoteButton } from '../../../functions/shared/polls.js';
+import { nameKey } from '../../../functions/shared/team.js';
 import { useMarket } from '../../market.js';
 import { glows } from '../../../functions/shared/market.js';
 import { PetBadge } from '../Pet.jsx';
@@ -266,51 +268,168 @@ function PollControls({ closed, onEnd, onReopen }) {
   );
 }
 
-function Poll({ m, actor, onVote, onEnd, onReopen, canEnd, onAnswer }) {
+function Poll({ m, actor, onVote, onPicks, onEnd, onReopen, canEnd, onAnswer }) {
   if (m.poll.kind === 'text') return <TextPoll m={m} actor={actor} onAnswer={onAnswer} onEnd={onEnd} onReopen={onReopen} canEnd={canEnd} />;
-  return <ChoicePoll m={m} actor={actor} onVote={onVote} onEnd={onEnd} onReopen={onReopen} canEnd={canEnd} onAnswer={onAnswer} />;
+  return <ChoicePoll m={m} actor={actor} onVote={onVote} onPicks={onPicks} onEnd={onEnd} onReopen={onReopen} canEnd={canEnd} onAnswer={onAnswer} />;
 }
 
-function ChoicePoll({ m, actor, onVote, onEnd, onReopen, canEnd, onAnswer }) {
+// What a poll asks people to do, in a few words ("Pick up to 3").
+export function pickWords(poll) {
+  const r = pickRule(poll);
+  if (r.mode === 'upto') return `Pick up to ${r.n}`;
+  if (r.mode === 'exact') return `Pick exactly ${r.n}`;
+  return r.mode === 'any' ? 'Pick one or more' : 'Pick one';
+}
+
+// A choice or people poll. Single-pick polls (and old any-number polls) vote
+// with a tap; polls with a pick rule (up to / exactly N, any number) have you
+// choose, then press Vote, so a half pick is never saved.
+function ChoicePoll({ m, actor, onVote, onPicks, onEnd, onReopen, canEnd, onAnswer }) {
+  const people = usePeople();
+  const rename = people?.rename || ((n) => n);
   const me = personId(actor.name);
-  // Only the current choices (and written answers) count.
-  const votes = pollVotes(m);
-  const counts = m.poll.options.map((o) => Object.keys(votes[o.id] || {}).length);
-  const voters = new Set(Object.values(votes).flatMap((v) => Object.keys(v || {})));
+  const { poll } = m;
+  // Only votes that follow the poll's rule count (shared/polls.js).
+  const t = pollTally(m, { rename });
+  const votes = t.votes;
+  const counts = poll.options.map((o) => t.counts[o.id] || 0);
+  const nVoters = t.voters.size;
   const max = Math.max(1, ...counts);
-  const closed = !!m.poll.closed;
+  const closed = !!poll.closed;
+  const picking = usesVoteButton(poll);
+  const bounds = pickBounds(poll, me, rename);
+  const stored = myPicks(m, actor.name, rename);
+  const mineValid = t.voters.has(me);
+  const [draft, setDraft] = useState(null); // the picks being made (null: your saved vote)
+  const [hint, setHint] = useState('');
+  const [busy, setBusy] = useState(false);
+  const editing = picking && !closed && (draft !== null || !mineValid);
+  const shown = editing ? (draft ?? stored) : stored;
+  const n = shown.length;
+  const fits = n >= bounds.min && n <= bounds.max;
+  useEffect(() => {
+    if (!hint) return;
+    const id = setTimeout(() => setHint(''), 3500);
+    return () => clearTimeout(id);
+  }, [hint]);
+  const isPeople = poll.kind === 'people';
+  const selfBlocked = (o) => poll.selfVote === false && !!o.person && nameKey(rename(o.person)) === me;
+  const toggle = (o) => {
+    if (!picking) return onVote(o.id, !votes[o.id]?.[me]);
+    if (shown.includes(o.id)) {
+      setHint('');
+      return setDraft(shown.filter((x) => x !== o.id));
+    }
+    if (shown.length >= bounds.max)
+      return setHint(bounds.min === bounds.max ? `You can pick ${bounds.max}. Unselect one to change.` : `You can pick up to ${bounds.max}`);
+    setHint('');
+    setDraft([...shown, o.id]);
+  };
+  const submit = async () => {
+    setBusy(true);
+    const saved = await onPicks(shown);
+    setBusy(false);
+    if (saved) setDraft(null);
+  };
+  // "Pick 2 more", "2 of 3 picked", "Pick up to 3".
+  const counter =
+    bounds.min === bounds.max
+      ? n === bounds.max
+        ? `${n} of ${bounds.max} picked`
+        : `${n} of ${bounds.max} picked · pick ${bounds.max - n} more`
+      : poll.pick?.mode === 'any'
+        ? n
+          ? `${n} picked`
+          : 'Pick one or more'
+        : n
+          ? `${n} of ${bounds.max} picked`
+          : `Pick up to ${bounds.max}`;
+  const lead = (o, i) => counts[i] > 0 && t.leaders.has(o.id);
+  // Someone above the last place is leading; those level at it are tied for it.
+  const leadWord = (i) => (t.tied && counts[i] === t.line ? 'Tied' : closed ? (t.cut > 1 ? 'Top pick' : 'Winner') : 'Leading');
+  const long = poll.options.length > 8;
+  const headline = closed && nVoters ? pollHeadline(m, { rename }) : '';
   return (
-    <div className="poll" onClick={(e) => e.stopPropagation()}>
-      <div className="poll-q">{m.poll.question}</div>
+    <div className={`poll${isPeople ? ' poll-people' : ''}`} onClick={(e) => e.stopPropagation()}>
+      <div className="poll-q">{poll.question}</div>
       <div className="muted tiny">
-        {closed ? 'Poll ended' : `${m.poll.multi ? 'Pick one or more' : 'Pick one'}${m.poll.write ? ' or write your own' : ''}`} · {voters.size}{' '}
-        {voters.size === 1 ? 'vote' : 'votes'}
-        {m.poll.required && !closed && <span className="poll-required"> · Everyone has to answer</span>}
+        {closed ? 'Poll ended' : `${pickWords(poll)}${poll.write ? ' or write your own' : ''}`} · {nVoters} {nVoters === 1 ? 'vote' : 'votes'}
+        {poll.required && !closed && <span className="poll-required"> · Everyone has to answer</span>}
+        {poll.selfVote === false && !closed && ' · No voting for yourself'}
       </div>
-      {m.poll.options.map((o, i) => {
-        const mine = !!votes[o.id]?.[me];
-        const names = Object.values(votes[o.id] || {});
-        return (
-          <button
-            key={o.id}
-            className={`poll-opt${mine ? ' mine' : ''}`}
-            disabled={closed}
-            onClick={() => onVote(o.id, !mine)}
-            title={names.join(', ') || 'No votes yet'}
-          >
-            <span className="poll-bar" style={{ width: `${(counts[i] / max) * 100}%`, opacity: counts[i] ? 1 : 0 }} />
-            <span className="poll-check">{mine ? '✓' : ''}</span>
-            <span className="grow">{o.text}</span>
-            <span className="poll-voters">
-              {names.slice(0, 3).map((n) => (
-                <Avatar key={n} name={n} size={18} />
-              ))}
+      <div className={`poll-list${long ? ' scroll' : ''}`} role="group" aria-label="Choices" tabIndex={long ? 0 : undefined}>
+        {poll.options.map((o, i) => {
+          const picked = shown.includes(o.id) && (editing || mineValid);
+          const names = Object.values(votes[o.id] || {});
+          const blocked = selfBlocked(o);
+          const pct = nVoters ? Math.round((counts[i] / nVoters) * 100) : 0;
+          return (
+            <button
+              key={o.id}
+              className={`poll-opt${picked ? ' mine' : ''}${picking ? ' pick' : ''}${lead(o, i) ? ' lead' : ''}`}
+              disabled={closed || blocked}
+              role={picking ? 'checkbox' : undefined}
+              aria-checked={picking ? picked : undefined}
+              onClick={() => toggle(o)}
+              title={blocked ? 'You can’t vote for yourself here' : names.join(', ') || 'No votes yet'}
+            >
+              <span className="poll-bar" style={{ width: `${(counts[i] / max) * 100}%`, opacity: counts[i] ? 1 : 0 }} />
+              <span className="poll-check">{picked ? '✓' : ''}</span>
+              {isPeople && o.person && <Avatar name={o.person} size={26} decoration="" />}
+              <span className="grow">
+                {optionLabel(o, rename)}
+                {blocked && <span className="muted tiny"> (you)</span>}
+                {lead(o, i) && <span className="poll-lead">{leadWord(i)}</span>}
+              </span>
+              <span className="poll-voters">
+                {names.slice(0, 3).map((nm) => (
+                  <Avatar key={nm} name={nm} size={18} decoration="" />
+                ))}
+              </span>
+              <b>{counts[i]}</b>
+              {picking && nVoters > 0 && <span className="poll-pct mono">{pct}%</span>}
+            </button>
+          );
+        })}
+      </div>
+      {long && (
+        <div className="muted tiny">
+          {poll.options.length} {isPeople ? 'people' : 'choices'}: scroll the list to see everyone
+        </div>
+      )}
+      {picking && !closed && (
+        <div className="poll-pickbar">
+          <span className="poll-counter small" role="status" aria-live="polite">
+            {hint || counter}
+          </span>
+          {editing ? (
+            <span className="row gap">
+              {draft !== null && mineValid && (
+                <button className="btn small-btn" onClick={() => setDraft(null)}>
+                  Cancel
+                </button>
+              )}
+              <button className="btn primary small-btn" disabled={!fits || busy} onClick={submit}>
+                {mineValid ? 'Update vote' : 'Vote'}
+              </button>
             </span>
-            <b>{counts[i]}</b>
-          </button>
-        );
-      })}
-      {m.poll.write && <WrittenAnswers m={m} actor={actor} onAnswer={onAnswer} closed={closed} optional />}
+          ) : (
+            <button className="btn small-btn" onClick={() => setDraft(stored)}>
+              Change vote
+            </button>
+          )}
+        </div>
+      )}
+      {picking && !closed && !mineValid && stored.length > 0 && draft === null && (
+        <div className="muted tiny">Your earlier picks don’t match this poll’s rule, so they don’t count. Pick again.</div>
+      )}
+      {headline && (
+        <div className="poll-result" role="status">
+          <span className="muted tiny">{t.cut > 1 || t.tied ? 'Final result' : 'Winner'}</span>
+          <b>{headline}</b>
+        </div>
+      )}
+      {poll.write && <WrittenAnswers m={m} actor={actor} onAnswer={onAnswer} closed={closed} optional />}
       {canEnd && <PollControls closed={closed} onEnd={onEnd} onReopen={onReopen} />}
     </div>
   );
@@ -616,6 +735,7 @@ export default function Message({
                 actor={actor}
                 canEnd={mine || isManager}
                 onVote={(optionId, on) => api.vote(conv, m, optionId, on)}
+                onPicks={(ids) => api.votePicks(conv, m, ids)}
                 onAnswer={(text) => api.answerPoll(conv, m, text)}
                 onEnd={() => api.editMessage(conv, m.id, { poll: { ...m.poll, closed: true } })}
                 onReopen={() => api.editMessage(conv, m.id, { poll: { ...m.poll, closed: false } })}
