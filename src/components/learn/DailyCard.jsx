@@ -29,7 +29,8 @@ export function DailyCard({ c, onPerson }) {
       setMine({ ...r, given: i });
       if (r.correct && (r.rank === 1 || [5, 10, 20, 30, 50].includes(r.streak))) celebrate({ count: 22 });
     } catch (e) {
-      setError(e.message || String(e));
+      // Already answered (the card hadn't loaded your answer yet): it shows up by itself.
+      setError(/already answered/i.test(e.message || '') ? '' : e.message || String(e));
     }
     setBusy(false);
   };
@@ -53,7 +54,7 @@ export function DailyCard({ c, onPerson }) {
         {(q.choices || []).map((ch, i) => {
           const st = done ? (i === mine.answer ? ' is-right' : i === mine.given ? ' is-wrong' : ' dim') : '';
           return (
-            <button key={i} className={`lq-choice${st}`} disabled={done || !open || busy || mine === undefined} onClick={() => choose(i)}>
+            <button key={i} className={`lq-choice${st}`} disabled={done || !open || busy} onClick={() => choose(i)}>
               {!tf && <span className="lq-choice-n mono">{String.fromCharCode(65 + i)}</span>}
               <span className="lq-choice-text">{ch}</span>
               {done && i === mine.answer && <Icon name="check" size={16} className="lq-choice-mark" />}
