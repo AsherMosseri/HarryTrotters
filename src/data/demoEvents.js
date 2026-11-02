@@ -117,7 +117,6 @@ export function demoEvents({ get, commit, uid }) {
     });
     const have = new Set((s.pets || []).map((p) => p.person));
     const more = [
-      pet('Cooper Mlezcko', 'bunny', 'Clover', 9, 85, 70),
       pet('Sophia Bermudez', 'fox', 'Ember', 14, 75, 90, { neck: 'bandana' }),
       pet('Sebastian Tolbert', 'panda', 'Bao', 16, 90, 80),
       pet('Michael Meidan', 'frog', 'Pogo', 6, 40, 55),
