@@ -257,14 +257,14 @@ export default function PartsView({ parts, tasks, api, onOpenTask, chatToggle, i
 
       <div className="parts-filters">
         <input className="search" type="search" placeholder="Search parts…" value={q} onChange={(e) => setQ(e.target.value)} />
-        <button className={`chip${!filter ? ' on' : ''}`} onClick={() => setFilter('')}>
+        <button className={`kb-fold chip${!filter ? ' on' : ''}`} onClick={() => setFilter('')}>
           All <strong>{parts.length}</strong>
         </button>
-        <button className={`chip${filter === 'pending' ? ' on' : ''}`} onClick={() => setFilter(filter === 'pending' ? '' : 'pending')}>
+        <button className={`kb-fold chip${filter === 'pending' ? ' on' : ''}`} onClick={() => setFilter(filter === 'pending' ? '' : 'pending')}>
           Not arrived <strong>{(totals.counts.needed || 0) + (totals.counts.ordered || 0)}</strong>
         </button>
         {PART_STATUSES.map((s) => (
-          <button key={s.id} className={`chip${filter === s.id ? ' on' : ''}`} onClick={() => setFilter(filter === s.id ? '' : s.id)}>
+          <button key={s.id} className={`kb-fold chip${filter === s.id ? ' on' : ''}`} onClick={() => setFilter(filter === s.id ? '' : s.id)}>
             <span className="dot" style={{ background: s.color }} /> {s.label} <strong>{totals.counts[s.id] || 0}</strong>
           </button>
         ))}

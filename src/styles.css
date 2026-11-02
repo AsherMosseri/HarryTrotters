@@ -2988,9 +2988,10 @@ body:has(.bottom-nav):has(.composer) .toast { bottom: calc(150px + env(safe-area
 html.kb-open #root { position: fixed; left: 0; right: 0; top: var(--vvt); height: var(--vvh); }
 html.kb-open .panel-backdrop,
 html.kb-open .checkin-gate,
-html.kb-open .update-gate,
 html.kb-open .sc-table,
 html.kb-open .dg-screen { inset: auto 0; top: var(--vvt); height: var(--vvh); }
+/* If a reading is ever wrong, the dimmed backdrop must not leave a strip of page showing: let its dim spread past its edges. The update screen has no text box, so it ignores the keyboard altogether. */
+html.kb-open .panel-backdrop { box-shadow: 0 0 0 100vmax rgb(10 12 20 / 40%); }
 html.kb-open .panel-backdrop.center { padding-top: 12px; padding-bottom: 12px; }
 html.kb-open .panel-backdrop.center > .dialog { max-height: calc(var(--vvh) - 24px); }
 html.kb-open .bottom-nav,

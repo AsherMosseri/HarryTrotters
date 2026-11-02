@@ -65,7 +65,9 @@ export function EmojiPicker({ onPick, onClose, teamEmoji = [], canManage, onMana
       {title && <div className="picker-title">{title}</div>}
       {editing && (
         <div className="quick-edit">
-          <b>Quick reactions</b>
+          <b>
+            Quick reactions <span className="quick-count mono">{editing.length}/{QUICK_MAX}</span>
+          </b>
           <span className="muted small">
             Pick up to {QUICK_MAX} below. Tap one here to take it off. ({editing.length}/{QUICK_MAX})
           </span>

@@ -3545,3 +3545,94 @@ button.pm-row:hover { background: color-mix(in srgb, var(--text) 4%, transparent
   .ev-tier-row select { grid-column: 1 / -2; }
 }
 .pf-tile-event { font-size: 11px; line-height: 1.25; text-align: center; }
+
+/* ---------- keyboard-aware panels ----------
+   One pattern for every pop-up that has a text box AND something that has to
+   stay on screen while you type (results, a list, Save). keyboard.js tells us
+   how much room is left (--vvh, --vvt, html.kb-open; html.kb-short when it is
+   very little). The panel is a column capped to that room; its list takes
+   what's left but never less than --kb-list-min (it scrolls inside); the
+   explaining text, big headings and spare rows fold away while the keyboard
+   is up. Without a keyboard none of this applies, so desktop and iPad look
+   the same as before. */
+:root { --kb-list-min: 140px; }
+html.kb-open :is(.emoji-picker, .gif-picker) { display: flex; flex-direction: column; overflow-x: hidden; overflow-y: auto; }
+html.kb-open :is(.emoji-picker, .gif-picker) > * { flex-shrink: 0; }
+html.kb-open .emoji-picker .emoji-scroll { height: auto; flex: 1 1 240px; min-height: var(--kb-list-min); overflow-y: auto; overscroll-behavior: contain; }
+html.kb-open .gif-picker .gif-grid { flex: 1 1 260px; max-height: none; min-height: var(--kb-list-min); overscroll-behavior: contain; }
+/* Pop-ups that sit by the message box use the whole visible area while you search. */
+@media (max-width: 760px) {
+  html.kb-open .composer :is(.composer-emoji, .sticker-picker, .gif-picker),
+  html.kb-open .msg-actions .reaction-picker,
+  html.kb-open .floating-picker { top: calc(var(--vvt, 0px) + env(safe-area-inset-top) + 8px); }
+  html.kb-open .composer :is(.composer-emoji, .sticker-picker, .gif-picker),
+  html.kb-open .msg-actions .reaction-picker,
+  html.kb-open .floating-picker .emoji-picker { max-height: calc(var(--vvh) - env(safe-area-inset-top) - 16px); }
+}
+@media (max-width: 760px) {
+  /* The emoji picker inside a pop-up (profile effects, theme studio) is a sheet fixed above the bottom: fill what's visible. */
+  html.kb-open .emoji-picker.effect-picker { bottom: calc(var(--vvb, 0px) + 8px); max-height: calc(var(--vvh) - 16px); }
+}
+@media (min-width: 761px) {
+  html.kb-open .composer :is(.composer-emoji, .sticker-picker, .gif-picker) { max-height: calc(var(--vvh) - 150px); }
+}
+/* Quick reactions editor: title and Save/Cancel on one row, the chips in one
+   scrolling row, the explaining text gone, so the results get the room. */
+.quick-count { display: none; }
+html.kb-open .quick-edit {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: 'title actions' 'chips chips'; align-items: center; gap: 2px 8px; padding: 6px 8px;
+}
+html.kb-open .quick-edit > b { grid-area: title; font-size: 14px; }
+html.kb-open .quick-edit > .muted { display: none; }
+html.kb-open .quick-edit .quick-count { display: inline; margin-left: 4px; color: var(--muted); font-weight: 600; }
+html.kb-open .quick-edit .quick-actions { grid-area: actions; margin: 0; }
+html.kb-open .quick-edit .quick-row { grid-area: chips; flex-wrap: nowrap; overflow-x: auto; margin: 0; padding: 8px 6px 2px 0; scrollbar-width: none; }
+html.kb-open .quick-edit .quick-row::-webkit-scrollbar { display: none; }
+html.kb-open .quick-edit .quick-chip { flex: none; }
+html.kb-open .quick-edit .quick-note { grid-column: 1 / -1; font-size: 12.5px; }
+/* Anything that isn't the box you're typing in or the list you're reading folds away while the keyboard is up (unless it holds the focus). */
+html.kb-open .kb-fold:not(:focus-within) { display: none; }
+html.kb-open .dm-pick { max-height: max(var(--kb-list-min), calc(var(--vvh) - 250px)); }
+/* Settings dialogs with a pinned top (a master switch card, tab pills, quick buttons) and a body that scrolls: with the keyboard up the card and quick buttons fold away and the tabs become one scrolling row, so the body has room. */
+html.kb-open :is(.ads-settings, .controls-page, .cmd-admin) :is(.ads-pause, .ctl-quick, .ctl-preview):not(:focus-within) { display: none; }
+html.kb-open .ads-tabs { flex-wrap: nowrap; scrollbar-width: none; }
+html.kb-open .ads-tabs::-webkit-scrollbar { display: none; }
+html.kb-open .ads-settings .ads-body { min-height: var(--kb-list-min); }
+
+/* Very little room (a phone on its side, or the tallest keyboard with the form bar): html.kb-short. */
+html.kb-short .page-head:not(:focus-within) { display: none; }
+html.kb-short .composer :is(.composer-emoji, .sticker-picker, .gif-picker),
+html.kb-short .msg-actions .reaction-picker {
+  position: fixed; top: calc(var(--vvt, 0px) + env(safe-area-inset-top) + 8px); bottom: auto; right: 10px; left: auto; margin: 0;
+  width: min(440px, calc(100vw - 20px)); max-height: calc(var(--vvh) - env(safe-area-inset-top) - 16px); z-index: 45;
+}
+html.kb-short .composer .gif-picker { left: 10px; width: auto; }
+html.kb-short .floating-picker { top: calc(var(--vvt, 0px) + env(safe-area-inset-top) + 8px) !important; }
+html.kb-short .floating-picker .emoji-picker { max-height: calc(var(--vvh) - env(safe-area-inset-top) - 16px); }
+html.kb-short .suggest-cmds { max-height: calc(var(--vvh) - 100px); }
+html.kb-short .dialog .panel-head { padding-top: 6px; padding-bottom: 6px; }
+html.kb-short .dialog .panel-head h2 { font-size: 16px; }
+html.kb-short .ll-sheet:not(.ll-quick) .ll-head { padding: 8px 12px 6px 16px; }
+html.kb-short .ll-sheet .ll-progress { margin-bottom: 6px; }
+html.kb-short .ll-sheet .ll-kicker { display: none; }
+html.kb-short .ll-sheet .ll-titles h2 { font-size: 17px; }
+html.kb-short .ll-sheet .ll-body { padding-top: 8px; padding-bottom: 8px; }
+html.kb-short .ll-sheet .ll-foot { padding-top: 6px; padding-bottom: 6px; }
+html.kb-short .ll-sheet .ll-foot .btn { min-height: 42px; }
+html.kb-short .quick-edit { padding: 4px 8px; }
+html.kb-short .quick-edit .quick-chip { width: 34px; height: 30px; font-size: 18px; }
+html.kb-short .quick-edit .quick-row { padding-top: 6px; }
+html.kb-short .emoji-picker { gap: 4px; padding: 6px; }
+html.kb-short .dialog { padding-bottom: 8px; gap: 8px; }
+html.kb-short .shell .board .column { height: calc(var(--vvh) - 100px); max-height: none; }
+/* A field scrolled into view stays clear of what a scrolling box pins at its edges (its title, a comment bar). */
+html:is(.kb-open, .kb-bar) .panel-scroll { scroll-padding: 8px 0 76px; }
+html:is(.kb-open, .kb-bar) .dialog { scroll-padding-top: 64px; }
+/* Pop-ups whose body is "the rest of the room" (flex: 1; min-height: 0) get squashed to nothing by a tall top; keep a usable floor and let the pop-up scroll. */
+html.kb-open :is(.ads-body, .submit-ad-body, .coins-body, .ad-action-body, .pf-roster) { min-height: var(--kb-list-min); }
+html.kb-open .coins-balance:not(:focus-within) { display: none; }
+html.kb-short .quick-edit { grid-template-areas: 'chips actions'; align-items: center; }
+html.kb-short .quick-edit > b { display: none; }
+html.kb-short .quick-edit .quick-row { padding-top: 6px; padding-bottom: 0; }
+/* iPad with a keyboard attached (just the suggestion bar): the chat side panel stays above it too. */
+html.kb-bar .chat-side-body { padding-bottom: calc(8px + var(--kb-bar, 0px)); }
