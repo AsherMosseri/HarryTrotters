@@ -1367,24 +1367,22 @@ h3.md-h { font-size: 16.5px; }
 .format-bar .fmt-BI { font-style: italic; font-weight: 900; font-family: Georgia, serif; }
 .display-name { font-weight: 700; }
 .name-btn.display-name { display: inline; }
-@keyframes deco-spin { to { transform: rotate(360deg); } }
-@keyframes deco-pulse { 50% { box-shadow: 0 0 calc(var(--s) * 0.25) calc(var(--s) * 0.06) var(--accent); } }
-@keyframes deco-bob { 50% { transform: translateY(-2px) rotate(-6deg); } }
+/* Motion for decorations, name effects and nameplates is all in shell.css; this file has how they look still. */
 .deco { position: relative; display: inline-block; flex: none; border-radius: 50%; }
 /* Grid, like .avatar itself, so initials stay centered inside a decoration. */
 .deco > .avatar { position: relative; z-index: 1; display: grid; }
 .deco::before { content: ''; position: absolute; inset: calc(var(--s) * -0.09); border-radius: 50%; z-index: 0; }
-.deco-rainbow::before { background: conic-gradient(#ef4444, #f97316, #eab308, #22c55e, #06b6d4, #6366f1, #d946ef, #ef4444); animation: deco-spin 3s linear infinite; }
+.deco-rainbow::before { background: conic-gradient(#ef4444, #f97316, #eab308, #22c55e, #06b6d4, #6366f1, #d946ef, #ef4444); }
 .deco-gold::before { background: conic-gradient(#fde68a, #f59e0b, #fef3c7, #b45309, #fde68a); box-shadow: 0 0 6px #f59e0b88; }
-.deco-neon::before { background: var(--accent); box-shadow: 0 0 calc(var(--s) * 0.12) var(--accent); animation: deco-pulse 1.8s ease-in-out infinite; }
-.deco-flame::before { background: conic-gradient(#f97316, #ef4444, #facc15, #f97316, #ef4444, #f97316); animation: deco-spin 1.6s linear infinite; }
-.deco-stars::before { background: conic-gradient(#facc15 0 10%, transparent 10% 25%, #facc15 25% 35%, transparent 35% 50%, #facc15 50% 60%, transparent 60% 75%, #facc15 75% 85%, transparent 85%); animation: deco-spin 6s linear infinite; }
+.deco-neon::before { background: var(--accent); box-shadow: 0 0 calc(var(--s) * 0.12) var(--accent); }
+.deco-flame::before { background: conic-gradient(#f97316, #ef4444, #facc15, #f97316, #ef4444, #f97316); }
+.deco-stars::before { background: conic-gradient(#facc15 0 10%, transparent 10% 25%, #facc15 25% 35%, transparent 35% 50%, #facc15 50% 60%, transparent 60% 75%, #facc15 75% 85%, transparent 85%); }
 .deco-crown::before, .deco-gear::before, .deco-robot::before, .deco-cat::before { background: color-mix(in srgb, var(--accent) 35%, transparent); }
 .deco-badge { position: absolute; z-index: 2; font-size: calc(var(--s) * 0.38); line-height: 1; pointer-events: none; }
 .deco-crown .deco-badge { top: calc(var(--s) * -0.32); left: 50%; transform: translateX(-50%) rotate(-12deg); font-size: calc(var(--s) * 0.42); }
-.deco-flame .deco-badge { bottom: calc(var(--s) * -0.12); right: calc(var(--s) * -0.1); animation: deco-bob 0.9s ease-in-out infinite; }
-.deco-gear .deco-badge { bottom: calc(var(--s) * -0.1); right: calc(var(--s) * -0.1); animation: deco-spin 4s linear infinite; }
-.deco-robot .deco-badge { bottom: calc(var(--s) * -0.12); right: calc(var(--s) * -0.14); animation: deco-bob 1.4s ease-in-out infinite; }
+.deco-flame .deco-badge { bottom: calc(var(--s) * -0.12); right: calc(var(--s) * -0.1); }
+.deco-gear .deco-badge { bottom: calc(var(--s) * -0.1); right: calc(var(--s) * -0.1); }
+.deco-robot .deco-badge { bottom: calc(var(--s) * -0.12); right: calc(var(--s) * -0.14); }
 .deco-stars .deco-badge { top: calc(var(--s) * -0.14); right: calc(var(--s) * -0.14); }
 .deco-cat .deco-badge { top: calc(var(--s) * -0.2); left: calc(var(--s) * -0.14); transform: rotate(-15deg); }
 @media (prefers-reduced-motion: reduce) { :root:not([data-motion='on']) .deco::before, :root:not([data-motion='on']) .deco-badge { animation: none !important; } }
@@ -1720,29 +1718,12 @@ h3.md-h { font-size: 16.5px; }
 
 /* ---------- custom avatar decoration (decoRender.jsx) ---------- */
 .deco-ring { position: absolute; border-radius: 50%; z-index: 0; }
-.deco-ring.thick { z-index: 2; }
 /* Initials shrink to fit inside a ring that grows inward. */
 .deco-custom.ring-in > span.avatar { font-size: calc(var(--s) * 0.4 * var(--fit)) !important; }
-.deco-ring.spin { animation: deco-spin var(--spd, 4s) linear infinite; }
-.deco-ring.spin.ccw { animation-direction: reverse; }
-.deco-ring.ring-glow { box-shadow: 0 0 calc(var(--s) * 0.16) var(--glow); animation: deco-glow 1.8s ease-in-out infinite; }
-@keyframes deco-glow { 50% { box-shadow: 0 0 calc(var(--s) * 0.32) calc(var(--s) * 0.04) var(--glow); } }
 .deco-b-at { position: absolute; z-index: 2; transform: translate(-50%, -50%); pointer-events: none; line-height: 1; }
-.deco-b { display: block; font-size: calc(var(--s) * var(--bs)); transform: rotate(var(--r)); }
+.deco-b { display: block; font-size: calc(var(--s) * var(--bs)); }
 .deco-b img { width: calc(var(--s) * var(--bs) * 1.15); height: calc(var(--s) * var(--bs) * 1.15); object-fit: contain; display: block; }
-.deco-orbit { position: absolute; inset: 0; z-index: 2; pointer-events: none; animation: deco-spin var(--spd) linear infinite; }
-.deco-orbit.ccw { animation-direction: reverse; }
-.deco-b.anim-spin { animation: deco-b-spin var(--spd) linear infinite; }
-.deco-b.anim-spin.ccw { animation-direction: reverse; }
-.deco-b.anim-bob { animation: deco-b-bob var(--spd) ease-in-out infinite; }
-.deco-b.anim-pulse { animation: deco-b-pulse var(--spd) ease-in-out infinite; }
-.deco-b.anim-wiggle { animation: deco-b-wiggle var(--spd) ease-in-out infinite; }
-.deco-b.anim-float { animation: deco-b-float var(--spd) ease-in-out infinite; }
-@keyframes deco-b-spin { from { transform: rotate(var(--r)); } to { transform: rotate(calc(var(--r) + 360deg)); } }
-@keyframes deco-b-bob { 50% { transform: translateY(-18%) rotate(var(--r)); } }
-@keyframes deco-b-pulse { 50% { transform: scale(1.25) rotate(var(--r)); } }
-@keyframes deco-b-wiggle { 25% { transform: rotate(calc(var(--r) - 16deg)); } 75% { transform: rotate(calc(var(--r) + 16deg)); } }
-@keyframes deco-b-float { 33% { transform: translate(12%, -14%) rotate(var(--r)); } 66% { transform: translate(-12%, 8%) rotate(var(--r)); } }
+.deco-orbit { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
 @media (prefers-reduced-motion: reduce) { :root:not([data-motion='on']) .deco-ring, :root:not([data-motion='on']) .deco-orbit, :root:not([data-motion='on']) .deco-b { animation: none !important; } }
 .deco-editor { display: flex; flex-direction: column; gap: 10px; padding: 12px; border: 1px dashed var(--border); border-radius: 12px; }
 .deco-top { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
@@ -2036,13 +2017,7 @@ body:has(.bottom-nav):has(.composer) .toast { bottom: calc(150px + env(safe-area
 /* ---------- display name effects ---------- */
 .ne { display: inline-block; }
 .ne-shimmer, .ne-rainbow { animation: ne-slide 3.2s linear infinite; }
-@keyframes ne-slide { to { background-position: -200% 0; } }
-.ne-neon { filter: drop-shadow(0 0 1.5px var(--nglow, currentColor)) drop-shadow(0 0 7px var(--nglow, currentColor)); animation: ne-neon 2.6s ease-in-out infinite; }
-@keyframes ne-neon {
-  50% { filter: drop-shadow(0 0 1px var(--nglow, currentColor)) drop-shadow(0 0 3px var(--nglow, currentColor)); }
-  93% { filter: drop-shadow(0 0 1.5px var(--nglow, currentColor)) drop-shadow(0 0 7px var(--nglow, currentColor)); opacity: 1; }
-  95% { opacity: 0.55; }
-}
+.ne-neon { filter: drop-shadow(0 0 1.5px var(--nglow, currentColor)) drop-shadow(0 0 7px var(--nglow, currentColor)); }
 .ne-outline { -webkit-text-stroke: 0.9px #0b1020; paint-order: stroke fill; filter: drop-shadow(1.5px 1.5px 0 #0b1020); }
 .ne-pop {
   --nshade: color-mix(in srgb, var(--nglow, #64748b) 45%, #000);
@@ -2076,34 +2051,7 @@ body:has(.bottom-nav):has(.composer) .toast { bottom: calc(150px + env(safe-area
 
 /* ---------- animated avatar decorations (decoRender.jsx) ---------- */
 .adeco { position: absolute; inset: calc(var(--s) * -0.3); width: calc(var(--s) * 1.6); height: calc(var(--s) * 1.6); z-index: 2; pointer-events: none; overflow: visible; }
-.adeco * { transform-box: view-box; }
-.adeco .ad-spin { transform-origin: 50px 50px; animation: deco-spin var(--spd, 4s) linear infinite; animation-delay: var(--d, 0s); }
-.adeco .ad-spin.ccw { animation-direction: reverse; }
-.adeco .ad-glow { filter: drop-shadow(0 0 3px var(--c, #fff)) drop-shadow(0 0 6px var(--c, #fff)); }
-.adeco .ad-flick { transform-box: fill-box; transform-origin: 50% 100%; animation: ad-flick 0.9s ease-in-out infinite alternate; animation-delay: var(--d, 0s); }
-@keyframes ad-flick { 0% { transform: scale(0.85, 0.7); } 40% { transform: scale(1.05, 1.15) skewX(4deg); } 100% { transform: scale(0.95, 0.95) skewX(-4deg); } }
-.adeco .ad-bolt { opacity: 0; animation: ad-bolt 0.45s steps(1) infinite; filter: drop-shadow(0 0 2px var(--c)) drop-shadow(0 0 5px var(--c)); }
-.adeco .ad-bolt1 { animation-delay: -0.15s; }
-.adeco .ad-bolt2 { animation-delay: -0.3s; }
-@keyframes ad-bolt { 0% { opacity: 1; } 33% { opacity: 0; } }
-.adeco .ad-bob { animation: ad-bob 2.4s ease-in-out infinite; }
-@keyframes ad-bob { 50% { transform: translateY(-4px); } }
-.adeco .ad-twinkle { transform-box: fill-box; transform-origin: center; animation: adeco-twinkle 1.8s ease-in-out infinite; animation-delay: var(--d, 0s); }
-@keyframes adeco-twinkle { 0%, 100% { transform: scale(0.2); opacity: 0.2; } 50% { transform: scale(1); opacity: 1; } }
-.adeco .ad-ripple-color { color: var(--accent); }
-.adeco .ad-ripple { transform-origin: 50px 50px; animation: ad-ripple 2.4s ease-out infinite; animation-delay: var(--d, 0s); }
-/* Each ring fades in as it leaves the avatar, so a new one never pops in. */
-@keyframes ad-ripple { from { transform: scale(1); opacity: 0; } 15% { opacity: 0.9; } to { transform: scale(1.3); opacity: 0; } }
-.adeco .ad-flip { transform-box: fill-box; transform-origin: center; animation: ad-flip 2.2s ease-in-out infinite; animation-delay: var(--d, 0s); }
-@keyframes ad-flip { 50% { transform: scaleX(-1) rotate(25deg); } }
-.adeco .ad-march { animation: ad-march 1.2s linear infinite; }
-@keyframes ad-march { to { stroke-dashoffset: -16; } }
-/* Decorations' keyframes have their own names: the ads' ad-pulse, ad-twinkle
-   and ad-sway (defined later) used to replace them, so the circuit pulse
-   bounced from a corner instead of running round the ring. */
-.adeco .ad-pulse { animation: adeco-pulse 2.2s linear infinite; }
-@keyframes adeco-pulse { to { stroke-dashoffset: -346; } }
-@media (prefers-reduced-motion: reduce) { :root:not([data-motion='on']) .adeco, :root:not([data-motion='on']) .adeco * { animation: none !important; } }
+/* Decorations that move are drawn as still pictures in boxes that move (decoRender.jsx); the motion is in shell.css. */
 /* Small avatars: a ring in the decoration's colors instead. */
 .deco-anim::before { inset: calc(var(--s) * -0.08); }
 .deco-comets::before { background: conic-gradient(#a5f3fc, #f0abfc, #fde68a, #a5f3fc); }
@@ -2124,46 +2072,19 @@ body:has(.bottom-nav):has(.composer) .toast { bottom: calc(150px + env(safe-area
   /* The art sits on the right and fades out under the name, like Discord's. */
   -webkit-mask-image: linear-gradient(to left, #000 20%, rgba(0, 0, 0, 0.55) 55%, transparent 92%);
   mask-image: linear-gradient(to left, #000 20%, rgba(0, 0, 0, 0.55) 55%, transparent 92%);
-  background-size: 200% 100%; animation: np-slide 6s linear infinite;
 }
-@keyframes np-slide { to { background-position: -200% 0; } }
-.np-aurora { background-image: linear-gradient(100deg, #22d3ee, #4ade80, #a78bfa, #22d3ee); opacity: 0.55; }
-.np-cyber {
-  background-image: repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.14) 0 1px, transparent 1px 4px), linear-gradient(100deg, #ec4899, #8b5cf6, #22d3ee, #ec4899);
-  background-size: 100% 4px, 200% 100%; animation: np-cyber 4s linear infinite; opacity: 0.6;
-}
-@keyframes np-cyber { to { background-position: 0 40px, -200% 0; } }
-.np-fire { background-image: linear-gradient(100deg, #f97316, #ef4444, #facc15, #f97316); animation-duration: 2.5s; opacity: 0.55; }
-.np-ocean {
-  background-image: radial-gradient(ellipse at 50% 120%, rgba(255, 255, 255, 0.35) 0 20%, transparent 21%), linear-gradient(100deg, #0ea5e9, #2563eb, #06b6d4, #0ea5e9);
-  background-size: 34px 24px, 200% 100%; animation: np-ocean 5s linear infinite; opacity: 0.55;
-}
-@keyframes np-ocean { to { background-position: 68px 0, -200% 0; } }
-.np-space {
-  background-image: radial-gradient(1.2px 1.2px at 20% 30%, #fff 50%, transparent 51%), radial-gradient(1px 1px at 70% 60%, #fff 50%, transparent 51%),
-    radial-gradient(1.4px 1.4px at 45% 80%, #c4b5fd 50%, transparent 51%), linear-gradient(100deg, #1e1b4b, #4c1d95, #0f172a, #1e1b4b);
-  background-size: 40px 30px, 52px 34px, 64px 40px, 200% 100%; animation: np-space 8s linear infinite; opacity: 0.85;
-}
-@keyframes np-space { to { background-position: -40px 0, -104px 0, -64px 0, -200% 0; } }
-.np-sakura {
-  background-image: radial-gradient(ellipse 4px 2.5px at 30% 40%, #fff 50%, transparent 52%), radial-gradient(ellipse 4px 2.5px at 75% 70%, #fbcfe8 50%, transparent 52%), linear-gradient(100deg, #f9a8d4, #fda4af, #f0abfc, #f9a8d4);
-  background-size: 46px 34px, 58px 38px, 200% 100%; animation: np-sakura 7s linear infinite; opacity: 0.6;
-}
-@keyframes np-sakura { to { background-position: 46px 34px, 58px -38px, -200% 0; } }
-.np-gold { background-image: linear-gradient(100deg, #b45309, #fcd34d 45%, #fffbeb 50%, #fcd34d 55%, #b45309); animation-duration: 3.5s; opacity: 0.55; }
-.np-custom { background-image: linear-gradient(100deg, var(--np1), var(--np2), var(--np1)); opacity: 0.55; }
-/* Rainbow and RGB repeat their colors once, so the whole spectrum is always in view as they slide. */
-.np-rainbow {
-  background-image: linear-gradient(90deg, #ef4444, #f97316, #eab308, #22c55e, #06b6d4, #6366f1, #d946ef, #ef4444, #f97316, #eab308, #22c55e, #06b6d4, #6366f1, #d946ef, #ef4444);
-  animation-duration: 8s; opacity: 0.55;
-}
-/* RGB: like a gaming keyboard. Fast, saturated, and pulsing brighter. */
-.np-rgb {
-  background-image: linear-gradient(90deg, #ff0040, #ff8000, #ffee00, #00ff6a, #00c8ff, #4b00ff, #ff00d4, #ff0040, #ff8000, #ffee00, #00ff6a, #00c8ff, #4b00ff, #ff00d4, #ff0040);
-  animation: np-slide 2.4s linear infinite, np-rgb 1.2s ease-in-out infinite alternate; opacity: 0.65;
-}
-@keyframes np-rgb { to { filter: brightness(1.3) saturate(1.6); } }
-@media (prefers-reduced-motion: reduce) { :root:not([data-motion='on']) .nameplate { animation: none; } }
+/* Each plate's art is drawn by its own layers (shell.css), which slide. Here: how much shows through. */
+.np-aurora { opacity: 0.55; }
+.np-cyber { opacity: 0.6; }
+.np-fire { opacity: 0.55; }
+.np-ocean { opacity: 0.55; }
+.np-space { opacity: 0.85; }
+.np-sakura { opacity: 0.6; }
+.np-gold { opacity: 0.55; }
+.np-custom { opacity: 0.55; }
+.np-rainbow { opacity: 0.55; }
+.np-rgb { opacity: 0.65; }
+
 /* The editor's preview row. */
 .np-preview { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 10px; background: var(--surface-2); }
 .np-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
@@ -2216,20 +2137,6 @@ body:has(.bottom-nav):has(.composer) .toast { bottom: calc(150px + env(safe-area
 }
 /* Decorations that break out of the circle (ears, hats, wings...). */
 .adeco.adeco-behind { z-index: 0; }
-.adeco .ad-twitch { animation: ad-twitch 4s ease-in-out infinite; }
-@keyframes ad-twitch { 0%, 86%, 100% { transform: rotate(0); } 90% { transform: rotate(var(--r, 10deg)); } 94% { transform: rotate(calc(var(--r, 10deg) * -0.4)); } }
-.adeco .ad-flop { animation: ad-flop 3s ease-in-out infinite; }
-@keyframes ad-flop { 50% { transform: rotate(var(--r, 7deg)); } }
-.adeco .ad-sway { animation: adeco-sway 3.4s ease-in-out infinite; }
-@keyframes adeco-sway { 0%, 100% { transform: rotate(-3deg); } 50% { transform: rotate(4deg); } }
-.adeco .ad-bop { animation: ad-bop 0.9s ease-in-out infinite; }
-@keyframes ad-bop { 50% { transform: translateY(-2px) rotate(-2deg); } }
-.adeco .ad-note { animation: ad-note 1.8s ease-out infinite; animation-delay: var(--d, 0s); }
-@keyframes ad-note { from { transform: translate(0, 10px); opacity: 0; } 30% { opacity: 1; } to { transform: translate(8px, -14px); opacity: 0; } }
-.adeco .ad-blink { animation: ad-blink 1.4s steps(1) infinite; }
-@keyframes ad-blink { 50% { fill: #7f1d1d; filter: none; } }
-.adeco .ad-flap { animation: ad-flap 1.6s ease-in-out infinite; }
-@keyframes ad-flap { 50% { transform: rotate(-14deg); } }
 .deco-catears::before, .deco-bunny::before, .deco-wizard::before, .deco-horns::before, .deco-headphones::before, .deco-antenna::before, .deco-wings::before { display: none; }
 
 /* GIF avatars: still frame + live GIF. Calm chat shows the still one in chat rows until hover or tap. */
@@ -2251,11 +2158,13 @@ body:has(.bottom-nav):has(.composer) .toast { bottom: calc(150px + env(safe-area
   .calm-chat :is(.msg, .member-row, .conv-row):not(:hover):not(.selected):not(.active) .adeco,
   .calm-chat :is(.msg, .member-row, .conv-row):not(:hover):not(.selected):not(.active) .adeco *,
   .calm-chat :is(.msg, .member-row, .conv-row):not(:hover):not(.selected):not(.active) .deco::before,
+  .calm-chat :is(.msg, .member-row, .conv-row):not(:hover):not(.selected):not(.active) .deco::after,
   .calm-chat :is(.msg, .member-row, .conv-row):not(:hover):not(.selected):not(.active) .deco-ring,
   .calm-chat :is(.msg, .member-row, .conv-row):not(:hover):not(.selected):not(.active) .deco-orbit,
   .calm-chat :is(.msg, .member-row, .conv-row):not(:hover):not(.selected):not(.active) .deco-b,
   .calm-chat :is(.msg, .member-row, .conv-row):not(:hover):not(.selected):not(.active) .custom-border,
   .calm-chat :is(.msg, .member-row, .conv-row):not(:hover):not(.selected):not(.active) .nameplate,
+  .calm-chat :is(.msg, .member-row, .conv-row):not(:hover):not(.selected):not(.active) .nameplate *,
   .calm-chat :is(.msg, .member-row, .conv-row):not(:hover):not(.selected):not(.active) .nameplate::before,
   .calm-chat :is(.msg, .member-row, .conv-row):not(:hover):not(.selected):not(.active) .nameplate::after { animation-play-state: paused; }
   .calm-chat :is(.msg, .member-row, .conv-row):not(:hover):not(.selected):not(.active) .gif-av > img { visibility: hidden; }
@@ -2268,11 +2177,13 @@ body:has(.bottom-nav):has(.composer) .toast { bottom: calc(150px + env(safe-area
   .calm-chat :is(.msg, .member-row, .conv-row):not(.selected):not(.active) .adeco,
   .calm-chat :is(.msg, .member-row, .conv-row):not(.selected):not(.active) .adeco *,
   .calm-chat :is(.msg, .member-row, .conv-row):not(.selected):not(.active) .deco::before,
+  .calm-chat :is(.msg, .member-row, .conv-row):not(.selected):not(.active) .deco::after,
   .calm-chat :is(.msg, .member-row, .conv-row):not(.selected):not(.active) .deco-ring,
   .calm-chat :is(.msg, .member-row, .conv-row):not(.selected):not(.active) .deco-orbit,
   .calm-chat :is(.msg, .member-row, .conv-row):not(.selected):not(.active) .deco-b,
   .calm-chat :is(.msg, .member-row, .conv-row):not(.selected):not(.active) .custom-border,
   .calm-chat :is(.msg, .member-row, .conv-row):not(.selected):not(.active) .nameplate,
+  .calm-chat :is(.msg, .member-row, .conv-row):not(.selected):not(.active) .nameplate *,
   .calm-chat :is(.msg, .member-row, .conv-row):not(.selected):not(.active) .nameplate::before,
   .calm-chat :is(.msg, .member-row, .conv-row):not(.selected):not(.active) .nameplate::after { animation-play-state: paused; }
   .calm-chat :is(.msg, .member-row, .conv-row):not(.selected):not(.active) .gif-av > img { visibility: hidden; }
@@ -2287,14 +2198,11 @@ body:has(.bottom-nav):has(.composer) .toast { bottom: calc(150px + env(safe-area
 @keyframes ne-fire { 0%, 100% { background-position: 0 0; } 50% { background-position: 0 100%; } }
 .ne-ice { animation: ne-slide 4s linear infinite; filter: drop-shadow(0 0 3px rgba(125, 211, 252, 0.8)); }
 .ne-gold { animation: ne-slide-wide 3s linear infinite; filter: drop-shadow(0 1px 0 #78350f); }
-/* Gold and Gear are 220% wide: one whole width is -183.33% (ne-slide's -200%
+/* Gold and Gear are 220% wide: one whole width is -183.33% (ne-slide-wide; ne-slide's -200%
    overshot it, so the shine jumped each time round). */
-@keyframes ne-slide-wide { to { background-position: -183.3333% 0; } }
 .ne-toon { -webkit-text-stroke: 1.6px #111827; paint-order: stroke fill; filter: drop-shadow(2px 2px 0 var(--nglow, #6366f1)); letter-spacing: 0.02em; }
 .ne-sparkle { animation: ne-glitter 1.6s linear infinite; }
 @keyframes ne-glitter { to { background-position: 14px -14px, -18px 18px, 22px 22px, 0 0; } }
-.ne-pulse { animation: ne-pulse 1.4s ease-in-out infinite; }
-@keyframes ne-pulse { 50% { filter: drop-shadow(0 0 6px var(--nglow, currentColor)); transform: scale(1.04); } }
 
 .ask-more { align-self: flex-start; margin-top: -2px; }
 .style-request { margin-top: 18px; padding: 12px; border-radius: 12px; background: var(--surface-2); display: flex; flex-direction: column; gap: 6px; }
@@ -2954,10 +2862,8 @@ body:has(.bottom-nav):has(.composer) .toast { bottom: calc(150px + env(safe-area
 .ads-group-tools { padding: 0 14px 8px; }
 
 /* Gear nameplate: a steel plate with two meshed gears turning on the right. */
-.np-gear {
-  background-image: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.07) 0 1px, transparent 1px 3px), linear-gradient(100deg, #334155, #64748b 40%, #cbd5e1 50%, #64748b 60%, #334155);
-  background-size: 100% 100%, 200% 100%; animation-duration: 7s; opacity: 0.75;
-}
+.np-gear { opacity: 0.75; }
+.np-gear::before, .np-gear::after { z-index: 1; }
 .np-gear::before, .np-gear::after {
   content: ''; position: absolute; top: 50%; aspect-ratio: 1; background: #e2e8f0;
   -webkit-mask: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'><circle cx='20' cy='20' r='15.5' fill='none' stroke='%23000' stroke-width='5' stroke-dasharray='4.058 4.058'/><circle cx='20' cy='20' r='10' fill='none' stroke='%23000' stroke-width='7'/><circle cx='20' cy='20' r='2.6'/></svg>") center / contain no-repeat;
@@ -2966,9 +2872,8 @@ body:has(.bottom-nav):has(.composer) .toast { bottom: calc(150px + env(safe-area
 }
 /* A 52px and a 32px gear, centers 32px apart so the teeth overlap; the small
    one turns the other way, faster by the size ratio, so they look meshed. */
-.np-gear::before { right: 8px; width: 52px; translate: 0 -50%; animation: np-gear 6s linear infinite; }
-.np-gear::after { right: 50px; width: 32px; translate: 0 -50%; animation: np-gear 3.7s linear infinite reverse; background: #94a3b8; }
-@keyframes np-gear { to { rotate: 360deg; } }
+.np-gear::before { right: 8px; width: 52px; translate: 0 -50%; }
+.np-gear::after { right: 50px; width: 32px; translate: 0 -50%; background: #94a3b8; }
 
 /* Gear name effect: steel text and a little gear turning after the name. */
 .ne-gear { animation: ne-slide-wide 3.4s linear infinite; filter: drop-shadow(0 1px 0 rgba(15, 23, 42, 0.55)); }
@@ -2977,9 +2882,7 @@ body:has(.bottom-nav):has(.composer) .toast { bottom: calc(150px + env(safe-area
   background: var(--nglow, #94a3b8);
   -webkit-mask: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'><circle cx='20' cy='20' r='15.5' fill='none' stroke='%23000' stroke-width='5' stroke-dasharray='4.058 4.058'/><circle cx='20' cy='20' r='10' fill='none' stroke='%23000' stroke-width='7'/><circle cx='20' cy='20' r='2.6'/></svg>") center / contain no-repeat;
   mask: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'><circle cx='20' cy='20' r='15.5' fill='none' stroke='%23000' stroke-width='5' stroke-dasharray='4.058 4.058'/><circle cx='20' cy='20' r='10' fill='none' stroke='%23000' stroke-width='7'/><circle cx='20' cy='20' r='2.6'/></svg>") center / contain no-repeat;
-  animation: np-gear 4s linear infinite;
 }
-@media (prefers-reduced-motion: reduce) { :root:not([data-motion='on']) .np-gear::before, :root:not([data-motion='on']) .np-gear::after { animation: none; } }
 
 /* ---------- on-screen keyboard (keyboard.js) ----------
    While it's open, only the part of the screen above it counts: the app and

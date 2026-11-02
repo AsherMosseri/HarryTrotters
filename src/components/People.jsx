@@ -821,6 +821,7 @@ export function ProfileEditor({ name, actor, api, tasks = [], onClose }) {
                               onClick={() => set({ nameStyle: { ...look.nameStyle, effect: e.id } })}
                             >
                               <span
+                                data-deco-own="1"
                                 {...nameProps(
                                   { nameStyle: { ...look.nameStyle, effect: e.id } },
                                   people?.infoOf(name)?.color,
@@ -852,7 +853,7 @@ export function ProfileEditor({ name, actor, api, tasks = [], onClose }) {
                                 aria-pressed={(look.nameplate?.id || '') === np.id}
                                 onClick={() => set({ nameplate: plate })}
                               >
-                                <Nameplate plate={plate} />
+                                <Nameplate plate={plate} live />
                                 <span>{np.label}</span>
                               </button>
                             );
@@ -901,6 +902,7 @@ export function ProfileEditor({ name, actor, api, tasks = [], onClose }) {
                                 size={36}
                                 decoration={d.id}
                                 decorationCustom={d.id === 'custom' ? look.decorationCustom || DEFAULT_DECO : undefined}
+                                own
                               />
                               <span className="tiny">{d.label}</span>
                             </button>

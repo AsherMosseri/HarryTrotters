@@ -808,11 +808,9 @@ button.sb-head-row { width: 100%; border: 0; background: none; color: var(--mute
    as it is; the message box lifts above the bar (keyboard.js). */
 html.kb-bar .composer { padding-bottom: calc(10px + var(--kb-bar, 0px)); }
 /* Your menu (bottom-left) opens like the other pop-ups: a quick slide and
-   scale up from where you tapped, not a flat fade. Decorations that spin get
-   their own layer so they stay smooth in the sidebar too. */
+   scale up from where you tapped, not a flat fade. */
 .sb-foot .me-menu { transform-origin: 20px calc(100% + 20px); animation: me-pop 0.2s cubic-bezier(0.2, 0.9, 0.3, 1.1); }
 @keyframes me-pop { from { opacity: 0; transform: translateY(8px) scale(0.96); } }
-.sidebar :is(.deco-ring, .deco-orbit, .deco-b, .adeco) { will-change: transform; }
 .reply-ic { vertical-align: -3px; color: var(--muted); margin-right: 2px; }
 .coins-sent-ic { font-size: 44px; color: var(--st-done); font-weight: 800; }
 
@@ -1164,46 +1162,224 @@ button, [role='button'] { -webkit-user-select: none; user-select: none; -webkit-
 .phone-shell ~ .code-ready, body:has(.phone-shell) .code-ready { bottom: calc(env(safe-area-inset-bottom) + 76px); }
 @keyframes code-ready-in { from { opacity: 0; transform: translate(-50%, 12px); } }
 
-/* ---------- Smooth avatar decorations on iPad ----------
-   iPad Safari runs an animation on the graphics chip only when it moves or
-   fades something with fixed values; anything else (shadows, filters,
-   variables in keyframes, shapes inside a drawing) is redrawn on the main
-   thread and stalls or freezes whenever the app is busy. */
-/* Layers of an animated decoration that turn as a whole. */
-.adeco.adeco-spin { transform-origin: 50% 50%; animation: deco-spin var(--spd, 4s) linear infinite; animation-delay: var(--d, 0s); will-change: transform; }
-.adeco.adeco-spin.ccw { animation-direction: reverse; }
-/* One soft glow instead of two, and none on small avatars. */
-.adeco .ad-glow { filter: drop-shadow(0 0 4px var(--c, #fff)); }
-.adeco .ad-bolt { filter: drop-shadow(0 0 3px var(--c)); }
-.adeco.small .ad-glow, .adeco.small .ad-bolt { filter: none; }
-/* Spinning rings and orbits get their own layer. */
-.deco-ring.spin, .deco-orbit, .deco-rainbow::before, .deco-flame::before, .deco-stars::before { will-change: transform; }
-/* Stickers: the tilt is on the outer span (decoRender.jsx), so these keyframes are plain. */
-.deco-b { transform: none; will-change: transform; }
-@keyframes deco-b-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-@keyframes deco-b-bob { 50% { transform: translateY(-18%); } }
-@keyframes deco-b-pulse { 50% { transform: scale(1.25); } }
-@keyframes deco-b-wiggle { 25% { transform: rotate(-16deg); } 75% { transform: rotate(16deg); } }
-@keyframes deco-b-float { 33% { transform: translate(12%, -14%); } 66% { transform: translate(-12%, 8%); } }
-/* Glows fade a drawn glow in and out instead of redrawing a shadow every frame. */
-.deco-ring.ring-glow { animation: none; }
-.deco-ring.ring-glow.spin { animation: deco-spin var(--spd, 4s) linear infinite; }
-.deco-ring.ring-glow::after {
-  content: ''; position: absolute; inset: 0; border-radius: 50%; pointer-events: none;
-  box-shadow: 0 0 calc(var(--s) * 0.32) calc(var(--s) * 0.04) var(--glow); opacity: 0;
-  animation: deco-glow-fade 0.9s ease-in-out infinite alternate; will-change: opacity;
-}
-@keyframes deco-glow-fade { to { opacity: 1; } }
-.deco-neon::before { animation: none; }
+/* ---------- Avatar decorations, name effects and nameplates: all the motion ----------
+   Everything here moves with transform and opacity only, with fixed keyframe
+   values (no variables, no calc), on its own box, so the browser hands it to the
+   graphics chip and nothing is redrawn while it plays. iPad Safari does that
+   for a moving box only: shadows, filters, background positions, dashes, and
+   shapes moving inside an SVG are redrawn on the main thread every frame, and
+   stall or freeze whenever the app is busy. Each @keyframes is defined once,
+   here. src/styles.css only has how things look when still.
+   Which ones move at all: Animations setting and Calm chat (rules below and in
+   styles.css), and decoMotion.js (only what's on screen, a few at a time). */
+
+/* Held still by decoMotion.js (off screen, or past the few that move at once). */
+[data-still], [data-still] *, [data-still]::before, [data-still]::after, [data-still] *::before, [data-still] *::after { animation-play-state: paused !important; }
+/* A two-frame pause when the app comes back, which wakes animations iOS left frozen. */
+:root[data-deco-kick] :is(.deco, .deco *, .nameplate, .nameplate *, .ne, .ne *),
+:root[data-deco-kick] :is(.deco, .deco *, .nameplate, .nameplate *, .ne, .ne *)::before,
+:root[data-deco-kick] :is(.deco, .deco *, .nameplate, .nameplate *, .ne, .ne *)::after { animation-play-state: paused !important; }
+
+@keyframes deco-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes deco-bob { 0%, 100% { transform: none; } 50% { transform: translateY(-2px) rotate(-6deg); } }
+@keyframes deco-glow-fade { from { opacity: 0; } to { opacity: 1; } }
+
+/* Plain decorations: the colored ring under the picture turns; badges bob or turn. */
+.deco-rainbow::before { animation: deco-spin 3s linear infinite; }
+.deco-flame::before { animation: deco-spin 1.6s linear infinite; }
+.deco-stars::before { animation: deco-spin 6s linear infinite; }
+.deco-rainbow::before, .deco-flame::before, .deco-stars::before { will-change: transform; backface-visibility: hidden; }
+.deco-flame .deco-badge { animation: deco-bob 0.9s ease-in-out infinite; }
+.deco-robot .deco-badge { animation: deco-bob 1.4s ease-in-out infinite; }
+.deco-gear .deco-badge { animation: deco-spin 4s linear infinite; }
+/* Neon: a still glow that fades in and out (a shadow that changed size would be redrawn every frame). */
 .deco-neon::after {
   content: ''; position: absolute; inset: calc(var(--s) * -0.06); border-radius: 50%; pointer-events: none; z-index: 0;
   box-shadow: 0 0 calc(var(--s) * 0.25) calc(var(--s) * 0.06) var(--accent); opacity: 0;
   animation: deco-glow-fade 0.9s ease-in-out infinite alternate; will-change: opacity;
 }
-@media (prefers-reduced-motion: reduce) {
-  :root:not([data-motion='on']) :is(.adeco.adeco-spin, .deco-ring.ring-glow::after, .deco-neon::after) { animation: none !important; }
+
+/* Custom rings: the ring turns, the orbit turns, a glow fades. */
+.deco-ring.spin { animation: deco-spin var(--spd, 4s) linear infinite; will-change: transform; backface-visibility: hidden; }
+.deco-ring.spin.ccw { animation-direction: reverse; }
+.deco-ring-clip { position: absolute; z-index: 2; border-radius: 50%; }
+.deco-ring-clip > .deco-ring { inset: 0; }
+.deco-custom.has-glow::before, .deco-custom.has-glow::after {
+  content: ''; position: absolute; inset: calc(var(--s) * -1 * var(--ro)); border-radius: 50%; pointer-events: none; z-index: 0;
 }
-:root[data-motion='off'] :is(.adeco.adeco-spin, .deco-ring.ring-glow::after, .deco-neon::after) { animation: none !important; }
+.deco-custom.has-glow::before { box-shadow: 0 0 calc(var(--s) * 0.16) var(--glow); }
+.deco-custom.has-glow::after {
+  box-shadow: 0 0 calc(var(--s) * 0.32) calc(var(--s) * 0.04) var(--glow); opacity: 0;
+  animation: deco-glow-fade 0.9s ease-in-out infinite alternate; will-change: opacity;
+}
+.deco-orbit { animation: deco-spin var(--spd) linear infinite; will-change: transform; backface-visibility: hidden; }
+.deco-orbit.ccw { animation-direction: reverse; }
+
+/* Stickers: the tilt is on the outer span (decoRender.jsx), so these are plain. */
+.deco-b { transform: none; }
+.deco-b.anim-spin { animation: deco-b-spin var(--spd) linear infinite; }
+.deco-b.anim-spin.ccw { animation-direction: reverse; }
+.deco-b.anim-bob { animation: deco-b-bob var(--spd) ease-in-out infinite; }
+.deco-b.anim-pulse { animation: deco-b-pulse var(--spd) ease-in-out infinite; }
+.deco-b.anim-wiggle { animation: deco-b-wiggle var(--spd) ease-in-out infinite; }
+.deco-b.anim-float { animation: deco-b-float var(--spd) ease-in-out infinite; }
+.deco-b[class*='anim-']:not(.anim-none) { will-change: transform; }
+@keyframes deco-b-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes deco-b-bob { 0%, 100% { transform: none; } 50% { transform: translateY(-18%); } }
+@keyframes deco-b-pulse { 0%, 100% { transform: none; } 50% { transform: scale(1.25); } }
+@keyframes deco-b-wiggle { 0%, 50%, 100% { transform: none; } 25% { transform: rotate(-16deg); } 75% { transform: rotate(16deg); } }
+@keyframes deco-b-float { 0%, 100% { transform: none; } 33% { transform: translate(12%, -14%); } 66% { transform: translate(-12%, 8%); } }
+
+/* Animated decorations (decoRender.jsx). Every moving piece is a box holding a
+   still drawing; the box turns, scales, slides or fades. */
+.ad-part { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; display: block; }
+.ad-sub { position: absolute; inset: 0; width: 100%; height: 100%; }
+.adeco { contain: layout style; }
+.adeco .ad-glow { filter: drop-shadow(0 0 4px var(--c, #fff)); }
+.adeco .ad-bolt-line { filter: drop-shadow(0 0 3px var(--c)); }
+/* Small avatars (lists, the sidebar) skip the glows: barely visible that size. */
+.adeco.small .ad-glow, .adeco.small .ad-bolt-line { filter: none; }
+.adeco-spin { animation: deco-spin var(--spd, 4s) linear infinite; animation-delay: var(--d, 0s); will-change: transform; backface-visibility: hidden; }
+.adeco-spin.ccw { animation-direction: reverse; }
+.ad-flick { animation: adeco-flick 0.9s ease-in-out infinite alternate; animation-delay: var(--d, 0s); }
+.ad-bolt { opacity: 0; animation: adeco-bolt 0.45s steps(1) infinite; }
+.ad-bolt1 { animation-delay: -0.15s; }
+.ad-bolt2 { animation-delay: -0.3s; }
+.ad-bob { animation: adeco-bob 2.4s ease-in-out infinite; }
+.ad-twinkle { animation: adeco-twinkle 1.8s ease-in-out infinite; animation-delay: var(--d, 0s); }
+/* Each ripple fades in as it leaves the avatar, so a new one never pops in. */
+.ad-ripple { color: var(--accent); animation: adeco-ripple 2.4s ease-out infinite; animation-delay: var(--d, 0s); }
+.ad-flip { animation: adeco-flip 2.2s ease-in-out infinite; animation-delay: var(--d, 0s); }
+/* Circuit: the dashes march (the whole dashed ring turns by two dashes) and the bright dash runs round (the ring turns once). */
+.ad-march { animation: adeco-march 1.2s linear infinite; }
+.ad-run { animation: deco-spin 2.2s linear infinite; will-change: transform; backface-visibility: hidden; }
+.ad-twitch-l { animation: adeco-twitch-l 4s ease-in-out infinite; }
+.ad-twitch-r { animation: adeco-twitch-r 4s ease-in-out infinite; }
+.ad-flop-l { animation: adeco-flop-l 3s ease-in-out infinite; }
+.ad-flop-r { animation: adeco-flop-r 3s ease-in-out infinite; }
+.ad-sway { animation: adeco-sway 3.4s ease-in-out infinite; }
+.ad-bop { animation: adeco-bop 0.9s ease-in-out infinite; }
+.ad-note { animation: adeco-note 1.8s ease-out infinite; animation-delay: var(--d, 0s); }
+.ad-blink { animation: adeco-blink 1.4s steps(1) infinite; }
+.ad-flap-l { animation: adeco-flap-l 1.6s ease-in-out infinite; }
+.ad-flap-r { animation: adeco-flap-r 1.6s ease-in-out infinite; }
+@keyframes adeco-flick { 0% { transform: scale(0.85, 0.7) skewX(0deg); } 40% { transform: scale(1.05, 1.15) skewX(4deg); } 100% { transform: scale(0.95, 0.95) skewX(-4deg); } }
+@keyframes adeco-bolt { 0% { opacity: 1; } 33%, 100% { opacity: 0; } }
+@keyframes adeco-bob { 0%, 100% { transform: none; } 50% { transform: translateY(-2.5%); } }
+@keyframes adeco-twinkle { 0%, 100% { transform: scale(0.2); opacity: 0.2; } 50% { transform: scale(1); opacity: 1; } }
+@keyframes adeco-ripple { 0% { transform: scale(1); opacity: 0; } 15% { opacity: 0.9; } 100% { transform: scale(1.3); opacity: 0; } }
+@keyframes adeco-flip { 0%, 100% { transform: none; } 50% { transform: scaleX(-1) rotate(25deg); } }
+@keyframes adeco-march { from { transform: rotate(0deg); } to { transform: rotate(16.667deg); } }
+@keyframes adeco-twitch-l { 0%, 86%, 100% { transform: rotate(0deg); } 90% { transform: rotate(-10deg); } 94% { transform: rotate(4deg); } }
+@keyframes adeco-twitch-r { 0%, 86%, 100% { transform: rotate(0deg); } 90% { transform: rotate(10deg); } 94% { transform: rotate(-4deg); } }
+@keyframes adeco-flop-l { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(-7deg); } }
+@keyframes adeco-flop-r { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(7deg); } }
+@keyframes adeco-sway { 0%, 100% { transform: rotate(-3deg); } 50% { transform: rotate(4deg); } }
+@keyframes adeco-bop { 0%, 100% { transform: none; } 50% { transform: translateY(-1.25%) rotate(-2deg); } }
+@keyframes adeco-note { 0% { transform: translate(0, 6.25%); opacity: 0; } 30% { opacity: 1; } 100% { transform: translate(5%, -8.75%); opacity: 0; } }
+@keyframes adeco-blink { 0% { opacity: 1; } 50% { opacity: 0; } 100% { opacity: 1; } }
+@keyframes adeco-flap-l { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(-14deg); } }
+@keyframes adeco-flap-r { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(14deg); } }
+
+/* Name effects: a glow that changed size would be redrawn every frame, so the
+   glow is drawn once and the name fades or scales instead. (A moving gradient
+   in text can't be a layer; those stay, and decoMotion.js keeps only a few
+   of them going at once.) */
+.ne-neon { animation: ne-neon 2.6s ease-in-out infinite; }
+@keyframes ne-neon { 0%, 100% { opacity: 1; } 50% { opacity: 0.8; } 93% { opacity: 1; } 95% { opacity: 0.55; } }
+.ne-pulse { filter: drop-shadow(0 0 3px var(--nglow, currentColor)); animation: ne-pulse 1.4s ease-in-out infinite; }
+@keyframes ne-pulse { 0%, 100% { transform: none; } 50% { transform: scale(1.04); } }
+@keyframes ne-slide { to { background-position: -200% 0; } }
+@keyframes ne-slide-wide { to { background-position: -183.3333% 0; } }
+
+/* Nameplates: the art is a strip wider than the row that slides sideways (one
+   whole picture per loop, so it never jumps), and the row only shows it through
+   its fade. Each layer of art moves at its own speed. */
+.nameplate { position: absolute; inset: 0; z-index: 0; pointer-events: none; border-radius: inherit; contain: layout style; }
+.nameplate > i { position: absolute; display: block; top: 0; bottom: 0; pointer-events: none; will-change: transform; backface-visibility: hidden; }
+/* A strip of one picture, twice as wide as the row, repeating: slides right by one picture per loop. */
+.nameplate > .np-strip { left: -200%; width: 400%; background-size: 50% 100%; animation: np-slide var(--np-t, 6s) linear infinite; }
+@keyframes np-slide { from { transform: translateX(0); } to { transform: translateX(50%); } }
+.np-aurora > i { --np-t: 6s; background-image: linear-gradient(100deg, #22d3ee, #4ade80, #a78bfa, #22d3ee); }
+.np-fire > i { --np-t: 2.5s; background-image: linear-gradient(100deg, #f97316, #ef4444, #facc15, #f97316); }
+.np-gold > i { --np-t: 3.5s; background-image: linear-gradient(100deg, #b45309, #fcd34d 45%, #fffbeb 50%, #fcd34d 55%, #b45309); }
+.np-custom > i { --np-t: 6s; background-image: linear-gradient(100deg, var(--np1), var(--np2), var(--np1)); }
+.np-rainbow > i {
+  --np-t: 8s;
+  background-image: linear-gradient(90deg, #ef4444, #f97316, #eab308, #22c55e, #06b6d4, #6366f1, #d946ef, #ef4444, #f97316, #eab308, #22c55e, #06b6d4, #6366f1, #d946ef, #ef4444);
+}
+.np-rgb > i {
+  --np-t: 2.4s;
+  background-image: linear-gradient(90deg, #ff0040, #ff8000, #ffee00, #00ff6a, #00c8ff, #4b00ff, #ff00d4, #ff0040, #ff8000, #ffee00, #00ff6a, #00c8ff, #4b00ff, #ff00d4, #ff0040);
+}
+/* RGB pulses brighter: the whole plate fades up and down. */
+.np-rgb { animation: np-pulse 1.2s ease-in-out infinite alternate; }
+@keyframes np-pulse { from { opacity: 0.65; } to { opacity: 0.82; } }
+.np-gear > i {
+  --np-t: 7s;
+  background-image: linear-gradient(100deg, #334155, #64748b 40%, #cbd5e1 50%, #64748b 60%, #334155);
+}
+/* Cyber: scan lines run down over a sliding gradient. */
+.np-cyber > i:nth-child(1) { --np-t: 4s; background-image: linear-gradient(100deg, #ec4899, #8b5cf6, #22d3ee, #ec4899); }
+.np-cyber > i:nth-child(2) { top: -4px; bottom: 0; left: 0; right: 0; background-image: repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.14) 0 1px, transparent 1px 4px); animation: np-scan 0.4s linear infinite; }
+@keyframes np-scan { from { transform: translateY(0); } to { transform: translateY(4px); } }
+/* Ocean: waves roll along (two tiles per loop) under the gradient's slide. */
+.np-ocean > i:nth-child(1) { --np-t: 5s; background-image: linear-gradient(100deg, #0ea5e9, #2563eb, #06b6d4, #0ea5e9); }
+.np-ocean > i:nth-child(2) { left: -68px; right: 0; background-image: radial-gradient(ellipse at 50% 120%, rgba(255, 255, 255, 0.35) 0 20%, transparent 21%); background-size: 34px 24px; animation: np-roll-68 5s linear infinite; }
+@keyframes np-roll-68 { from { transform: translateX(0); } to { transform: translateX(68px); } }
+/* Space: three layers of stars drift left at different speeds. */
+.np-space > i:nth-child(1) { --np-t: 8s; background-image: linear-gradient(100deg, #1e1b4b, #4c1d95, #0f172a, #1e1b4b); }
+.np-space > i:nth-child(2) { left: 0; right: -40px; background-image: radial-gradient(1.2px 1.2px at 20% 30%, #fff 50%, transparent 51%); background-size: 40px 30px; animation: np-drift-40 8s linear infinite; }
+.np-space > i:nth-child(3) { left: 0; right: -104px; background-image: radial-gradient(1px 1px at 70% 60%, #fff 50%, transparent 51%); background-size: 52px 34px; animation: np-drift-104 8s linear infinite; }
+.np-space > i:nth-child(4) { left: 0; right: -64px; background-image: radial-gradient(1.4px 1.4px at 45% 80%, #c4b5fd 50%, transparent 51%); background-size: 64px 40px; animation: np-drift-64 8s linear infinite; }
+@keyframes np-drift-40 { from { transform: translateX(0); } to { transform: translateX(-40px); } }
+@keyframes np-drift-104 { from { transform: translateX(0); } to { transform: translateX(-104px); } }
+@keyframes np-drift-64 { from { transform: translateX(0); } to { transform: translateX(-64px); } }
+/* Sakura: two layers of petals drift across, over the gradient. */
+.np-sakura > i:nth-child(1) { --np-t: 7s; background-image: linear-gradient(100deg, #f9a8d4, #fda4af, #f0abfc, #f9a8d4); }
+.np-sakura > i:nth-child(2) { left: -46px; right: 0; top: -34px; background-image: radial-gradient(ellipse 4px 2.5px at 30% 40%, #fff 50%, transparent 52%); background-size: 46px 34px; animation: np-fall-a 7s linear infinite; }
+.np-sakura > i:nth-child(3) { left: -58px; right: 0; bottom: -38px; background-image: radial-gradient(ellipse 4px 2.5px at 75% 70%, #fbcfe8 50%, transparent 52%); background-size: 58px 38px; animation: np-fall-b 7s linear infinite; }
+@keyframes np-fall-a { from { transform: translate(0, 0); } to { transform: translate(46px, 34px); } }
+@keyframes np-fall-b { from { transform: translate(0, 0); } to { transform: translate(58px, -38px); } }
+/* Gear: the steel plate slides; two gears turn on the right (styles.css has how they look). */
+.np-gear::before { animation: np-gear 6s linear infinite; }
+.np-gear::after { animation: np-gear 3.7s linear infinite reverse; }
+.ne-gear::after { animation: np-gear 4s linear infinite; }
+@keyframes np-gear { from { rotate: 0deg; } to { rotate: 360deg; } }
+
+/* Off: the Animations switch (Appearance), and Reduce Motion unless Animations is forced on. */
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion='on']) .deco::before,
+  :root:not([data-motion='on']) .deco::after,
+  :root:not([data-motion='on']) .deco-badge,
+  :root:not([data-motion='on']) .deco-ring,
+  :root:not([data-motion='on']) .deco-orbit,
+  :root:not([data-motion='on']) .deco-b,
+  :root:not([data-motion='on']) .adeco,
+  :root:not([data-motion='on']) .adeco *,
+  :root:not([data-motion='on']) .nameplate,
+  :root:not([data-motion='on']) .nameplate *,
+  :root:not([data-motion='on']) .nameplate::before,
+  :root:not([data-motion='on']) .nameplate::after,
+  :root:not([data-motion='on']) .ne,
+  :root:not([data-motion='on']) .ne::before,
+  :root:not([data-motion='on']) .ne::after { animation: none !important; }
+}
+:root[data-motion='off'] .deco::before,
+  :root[data-motion='off'] .deco::after,
+  :root[data-motion='off'] .deco-badge,
+  :root[data-motion='off'] .deco-ring,
+  :root[data-motion='off'] .deco-orbit,
+  :root[data-motion='off'] .deco-b,
+  :root[data-motion='off'] .adeco,
+  :root[data-motion='off'] .adeco *,
+  :root[data-motion='off'] .nameplate,
+  :root[data-motion='off'] .nameplate *,
+  :root[data-motion='off'] .nameplate::before,
+  :root[data-motion='off'] .nameplate::after,
+  :root[data-motion='off'] .ne,
+  :root[data-motion='off'] .ne::before,
+  :root[data-motion='off'] .ne::after { animation: none !important; }
 
 /* 3.0: the old Home Screen app sends you to add the new one. */
 .new-app-steps li + li { margin-top: 14px; }

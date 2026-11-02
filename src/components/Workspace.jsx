@@ -2368,7 +2368,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
         aria-label={newRequests ? `You: ${newRequests} new feature requests` : 'You: profile, ideas, help, theme'}
         aria-expanded={meMenu}
       >
-        <Avatar name={actor.name} size={28} />
+        <Avatar name={actor.name} size={28} own />
         <span className="user-name">{actor.name}</span>
         <Icon name="more" size={18} className="me-more" />
         {newRequests > 0 && <span className="bell-badge">{newRequests > 9 ? '9+' : newRequests}</span>}
@@ -2412,7 +2412,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
                   {shiftButton}
                   {inboxButton}
                   <button className="avatar-btn me-btn" onClick={() => setPhoneSheet('me')} aria-label="You: profile, theme, ideas, help">
-                    <Avatar name={actor.name} size={34} />
+                    <Avatar name={actor.name} size={34} own />
                     {newRequests > 0 && <span className="bell-badge">{newRequests > 9 ? '9+' : newRequests}</span>}
                   </button>
                 </header>
