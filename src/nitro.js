@@ -1,6 +1,10 @@
 // Profile and app styles (the Nitro-style extras). Ids are saved in profiles,
 // so keep them stable.
 import { FX } from './fx/effects.js';
+import { watchDeco } from './decoMotion.js';
+
+// Name effects that don't move.
+const STILL_EFFECTS = ['outline', 'pop', 'toon'];
 
 export const DECORATIONS = [
   { id: '', label: 'None' },
@@ -220,6 +224,8 @@ export function nameStyle(profile, fallbackColor) {
 export function nameProps(profile, fallbackColor, name, className = '') {
   const effect = profile?.nameStyle?.effect;
   return {
+    // The ones that move register with decoMotion.js, which keeps only a few going at once.
+    ref: effect && !STILL_EFFECTS.includes(effect) ? watchDeco : undefined,
     className: `display-name ${className}${effect ? ` ne ne-${effect}` : ''}`,
     style: nameStyle(profile, fallbackColor),
     'data-text': name,

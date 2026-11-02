@@ -165,7 +165,7 @@ export default function DecorationEditor({ name, value, onChange, upload }) {
           onPointerCancel={() => (dragging.current = false)}
           title={b ? 'Tap or drag to place the selected sticker' : ''}
         >
-          <Avatar name={name} size={120} decoration="custom" decorationCustom={d} />
+          <Avatar name={name} size={120} decoration="custom" decorationCustom={d} own />
         </div>
         <div className="deco-top-side">
           <p className="muted small">

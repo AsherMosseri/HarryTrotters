@@ -3,6 +3,7 @@ import { STATUSES, PRIORITIES, statusById, priorityById } from '../config.js';
 import { colorFor, initials, dueInfo } from '../util.js';
 import { decorationById, nameProps } from '../nitro.js';
 import { AnimatedDecoration, CustomDecoration, DecorationBehind } from './decoRender.jsx';
+import { watchDeco } from '../decoMotion.js';
 import { createPortal } from 'react-dom';
 import { Icon } from './shell/icons.jsx';
 
@@ -42,7 +43,12 @@ function GifAvatar({ src, name, size }) {
   );
 }
 
-export function Avatar({ name: saved, size = 26, photo, showOnline = false, decoration, decorationCustom }) {
+// The plain decorations that move (the others are still).
+const MOVING = new Set(['rainbow', 'neon', 'flame', 'stars', 'gear', 'robot']);
+
+// own: your own picture in a corner of the screen, or a preview while you pick
+// a decoration; it always moves (decoMotion.js).
+export function Avatar({ name: saved, size = 26, photo, showOnline = false, decoration, decorationCustom, own = false }) {
   const people = usePeople();
   // The current name, even for something saved before a rename.
   const name = people?.rename ? people.rename(saved || '') : saved;
@@ -62,14 +68,19 @@ export function Avatar({ name: saved, size = 26, photo, showOnline = false, deco
   const custom = deco === 'custom' ? (decorationCustom ?? people?.profileOf(name)?.decorationCustom) : null;
   if (custom) {
     pic = (
-      <CustomDecoration size={size} custom={custom}>
+      <CustomDecoration size={size} custom={custom} own={own}>
         {pic}
       </CustomDecoration>
     );
   } else if (decorationById[deco]?.anim) {
     // Animated decorations; tiny avatars (under 24px) get just a matching ring.
     pic = (
-      <span className={`deco deco-anim deco-${deco}`} style={{ width: size, height: size, '--s': `${size}px` }}>
+      <span
+        ref={watchDeco}
+        data-deco-own={own ? '1' : undefined}
+        className={`deco deco-anim deco-${deco}`}
+        style={{ width: size, height: size, '--s': `${size}px` }}
+      >
         {size >= 24 && <DecorationBehind id={deco} />}
         {pic}
         {size >= 24 && <AnimatedDecoration id={deco} small={size < 56} />}
@@ -78,7 +89,12 @@ export function Avatar({ name: saved, size = 26, photo, showOnline = false, deco
   } else if (deco && deco !== 'custom' && decorationById[deco]) {
     const badge = size >= 24 && decorationById[deco].badge;
     pic = (
-      <span className={`deco deco-${deco}`} style={{ width: size, height: size, '--s': `${size}px` }}>
+      <span
+        ref={MOVING.has(deco) ? watchDeco : undefined}
+        data-deco-own={own ? '1' : undefined}
+        className={`deco deco-${deco}`}
+        style={{ width: size, height: size, '--s': `${size}px` }}
+      >
         {pic}
         {badge && <span className="deco-badge">{badge}</span>}
       </span>
@@ -99,15 +115,25 @@ export function Avatar({ name: saved, size = 26, photo, showOnline = false, deco
 // subteam color.
 // A nameplate behind a row (members list, DMs): profile.nameplate is
 // { id } for a preset, or { id: 'custom', colors: [a, b] }.
-export function Nameplate({ plate }) {
+// Its art is a few layers that slide (shell.css); how many depends on the plate.
+const PLATE_LAYERS = { cyber: 2, ocean: 2, space: 4, sakura: 3 };
+// live: the previews while choosing one, which always move.
+export function Nameplate({ plate, live = false }) {
   if (!plate?.id) return null;
   const [a, b] = plate.colors || [];
+  const layers = PLATE_LAYERS[plate.id] || 1;
   return (
     <span
+      ref={watchDeco}
+      data-deco-own={live ? '1' : undefined}
       className={`nameplate np-${plate.id}`}
       style={plate.id === 'custom' ? { '--np1': a || '#6366f1', '--np2': b || a || '#ec4899' } : undefined}
       aria-hidden="true"
-    />
+    >
+      {Array.from({ length: layers }, (_, i) => (
+        <i key={i} className={i ? undefined : 'np-strip'} />
+      ))}
+    </span>
   );
 }
 
