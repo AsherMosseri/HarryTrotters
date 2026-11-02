@@ -4,6 +4,16 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '3.0.5',
+    date: '2026-11-02',
+    title: 'Keyboard, take two',
+    items: [
+      'Typing in a search box with the keyboard up now keeps the results in view: the reaction picker, emoji, GIF and sticker pickers, Parts, Scout and the settings pages all make room instead of squeezing the list to nothing. The quick reactions editor is compact too.',
+      'The update screen and What’s new no longer come up short or half-dimmed on iPad after an update.',
+      'Learn: the quiz and daily question answer buttons count the first tap on iPhone and iPad.',
+    ],
+  },
+  {
     version: '3.0.4',
     date: '2026-11-02',
     title: 'Pet park and team events',
