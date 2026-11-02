@@ -4,6 +4,16 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '3.0.3',
+    date: '2026-11-02',
+    title: 'The keyboard stays out of the way',
+    items: [
+      'Fixed: the keyboard no longer covers the message box and Send on iPhone and iPad, even after tapping Aa, Send or the + button, or coming back to the app. The top of the page also stays put when the keyboard closes.',
+      'Pop-ups, pickers and side panels in chat stay inside the part of the screen you can see while the keyboard is up.',
+      'Fixed: /me lines show the name and the action together on one line on phones.',
+    ],
+  },
+  {
     version: '3.0.2',
     date: '2026-11-02',
     title: 'Pets grow up',
