@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react';
 import {
   CHAT_EXTRAS,
   PERK_IDEAS,
-  PET_ITEMS,
   STATUSES,
   TOURNAMENT_GAMES,
   cleanPerk,
@@ -11,14 +10,13 @@ import {
   standings,
   weekFrom,
 } from '../../functions/shared/market.js';
-import { FULL } from '../../functions/shared/pets.js';
 import { commandByName } from '../commands.js';
 import { useMarket } from '../market.js';
 import { useLocalStorage } from '../util.js';
 import { Avatar, CloseIcon, Overlay } from './common.jsx';
 import { Coins } from './Coins.jsx';
 import { confirmDialog, promptDialog } from './Dialogs.jsx';
-import { AdoptPet, PetCard } from './Pet.jsx';
+import { PetsShelf } from './PetFamily.jsx';
 import { Icon } from './shell/icons.jsx';
 
 // The market (F1): spend Jackson coins on pet care, real perks team
@@ -49,7 +47,7 @@ function scoreText(t, n) {
   return m ? `${m}:${(n - m * 60).toFixed(1).padStart(4, '0')}` : `${n.toFixed(1)} s`;
 }
 
-export default function MarketView({ actor, balance, onToast, onPlay, onOpenCoins }) {
+export default function MarketView({ actor, balance, onToast, onPlay, onOpenCoins, roster }) {
   const market = useMarket();
   const [shelf, setShelf] = useLocalStorage('market-shelf', 'pets');
   const isManager = !!actor.admin;
@@ -87,7 +85,7 @@ export default function MarketView({ actor, balance, onToast, onPlay, onOpenCoin
           </button>
         ))}
       </div>
-      {shelf === 'pets' && <PetsShelf actor={actor} balance={balance} buy={buy} busy={busy} onToast={onToast} />}
+      {shelf === 'pets' && <PetsShelf actor={actor} balance={balance} buy={buy} busy={busy} onToast={onToast} roster={roster} />}
       {shelf === 'perks' && <PerksShelf actor={actor} balance={balance} buy={buy} busy={busy} onToast={onToast} />}
       {shelf === 'extras' && <ExtrasShelf actor={actor} balance={balance} buy={buy} busy={busy} onToast={onToast} />}
       {shelf === 'games' && <GamesShelf actor={actor} balance={balance} onToast={onToast} onPlay={onPlay} />}
@@ -100,63 +98,6 @@ function Price({ n }) {
     <span className="mk-price">
       <Coins n={n} size={15} />
     </span>
-  );
-}
-
-// ---------- pets ----------
-function PetsShelf({ actor, balance, buy, busy, onToast }) {
-  const market = useMarket();
-  const mine = market.petOf(actor.name);
-  if (!mine)
-    return (
-      <section className="mk-sec">
-        <div className="sec-head">
-          <h2>Adopt a pet</h2>
-        </div>
-        <AdoptPet />
-      </section>
-    );
-  const { pet, st } = mine;
-  return (
-    <>
-      <section className="mk-sec">
-        <div className="sec-head">
-          <h2>Your pet</h2>
-        </div>
-        <PetCard name={actor.name} big owner />
-      </section>
-      <section className="mk-sec">
-        <div className="sec-head">
-          <h2>Pet items</h2>
-        </div>
-        <p className="muted small">Food and fun only. {pet.name} grows with your lab time, never with coins.</p>
-        <ul className="mk-grid">
-          {PET_ITEMS.map((it) => {
-            const full = !((it.food && st.food < FULL) || (it.fun && st.fun < FULL));
-            const item = `pet:${it.id}`;
-            return (
-              <li key={it.id} className="mk-card">
-                <div className="mk-card-top">
-                  <b>{it.name}</b>
-                  <Price n={it.price} />
-                </div>
-                <p className="muted small">
-                  {it.desc}{' '}
-                  {[it.food && `+${it.food} food`, it.fun && `+${it.fun} fun`].filter(Boolean).join(', ')}
-                </p>
-                <button
-                  className="btn small mk-buy"
-                  disabled={!market.coinsOn || full || it.price > balance || !!busy}
-                  onClick={() => buy(item, {}, () => onToast(`${pet.name} loved the ${it.name.toLowerCase()}.`))}
-                >
-                  {full ? `${pet.name} is full` : it.price > balance ? 'Not enough coins' : busy === item ? 'Buying…' : 'Buy'}
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      </section>
-    </>
   );
 }
 

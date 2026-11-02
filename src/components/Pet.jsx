@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import robot from '../assets/robot-dance.webp';
-import { SPECIES, moodLine, mascotState } from '../../functions/shared/pets.js';
+import { SPECIES, cleanGear, moodLine, mascotState, ringOf, titleOf } from '../../functions/shared/pets.js';
 import { useMarket } from '../market.js';
 import { Icon } from './shell/icons.jsx';
 import { confirmDialog, promptDialog } from './Dialogs.jsx';
+import { PetWithGear } from './PetGear.jsx';
 
 // Pets (H3): drawn here as small flat SVGs in one style (a round body, a
 // round head, the species' ears or tail, and a face that shows the mood).
@@ -292,14 +293,17 @@ export function PetBadge({ name }) {
   const market = useMarket();
   const mine = market?.petOf(name);
   if (!mine || mine.pet.inChat === false) return null;
+  // A ring around it for levels 10, 20 and 30; its fur tint too.
+  const ring = ringOf(mine.st.level);
+  const tint = cleanGear(mine.pet.gear).palette;
   return (
-    <span className="pet-badge" title={`${mine.pet.name}, level ${mine.st.level}`}>
-      <PetArt species={mine.pet.species} mood={mine.st.mood} stage={mine.st.stage} size={18} still />
+    <span className={`pet-badge${ring ? ` ring-${ring}` : ''}`} title={`${mine.pet.name}, level ${mine.st.level}, ${titleOf(mine.st.level)}`}>
+      <PetArt species={mine.pet.species} mood={mine.st.mood} stage={mine.st.stage} size={18} still className={tint ? `pet-tint-${tint}` : ''} />
     </span>
   );
 }
 
-function Meter({ label, value, tone }) {
+export function Meter({ label, value, tone }) {
   return (
     <div className={`pet-meter ${tone || (value < 30 ? 'low' : value < 60 ? 'mid' : 'high')}`}>
       <span className="pet-meter-label">{label}</span>
@@ -312,7 +316,7 @@ function Meter({ label, value, tone }) {
 }
 
 // About how much lab time the next level needs (15 minutes an xp point).
-function nextLevelLine(st) {
+export function nextLevelLine(st) {
   if (st.to <= st.from) return 'Top level';
   const min = (st.to - st.xp) * 15;
   const t = min < 60 ? `${min} min` : `${Math.round((min / 60) * 2) / 2} h`;
@@ -335,7 +339,7 @@ export function PetCard({ name, big = false, owner = false, onCare }) {
   return (
     <div className={`pet-card${big ? ' big' : ''} mood-${st.mood}`}>
       <div className="pet-stage">
-        <PetArt species={pet.species} mood={st.mood} stage={st.stage} size={big ? 148 : 92} title={`${pet.name} the ${pet.species}`} />
+        <PetWithGear species={pet.species} mood={st.mood} stage={st.stage} size={big ? 148 : 92} title={`${pet.name} the ${pet.species}`} gear={pet.gear} />
       </div>
       <div className="pet-info">
         <div className="pet-name-row">
@@ -344,6 +348,7 @@ export function PetCard({ name, big = false, owner = false, onCare }) {
             Level <span className="mono">{st.level}</span>
           </span>
         </div>
+        <p className="pet-title">{titleOf(st.level)}</p>
         <p className="pet-mood">{moodLine(pet.name, st)}</p>
         <div className="pet-xp" title={nextLevelLine(st)}>
           <span style={{ transform: `scaleX(${Math.max(0.02, st.progress)})` }} />

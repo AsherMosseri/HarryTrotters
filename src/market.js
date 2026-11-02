@@ -5,7 +5,7 @@
 // pays: the server does.
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { activeExtras } from '../functions/shared/market.js';
-import { petState } from '../functions/shared/pets.js';
+import { giftOpen, petState, petsIn } from '../functions/shared/pets.js';
 import { celebrate } from './motion.js';
 import { noteFor } from './connection.js';
 
@@ -34,10 +34,12 @@ export function useMarketData(store, { actor, rename, shifts, balanceOf, coinsOn
   const [rawPurchases, setPurchases] = useState([]);
   const [rawPets, setPets] = useState([]);
   const [rawTournaments, setTournaments] = useState([]);
+  const [rawGifts, setGifts] = useState([]);
   useEffect(() => store.subscribePerks?.(setPerks), [store]);
   useEffect(() => store.subscribePurchases?.(setPurchases), [store]);
   useEffect(() => store.subscribePets?.(setPets), [store]);
   useEffect(() => store.subscribeTournaments?.(setTournaments), [store]);
+  useEffect(() => store.subscribePetGifts?.(actor.name, setGifts), [store, actor.name]);
   // A minute clock: needs run down and chat extras run out while you watch.
   const [minute, setMinute] = useState(() => Math.floor(Date.now() / 60000));
   useEffect(() => {
@@ -68,6 +70,21 @@ export function useMarketData(store, { actor, rename, shifts, balanceOf, coinsOn
     },
     [pets, shifts, now],
   );
+
+  // All of a person's pets (the first, then a baby or a gift), each with its
+  // own level; `born` tells them apart (the server's `pet` and `buy` take it).
+  const petsOf = useCallback(
+    (name) => {
+      const doc = pets.get(name);
+      return doc ? petsIn(doc).map((pet) => ({ pet, st: petState(pet, { shifts, now }) })) : [];
+    },
+    [pets, shifts, now],
+  );
+  // Offers to give a pet away that are still open (they last a week).
+  const gifts = useMemo(() => {
+    const open = rawGifts.filter((g) => giftOpen(g, now)).map((g) => ({ ...g, from: rename(g.from), to: rename(g.to) }));
+    return { incoming: open.filter((g) => g.to === actor.name), outgoing: open.filter((g) => g.from === actor.name) };
+  }, [rawGifts, now, rename, actor.name]);
 
   // Your pet grew a level since this device last saw it: a celebration.
   const mine = petOf(actor.name);
@@ -104,7 +121,7 @@ export function useMarketData(store, { actor, rename, shifts, balanceOf, coinsOn
   const deletePerk = useCallback((id) => store.deletePerk(id), [store]);
 
   return useMemo(
-    () => ({ perks, purchases, pets, tournaments, extras, petOf, run, now, coinsOn, savePerk, deletePerk }),
-    [perks, purchases, pets, tournaments, extras, petOf, run, now, coinsOn, savePerk, deletePerk],
+    () => ({ perks, purchases, pets, tournaments, extras, petOf, petsOf, gifts, run, now, coinsOn, savePerk, deletePerk }),
+    [perks, purchases, pets, tournaments, extras, petOf, petsOf, gifts, run, now, coinsOn, savePerk, deletePerk],
   );
 }

@@ -688,6 +688,23 @@ export const firebaseStore = {
       (e) => console.warn('pets', e),
     );
   },
+  // Offers to give a pet away that you made or got (the rules let you read
+  // only those); the two lists are joined here.
+  subscribePetGifts(name, cb) {
+    const parts = { from: [], to: [] };
+    const send = () => cb([...parts.from, ...parts.to.filter((g) => !parts.from.some((x) => x.id === g.id))]);
+    const offs = ['from', 'to'].map((field) =>
+      onSnapshot(
+        query(collection(db, 'petGifts'), where(field, '==', name)),
+        (snap) => {
+          parts[field] = snap.docs.map(readDoc);
+          send();
+        },
+        (e) => console.warn('petGifts', e),
+      ),
+    );
+    return () => offs.forEach((off) => off());
+  },
   subscribeTournaments(cb) {
     return onSnapshot(
       collection(db, 'tournaments'),

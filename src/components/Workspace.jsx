@@ -2738,6 +2738,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
                   <MarketView
                     actor={actor}
                     balance={myWallet.balance}
+                    roster={roster}
                     onToast={(text) => setToast({ text })}
                     onOpenCoins={() => setCoinsOpen(true)}
                     onPlay={(t) => {
