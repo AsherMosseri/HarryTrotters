@@ -29,6 +29,7 @@ export const SPECIES = [
   { id: 'panda', name: 'Panda' },
   { id: 'monkey', name: 'Proboscis monkey' },
   { id: 'cassowary', name: 'Cassowary' },
+  { id: 'redpanda', name: 'Red panda' },
 ];
 export const isSpecies = (id) => SPECIES.some((s) => s.id === id);
 

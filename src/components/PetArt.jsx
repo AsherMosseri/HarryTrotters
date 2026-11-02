@@ -35,6 +35,8 @@ const LOOK = {
     blue: '#2f86e6', blueLine: '#1d55b0', casque: '#ecd59b', leg: '#d9c28f',
   },
   monkey: { body: '#c9733a', dark: '#7d431d', belly: '#f6d9b2', inner: '#f6b9a0', nose: '#f0916c', line: '#7d431d', face: '#f2c996' },
+  // Rusty fur, a cream face, dark brown belly, legs and ear insides, darker rust tear marks and tail rings.
+  redpanda: { body: '#c8532b', dark: '#432a25', light: '#ee8a4e', shade: '#9c3a1c', belly: '#fff3e4', inner: '#432a25', nose: '#2a1a18', line: '#9a3a18', tear: '#8e3213', ring: '#9a3c1d' },
 };
 
 // --- shared face parts ----------------------------------------------------
@@ -554,6 +556,63 @@ const DRAW = {
           <path d="M32 24.4 v7.4" stroke="#9a7638" strokeWidth="0.8" strokeLinecap="round" opacity="0.7" />
           <path d="M29.4 33.4 C27.8 38 29.4 42.4 32 42.8 C34.6 42.4 36.2 38 34.6 33.4 Q32 35.4 29.4 33.4Z" fill={`url(#${id}w)`} stroke="#8f1530" strokeWidth="1" strokeLinejoin="round" />
           {detail && <path d="M32 36 v5" stroke="#8f1530" strokeWidth="0.8" strokeLinecap="round" opacity="0.6" />}
+        </>
+      ),
+    };
+  },
+
+  redpanda({ c, id, mood, detail, ek, L }) {
+    const sad = mood === 'sad';
+    const tilt = sad ? 30 : mood === 'happy' ? 12 : 17;
+    const tail = 'M40 56 C50 60.6 59 54.4 58.2 46 C57.8 41.2 56 38.4 54.6 36.8';
+    const tear = { stroke: c.tear, strokeWidth: detail ? 1.9 : 3, strokeLinecap: 'round', fill: 'none' };
+    const ear = (x, s) => (
+      <g transform={`rotate(${s * tilt} ${x} 24)`}>
+        <ellipse cx={x} cy="15.6" rx="6.5" ry="7.6" fill={`url(#${id}f)`} {...L} />
+        <ellipse cx={x} cy="17.2" rx="3.5" ry="4.4" fill={`url(#${id}k)`} />
+      </g>
+    );
+    return {
+      back: (
+        <g className="pet-tail">
+          <path d={tail} stroke={c.line} strokeWidth="11.4" fill="none" strokeLinecap="round" />
+          <path d={tail} stroke={`url(#${id}b)`} strokeWidth="8.7" fill="none" strokeLinecap="round" />
+          <path d={tail} stroke={c.ring} strokeWidth="8.7" fill="none" strokeDasharray="3.4 4.2" strokeDashoffset="-4.2" />
+          <circle cx="54.6" cy="36.8" r="4.35" fill={`url(#${id}k)`} />
+        </g>
+      ),
+      body: (
+        <>
+          <ellipse cx="32" cy="47" rx="14.8" ry="11" fill={`url(#${id}b)`} {...L} />
+          <ellipse cx="32" cy="49.2" rx="10.6" ry="8.6" fill={`url(#${id}k)`} />
+          {detail && <path d="M27.6 45 q4.4 -1.8 8.8 0" stroke="#7a5249" strokeWidth="1" fill="none" strokeLinecap="round" opacity="0.7" />}
+          <ellipse cx="25.2" cy="55.6" rx="4.9" ry="3.1" fill={`url(#${id}k)`} {...L} />
+          <ellipse cx="38.8" cy="55.6" rx="4.9" ry="3.1" fill={`url(#${id}k)`} {...L} />
+        </>
+      ),
+      head: (
+        <>
+          <clipPath id={`${id}hc`}>
+            <ellipse cx="32" cy="28.6" rx="17.6" ry="14.4" />
+          </clipPath>
+          {ear(17.8, -1)}
+          <g className="pet-ear">{ear(46.2, 1)}</g>
+          <ellipse cx="32" cy="28.6" rx="17.6" ry="14.4" fill={`url(#${id}b)`} {...L} />
+          <Gloss id={id} cx={24} cy={18.6} />
+          <path
+            clipPath={`url(#${id}hc)`}
+            d="M12 37 C12.4 31.6 17 30.6 20.4 32.6 C22.8 34 25.8 33.2 27.6 31.8 Q32 34 36.4 31.8 C38.2 33.2 41.2 34 43.6 32.6 C47 30.6 51.6 31.6 52 37 L52 46 L12 46 Z"
+            fill={`url(#${id}f)`}
+          />
+          {detail && <ellipse cx="24.4" cy="21.6" rx="2.6" ry="1.5" fill={c.belly} opacity="0.95" />}
+          {detail && <ellipse cx="39.6" cy="21.6" rx="2.6" ry="1.5" fill={c.belly} opacity="0.95" />}
+          <path d="M26.4 32.2 Q23.2 35.6 23.8 39.6" {...tear} />
+          <path d="M37.6 32.2 Q40.8 35.6 40.2 39.6" {...tear} />
+          {detail && <Blush y={37.4} dx={13.2} rx={2.7} ry={1.8} o={0.45} />}
+          <Eyes mood={mood} xs={[24.4, 39.6]} y={28.4} r={3.2} ek={ek} brow={c.dark} detail={detail} />
+          <path d="M29.8 33 Q32 31.8 34.2 33 Q33.4 35.2 32 35.4 Q30.6 35.2 29.8 33Z" fill={c.nose} />
+          <ellipse cx="31.1" cy="32.7" rx="1" ry="0.5" fill="#fff" opacity="0.55" />
+          <Mouth mood={mood} y={36.2} w={3.2} h={2.5} kind="w" />
         </>
       ),
     };
