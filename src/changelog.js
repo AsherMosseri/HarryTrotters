@@ -10,6 +10,7 @@ export const CHANGELOG = [
     items: [
       'Fixed: on iPad the page could get stuck a little off to one side, with a white bar at the bottom that bounced every time you swiped. The page itself can’t scroll now, only what’s inside it.',
       'New pet: the panda. Adopt one from the Market.',
+      'Drafts: what you’ve typed and not sent is kept per channel and per DM, and a small pencil next to its name in the channel list (or “draft” in the phone’s channel picker) shows where one is waiting.',
       '/me now reads like an action: “/me waves” shows “Asher waves” in italics with a mark on the left, instead of just the word “waves”.',
       'Competition mode’s “On now” is “On for a day” and switches itself off after 24 hours.',
       'Phones: the profile picture at the top right isn’t cut off any more, and color themes tint the top bar and full-screen pop-ups instead of leaving them navy.',

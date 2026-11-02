@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Icon } from './icons.jsx';
 import { Avatar } from '../common.jsx';
+import { useDraftKeys } from '../../drafts.js';
 import ConnectionPill from './ConnectionPill.jsx';
 import { TEAM_NAME, TEAM_NICKNAME } from '../../config.js';
 import horse from '../../assets/horse.webp';
@@ -29,7 +30,7 @@ const LABELS = {
   scout: 'Scout',
 };
 
-function Row({ icon, label, active, count, strong, onClick, extra }) {
+function Row({ icon, label, active, count, strong, onClick, extra, draft }) {
   return (
     <div className={`sb-row-wrap${active ? ' active' : ''}`}>
       <button
@@ -39,6 +40,11 @@ function Row({ icon, label, active, count, strong, onClick, extra }) {
       >
         {icon}
         <span className="sb-label">{label}</span>
+        {draft && (
+          <span className="sb-draft" title="Unsent draft" role="img" aria-label="Unsent draft">
+            <Icon name="edit" size={13} />
+          </span>
+        )}
         {count > 0 && <span className={`sb-count${strong ? ' strong' : ''}`}>{count > 99 ? '99+' : count}</span>}
       </button>
       {extra}
@@ -143,6 +149,7 @@ export default function Sidebar({
   const chatOn = show('chat');
   const [allDms, setAllDms] = useState(false);
   const dmOn = (c) => page === 'chat' && currentConv?.key === c.key;
+  const drafts = useDraftKeys();
   const dms = allDms ? convs.dms : convs.dms.filter((c, i) => i < DMS_SHOWN || unread[c.key]?.count > 0 || dmOn(c));
   const [teamDmsOpen, setTeamDmsOpen] = useState(false);
   const [convPop, setConvPop] = useState(null); // { el }: the rail's chat button
@@ -267,6 +274,7 @@ export default function Sidebar({
                   icon={<Icon name={c.announce ? 'announce' : 'hash'} />}
                   label={c.name}
                   active={page === 'chat' && currentConv?.key === c.key}
+                  draft={drafts.has(c.key) && !(page === 'chat' && currentConv?.key === c.key)}
                   count={u && !u.muted ? u.count : u?.mentions || 0}
                   strong={!!u?.mentions}
                   onClick={() => onOpenConv(c.key)}
@@ -302,6 +310,7 @@ export default function Sidebar({
                       icon={others.length === 1 ? <Avatar name={others[0]} size={24} showOnline /> : <Icon name="team" />}
                       label={c.short}
                       active={dmOn(c)}
+                      draft={drafts.has(c.key) && !dmOn(c)}
                       count={u?.count || 0}
                       strong={u?.count > 0}
                       onClick={() => onOpenConv(c.key)}

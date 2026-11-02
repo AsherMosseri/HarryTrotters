@@ -58,6 +58,7 @@ import ShiftsView, { ShiftButton } from './Shifts.jsx';
 import { CheckinGate, PollGate, answerOf } from './Checkin.jsx';
 import ThemeStudio, { AppBackdrop, CUSTOM_DEFAULT, applyThemeVars, themeFromProfile } from './ThemeStudio.jsx';
 import { CHANGELOG, VERSION, versionsSince } from '../changelog.js';
+import { setDraft } from '../drafts.js';
 import Inbox from './Inbox.jsx';
 import {
   AdActionDialog,
@@ -2743,8 +2744,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
                       // The game command in #arcade, ready to send (the
                       // composer picks up the draft when it opens).
                       try {
-                        const drafts = JSON.parse(localStorage.getItem('chat-drafts') || '{}');
-                        localStorage.setItem('chat-drafts', JSON.stringify({ ...drafts, arcade: playLine(t) }));
+                        setDraft('arcade', playLine(t));
                       } catch {
                         /* storage unavailable */
                       }

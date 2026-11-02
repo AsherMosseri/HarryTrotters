@@ -3324,3 +3324,7 @@ button.pm-row:hover { background: color-mix(in srgb, var(--text) 4%, transparent
   :root[data-palette] .dialog.profile-editor > .panel-head,
   :root[data-palette] .dialog.theme-studio > .panel-head { background: color-mix(in srgb, var(--p1) var(--tint, 16%), var(--bg)); }
 }
+
+/* An unsent draft waiting in a channel or DM. */
+.sb-draft { display: inline-flex; flex: none; margin-left: 6px; opacity: 0.7; }
+.sb-row.strong .sb-draft, .sb-row:hover .sb-draft { opacity: 1; }

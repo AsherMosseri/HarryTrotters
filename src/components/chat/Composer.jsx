@@ -3,6 +3,7 @@ import { Icon } from '../shell/icons.jsx';
 import { SUBTEAMS, SUBTEAM_COLORS } from '../../config.js';
 import { useControls } from '../../controls.js';
 import { preparePhoto } from '../../util.js';
+import { getDraft, setDraft } from '../../drafts.js';
 import { Avatar, CloseIcon, PlusIcon, StatusDot, usePeople } from '../common.jsx';
 import { prefixLines, wrapSelection } from './format.jsx';
 import { emojiList, loadEmoji, rememberEmoji, searchEmoji } from './emoji.js';
@@ -32,26 +33,8 @@ const FORMATS = [
   ['▒', 'Spoiler (hidden until tapped)', ['wrap', '||']],
 ];
 
-// Unsent messages, per conversation, on this device: they're still there when
-// you come back from another channel or tab.
-const DRAFTS = 'chat-drafts';
-const readDrafts = () => {
-  try {
-    return JSON.parse(localStorage.getItem(DRAFTS)) || {};
-  } catch {
-    return {};
-  }
-};
-const saveDraft = (conv, text) => {
-  try {
-    const all = readDrafts();
-    if (text.trim()) all[conv] = text;
-    else delete all[conv];
-    localStorage.setItem(DRAFTS, JSON.stringify(all));
-  } catch {
-    /* storage unavailable */
-  }
-};
+// Unsent messages, per conversation, on this device (src/drafts.js): they're
+// still there when you come back from another channel or tab.
 
 export default function Composer({
   conv,
@@ -81,7 +64,7 @@ export default function Composer({
   // Asher's Controls: features switched off don't show up here at all.
   const feat = useControls().isOn;
   const teamEmoji = feat('teamEmoji') ? allTeamEmoji : [];
-  const [text, setText] = useState(() => readDrafts()[conv] || '');
+  const [text, setText] = useState(() => getDraft(conv));
   const [taskIds, setTaskIds] = useState([]);
   const [photo, setPhoto] = useState(null); // { file, preview }
   const [suggest, setSuggest] = useState(null); // { kind: '@' | '#' | ':', query, start, end }
@@ -123,7 +106,7 @@ export default function Composer({
     box.current.setSelectionRange(pos[0], pos[1]);
   }, [text]);
   useEffect(() => {
-    if (!editing) saveDraft(conv, text);
+    if (!editing) setDraft(conv, text);
   }, [conv, text, editing]);
   useEffect(() => {
     const el = box.current;
@@ -232,7 +215,7 @@ export default function Composer({
 
   const reset = () => {
     // After editing a message, your unsent draft comes back.
-    setText(editing ? readDrafts()[conv] || '' : '');
+    setText(editing ? getDraft(conv) : '');
     setTaskIds([]);
     setPhoto(null);
     setSuggest(null);

@@ -73,7 +73,7 @@ const SECTIONS = [
       'Streaks: school days in a row with a shift (days without school never break it) and weeks in a row. They’re on your profile and the Shifts tab, next to the team’s season numbers.',
       'Lab check-in: when team management asks who’s going to the lab, the app asks you when you open it. Answer Yes or No for lunch and after school; change it later in the Shifts tab.',
       'Required polls work the same way: a poll in #announcements that everyone has to answer pops up until you vote (or write your answer).',
-      'Drafts: anything you type and don’t send stays in that channel’s box until you come back. Return (Enter) sends; Shift+Return starts a new line.',
+      'Drafts: anything you type and don’t send stays in that channel’s or DM’s box until you come back, and a small pencil next to its name in the channel list shows where one is waiting. Return (Enter) sends; Shift+Return starts a new line.',
     ],
   ],
   [

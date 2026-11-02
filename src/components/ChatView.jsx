@@ -9,6 +9,7 @@ import Message, { messageShows } from './chat/Message.jsx';
 import { CommandNote } from './chat/Commands.jsx';
 import { mentionPattern } from './chat/format.jsx';
 import { EmojiManager, StickerManager } from './chat/Pickers.jsx';
+import { useDraftKeys } from '../drafts.js';
 import { ChannelDialog, ChannelIcon, MembersPanel, NewDmDialog, NotifyMenu, PinnedBar, PinsPanel, SearchPanel, slugChannel } from './chat/Panels.jsx';
 import { Icon } from './shell/icons.jsx';
 import { BotReplies, ChatAd, chatAdSpots, useAds } from './Ads.jsx';
@@ -166,6 +167,7 @@ export default function ChatView({
   }, [ask, onAsked]);
   const [notifyOpen, setNotifyOpen] = useState(false);
   const [showTeamDms, setShowTeamDms] = useState(false);
+  const draftKeys = useDraftKeys();
   const [flash, setFlash] = useState(null);
   // What's pinned here, newest first: the bar under the header and the count on the pin button.
   const [pins, setPins] = useState([]);
@@ -491,6 +493,7 @@ export default function ChatView({
                 <option key={c.key} value={c.key}>
                   #{c.name}
                   {unread[c.key]?.count && !unread[c.key].muted ? ` (${unread[c.key].count})` : ''}
+                  {draftKeys.has(c.key) && c.key !== conv.key ? ' · draft' : ''}
                 </option>
               ))}
             </optgroup>
@@ -500,6 +503,7 @@ export default function ChatView({
                   <option key={c.key} value={c.key}>
                     {c.short}
                     {unread[c.key]?.count && !unread[c.key].muted ? ` (${unread[c.key].count})` : ''}
+                    {draftKeys.has(c.key) && c.key !== conv.key ? ' · draft' : ''}
                   </option>
                 ))}
               </optgroup>
