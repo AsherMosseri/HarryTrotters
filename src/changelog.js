@@ -4,6 +4,18 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '3.0.2',
+    date: '2026-11-02',
+    title: 'Pets grow up',
+    items: [
+      'Every pet has been redrawn: softer, cuter, and their mood shows on their faces. There’s also a new pet, the cassowary.',
+      'Levels now unlock things just for show (nothing to do with coins): a title under your pet’s name, from Rookie up to Hall of Famer, and bronze, silver and gold rings around the small pet next to your name in chat.',
+      'Tap Style to dress your pet: caps, hard hats, glasses, bandanas, medals, a crown, a halo and fur tints unlock at set levels. Locked ones show their level, and the sheet says what comes next. The Level path in the Pets tab lists everything.',
+      'At level 10 a pet can have one baby (Meet the baby, then name it). The baby grows with your lab time since it was born, and you can hold two pets.',
+      'Give a pet to a teammate: they get a notification and can accept or say no thanks within a week, and you can cancel until they answer. A pet that moves keeps its name and starts over at level 1 with its new owner’s lab time.',
+    ],
+  },
+  {
     version: '3.0.1',
     date: '2026-11-02',
     title: 'Steadier iPad, a panda, and /me',

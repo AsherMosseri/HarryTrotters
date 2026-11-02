@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
+    <meta name="theme-color" content="#14284b" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="32313 Tasks" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <script>
+      // The saved light/dark choice, before the first paint: iPadOS takes the
+      // status bar's color from .status-bar-band once (see index.html body).
+      try {
+        var theme = JSON.parse(localStorage.getItem('theme'));
+        if (theme === 'light' || theme === 'dark') document.documentElement.setAttribute('data-theme', theme);
+      } catch (e) {}
+      if (/[?&]demo(=|&|$)/.test(location.search)) document.documentElement.setAttribute('data-demo', '');
+      // Animations (Appearance): on, off, or follow the device's Reduce Motion.
+      try {
+        var motion = JSON.parse(localStorage.getItem('motion'));
+        if (motion === 'on' || motion === 'off') document.documentElement.setAttribute('data-motion', motion);
+      } catch (e) {}
+      // Which kinds of animation play (src/motion.js, applyAnim): none with
+      // Animations off or Reduce Motion on (Match device), else each one whose
+      // own switch is on.
+      try {
+        var m = JSON.parse(localStorage.getItem('motion') || '"auto"');
+        var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+        var areas = [];
+        if (m === 'on' || (m !== 'off' && !reduce))
+          ['celebrate', 'move', 'pages', 'taps'].forEach(function (a) {
+            if (localStorage.getItem('anim-' + a) !== 'false') areas.push(a);
+          });
+        document.documentElement.setAttribute('data-anim', areas.join(' '));
+      } catch (e) {}
+    </script>
+    <!-- Display name fonts (Edit profile → Style). Each font file loads only when someone uses it, and the
+         list loads without holding up the first paint (media="print" until it arrives). -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      media="print"
+      onload="this.media = 'all'"
+      href="https://fonts.googleapis.com/css2?family=Bangers&family=Barlow+Condensed:wght@600;700&family=Bebas+Neue&family=Caveat:wght@700&family=Fredoka:wght@600&family=JetBrains+Mono:wght@500;700&family=Monoton&family=Orbitron:wght@800&family=Pacifico&family=Permanent+Marker&family=Playfair+Display:ital,wght@1,800&family=Press+Start+2P&family=Silkscreen&family=Special+Elite&family=UnifrakturMaguntia&display=swap"
+    />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png" />
+    <title>FTC 32313 Task Board</title>
+    <script type="module" crossorigin src="./assets/index-CHBZtBP7.js"></script>
+    <link rel="modulepreload" crossorigin href="./assets/react-DvXU6kJ2.js">
+    <link rel="modulepreload" crossorigin href="./assets/matches-CfzUm9gM.js">
+    <link rel="stylesheet" crossorigin href="./assets/index-B-uCaLcv.css">
+  </head>
+  <body>
+    <!-- iPadOS 26 blurs whatever sits under the status bar in Home Screen apps,
+         unless a fixed strip at least 10px tall and 90% wide is at the top for
+         Safari to take a solid color from. It must be solid, there from the
+         first paint, on top of everything (dialogs too), and one color: the
+         first time the element at the top edge changes, iPadOS blurs until a
+         reload, and it keeps the first color it reads. It's the header's
+         color, so it looks like part of the header and status bar. -->
+    <div class="status-bar-band" aria-hidden="true"></div>
+    <div id="root">
+      <div class="gate splash" role="status" aria-label="Loading">
+        <div class="splash-mark">
+          <img class="splash-logo" src="horse.webp" alt="" aria-hidden="true" />
+          <h1>Harry Trotters</h1>
+          <p>FTC 32313</p>
+          <div class="splash-bar" aria-hidden="true"><span style="width: 12%"></span></div>
+          <script>
+            // The sheen runs on the page's clock (like the app's copy of this screen, Gate.jsx).
+            requestAnimationFrame(function () {
+              try {
+                document.querySelector('.splash-bar span').getAnimations({ subtree: true }).forEach(function (a) { a.startTime = 0; });
+              } catch (e) {}
+            });
+          </script>
+          <p class="splash-step">Opening…</p>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
