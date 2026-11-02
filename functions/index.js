@@ -153,14 +153,15 @@ async function notify(notes) {
     if (!unreadOf.has(person))
       unreadOf.set(
         person,
+        // Same window the app shows (the newest 40), so the icon number matches the bell.
         await db
           .collection('inbox')
           .doc(personId(person))
           .collection('items')
-          .where('read', '==', false)
-          .count()
+          .orderBy('at', 'desc')
+          .limit(40)
           .get()
-          .then((c) => c.data().count)
+          .then((snap) => snap.docs.filter((d) => d.get('read') === false).length)
           .catch(() => 0),
       );
     return unreadOf.get(person);
