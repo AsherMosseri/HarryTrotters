@@ -170,7 +170,7 @@ function Neck({ id, neck }) {
 
 // Over a hat it floats higher.
 function Halo({ head, high }) {
-  const y = head.y - head.r - (high ? 9 : 3.4);
+  const y = head.y - head.r - head.up - (high ? 9 : 3.4);
   return (
     <g className="gear-halo">
       <ellipse cx={head.x} cy={y} rx="8.4" ry="2.8" fill="none" stroke={GOLD} strokeWidth="2.2" />
@@ -192,9 +192,13 @@ export function GearOverlay({ species, gear, stage = 'young', mood = 'ok', size 
           {/* Keeps the bobbing in step with the pet underneath. */}
           <rect x="15" y="5" width="34" height="54" fill="none" />
           {g.neck && <Neck id={g.neck} neck={a.neck} />}
-          {g.face && <Face id={g.face} eyes={a.eyes} />}
-          {hat && <g transform={`translate(${a.head.x} ${a.head.y}) scale(${k})`}>{hat}</g>}
-          {g.extra === 'halo' && <Halo head={a.head} high={!!hat} />}
+          {/* The chicken pecks: its head gear moves with the head (same translate-only keyframe). */}
+          <g className={species === 'chicken' ? 'pet-peck' : undefined}>
+            {g.face && <Face id={g.face} eyes={a.eyes} />}
+            {/* A headset wraps the head's sides, so it stays put; the rest ride up over a comb or spines. */}
+            {hat && <g transform={`translate(${a.head.x} ${a.head.y - (g.head === 'headset' ? 0 : a.head.up)}) scale(${k})`}>{hat}</g>}
+            {g.extra === 'halo' && <Halo head={a.head} high={!!hat} />}
+          </g>
         </g>
       </g>
     </svg>

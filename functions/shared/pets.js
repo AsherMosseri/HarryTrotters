@@ -30,6 +30,8 @@ export const SPECIES = [
   { id: 'monkey', name: 'Proboscis monkey' },
   { id: 'cassowary', name: 'Cassowary' },
   { id: 'redpanda', name: 'Red panda' },
+  { id: 'hedgehog', name: 'Hedgehog' },
+  { id: 'chicken', name: 'Chicken' },
 ];
 export const isSpecies = (id) => SPECIES.some((s) => s.id === id);
 

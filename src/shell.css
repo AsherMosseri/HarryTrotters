@@ -2012,6 +2012,7 @@ button.pm-row:hover { background: color-mix(in srgb, var(--text) 4%, transparent
 .pet-art .pet-tail { transform-box: fill-box; transform-origin: 0% 100%; }
 .pet-art .pet-ear { transform-box: fill-box; transform-origin: 50% 90%; }
 .pet-art .pet-tongue { transform-box: fill-box; transform-origin: 50% 0%; }
+.pet-art .pet-spines { transform-box: fill-box; transform-origin: 50% 100%; }
 :root[data-anim~='move'] .pet-art.anim.pet-happy .pet-bob { animation: pet-hop 1.9s ease-in-out infinite; }
 :root[data-anim~='move'] .pet-art.anim.pet-ok .pet-bob { animation: pet-breathe 3.2s ease-in-out infinite; }
 :root[data-anim~='move'] .pet-art.anim.pet-sad .pet-bob { animation: pet-droop 4.4s ease-in-out infinite; }
@@ -2020,6 +2021,10 @@ button.pm-row:hover { background: color-mix(in srgb, var(--text) 4%, transparent
 :root[data-anim~='move'] .pet-art.anim.pet-ok .pet-tail { animation: pet-sway 3.6s ease-in-out infinite alternate; }
 :root[data-anim~='move'] .pet-art.anim .pet-ear { animation: pet-twitch 6.4s ease-in-out infinite; }
 :root[data-anim~='move'] .pet-art.anim.pet-happy .pet-tongue { animation: pet-pant 0.7s ease-in-out infinite alternate; }
+/* Hedgehog: the spines puff up now and then. Chicken: the head pecks (translate only, so gear on it can follow). */
+:root[data-anim~='move'] .pet-art.anim .pet-spines { animation: pet-prickle 5.4s ease-in-out infinite; }
+:root[data-anim~='move'] .pet-art.anim.pet-happy .pet-peck { animation: pet-peck 1.9s ease-in-out infinite; }
+:root[data-anim~='move'] .pet-art.anim.pet-ok .pet-peck { animation: pet-peck 4.6s ease-in-out infinite; }
 @keyframes pet-hop {
   0%, 55%, 100% { transform: translateY(0) scale(1, 1); }
   66% { transform: translateY(0) scale(1.05, 0.94); }
@@ -2032,6 +2037,8 @@ button.pm-row:hover { background: color-mix(in srgb, var(--text) 4%, transparent
 @keyframes pet-wag { from { transform: rotate(-9deg); } to { transform: rotate(9deg); } }
 @keyframes pet-sway { from { transform: rotate(-3deg); } to { transform: rotate(4deg); } }
 @keyframes pet-twitch { 0%, 88%, 100% { transform: rotate(0deg); } 91% { transform: rotate(7deg); } 94% { transform: rotate(-3deg); } 97% { transform: rotate(4deg); } }
+@keyframes pet-prickle { 0%, 84%, 100% { transform: scale(1, 1); } 90% { transform: scale(1.045, 1.05); } 95% { transform: scale(0.99, 1); } }
+@keyframes pet-peck { 0%, 80%, 100% { transform: translateY(0); } 85%, 95% { transform: translateY(2.2px); } 90% { transform: translateY(0); } }
 @keyframes pet-pant { from { transform: scaleY(1); } to { transform: scaleY(1.18); } }
 .pet-badge { display: inline-flex; vertical-align: -3px; margin-left: 3px; }
 .pet-card { display: flex; align-items: center; gap: 16px; padding: 12px 14px; border-radius: 14px; background: var(--surface-2); min-width: 0; }
@@ -2073,9 +2080,11 @@ button.pm-row:hover { background: color-mix(in srgb, var(--text) 4%, transparent
 }
 .adopt-tile.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
 .adopt-row { display: flex; gap: 10px; }
-/* Ten species: two even rows of five on iPad, three across on a phone with the last one centered. */
-@media (min-width: 700px) { .adopt-grid { grid-template-columns: repeat(5, 1fr); } }
-@media (max-width: 699px) { .adopt-grid .adopt-tile:last-child:nth-child(3n + 1) { grid-column: 2; } }
+/* Twelve species, always an even grid: 6 + 6 on a wide iPad, 4 x 3 on a narrow one (the sidebar leaves ~510px), 3 x 4 on a phone. */
+.adopt-grid > .adopt-tile { min-width: 0; }
+@media (min-width: 1000px) { .adopt-grid { grid-template-columns: repeat(6, 1fr); } }
+@media (min-width: 700px) and (max-width: 999px) { .adopt-grid { grid-template-columns: repeat(4, 1fr); } }
+@media (max-width: 699px) { .adopt-grid { grid-template-columns: repeat(3, 1fr); } }
 
 /* The team robot on Today. */
 .mascot-energy { font-size: 13px; font-weight: 700; }
@@ -3650,6 +3659,8 @@ button.pm-row:hover { background: color-mix(in srgb, var(--text) 4%, transparent
 /* Each moving pet keeps its own rhythm, so they don't all hop together. */
 :root[data-anim~='move'] .park .pet-art.anim .pet-bob,
 :root[data-anim~='move'] .park .pet-art.anim .pet-tail,
+:root[data-anim~='move'] .park .pet-art.anim .pet-spines,
+:root[data-anim~='move'] .park .pet-art.anim .pet-peck,
 :root[data-anim~='move'] .park .pet-art.anim .pet-ear { animation-delay: var(--pd, 0s) !important; }
 .park.compact { border-radius: 12px; }
 .park.compact .park-field { margin-top: 54px; padding: 12px 8px 10px; min-height: 0; flex-wrap: nowrap; gap: 0 6px; overflow: hidden; }
