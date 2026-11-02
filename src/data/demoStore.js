@@ -27,6 +27,7 @@ import * as market from '../../functions/shared/market.js';
 import { PERK_IDEAS } from '../../functions/shared/market.js';
 import { giftAccept, giftEnd, giftOffer, petEdit, petsIn } from '../../functions/shared/pets.js';
 import { ROSTER, cleanName, sameName } from '../../functions/shared/team.js';
+import { checkPicks, myPicks, personOptionId, usesVoteButton } from '../../functions/shared/polls.js';
 import { demoLife } from './demoLife.js';
 import { demoLearn } from './demoLearn.js';
 import { demoEvents } from './demoEvents.js';
@@ -182,6 +183,48 @@ function seed() {
     general: [
       msg(180, 'Sebastian Tolbert', 'Practice moved to 4pm tomorrow, everyone bring safety glasses'),
       msg(170, 'Sophia Bermudez', 'got it 👍', { reactions: { '👍': { 'Jackson Lucks': 'Jackson Lucks' } } }),
+      msg(75, 'Sebastian Tolbert', 'Who should drive in match 1?', {
+        poll: {
+          question: 'Who should drive in match 1? Pick up to 2',
+          kind: 'people',
+          multi: true,
+          pick: { mode: 'upto', n: 2 },
+          selfVote: true,
+          options: ['Sebastian Tolbert', 'Jackson Lucks', 'Cooper Mlezcko', 'Michael Meidan', 'Matthew Kuehl', 'Katarina Jurasic'].map((n) => ({
+            id: personOptionId(n),
+            text: n,
+            person: n,
+          })),
+        },
+        votes: {
+          [personOptionId('Sebastian Tolbert')]: { 'jackson-lucks': 'Jackson Lucks', 'katarina-jurasic': 'Katarina Jurasic', 'michael-meidan': 'Michael Meidan' },
+          [personOptionId('Jackson Lucks')]: { 'sebastian-tolbert': 'Sebastian Tolbert', 'sophia-bermudez': 'Sophia Bermudez', 'ira-kumar': 'Ira Kumar' },
+          [personOptionId('Cooper Mlezcko')]: { 'sebastian-tolbert': 'Sebastian Tolbert', 'matthew-kuehl': 'Matthew Kuehl' },
+          [personOptionId('Michael Meidan')]: { 'jackson-lucks': 'Jackson Lucks', 'shrey-kumar': 'Shrey Kumar' },
+        },
+      }),
+      msg(55, 'Michael Meidan', 'Which three should we practice most?', {
+        poll: {
+          question: 'Which 3 things should we practice most this week? Pick exactly 3',
+          kind: 'choices',
+          multi: true,
+          pick: { mode: 'exact', n: 3 },
+          options: [
+            { id: 'a', text: 'Intake' },
+            { id: 'b', text: 'Lift' },
+            { id: 'c', text: 'Auto' },
+            { id: 'd', text: 'Parking' },
+            { id: 'e', text: 'Driver practice' },
+          ],
+        },
+        votes: {
+          a: { 'sebastian-tolbert': 'Sebastian Tolbert', 'jackson-lucks': 'Jackson Lucks', 'katarina-jurasic': 'Katarina Jurasic', 'ira-kumar': 'Ira Kumar' },
+          b: { 'sebastian-tolbert': 'Sebastian Tolbert', 'katarina-jurasic': 'Katarina Jurasic' },
+          c: { 'sebastian-tolbert': 'Sebastian Tolbert', 'jackson-lucks': 'Jackson Lucks', 'ira-kumar': 'Ira Kumar', 'shrey-kumar': 'Shrey Kumar' },
+          d: { 'jackson-lucks': 'Jackson Lucks', 'shrey-kumar': 'Shrey Kumar' },
+          e: { 'katarina-jurasic': 'Katarina Jurasic', 'ira-kumar': 'Ira Kumar', 'shrey-kumar': 'Shrey Kumar' },
+        },
+      }),
       msg(30, 'Cooper Mlezcko', '@Asher Mosseri can you check the auto path before practice?', {
         mentions: ['Asher Mosseri'],
         taskIds: [tasks[1].id],
@@ -579,6 +622,7 @@ const dataUrl = (blob) =>
     r.readAsDataURL(blob);
   });
 
+const findMsg = (conv, id) => (state.chat[conv] || []).find((m) => m.id === id);
 function updateMsg(conv, id, fn) {
   state.chat = { ...state.chat, [conv]: (state.chat[conv] || []).map((m) => (m.id === id ? fn(m) : m)) };
   commit();
@@ -2443,14 +2487,35 @@ export const demoStore = {
       return { ...m, supers };
     });
   },
-  async vote(conv, msg, optionId, actor, on) {
+  async vote(conv, msg, optionId, actor, on, rename) {
     const me = personId(actor.name);
+    const cur = findMsg(conv, msg.id) || msg;
+    if (cur.poll.closed) throw new Error('This poll has ended.');
+    if (on && usesVoteButton(cur.poll)) return this.votePicks(conv, msg, [...myPicks(cur, actor.name, rename), optionId], actor, rename);
+    if (on && cur.poll.selfVote === false && !checkPicks({ ...cur.poll, pick: { mode: 'any' }, multi: true }, [optionId], actor.name, rename).ok)
+      throw new Error('You can’t vote for yourself here.');
     updateMsg(conv, msg.id, (m) => {
       const votes = Object.fromEntries(Object.entries(m.votes || {}).map(([k, v]) => [k, { ...v }]));
       if (on && !m.poll.multi) for (const k of Object.keys(votes)) delete votes[k][me];
       votes[optionId] = votes[optionId] || {};
       if (on) votes[optionId][me] = actor.name;
       else delete votes[optionId][me];
+      return { ...m, votes };
+    });
+  },
+  // A person's whole vote at once; the picks have to follow the poll's rule.
+  async votePicks(conv, msg, ids, actor, rename) {
+    const me = personId(actor.name);
+    const cur = findMsg(conv, msg.id) || msg;
+    const check = checkPicks(cur.poll, ids, actor.name, rename);
+    if (!check.ok) throw new Error(check.why);
+    updateMsg(conv, msg.id, (m) => {
+      const votes = Object.fromEntries(Object.entries(m.votes || {}).map(([k, v]) => [k, { ...v }]));
+      for (const o of m.poll.options) {
+        votes[o.id] = votes[o.id] || {};
+        if (check.ids.includes(o.id)) votes[o.id][me] = actor.name;
+        else delete votes[o.id][me];
+      }
       return { ...m, votes };
     });
   },

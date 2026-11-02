@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { GIPHY_API_KEY } from '../../config.js';
-import { AutoTextarea, CloseIcon, Overlay, PlusIcon } from '../common.jsx';
+import { GIPHY_API_KEY, ORG_GROUPS } from '../../config.js';
+import { AutoTextarea, Avatar, AvatarStack, CloseIcon, Overlay, PlusIcon, usePeople } from '../common.jsx';
+import { MAX_CHOICES, MAX_PEOPLE, MAX_PICK, optionLimit, personOptionId, pickRule, votesFit } from '../../../functions/shared/polls.js';
+import { nameKey } from '../../../functions/shared/team.js';
 import { GROUPS, emojiList, firstEmoji, loadEmoji, recentEmoji, searchEmoji, rememberEmoji } from './emoji.js';
 import { isTouch } from '../../util.js';
 import { Icon } from '../shell/icons.jsx';
@@ -421,22 +423,64 @@ export function GifPicker({ onPick, onUpload, onClose }) {
   );
 }
 
-// Create a poll: a question, 2–10 options, one or several choices.
+// Create a poll: a question and either 2–10 text choices, 2–40 team members,
+// or a written answer everyone types. Choices and people can allow one pick,
+// several (up to N, exactly N, or any number).
 // New poll, or editing one (editing: the posted poll; its choices keep their
 // ids so votes stay with them, and new ones get an id no choice ever had, so
 // a removed choice's votes never move to a new one; votes: the poll's votes).
-export function PollDialog({ onCreate, onClose, canRequire = false, initialQuestion = '', editing = null, votes = null }) {
+// roster: the people a "people" poll can use (the team, or a DM's people).
+export function PollDialog({ onCreate, onClose, canRequire = false, initialQuestion = '', editing = null, votes = null, roster = null }) {
+  const people = usePeople();
+  const rename = people?.rename || ((n) => n);
+  const pool = useMemo(() => [...new Set((roster || people?.roster || []).map(rename))], [roster, people, rename]);
   const [question, setQuestion] = useState(editing?.question ?? initialQuestion);
-  // 'choices': pick from options; 'text': everyone writes their own answer.
-  const [kind, setKind] = useState(editing?.kind === 'text' ? 'text' : 'choices');
-  const [options, setOptions] = useState(editing?.options?.length ? editing.options.map((o) => ({ ...o })) : [{ text: '' }, { text: '' }]);
-  const [multi, setMulti] = useState(!!editing?.multi);
+  // 'choices': text options; 'people': team members; 'text': everyone writes their own answer.
+  const [kind, setKind] = useState(editing?.kind === 'text' ? 'text' : editing?.kind === 'people' ? 'people' : 'choices');
+  const [options, setOptions] = useState(
+    editing?.kind !== 'people' && editing?.options?.length ? editing.options.map((o) => ({ ...o })) : [{ text: '' }, { text: '' }],
+  );
+  // People: who the options are. Editing starts from the people already in it.
+  const [source, setSource] = useState(editing?.kind === 'people' ? 'pick' : 'everyone');
+  const [subteam, setSubteam] = useState('');
+  const [picked, setPicked] = useState(() =>
+    editing?.kind === 'people' ? new Set(editing.options.map((o) => rename(o.person || o.text))) : new Set(),
+  );
+  const [find, setFind] = useState('');
+  const [selfVote, setSelfVote] = useState(editing?.selfVote !== false);
+  // How many can people pick: 'one' or 'several' (a rule + N).
+  const rule0 = editing ? pickRule(editing) : { mode: 'one', n: 2 };
+  const [pickKind, setPickKind] = useState(rule0.mode === 'one' ? 'one' : 'several');
+  const [mode, setMode] = useState(rule0.mode === 'exact' ? 'exact' : rule0.mode === 'any' ? 'any' : 'upto');
+  const [n, setN] = useState(rule0.mode === 'upto' || rule0.mode === 'exact' ? rule0.n : 2);
   // Choices, plus a box to write your own answer (or both).
   const [write, setWrite] = useState(!!editing?.write);
   const [required, setRequired] = useState(!!editing?.required);
   useEscape(onClose);
   const filled = options.filter((o) => o.text.trim());
-  const ok = question.trim() && (kind === 'text' || filled.length >= 2 || (write && filled.length >= 1));
+
+  // The subteams that have people, and who is in the list for each source.
+  const subteams = useMemo(
+    () => ORG_GROUPS.map((s) => [s, pool.filter((p) => people?.infoOf(p)?.subteams?.includes(s))]).filter(([, who]) => who.length),
+    [pool, people],
+  );
+  const subteamName = subteam || subteams[0]?.[0] || '';
+  const extraPicked = [...picked].filter((p) => !pool.includes(p)); // in the poll, since left the team
+  const everyone = source === 'everyone' ? pool : source === 'subteam' ? (subteams.find(([s]) => s === subteamName)?.[1] ?? []) : null;
+  const listPool = [...pool, ...extraPicked];
+  const chosen = kind !== 'people' ? [] : everyone ? everyone : listPool.filter((p) => picked.has(p));
+  const count = kind === 'people' ? chosen.length : filled.length;
+  const limit = optionLimit(kind);
+  // N can go up to the number of options (one fewer if people can't pick themselves).
+  const maxN = Math.min(MAX_PICK, count - (kind === 'people' && !selfVote ? 1 : 0));
+  const several = pickKind === 'several';
+  const nEff = Math.max(2, Math.min(n, Math.max(2, maxN)));
+  const pickField = !several
+    ? { mode: 'one', n: 1 }
+    : mode === 'any'
+      ? { mode: 'any', n: Math.min(count, MAX_PICK) }
+      : { mode, n: nEff };
+
   // Ids that are or ever were taken: the poll's choices, any choice that
   // still has votes stored, and the ones in this dialog.
   const [everUsed] = useState(() => new Set([...(editing?.options || []).map((o) => o.id), ...Object.keys(votes || {})]));
@@ -446,6 +490,66 @@ export function PollDialog({ onCreate, onClose, canRequire = false, initialQuest
     for (let i = 0; ; i++) if (free(`o${i}`)) return `o${i}`;
   };
   const nextId = () => freeId(new Set(options.map((o) => o.id).filter(Boolean)));
+
+  // The poll this dialog would post.
+  const build = () => {
+    const base = { ...(editing || {}), question: question.trim().slice(0, 500), required };
+    if (kind === 'text') return { ...base, kind: 'text', multi: false, write: false, options: [] };
+    let opts;
+    if (kind === 'people') {
+      const had = new Map((editing?.options || []).map((o) => [nameKey(rename(o.person || o.text)), o]));
+      opts = chosen.slice(0, MAX_PEOPLE).map((name) => had.get(nameKey(name)) || { id: personOptionId(name), text: name, person: name });
+    } else {
+      const used = new Set();
+      opts = filled.slice(0, MAX_CHOICES).map((o) => {
+        const id = o.id && !used.has(o.id) ? o.id : freeId(used);
+        used.add(id);
+        return { id, text: o.text.trim().slice(0, 200) };
+      });
+    }
+    const out = { ...base, kind, multi: several, write: kind === 'choices' ? write : false, options: opts, pick: pickField };
+    if (kind === 'people') out.selfVote = selfVote;
+    else delete out.selfVote;
+    // An old poll saved with the same rule it always had keeps having no rule.
+    if (editing && !editing.pick && pickField.mode === (editing.multi ? 'any' : 'one')) delete out.pick;
+    return out;
+  };
+
+  // What stops the poll from posting (said under the button).
+  const problem = (() => {
+    if (!question.trim()) return 'Type a question to post.';
+    if (kind === 'choices' && !(filled.length >= 2 || (write && filled.length >= 1))) return 'Add at least 2 choices.';
+    if (kind === 'people' && count < 2)
+      return source === 'pick' ? 'Pick at least 2 people.' : source === 'subteam' ? 'That subteam needs at least 2 people.' : 'There need to be at least 2 people.';
+    if (kind === 'people' && count > MAX_PEOPLE) return `That’s ${count} people. A poll can have ${MAX_PEOPLE}. Pick a subteam or choose people.`;
+    if (kind !== 'text' && several && mode !== 'any' && maxN < 2) return 'Add more options to let people pick several.';
+    if (editing && votes && kind !== 'text') {
+      const next = build();
+      const key = (r) => `${r.mode}${r.mode === 'upto' || r.mode === 'exact' ? r.n : ''}`;
+      const same = key(pickRule(next)) === key(pickRule(editing)) && next.selfVote === editing.selfVote;
+      if (!same) {
+        const fit = votesFit({ poll: editing, votes }, next, { rename });
+        if (!fit.ok)
+          return `${fit.lost.length} ${fit.lost.length === 1 ? 'person’s vote wouldn’t' : 'people’s votes wouldn’t'} count with this. Keep the old rule, or change it before people vote.`;
+      }
+    }
+    return '';
+  })();
+
+  const shownPeople = listPool.filter((p) => !find.trim() || p.toLowerCase().includes(find.trim().toLowerCase()));
+  const togglePerson = (p) =>
+    setPicked((cur) => {
+      const next = new Set(cur);
+      if (next.has(p)) next.delete(p);
+      else if (next.size < MAX_PEOPLE) next.add(p);
+      return next;
+    });
+  const stepper = (d) => setN(Math.max(2, Math.min(Math.max(2, maxN), nEff + d)));
+  const kinds = [
+    ['choices', 'Choices'],
+    ['people', 'People'],
+    ['text', 'Written answer'],
+  ];
   return (
     <Overlay>
       <div className="panel-backdrop center" onClick={onClose}>
@@ -454,19 +558,8 @@ export function PollDialog({ onCreate, onClose, canRequire = false, initialQuest
           onClick={(e) => e.stopPropagation()}
           onSubmit={(e) => {
             e.preventDefault();
-            if (!ok) return;
-            const used = new Set();
-            const ids = filled.slice(0, 10).map((o) => {
-              const id = o.id && !used.has(o.id) ? o.id : freeId(used);
-              used.add(id);
-              return { id, text: o.text.trim().slice(0, 200) };
-            });
-            onCreate({
-              ...(editing || {}),
-              question: question.trim().slice(0, 500),
-              required,
-              ...(kind === 'text' ? { kind: 'text', multi: false, write: false, options: [] } : { kind: 'choices', multi, write, options: ids }),
-            });
+            if (problem) return;
+            onCreate(build());
           }}
         >
           <div className="panel-head">
@@ -477,10 +570,7 @@ export function PollDialog({ onCreate, onClose, canRequire = false, initialQuest
             </button>
           </div>
           <div className="segmented poll-kind" role="radiogroup" aria-label="Kind of poll">
-            {[
-              ['choices', 'Choices'],
-              ['text', 'Written answer'],
-            ].map(([id, label]) => (
+            {kinds.map(([id, label]) => (
               <button
                 key={id}
                 type="button"
@@ -488,7 +578,7 @@ export function PollDialog({ onCreate, onClose, canRequire = false, initialQuest
                 aria-checked={kind === id}
                 className={`plain-seg${kind === id ? ' on' : ''}`}
                 onClick={() => setKind(id)}
-                disabled={!!editing && editing.kind !== id && (id === 'text' || editing.kind === 'text')}
+                disabled={!!editing && (editing.kind || 'choices') !== id}
               >
                 {label}
               </button>
@@ -499,7 +589,7 @@ export function PollDialog({ onCreate, onClose, canRequire = false, initialQuest
             autoFocus={!isTouch}
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
-            placeholder={kind === 'text' ? 'Ask a question everyone answers in their own words' : 'Ask a question'}
+            placeholder={kind === 'text' ? 'Ask a question everyone answers in their own words' : kind === 'people' ? 'Ask who (like “Who should drive?”)' : 'Ask a question'}
             maxLength={500}
           />
           {kind === 'text' && <p className="muted small poll-kind-hint">Everyone types their own answer. Answers show under the poll.</p>}
@@ -525,15 +615,145 @@ export function PollDialog({ onCreate, onClose, canRequire = false, initialQuest
                 )}
               </div>
             ))}
-          {kind === 'choices' && options.length < 10 && (
+          {kind === 'choices' && options.length < MAX_CHOICES && (
             <button type="button" className="link-btn" onClick={() => setOptions([...options, { id: editing ? nextId() : undefined, text: '' }])}>
               ＋ Add option
             </button>
           )}
-          {kind === 'choices' && (
-            <label className="row gap small">
-              <input type="checkbox" checked={multi} onChange={(e) => setMulti(e.target.checked)} /> Allow picking more than one
-            </label>
+          {kind === 'people' && (
+            <div className="poll-people-src">
+              <div className="muted tiny poll-sec-label">Who can people vote for?</div>
+              <div className="segmented poll-kind" role="radiogroup" aria-label="Who is in the poll">
+                {[
+                  ['everyone', 'Everyone'],
+                  ['subteam', 'A subteam'],
+                  ['pick', 'Pick people'],
+                ].map(([id, label]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    role="radio"
+                    aria-checked={source === id}
+                    className={`plain-seg${source === id ? ' on' : ''}`}
+                    onClick={() => setSource(id)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              {source === 'everyone' && <p className="muted small poll-kind-hint">Everyone on the team right now, {pool.length} {pool.length === 1 ? 'person' : 'people'}.</p>}
+              {source === 'subteam' && (
+                <select className="input" value={subteamName} onChange={(e) => setSubteam(e.target.value)} aria-label="Subteam">
+                  {subteams.map(([s, who]) => (
+                    <option key={s} value={s}>
+                      {s} ({who.length})
+                    </option>
+                  ))}
+                </select>
+              )}
+              {source === 'pick' && (
+                <div className="people-pick">
+                  <input className="input" type="search" value={find} onChange={(e) => setFind(e.target.value)} placeholder="Search people" aria-label="Search people" />
+                  <div className="people-pick-list" role="group" aria-label="People in the poll">
+                    {shownPeople.map((p) => (
+                      <label key={p} className={`people-row${picked.has(p) ? ' on' : ''}`}>
+                        <input type="checkbox" checked={picked.has(p)} onChange={() => togglePerson(p)} disabled={!picked.has(p) && picked.size >= MAX_PEOPLE} />
+                        <Avatar name={p} size={28} decoration="" />
+                        <span className="grow">{p}</span>
+                      </label>
+                    ))}
+                    {!shownPeople.length && <p className="muted small">No one matches.</p>}
+                  </div>
+                  <div className="row gap small">
+                    <span className="mono">{picked.size}</span>
+                    <span className="muted">of {MAX_PEOPLE} max picked</span>
+                    <span className="spacer" />
+                    <button type="button" className="link-btn" onClick={() => setPicked(new Set([...picked, ...shownPeople].slice(0, MAX_PEOPLE)))}>
+                      Add {find.trim() ? 'these' : 'everyone'}
+                    </button>
+                    <button type="button" className="link-btn" onClick={() => setPicked(new Set())} disabled={!picked.size}>
+                      Clear
+                    </button>
+                  </div>
+                </div>
+              )}
+              {source !== 'pick' && count > 0 && (
+                <div className="row gap small">
+                  <AvatarStack names={chosen} max={8} size={24} />
+                  <span className="muted">
+                    {count} {count === 1 ? 'person' : 'people'}
+                  </span>
+                </div>
+              )}
+              <label className="row gap small">
+                <input type="checkbox" checked={selfVote} onChange={(e) => setSelfVote(e.target.checked)} /> People can vote for themselves
+              </label>
+            </div>
+          )}
+          {kind !== 'text' && (
+            <fieldset className="poll-pick">
+              <legend className="muted tiny poll-sec-label">How many can people pick?</legend>
+              <div className="segmented poll-kind" role="radiogroup" aria-label="How many can people pick">
+                {[
+                  ['one', 'Just one'],
+                  ['several', 'Several'],
+                ].map(([id, label]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    role="radio"
+                    aria-checked={pickKind === id}
+                    className={`plain-seg${pickKind === id ? ' on' : ''}`}
+                    onClick={() => setPickKind(id)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              {several && (
+                <>
+                  <div className="segmented poll-kind" role="radiogroup" aria-label="Pick rule">
+                    {[
+                      ['upto', 'Up to'],
+                      ['exact', 'Exactly'],
+                      ['any', 'Any number'],
+                    ].map(([id, label]) => (
+                      <button
+                        key={id}
+                        type="button"
+                        role="radio"
+                        aria-checked={mode === id}
+                        className={`plain-seg${mode === id ? ' on' : ''}`}
+                        onClick={() => setMode(id)}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  {mode !== 'any' && (
+                    <div className="poll-stepper" role="group" aria-label="How many">
+                      <button type="button" className="btn stepper-btn" onClick={() => stepper(-1)} disabled={nEff <= 2} aria-label="Fewer">
+                        −
+                      </button>
+                      <span className="mono stepper-n" aria-live="polite">
+                        {nEff}
+                      </span>
+                      <button type="button" className="btn stepper-btn" onClick={() => stepper(1)} disabled={nEff >= Math.max(2, maxN)} aria-label="More">
+                        +
+                      </button>
+                    </div>
+                  )}
+                  <p className="muted small poll-kind-hint">
+                    {mode === 'upto' && `People can pick 1 to ${nEff}.`}
+                    {mode === 'exact' && `Exactly ${nEff}: people have to pick ${nEff} before their vote counts.`}
+                    {mode === 'any' && 'People can pick as many as they like.'}
+                  </p>
+                </>
+              )}
+              {editing && votes && Object.keys(votes).length > 0 && (
+                <p className="muted tiny poll-kind-hint">Votes are in, so the rule can only change if everyone’s picks still fit it.</p>
+              )}
+            </fieldset>
           )}
           {kind === 'choices' && (
             <label className="row gap small">
@@ -549,7 +769,12 @@ export function PollDialog({ onCreate, onClose, canRequire = false, initialQuest
               </span>
             </label>
           )}
-          <button className="btn primary big-btn" disabled={!ok}>
+          {problem && (
+            <p className="muted small poll-problem" role="status">
+              {problem}
+            </p>
+          )}
+          <button className="btn primary big-btn" disabled={!!problem}>
             {editing ? 'Save poll' : 'Post poll'}
           </button>
         </form>

@@ -48,6 +48,7 @@ import {
   itemId,
   personId,
 } from './diff.js';
+import { checkPicks, myPicks, usesVoteButton } from '../../functions/shared/polls.js';
 import { NEXT } from '../next.js';
 import { swOptions } from '../offline.js';
 import { browserIsOnline, isOnline, needsInternet, setServerReachable } from '../connection.js';
@@ -1198,12 +1199,33 @@ export const firebaseStore = {
 
   // Polls: votes: { [optionId]: { [personKey]: name } }. One vote per person
   // (not per device); single-choice polls clear the person's other votes.
-  vote(conv, msg, optionId, actor, on) {
+  // A poll with a pick rule (up to / exactly N) goes through votePicks, which
+  // checks the rule before anything is written.
+  async vote(conv, msg, optionId, actor, on, rename) {
     const me = personId(actor.name);
+    if (msg.poll.closed) throw new Error('This poll has ended.');
+    if (on && usesVoteButton(msg.poll)) return this.votePicks(conv, msg, [...myPicks(msg, actor.name, rename), optionId], actor, rename);
+    if (on && msg.poll.selfVote === false && !checkPicks({ ...msg.poll, pick: { mode: 'any' }, multi: true }, [optionId], actor.name, rename).ok)
+      throw new Error('You can’t vote for yourself here.');
     const args = [new FieldPath('votes', optionId, me), on ? actor.name : deleteField()];
     if (on && !msg.poll.multi)
       for (const o of msg.poll.options)
         if (o.id !== optionId && msg.votes?.[o.id]?.[me]) args.push(new FieldPath('votes', o.id, me), deleteField());
+    return updateDoc(doc(convCol(conv), msg.id), ...args);
+  },
+
+  // Set a person's whole vote at once (a pick-N poll's Vote button, the
+  // required-poll screen): the picks must follow the poll's rule, so a half
+  // pick is never saved. Their other choices are cleared in the same write.
+  async votePicks(conv, msg, ids, actor, rename) {
+    const me = personId(actor.name);
+    const check = checkPicks(msg.poll, ids, actor.name, rename);
+    if (!check.ok) throw new Error(check.why);
+    const args = [];
+    for (const o of msg.poll.options) {
+      if (check.ids.includes(o.id)) args.push(new FieldPath('votes', o.id, me), actor.name);
+      else if (msg.votes?.[o.id]?.[me] !== undefined) args.push(new FieldPath('votes', o.id, me), deleteField());
+    }
     return updateDoc(doc(convCol(conv), msg.id), ...args);
   },
 

@@ -3,7 +3,8 @@ import { lunchOf } from '../config.js';
 import { addDays, parseDay, todayISO } from '../milestones.js';
 import { firstName } from '../util.js';
 import { AutoTextarea, Avatar, CloseIcon, Overlay } from './common.jsx';
-import { sameName } from '../../functions/shared/team.js';
+import { nameKey, sameName } from '../../functions/shared/team.js';
+import { checkPicks, optionLabel, pickBounds } from '../../functions/shared/polls.js';
 import { teamDay } from '../../functions/shared/coins.js';
 import { cleanSkips, upcomingDays } from '../../functions/shared/checkin.js';
 import { confirmDialog } from './Dialogs.jsx';
@@ -403,15 +404,41 @@ export function CheckinDialog({ schedule, onDone, onSchedule, onClose }) {
 
 // A required poll from #announcements, not voted on yet: blocks the app,
 // like a lab check-in, until it's answered (or the poll is ended).
-export function PollGate({ msg, rename, onVote, onAnswer, onSkip }) {
+export function PollGate({ msg, rename, me, onVote, onAnswer, onSkip }) {
   const [picked, setPicked] = useState([]);
   const [answer, setAnswer] = useState('');
+  const [hint, setHint] = useState('');
   const written = msg.poll.kind === 'text';
   // A choice poll that also takes written answers: pick, write, or both.
   const both = !written && !!msg.poll.write;
   const [busy, setBusy] = useState(false);
   const { poll } = msg;
-  const toggle = (id) => setPicked(poll.multi ? (picked.includes(id) ? picked.filter((x) => x !== id) : [...picked, id]) : [id]);
+  const bounds = pickBounds(poll, nameKey(rename(me || '')), rename);
+  const rule = poll.pick?.mode;
+  // Your picks follow the poll's rule: tapping past the limit does nothing but say so.
+  const toggle = (id) => {
+    if (picked.includes(id)) return setPicked(picked.filter((x) => x !== id));
+    if (bounds.max === 1) return setPicked([id]);
+    if (picked.length >= bounds.max) return setHint(bounds.min === bounds.max ? `You can pick ${bounds.max}. Unselect one to change.` : `You can pick up to ${bounds.max}`);
+    setHint('');
+    setPicked([...picked, id]);
+  };
+  const valid = checkPicks({ ...poll, closed: false }, picked, me || '', rename).ok;
+  const ask = written
+    ? 'Write your answer'
+    : rule === 'upto'
+      ? `Pick up to ${bounds.max}`
+      : rule === 'exact'
+        ? `Pick exactly ${bounds.max}`
+        : bounds.max === 1
+          ? 'Pick one'
+          : 'Pick one or more';
+  const counter =
+    bounds.min === bounds.max && bounds.max > 1
+      ? `${picked.length} of ${bounds.max} picked`
+      : bounds.max > 1 && picked.length
+        ? `${picked.length} of ${bounds.max} picked`
+        : '';
   return (
     <Overlay>
       <div className="checkin-gate" role="alertdialog" aria-labelledby="pollgate-title">
@@ -419,9 +446,8 @@ export function PollGate({ msg, rename, onVote, onAnswer, onSkip }) {
           <p className="gate-eyebrow">Poll</p>
           <h1 id="pollgate-title">{poll.question}</h1>
           <p className="muted">
-            Poll from {firstName(rename(msg.by || ''))} in #announcements.{' '}
-            {written ? 'Write your answer' : `${poll.multi ? 'Pick one or more' : 'Pick one'}${both ? ', or write your own' : ''}`} to keep
-            going.
+            Poll from {firstName(rename(msg.by || ''))} in #announcements. {ask}
+            {both ? ', or write your own' : ''} to keep going.
           </p>
           {written && (
             <AutoTextarea
@@ -433,19 +459,31 @@ export function PollGate({ msg, rename, onVote, onAnswer, onSkip }) {
               autoFocus
             />
           )}
-          <div className="pollgate-options" hidden={written}>
-            {poll.options.map((o) => (
-              <button
-                key={o.id}
-                className={`pollgate-opt${picked.includes(o.id) ? ' on' : ''}`}
-                aria-pressed={picked.includes(o.id)}
-                onClick={() => toggle(o.id)}
-              >
-                <span className="poll-check">{picked.includes(o.id) ? '✓' : ''}</span>
-                {o.text}
-              </button>
-            ))}
+          <div className={`pollgate-options${poll.options.length > 7 ? ' scroll' : ''}`} hidden={written}>
+            {poll.options.map((o) => {
+              const on = picked.includes(o.id);
+              const self = poll.selfVote === false && !!o.person && nameKey(rename(o.person)) === nameKey(rename(me || ''));
+              return (
+                <button
+                  key={o.id}
+                  className={`pollgate-opt${on ? ' on' : ''}`}
+                  aria-pressed={on}
+                  disabled={self}
+                  onClick={() => toggle(o.id)}
+                >
+                  <span className="poll-check">{on ? '✓' : ''}</span>
+                  {o.person && <Avatar name={o.person} size={28} decoration="" />}
+                  {optionLabel(o, rename)}
+                  {self && <span className="muted tiny"> (you)</span>}
+                </button>
+              );
+            })}
           </div>
+          {!written && (hint || counter) && (
+            <p className="small poll-counter" role="status" aria-live="polite">
+              {hint || counter}
+            </p>
+          )}
           {both && (
             <AutoTextarea
               className="input"
@@ -457,7 +495,7 @@ export function PollGate({ msg, rename, onVote, onAnswer, onSkip }) {
           )}
           <button
             className="btn primary big-btn"
-            disabled={(written ? !answer.trim() : !picked.length && !(both && answer.trim())) || busy}
+            disabled={(written ? !answer.trim() : !valid && !(both && answer.trim() && !picked.length)) || busy}
             onClick={async () => {
               setBusy(true);
               if (written) await onAnswer(answer);

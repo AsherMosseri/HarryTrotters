@@ -423,6 +423,7 @@ export default function Composer({
       {panel === 'poll' && (
         <PollDialog
           initialQuestion={pollQuestion}
+          roster={isDm && members?.length ? members : roster}
           canRequire={conv === 'announcements'}
           onCreate={(poll) => sendExtra({ poll, text: '', votes: {} })}
           onClose={() => {
