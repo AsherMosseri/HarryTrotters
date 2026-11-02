@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { PET_ITEMS } from '../../functions/shared/market.js';
 import {
+  EVENT_GEAR,
   FULL,
   GEAR,
   GEAR_SLOTS,
@@ -23,6 +24,7 @@ import { Coins } from './Coins.jsx';
 import { alertDialog, confirmDialog, promptDialog } from './Dialogs.jsx';
 import { AdoptPet, Meter, nextLevelLine } from './Pet.jsx';
 import { PetWithGear } from './PetGear.jsx';
+import { EventsAdmin, ParkSection } from './PetPark.jsx';
 import { Icon } from './shell/icons.jsx';
 
 // Pets in the market, and their family (3.0): your pets with what they wear,
@@ -63,6 +65,8 @@ export function PetsShelf({ actor, balance, buy, busy, onToast, roster = [] }) {
           </ul>
         </section>
       )}
+
+      <ParkSection />
 
       {!list.length ? (
         <section className="mk-sec">
@@ -117,6 +121,8 @@ export function PetsShelf({ actor, balance, buy, busy, onToast, roster = [] }) {
         </div>
         {pathOpen ? <LevelPath level={level} /> : <p className="muted small">What each level brings: titles, gear, chat rings and the baby. It’s all for show; none of it costs or earns coins.</p>}
       </section>
+
+      {actor.admin && <EventsAdmin onToast={onToast} />}
 
       {target && (
         <section className="mk-sec">
@@ -331,7 +337,10 @@ function StyleSheet({ entry, onClose, onSave }) {
   useEscape(onClose);
   const [draft, setDraft] = useState(() => cleanGear(pet.gear));
   const [saving, setSaving] = useState(false);
+  const market = useMarket();
   const open = new Set(unlockedGear(st.level).map((g) => g.id));
+  // Event gear: any level, but only if you earned it (the server checks too).
+  const earned = new Set(market.unlocks.earned);
   const next = nextUnlock(st.level);
   const changed = GEAR_SLOTS.some((s) => draft[s.id] !== cleanGear(pet.gear)[s.id]);
   const pick = (slot, id) => setDraft((d) => ({ ...d, [slot]: id }));
@@ -363,7 +372,7 @@ function StyleSheet({ entry, onClose, onSave }) {
               </div>
             </div>
             {GEAR_SLOTS.map((slot) => {
-              const items = GEAR.filter((g) => g.slot === slot.id);
+              const items = [...GEAR.filter((g) => g.slot === slot.id), ...EVENT_GEAR.filter((g) => g.slot === slot.id)];
               return (
                 <fieldset key={slot.id} className="pf-slot">
                   <legend>{slot.name}</legend>
@@ -375,7 +384,8 @@ function StyleSheet({ entry, onClose, onSave }) {
                       <span className="pf-tile-name">None</span>
                     </button>
                     {items.map((g) => {
-                      const locked = !open.has(g.id);
+                      const event = !!g.earn;
+                      const locked = event ? !earned.has(g.id) : !open.has(g.id);
                       return (
                         <button
                           key={g.id}
@@ -384,7 +394,7 @@ function StyleSheet({ entry, onClose, onSave }) {
                           aria-disabled={locked}
                           className={`pf-tile${draft[slot.id] === g.id ? ' on' : ''}${locked ? ' locked' : ''}`}
                           onClick={() => !locked && pick(slot.id, g.id)}
-                          title={locked ? `${g.name}: unlocks at level ${g.level}` : g.name}
+                          title={locked ? (event ? `${g.name}: earn it in ${g.earn}` : `${g.name}: unlocks at level ${g.level}`) : g.name}
                         >
                           <span className="pf-tile-art">
                             {slot.id === 'palette' ? (
@@ -394,7 +404,11 @@ function StyleSheet({ entry, onClose, onSave }) {
                             )}
                           </span>
                           <span className="pf-tile-name">{g.name}</span>
-                          <span className="pf-tile-sub mono">{locked ? `Level ${g.level}` : ' '}</span>
+                          {event ? (
+                            <span className="pf-tile-sub pf-tile-event">{locked ? `Earn it in ${g.earn}` : g.earn}</span>
+                          ) : (
+                            <span className="pf-tile-sub mono">{locked ? `Level ${g.level}` : ' '}</span>
+                          )}
                         </button>
                       );
                     })}

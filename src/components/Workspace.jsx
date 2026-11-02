@@ -1586,6 +1586,10 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
       claimBingo: (req) => store.claimBingo(req || {}, actor),
       predict: (req) => store.predict(req, actor).catch((e) => ({ error: e?.message || 'That didn’t work.' })),
       recap: (req) => store.recap(req, actor),
+      // Team events (functions/petevents.js): refresh the sums, mark a reward
+      // seen, and (team management) create, edit or end an event. Answers
+      // { ok } or { note }; a failed call comes back as a note.
+      petEvent: (req) => Promise.resolve(store.petEvent(req, actor)).catch((e) => ({ note: noteFor(e, 'That didn’t go through') })),
       // Learn (functions/learn.js): these throw, and the game shows the error.
       quizNext: (req) => store.quizNext(req, actor),
       quizAnswer: (req) => store.quizAnswer(req, actor),

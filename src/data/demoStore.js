@@ -29,6 +29,8 @@ import { giftAccept, giftEnd, giftOffer, petEdit, petsIn } from '../../functions
 import { ROSTER, cleanName, sameName } from '../../functions/shared/team.js';
 import { demoLife } from './demoLife.js';
 import { demoLearn } from './demoLearn.js';
+import { demoEvents } from './demoEvents.js';
+import { earnedIds } from '../../functions/shared/events.js';
 
 const KEY = 'ftc32313-demo-v13';
 const listeners = new Set();
@@ -880,6 +882,10 @@ function recordDemoRun(s, me, r, score, problem, review, now) {
 const life = demoLife({ get: () => state, commit: () => commit(), uid });
 life.seedSamples();
 
+// Team events and the pet park (demoEvents.js): a running event with progress.
+const events = demoEvents({ get: () => state, commit: () => commit(), uid });
+events.seedSamples();
+
 function commit() {
   try {
     localStorage.setItem(KEY, JSON.stringify(state));
@@ -1327,6 +1333,16 @@ export const demoStore = {
   subscribePetGifts(name, cb) {
     return listen(() => cb((state.petGifts || []).filter((g) => g.from === name || g.to === name).map((g) => ({ ...g }))));
   },
+  // Team events (functions/petevents.js, demoEvents.js here).
+  subscribePetEvents(cb) {
+    return listen(() => cb((state.petEvents || []).map((e) => ({ ...e }))));
+  },
+  subscribePetUnlocks(cb) {
+    return listen(() => cb((state.petUnlocks || []).map((u) => ({ ...u }))));
+  },
+  async petEvent(req, actor) {
+    return events.petEvent(req, actor);
+  },
   subscribeTournaments(cb) {
     const tick = () => settleDemoTournaments() && commit();
     tick();
@@ -1476,7 +1492,9 @@ export const demoStore = {
       const gifts = state.petGifts || (state.petGifts = []);
       const action = data.action;
       if (['adopt', 'rename', 'inChat', 'release', 'style', 'hatch'].includes(action)) {
-        const r = petEdit(action, data, { me, doc: docOfName(me), shifts: state.shifts || [], now });
+        // Event gear counts only for whoever earned it (petUnlocks, like the server).
+        const earned = earnedIds((state.petUnlocks || []).find((u) => u.person === me));
+        const r = petEdit(action, data, { me, doc: docOfName(me), shifts: state.shifts || [], earned, now });
         if (r.unknown) return note('Unknown action.');
         if (r.note) return r;
         putDoc(me, r.doc);

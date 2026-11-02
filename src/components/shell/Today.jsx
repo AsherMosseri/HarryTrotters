@@ -15,6 +15,9 @@ import { useFlip } from '../../motion.js';
 import CountUp from '../CountUp.jsx';
 import { MascotCard } from '../Pet.jsx';
 import { ShoutOuts } from '../Market.jsx';
+import { ParkCardToday } from '../PetPark.jsx';
+import { useMarket } from '../../market.js';
+import { statusOf as eventStatus } from '../../../functions/shared/events.js';
 import { LabLogContext } from '../LabLog.jsx';
 import { BingoCard, RecapRow } from '../Life.jsx';
 import Readiness from './Readiness.jsx';
@@ -173,7 +176,22 @@ function UsualToday({
   joinRequests = [],
 }) {
   const lab = useContext(LabLogContext);
+  const market = useMarket();
   const all = tasks || [];
+  // The pet park (with a team event's meter): up top while an event is on or
+  // coming, else under the robot. Open goes to Market, Pets.
+  const eventOn = !!market?.events.some((e) => ['live', 'upcoming'].includes(eventStatus(e, market.now)));
+  const openPark = on.includes('market')
+    ? () => {
+        try {
+          localStorage.setItem('market-shelf', JSON.stringify('pets'));
+        } catch {
+          /* storage unavailable */
+        }
+        onPage('market');
+      }
+    : null;
+  const park = <ParkCardToday onOpen={openPark} />;
   // Rows ease in and out and slide into place as tasks change (Moving things).
   const gridRef = useRef(null);
   useFlip(gridRef, tasks);
@@ -334,6 +352,7 @@ function UsualToday({
 
       <div className="today-grid" ref={gridRef}>
         <div className="today-col">
+          {eventOn && park}
           {showReady && (
             <Readiness
               r={ready}
@@ -393,6 +412,7 @@ function UsualToday({
         <div className="today-col side">
           {/* The team's robot: its mood is the whole team's last seven days. */}
           <MascotCard shifts={shifts} tasks={all} logs={lab?.logs || []} roster={roster} />
+          {!eventOn && park}
           {api && <BingoCard actor={actor} api={api} sig={bingoSig} />}
           {api && actor.admin && <RecapRow api={api} />}
           {on.includes('shifts') && (

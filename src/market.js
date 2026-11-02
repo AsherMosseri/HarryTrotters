@@ -5,7 +5,8 @@
 // pays: the server does.
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { activeExtras } from '../functions/shared/market.js';
-import { giftOpen, petState, petsIn } from '../functions/shared/pets.js';
+import { eventGearItem, giftOpen, petState, petsIn } from '../functions/shared/pets.js';
+import { earnedIds, shownEvents, unseenIds } from '../functions/shared/events.js';
 import { celebrate } from './motion.js';
 import { noteFor } from './connection.js';
 
@@ -35,11 +36,15 @@ export function useMarketData(store, { actor, rename, shifts, balanceOf, coinsOn
   const [rawPets, setPets] = useState([]);
   const [rawTournaments, setTournaments] = useState([]);
   const [rawGifts, setGifts] = useState([]);
+  const [rawEvents, setEvents] = useState([]);
+  const [rawUnlocks, setUnlocks] = useState([]);
   useEffect(() => store.subscribePerks?.(setPerks), [store]);
   useEffect(() => store.subscribePurchases?.(setPurchases), [store]);
   useEffect(() => store.subscribePets?.(setPets), [store]);
   useEffect(() => store.subscribeTournaments?.(setTournaments), [store]);
   useEffect(() => store.subscribePetGifts?.(actor.name, setGifts), [store, actor.name]);
+  useEffect(() => store.subscribePetEvents?.(setEvents), [store]);
+  useEffect(() => store.subscribePetUnlocks?.(setUnlocks), [store]);
   // A minute clock: needs run down and chat extras run out while you watch.
   const [minute, setMinute] = useState(() => Math.floor(Date.now() / 60000));
   useEffect(() => {
@@ -86,12 +91,65 @@ export function useMarketData(store, { actor, rename, shifts, balanceOf, coinsOn
     return { incoming: open.filter((g) => g.to === actor.name), outgoing: open.filter((g) => g.from === actor.name) };
   }, [rawGifts, now, rename, actor.name]);
 
+  const toast = useRef(onToast);
+  toast.current = onToast;
+  // Team events (shared/events.js): the ones to show now, and the event gear
+  // you have earned (under your current name; a rename keeps it).
+  const events = useMemo(() => shownEvents(rawEvents, now), [rawEvents, now]);
+  const unlocks = useMemo(() => {
+    const mine = rawUnlocks.filter((u) => rename(u.person || '') === actor.name);
+    const doc = { gear: Object.assign({}, ...mine.map((u) => u.gear || {})), seen: Object.assign({}, ...mine.map((u) => u.seen || {})) };
+    return { earned: earnedIds(doc), unseen: unseenIds(doc), doc };
+  }, [rawUnlocks, rename, actor.name]);
+
+  // The server does the sums (hours come from the shift records, never from
+  // here): ask it to refresh on opening, now and then, when the app comes
+  // back to the front and when one of your shifts ends.
+  const lastAsk = useRef(0);
+  const ask = useCallback(
+    (force = false) => {
+      if (actor.preview || !store.petEvent) return;
+      const t = Date.now();
+      if (!force && t - lastAsk.current < 30000) return;
+      lastAsk.current = t;
+      Promise.resolve(store.petEvent({ action: 'refresh' }, actor)).catch(() => {});
+    },
+    [store, actor],
+  );
+  useEffect(() => {
+    ask(true);
+    const every = setInterval(() => ask(), 5 * 60000);
+    const back = () => document.visibilityState === 'visible' && ask();
+    document.addEventListener('visibilitychange', back);
+    return () => {
+      clearInterval(every);
+      document.removeEventListener('visibilitychange', back);
+    };
+  }, [ask]);
+  const myShifts = shifts.filter((x) => x.person === actor.name && x.end).length;
+  useEffect(() => {
+    if (myShifts) ask();
+  }, [myShifts, ask]);
+
+  // You earned event gear since this device last told you: one celebration,
+  // once per reward (the server remembers which ones you have seen).
+  const told = useRef(new Set());
+  const unseenKey = unlocks.unseen.join();
+  useEffect(() => {
+    const fresh = unlocks.unseen.filter((id) => !told.current.has(id));
+    if (!fresh.length || actor.preview) return;
+    fresh.forEach((id) => told.current.add(id));
+    const names = fresh.map((id) => eventGearItem(id)?.name).filter(Boolean);
+    celebrate();
+    toast.current?.(`You earned the ${names.join(' and the ')} in ${eventGearItem(fresh[0])?.earn || 'a team event'}. Dress a pet in it: Market, Pets, Style.`);
+    for (const id of fresh) Promise.resolve(store.petEvent?.({ action: 'seen', gear: id }, actor)).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [unseenKey]);
+
   // Your pet grew a level since this device last saw it: a celebration.
   const mine = petOf(actor.name);
   const level = mine?.st.level || 0;
   const petKey = mine ? `pet-level-${mine.pet.adoptedAt}` : '';
-  const toast = useRef(onToast);
-  toast.current = onToast;
   useEffect(() => {
     if (!petKey || !level || actor.preview) return;
     const seen = readNum(petKey);
@@ -116,12 +174,24 @@ export function useMarketData(store, { actor, rename, shifts, balanceOf, coinsOn
     [store, actor, coinsOn],
   );
 
+  // Team events: ask the server (it answers { ok } or { note }).
+  const petEvent = useCallback(
+    async (req) => {
+      try {
+        return await store.petEvent(req, actor);
+      } catch (e) {
+        return { note: noteFor(e, 'That didn’t go through') };
+      }
+    },
+    [store, actor],
+  );
+
   // Perks: team management writes them directly (the rules check who).
   const savePerk = useCallback((id, data) => store.savePerk(id, data, actor), [store, actor]);
   const deletePerk = useCallback((id) => store.deletePerk(id), [store]);
 
   return useMemo(
-    () => ({ perks, purchases, pets, tournaments, extras, petOf, petsOf, gifts, run, now, coinsOn, savePerk, deletePerk }),
-    [perks, purchases, pets, tournaments, extras, petOf, petsOf, gifts, run, now, coinsOn, savePerk, deletePerk],
+    () => ({ perks, purchases, pets, tournaments, extras, petOf, petsOf, gifts, run, now, coinsOn, savePerk, deletePerk, events, allEvents: rawEvents, unlocks, askEvents: ask, petEvent, me: actor.name, rename }),
+    [perks, purchases, pets, tournaments, extras, petOf, petsOf, gifts, run, now, coinsOn, savePerk, deletePerk, events, rawEvents, unlocks, ask, petEvent, actor.name, rename],
   );
 }

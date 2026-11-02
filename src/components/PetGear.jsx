@@ -54,6 +54,18 @@ const HEAD = {
       <circle cx="5.4" cy="12.5" r="1.8" fill="#232834" />
     </>
   ),
+  // Event gear (shared/pets.js EVENT_GEAR): a hi-vis cap with a reflective stripe.
+  'pitcrew-cap': (
+    <>
+      <path d="M-12.8 -5 C-12.8 -22.4 12.8 -22.4 12.8 -5 Z" fill="#ff7a1a" stroke="#a94700" strokeWidth="1.2" strokeLinejoin="round" />
+      <path d="M-11.6 -11 Q0 -17.4 11.6 -11" stroke="#e8edf2" strokeWidth="2" fill="none" strokeLinecap="round" />
+      <path d="M-11.6 -11 Q0 -17.4 11.6 -11" stroke="#9aa6b2" strokeWidth="0.5" fill="none" strokeLinecap="round" opacity="0.7" />
+      <path d="M-14.6 -4.4 Q0 3.2 14.6 -4.4 Q0 -8.6 -14.6 -4.4 Z" fill="#d9600a" stroke="#a94700" strokeWidth="1" strokeLinejoin="round" />
+      <circle cx="0" cy="-20" r="1.4" fill="#a94700" />
+      <circle cx="0" cy="-8.6" r="2.3" fill="#fff" opacity="0.92" />
+      <path d="M0 -10.6 V-6.6 M-2 -8.6 H2" stroke="#a94700" strokeWidth="0.9" strokeLinecap="round" />
+    </>
+  ),
   crown: (
     <>
       <path d="M-9.5 -8 L-11 -19 L-5.4 -13.4 L0 -20.6 L5.4 -13.4 L11 -19 L9.5 -8 Z" fill={GOLD} stroke={GOLD_DARK} strokeWidth="1.1" strokeLinejoin="round" />
@@ -127,6 +139,19 @@ function Neck({ id, neck }) {
         <path d={`M${x - 1} ${y + 1.6} L${x - 7.2} ${y - 2} L${x - 7.2} ${y + 5.2} Z`} fill="#3b5bdb" stroke="#27389a" strokeWidth="1" strokeLinejoin="round" />
         <path d={`M${x + 1} ${y + 1.6} L${x + 7.2} ${y - 2} L${x + 7.2} ${y + 5.2} Z`} fill="#3b5bdb" stroke="#27389a" strokeWidth="1" strokeLinejoin="round" />
         <circle cx={x} cy={y + 1.6} r="1.9" fill="#2d46b0" stroke="#27389a" strokeWidth="0.8" />
+      </>
+    );
+  // Event gear: a gold medal on a blue and white ribbon, with the date on it.
+  if (id === 'medal-nov14')
+    return (
+      <>
+        <path d={`M${x - 4.6} ${y - 1.2} L${x - 0.6} ${y + 7} M${x + 4.6} ${y - 1.2} L${x + 0.6} ${y + 7}`} stroke="#2f5fe0" strokeWidth="2.8" strokeLinecap="butt" />
+        <path d={`M${x - 4.6} ${y - 1.2} L${x - 0.6} ${y + 7} M${x + 4.6} ${y - 1.2} L${x + 0.6} ${y + 7}`} stroke="#fff" strokeWidth="0.7" strokeLinecap="butt" opacity="0.85" />
+        <circle cx={x} cy={y + 10.2} r="4.2" fill={GOLD} stroke={GOLD_DARK} strokeWidth="1" />
+        <circle cx={x} cy={y + 10.2} r="2.9" fill="none" stroke="#fff3b0" strokeWidth="0.6" />
+        <text x={x} y={y + 11.7} textAnchor="middle" fontSize="4.2" fontWeight="800" fill="#7a4f0c" fontFamily="system-ui, sans-serif">
+          14
+        </text>
       </>
     );
   if (id === 'medal' || id === 'goldmedal') {

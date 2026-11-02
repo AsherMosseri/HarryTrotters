@@ -705,9 +705,31 @@ export const firebaseStore = {
     );
     return () => offs.forEach((off) => off());
   },
+  // Team events (functions/petevents.js): the event with its progress, and
+  // the event gear people earned. Read-only here; petEvent({ action }) asks
+  // the server to refresh the sums, mark a reward seen, or (team management)
+  // create, edit or end an event.
+  subscribePetEvents(cb) {
+    return onSnapshot(
+      collection(db, 'petEvents'),
+      (snap) => cb(snap.docs.map(readDoc)),
+      (e) => console.warn('petEvents', e),
+    );
+  },
+  subscribePetUnlocks(cb) {
+    return onSnapshot(
+      collection(db, 'petUnlocks'),
+      (snap) => cb(snap.docs.map(readDoc)),
+      (e) => console.warn('petUnlocks', e),
+    );
+  },
+  async petEvent(req) {
+    return (await callable('petEvent')(req)).data;
+  },
   subscribeTournaments(cb) {
     return onSnapshot(
       collection(db, 'tournaments'),
+      (snap) => cb(snap.docs.map(readDoc)),
       (snap) => cb(snap.docs.map(readDoc)),
       (e) => console.warn('tournaments', e),
     );
