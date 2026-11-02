@@ -37,6 +37,10 @@ const LOOK = {
   monkey: { body: '#c9733a', dark: '#7d431d', belly: '#f6d9b2', inner: '#f6b9a0', nose: '#f0916c', line: '#7d431d', face: '#f2c996' },
   // Rusty fur, a cream face, dark brown belly, legs and ear insides, darker rust tear marks and tail rings.
   redpanda: { body: '#c8532b', dark: '#432a25', light: '#ee8a4e', shade: '#9c3a1c', belly: '#fff3e4', inner: '#432a25', nose: '#2a1a18', line: '#9a3a18', tear: '#8e3213', ring: '#9a3c1d' },
+  // Brown spines with tan tips over a darker underlayer, a cream face and belly, pink ears.
+  hedgehog: { body: '#8a5a3a', dark: '#4e301d', light: '#c99d6a', shade: '#5c3a22', belly: '#f3dcc0', inner: '#f2aa9a', nose: '#2a1a18', line: '#5e3b22', tip: '#e2b985', foot: '#5a3a26' },
+  // A warm cream hen with a soft tan outline and light-orange shading, a red comb and wattle, an orange beak and legs.
+  chicken: { body: '#f6ecd6', dark: '#e9a95c', light: '#fffaf0', shade: '#ead3a6', belly: '#fffbf0', inner: '#e0483c', nose: '#f2a31e', line: '#c9a272', comb: '#e44a3c', combLine: '#a8302a', leg: '#f08a24', legLine: '#c4661a', wing: '#f0d3a0' },
 };
 
 // --- shared face parts ----------------------------------------------------
@@ -144,6 +148,32 @@ function Lid({ id, n, x, y, r, side, color }) {
       />
     </>
   );
+}
+
+// A ring of spines along part of an ellipse (angles in degrees, 0 = right, going
+// up and over to the left). Returns the points as tips and valleys in order.
+function spikes(cx, cy, rx, ry, a0, a1, n, dep) {
+  const pt = (a, k) => [cx + rx * k * Math.cos((a * Math.PI) / 180), cy - ry * k * Math.sin((a * Math.PI) / 180)];
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    out.push({ tip: false, p: pt(a0 + ((a1 - a0) * i) / n, 1 - dep) });
+    out.push({ tip: true, p: pt(a0 + ((a1 - a0) * (i + 0.5)) / n, 1) });
+  }
+  out.push({ tip: false, p: pt(a1, 1 - dep) });
+  return out;
+}
+const f1 = (n) => n.toFixed(1);
+const spikePath = (pts) => pts.map((q, i) => `${i ? 'L' : 'M'}${f1(q.p[0])} ${f1(q.p[1])}`).join(' ');
+// The lighter tip of every spine: a small triangle from the tip toward its two valleys.
+function spikeTips(pts, k = 0.5) {
+  let d = '';
+  for (let i = 1; i < pts.length - 1; i += 2) {
+    const [x, y] = pts[i].p;
+    const [ax, ay] = pts[i - 1].p;
+    const [bx, by] = pts[i + 1].p;
+    d += `M${f1(ax + (x - ax) * (1 - k))} ${f1(ay + (y - ay) * (1 - k))} L${f1(x)} ${f1(y)} L${f1(bx + (x - bx) * (1 - k))} ${f1(by + (y - by) * (1 - k))} Z `;
+  }
+  return d;
 }
 
 // --- species --------------------------------------------------------------
@@ -613,6 +643,135 @@ const DRAW = {
           <path d="M29.8 33 Q32 31.8 34.2 33 Q33.4 35.2 32 35.4 Q30.6 35.2 29.8 33Z" fill={c.nose} />
           <ellipse cx="31.1" cy="32.7" rx="1" ry="0.5" fill="#fff" opacity="0.55" />
           <Mouth mood={mood} y={36.2} w={3.2} h={2.5} kind="w" />
+        </>
+      ),
+    };
+  },
+
+  hedgehog({ c, id, mood, detail, ek, L }) {
+    const sad = mood === 'sad';
+    // Sad: the spines lie flatter (shallower points).
+    const dep = sad ? 0.12 : 0.21;
+    const under = spikes(32, 36.5, 23.4, 26, 207, -27, 11, dep);
+    const mid = spikes(32, 38, 20.4, 22.6, 200, -20, 10, dep);
+    const cap = spikes(32, 29.4, 19.6, 16.8, 173, 7, 9, dep);
+    const tilt = sad ? 22 : mood === 'happy' ? 6 : 12;
+    const ear = (x, s) => (
+      <g transform={`rotate(${s * tilt} ${x} 22.6)`}>
+        <circle cx={x} cy="19.8" r="4.9" fill={c.inner} {...L} />
+        <circle cx={x} cy="20.4" r="2.7" fill="#fbd3c6" />
+      </g>
+    );
+    const hair = 'L50.6 27 C50.8 21.6 45 19.2 40.4 19.8 Q36 20.4 32 23.2 Q28 20.4 23.6 19.8 C19 19.2 13.2 21.6 13.4 27 Z';
+    return {
+      back: (
+        <g className="pet-spines">
+          <path d={`${spikePath(under)} L47 54 Q32 60 17 54 Z`} fill={`url(#${id}k)`} {...L} />
+          <path d={`${spikePath(mid)} L45 54 Q32 58 19 54 Z`} fill={`url(#${id}b)`} />
+          {detail && <path d={spikeTips(mid, 0.46)} fill={c.light} opacity="0.55" />}
+          {detail && <path d={spikeTips(under, 0.34)} fill={c.light} opacity="0.4" />}
+        </g>
+      ),
+      body: (
+        <>
+          <ellipse cx="32" cy="47.4" rx="13.6" ry="10.6" fill={`url(#${id}f)`} {...L} />
+          <ellipse cx="22.6" cy="50" rx="3.1" ry="2.5" fill={c.belly} {...L} />
+          <ellipse cx="41.4" cy="50" rx="3.1" ry="2.5" fill={c.belly} {...L} />
+          <ellipse cx="25.8" cy="56.4" rx="4.3" ry="2.6" fill={c.foot} stroke={c.dark} strokeWidth={L.strokeWidth} />
+          <ellipse cx="38.2" cy="56.4" rx="4.3" ry="2.6" fill={c.foot} stroke={c.dark} strokeWidth={L.strokeWidth} />
+          {detail && <path d="M24.2 55.6 v1.2 M26 55.8 v1.2 M36.2 55.8 v1.2 M38 55.6 v1.2" stroke={c.tip} strokeWidth="0.7" strokeLinecap="round" opacity="0.7" />}
+        </>
+      ),
+      head: (
+        <>
+          <ellipse cx="32" cy="29" rx="17.6" ry="14.4" fill={`url(#${id}f)`} {...L} />
+          <path d={`${spikePath(cap)} ${hair}`} fill={`url(#${id}b)`} {...L} />
+          <path d={spikeTips(cap, 0.5)} fill={c.light} opacity="0.7" />
+          {ear(15.2, -1)}
+          {ear(48.8, 1)}
+          <Gloss id={id} cx={24} cy={17.4} rx={7} ry={3} />
+          {detail && <Blush y={35.4} dx={13} rx={2.8} ry={1.8} o={0.45} />}
+          <Eyes mood={mood} xs={[24.2, 39.8]} y={29.4} r={3.1} ek={ek} brow={c.dark} detail={detail} />
+          <path d="M26.6 34 C26.6 31.8 29 30.4 32 30.4 C35 30.4 37.4 31.8 37.4 34 C37.4 36.6 34.2 39.2 32 40 C29.8 39.2 26.6 36.6 26.6 34Z" fill="#fbead4" stroke={c.line} strokeWidth="0.8" strokeOpacity="0.45" />
+          <ellipse cx="32" cy="36.6" rx="2.7" ry="2.1" fill={c.nose} />
+          <ellipse cx="31" cy="35.8" rx="0.9" ry="0.5" fill="#fff" opacity="0.8" />
+          <Mouth mood={mood} y={39.4} w={2.8} h={1.8} kind="w" />
+        </>
+      ),
+    };
+  },
+
+  chicken({ c, id, mood, detail, ek, L }) {
+    const sad = mood === 'sad';
+    const feather = (a, len, w) => (
+      <path
+        transform={`translate(43.6 51.4) rotate(${a})`}
+        d={`M0 0 C${-w} ${-len * 0.3} ${-w} ${-len * 0.8} 0 ${-len} C${w} ${-len * 0.8} ${w} ${-len * 0.3} 0 0Z`}
+        fill={`url(#${id}k)`}
+        {...L}
+      />
+    );
+    const toe = { stroke: c.legLine, strokeWidth: detail ? 1.5 : 2, strokeLinecap: 'round', fill: 'none' };
+    const wing = (s) => (
+      <g transform={s < 0 ? undefined : 'translate(64 0) scale(-1 1)'}>
+        <path d="M17.2 40.4 C11.6 42.6 10.8 52 16.4 55 C19.8 54.6 21.6 50.4 21.4 45.6 C21.2 42.8 19.6 40.6 17.2 40.4Z" fill={c.wing} {...L} />
+        {detail && <path d="M13.6 49.6 q1.8 2.2 3.8 0.6 M15.6 45.8 q1.8 2.2 3.8 0.6 M16.6 52.4 q1.4 1.2 2.8 0.2" stroke={c.light} strokeWidth="1.1" fill="none" strokeLinecap="round" />}
+      </g>
+    );
+    const comb = (
+      <g transform={sad ? 'rotate(20 32 17) translate(1.2 1.4)' : undefined}>
+        {[[26.6, 13.6, 3.7], [32, 11.2, 4.3], [37.4, 13.6, 3.7]].map(([x, y, r]) => (
+          <circle key={x} cx={x} cy={y} r={r} fill={c.comb} stroke={c.combLine} strokeWidth={L.strokeWidth * 2.1} />
+        ))}
+        <ellipse cx="32" cy="16.4" rx="6.9" ry="3.2" fill={c.comb} stroke={c.combLine} strokeWidth={L.strokeWidth * 2.1} />
+        {[[26.6, 13.6, 3.7], [32, 11.2, 4.3], [37.4, 13.6, 3.7]].map(([x, y, r]) => (
+          <circle key={x} cx={x} cy={y} r={r} fill={c.comb} />
+        ))}
+        <ellipse cx="32" cy="16.4" rx="6.9" ry="3.2" fill={c.comb} />
+        <ellipse cx="30.4" cy="9.8" rx="1.7" ry="1" fill="#fff" opacity="0.5" transform="rotate(-20 30.4 9.8)" />
+      </g>
+    );
+    return {
+      back: (
+        <g className="pet-tail">
+          {feather(62, 19, 4.4)}
+          {feather(32, 22.5, 4.8)}
+          {feather(4, 20, 4.4)}
+        </g>
+      ),
+      body: (
+        <>
+          <path d="M26 54.4 V58.6 M38 54.4 V58.6" stroke={c.leg} strokeWidth={detail ? 1.7 : 2.4} strokeLinecap="round" />
+          <path d="M26 58.8 L22.4 60.2 M26 58.8 V60.6 M26 58.8 L29.6 60.2 M38 58.8 L34.4 60.2 M38 58.8 V60.6 M38 58.8 L41.6 60.2" {...toe} stroke={c.leg} />
+          <ellipse cx="32" cy="46" rx="15.4" ry="10.8" fill={`url(#${id}b)`} {...L} />
+          <ellipse cx="32" cy="49.4" rx="9.2" ry="7.2" fill={`url(#${id}f)`} />
+          {wing(-1)}
+          {wing(1)}
+        </>
+      ),
+      head: (
+        <>
+          <g className="pet-peck">
+            {comb}
+            <ellipse cx="32" cy="29" rx="17.4" ry="14.4" fill={`url(#${id}b)`} {...L} />
+            <Gloss id={id} cx={24} cy={19.4} rx={7.6} ry={3.6} />
+            {detail && <Blush y={34} dx={12.4} rx={3} ry={2} o={0.5} />}
+            <Eyes mood={mood} xs={[24.6, 39.4]} y={28.2} r={3.1} ek={ek} brow={c.line} detail={detail} />
+            <path d="M32 36 C29.8 36 29 38.4 29.6 40.6 C30.2 42.8 33.8 42.8 34.4 40.6 C35 38.4 34.2 36 32 36Z" fill={c.comb} stroke={c.combLine} strokeWidth="0.8" strokeLinejoin="round" />
+            {mood === 'happy' ? (
+              <>
+                <path d="M28.6 31.2 Q32 29.6 35.4 31.2 Q34 33.8 32 34 Q30 33.8 28.6 31.2Z" fill={c.nose} stroke="#c9801a" strokeWidth="0.8" strokeLinejoin="round" />
+                <path d="M29.2 34 Q32 33.2 34.8 34 Q33.8 37.6 32 37.8 Q30.2 37.6 29.2 34Z" fill="#6e2437" stroke="#c9801a" strokeWidth="0.8" strokeLinejoin="round" />
+                <path d="M29.8 33.7 L34.2 33.7 L32 35.8Z" fill={c.nose} />
+              </>
+            ) : (
+              <>
+                <path d={sad ? 'M28.4 31.8 Q32 30 35.6 31.8 Q34 36.4 32 36.8 Q30 36.4 28.4 31.8Z' : 'M28.4 31.2 Q32 29.4 35.6 31.2 Q34 35.8 32 36.2 Q30 35.8 28.4 31.2Z'} fill={c.nose} stroke="#c9801a" strokeWidth="0.8" strokeLinejoin="round" />
+                <path d="M29.2 32 Q32 33.2 34.8 32" stroke="#c9801a" strokeWidth="0.7" fill="none" strokeLinecap="round" opacity="0.7" />
+                <ellipse cx="31" cy="31.4" rx="1" ry="0.5" fill="#fff" opacity="0.6" />
+              </>
+            )}
+          </g>
         </>
       ),
     };

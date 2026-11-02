@@ -3,7 +3,8 @@
 // viewBox, for the 'young' stage drawn at scale 1 (the figure before the stage
 // transforms in PetArt). head: the head's center and radius; eyes: the eye
 // line's y and the distance between the two eyes (centered on x 32); neck: the
-// middle of the scarf band, and how wide it is.
+// middle of the scarf band, and how wide it is. up (optional): how far hats and
+// the halo sit higher than the head's top, for pets with something on top (a comb).
 export const PET_ANCHORS = {
   cat: { head: { x: 32, y: 28.6, r: 16 }, eyes: { x: 32, y: 28.6, gap: 15.2 }, neck: { x: 32, y: 44.5, w: 26 } },
   dog: { head: { x: 32, y: 28.6, r: 15.8 }, eyes: { x: 32, y: 27.2, gap: 15.2 }, neck: { x: 32, y: 44.5, w: 26 } },
@@ -14,6 +15,10 @@ export const PET_ANCHORS = {
   panda: { head: { x: 32, y: 28.6, r: 16.2 }, eyes: { x: 32, y: 28.6, gap: 15.2 }, neck: { x: 32, y: 44.5, w: 26 } },
   monkey: { head: { x: 32, y: 27.6, r: 15.3 }, eyes: { x: 32, y: 27.8, gap: 14 }, neck: { x: 32, y: 44.5, w: 26 } },
   redpanda: { head: { x: 32, y: 28.6, r: 16 }, eyes: { x: 32, y: 28.4, gap: 15.2 }, neck: { x: 32, y: 44.5, w: 26 } },
+  // Spines crown the head to about y 12.6, so hats ride 2 up (see `up` below).
+  hedgehog: { head: { x: 32, y: 29, r: 16 }, eyes: { x: 32, y: 29.4, gap: 15.6 }, neck: { x: 32, y: 44.5, w: 26 }, up: 2 },
+  // The comb rises to y 7 above the head, so hats and the halo ride 5 up and cover it.
+  chicken: { head: { x: 32, y: 29, r: 16 }, eyes: { x: 32, y: 28.2, gap: 14.8 }, neck: { x: 32, y: 44.5, w: 26 }, up: 5 },
   // The head sits high on a long neck: the blue ball; the casque rises to y 5.6 above it, the wattle hangs to y 43.
   cassowary: { head: { x: 32, y: 22.6, r: 12.4 }, eyes: { x: 32, y: 22.8, gap: 12 }, neck: { x: 32, y: 41, w: 17 } },
 };
@@ -36,7 +41,7 @@ export function stageAnchors(species, stage = 'young') {
   const Y = (y) => 60 + (y - 60) * s;
   const H = (y) => 41 + (y - 41) * hk; // head scale about the neck point
   return {
-    head: { x: X(a.head.x), y: Y(H(a.head.y)), r: a.head.r * hk * s },
+    head: { x: X(a.head.x), y: Y(H(a.head.y)), r: a.head.r * hk * s, up: (a.up || 0) * hk * s },
     eyes: { x: X(a.eyes.x), y: Y(H(a.eyes.y)), gap: a.eyes.gap * hk * s },
     neck: { x: X(a.neck.x), y: Y(a.neck.y), w: a.neck.w * s },
   };
