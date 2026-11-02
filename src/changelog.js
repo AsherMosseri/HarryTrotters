@@ -4,6 +4,18 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '3.0.4',
+    date: '2026-11-02',
+    title: 'Pet park and team events',
+    items: [
+      'Pet park: see everyone’s pets together in a calm park, at the top of Market → Pets and as a small card on Today. Tap a pet to see its owner, level, title and what it wears.',
+      'Team events: the whole team’s lab time over a few days fills a meter with tiers, shown on Today and in the Pets tab with hours so far, the goal, time left and how much you put in.',
+      'The first one is Competition week, Mon Nov 9 to Sat Nov 14. Reach 40 team hours for the Pit crew cap and 60 for the Nov 14 medal; anyone with at least an hour of their own lab time that week gets them.',
+      'Event gear is limited, wears at any pet level, and shows as locked in the Style sheet until you earn it. You get a notification for each tier, a celebration when you open the app, and the park throws a party.',
+      'Team management can start, edit and end events at the bottom of the Pets tab.',
+    ],
+  },
+  {
     version: '3.0.3',
     date: '2026-11-02',
     title: 'The keyboard stays out of the way',
