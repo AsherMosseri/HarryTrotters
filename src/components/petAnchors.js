@@ -13,6 +13,7 @@ export const PET_ANCHORS = {
   frog: { head: { x: 32, y: 30.4, r: 16 }, eyes: { x: 32, y: 20.8, gap: 19.2 }, neck: { x: 32, y: 44.5, w: 26 } },
   panda: { head: { x: 32, y: 28.6, r: 16.2 }, eyes: { x: 32, y: 28.6, gap: 15.2 }, neck: { x: 32, y: 44.5, w: 26 } },
   monkey: { head: { x: 32, y: 27.6, r: 15.3 }, eyes: { x: 32, y: 27.8, gap: 14 }, neck: { x: 32, y: 44.5, w: 26 } },
+  redpanda: { head: { x: 32, y: 28.6, r: 16 }, eyes: { x: 32, y: 28.4, gap: 15.2 }, neck: { x: 32, y: 44.5, w: 26 } },
   // The head sits high on a long neck: the blue ball; the casque rises to y 5.6 above it, the wattle hangs to y 43.
   cassowary: { head: { x: 32, y: 22.6, r: 12.4 }, eyes: { x: 32, y: 22.8, gap: 12 }, neck: { x: 32, y: 41, w: 17 } },
 };

@@ -1897,6 +1897,9 @@ button.pm-row:hover { background: color-mix(in srgb, var(--text) 4%, transparent
 }
 .adopt-tile.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
 .adopt-row { display: flex; gap: 10px; }
+/* Ten species: two even rows of five on iPad, three across on a phone with the last one centered. */
+@media (min-width: 700px) { .adopt-grid { grid-template-columns: repeat(5, 1fr); } }
+@media (max-width: 699px) { .adopt-grid .adopt-tile:last-child:nth-child(3n + 1) { grid-column: 2; } }
 
 /* The team robot on Today. */
 .mascot-energy { font-size: 13px; font-weight: 700; }
