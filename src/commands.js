@@ -34,7 +34,7 @@ export const COMMANDS = [
   { name: 'remind', group: 'basics', args: 'when what', desc: 'A reminder later (10m, 2h, tomorrow 7am, at 5pm…)' },
   { name: 'poll', group: 'basics', args: 'question', desc: 'Start a poll' },
 
-  { name: 'me', group: 'text', args: 'action', desc: '*Asher does something*' },
+  { name: 'me', group: 'text', args: 'action', desc: 'Say what you’re doing: /me waves shows “Asher waves”' },
   { name: 'shrug', group: 'text', args: 'message', desc: 'Adds ¯\\_(ツ)_/¯' },
   { name: 'tableflip', group: 'text', args: 'message', desc: 'Adds (╯°□°)╯︵ ┻━┻' },
   { name: 'unflip', group: 'text', args: 'message', desc: 'Adds ┬─┬ ノ( ゜-゜ノ)' },

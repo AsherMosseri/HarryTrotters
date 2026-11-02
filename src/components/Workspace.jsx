@@ -57,7 +57,7 @@ import { BottomNav, MoreSheet, Sheet } from './PhoneChrome.jsx';
 import ShiftsView, { ShiftButton } from './Shifts.jsx';
 import { CheckinGate, PollGate, answerOf } from './Checkin.jsx';
 import ThemeStudio, { AppBackdrop, CUSTOM_DEFAULT, applyThemeVars, themeFromProfile } from './ThemeStudio.jsx';
-import { VERSION, versionsSince } from '../changelog.js';
+import { CHANGELOG, VERSION, versionsSince } from '../changelog.js';
 import Inbox from './Inbox.jsx';
 import {
   AdActionDialog,
@@ -569,7 +569,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
   const [seenVersion, setSeenVersion] = useLocalStorage('seen-version', null);
   // 3.0 is the big one: everyone sees its whole log the first time they're in the new app, even on a brand-new device.
   const [seenLog30, setSeenLog30] = useLocalStorage('seen-log-3.0', false);
-  const first30 = VERSION === '3.0' && !seenLog30;
+  const first30 = VERSION.startsWith('3.0') && !seenLog30;
   const [showLog, setShowLog] = useState(false);
   useEffect(() => {
     if (!welcomed && seenVersion !== VERSION) setSeenVersion(VERSION);
@@ -577,7 +577,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
   const whatsNew = !welcomed
     ? null
     : first30
-      ? versionsSince(null)
+      ? CHANGELOG.filter((v) => v.version === '3.0' || v.version === VERSION)
       : seenVersion && seenVersion !== VERSION
         ? versionsSince(seenVersion)
         : !seenVersion

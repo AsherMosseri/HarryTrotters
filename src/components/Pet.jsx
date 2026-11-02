@@ -18,20 +18,22 @@ const LOOK = {
   fox: { body: '#ee7a3b', dark: '#b0501f', belly: '#fff3e6', nose: INK },
   owl: { body: '#ab8665', dark: '#6c4f37', belly: '#ecdac2', nose: '#f2b33d' },
   frog: { body: '#84c770', dark: '#4b8f3e', belly: '#e0f2cc', nose: INK },
+  // Black and white: black ears, eye patches, nose and legs (dark), and a soft gray outline.
+  panda: { body: '#f7f6f2', dark: '#2b2b31', belly: '#ffffff', nose: '#2b2b31', line: '#a9a9b3' },
 };
 const SCALE = { baby: 0.78, young: 0.9, grown: 1 };
 
-function Eyes({ mood, at = [26.5, 37.5], y = 28 }) {
+function Eyes({ mood, at = [26.5, 37.5], y = 28, ink = INK }) {
   if (mood === 'happy')
-    return at.map((x) => <path key={x} d={`M${x - 2.6} ${y + 0.6} Q${x} ${y - 2.6} ${x + 2.6} ${y + 0.6}`} stroke={INK} strokeWidth="2" fill="none" strokeLinecap="round" />);
+    return at.map((x) => <path key={x} d={`M${x - 2.6} ${y + 0.6} Q${x} ${y - 2.6} ${x + 2.6} ${y + 0.6}`} stroke={ink} strokeWidth="2" fill="none" strokeLinecap="round" />);
   return at.map((x, i) => (
     <g key={x}>
-      <circle cx={x} cy={y} r={mood === 'sad' ? 2.1 : 2.4} fill={INK} />
-      <circle cx={x + 0.8} cy={y - 0.8} r="0.7" fill="#fff" />
+      <circle cx={x} cy={y} r={mood === 'sad' ? 2.1 : 2.4} fill={ink} />
+      <circle cx={x + 0.8} cy={y - 0.8} r="0.7" fill={ink === INK ? '#fff' : INK} />
       {mood === 'sad' && (
         <path
           d={i ? `M${x + 3} ${y - 3.4} L${x - 2.4} ${y - 5}` : `M${x - 3} ${y - 3.4} L${x + 2.4} ${y - 5}`}
-          stroke={INK}
+          stroke={ink}
           strokeWidth="1.4"
           strokeLinecap="round"
         />
@@ -75,6 +77,13 @@ function Back({ species, c }) {
         <ellipse cx="54.6" cy="38.2" rx="3.2" ry="4.2" transform="rotate(38 54.6 38.2)" fill={c.belly} />
       </g>
     );
+  if (species === 'panda')
+    return (
+      <>
+        <ellipse cx="17.5" cy="45" rx="4.4" ry="8.5" transform="rotate(16 17.5 45)" fill={c.dark} />
+        <ellipse cx="46.5" cy="45" rx="4.4" ry="8.5" transform="rotate(-16 46.5 45)" fill={c.dark} />
+      </>
+    );
   if (species === 'bunny')
     return (
       <>
@@ -106,6 +115,13 @@ function Ears({ species, c }) {
         <path d="M45 22 L46 6.5 L34 14.5 Z" fill={c.body} {...line} />
         <path d="M21 17.5 L20.5 11 L26 14.8 Z" fill={c.dark} opacity="0.7" />
         <path d="M43 17.5 L43.5 11 L38 14.8 Z" fill={c.dark} opacity="0.7" />
+      </>
+    );
+  if (species === 'panda')
+    return (
+      <>
+        <circle cx="21.2" cy="16.8" r="5.6" fill={c.dark} />
+        <circle cx="42.8" cy="16.8" r="5.6" fill={c.dark} />
       </>
     );
   if (species === 'owl')
@@ -144,12 +160,20 @@ function Front({ species, c }) {
       </>
     );
   if (species === 'bunny') return <ellipse cx="32" cy="31" rx="1.7" ry="1.2" fill={c.nose} />;
+  if (species === 'panda')
+    return (
+      <>
+        <ellipse cx="25.6" cy="28.6" rx="4.1" ry="5.3" transform="rotate(24 25.6 28.6)" fill={c.dark} />
+        <ellipse cx="38.4" cy="28.6" rx="4.1" ry="5.3" transform="rotate(-24 38.4 28.6)" fill={c.dark} />
+        <ellipse cx="32" cy="31.4" rx="2.3" ry="1.6" fill={c.nose} />
+      </>
+    );
   return null;
 }
 
 export function PetArt({ species = 'cat', mood = 'ok', stage = 'young', size = 64, still = false, className = '', title }) {
   const c = LOOK[species] || LOOK.cat;
-  const line = { stroke: c.dark, strokeWidth: 1.5 };
+  const line = { stroke: c.line || c.dark, strokeWidth: 1.5 };
   const s = SCALE[stage] || 1;
   const feet = (
     <>
@@ -210,7 +234,7 @@ export function PetArt({ species = 'cat', mood = 'ok', stage = 'young', size = 6
         <circle cx="32" cy="27.5" r="14" fill={c.body} {...line} />
         <Front species={species} c={c} />
         <g className="pet-eyes">
-          <Eyes mood={mood} />
+          <Eyes mood={mood} ink={species === 'panda' ? '#fff' : INK} />
         </g>
         <Cheeks />
         <Mouth mood={mood} y={species === 'dog' ? 35 : 34.5} />

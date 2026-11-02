@@ -582,7 +582,13 @@ export default function Message({
           <>
             {m.text && !m.poll && (!m.cmd || m.cmd.name === 'me') && (
               <div className={`msg-text${jumbo ? ' jumbo' : ''}${m.cmd ? ' msg-me' : ''} ${frame.className}`} style={frame.style}>
-                {m.cmd ? <em>{renderRich(m.text, ctx)}</em> : renderRich(m.text, ctx)}
+                {m.cmd ? (
+                  <em>
+                    <b className="me-who">{(m.by || '').split(' ')[0]}</b> {renderRich(m.text, ctx)}
+                  </em>
+                ) : (
+                  renderRich(m.text, ctx)
+                )}
                 {m.editedAt && feat('editing') && <span className="muted tiny edited"> (edited)</span>}
               </div>
             )}

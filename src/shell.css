@@ -3267,6 +3267,10 @@ button.pm-row:hover { background: color-mix(in srgb, var(--text) 4%, transparent
 .dg-zoom .icon-btn.on { background: var(--accent); color: #fff; }
 .dg-svg.hand, .dg-canvas:has(.dg-zoom .icon-btn.on) .dg-svg { cursor: grab; }
 
+/* /me: an action line, like "* Asher waves". */
+.msg-me { border-left: 3px solid var(--accent); padding-left: 9px; }
+.msg-me .me-who { font-style: normal; font-weight: 650; }
+
 /* Pinned: the bar under a channel's header, and the count on the pin button. */
 .pinned-bar { display: flex; align-items: center; gap: 8px; padding: 0 14px; min-height: 38px; border-bottom: 1px solid var(--hairline); background: color-mix(in srgb, var(--accent) 5%, var(--surface)); }
 .pinned-bar .pb-main { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; padding: 8px 0; border: 0; background: none; color: var(--text); font: inherit; font-size: 13.5px; text-align: left; cursor: pointer; }

@@ -85,7 +85,12 @@
    misplaces fixed/sticky elements when the document scrolls, and blurs a
    header that content scrolls underneath. */
 html, body, #root { height: 100%; }
-html, body { overflow: hidden; }
+html, body { overflow: hidden; overscroll-behavior: none; }
+/* The page itself can never scroll: iPadOS scrolled it to bring a box into view
+   and left it stuck a little off, with a bar showing at the bottom and a bounce
+   on every swipe. Fixed, there's nothing to scroll; only .app-scroll (and #root
+   on the sign-in pages) scroll inside it. */
+body { position: fixed; inset: 0; width: 100%; }
 #root { overflow-y: auto; }
 body {
   margin: 0;
