@@ -4,6 +4,17 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '3.0.8',
+    date: '2026-11-02',
+    title: 'Polls about people, and pick a few',
+    items: [
+      'Polls can now be about people: pick teammates (everyone, a subteam, or people you choose) and vote with their pictures.',
+      'New “How many can people pick?” for polls: just one, or several as up to N, exactly N, or any number. With several picks you choose, then press Vote, and you can change your vote until the poll ends.',
+      'Polls count each person’s vote only if it follows the poll’s rule, and you can turn off voting for yourself.',
+      'Poll results show each choice’s share of voters, highlight the top choice (or the top few), show ties as ties, and give a final result when a poll ends.',
+    ],
+  },
+  {
     version: '3.0.7',
     date: '2026-11-02',
     title: 'Two new pets',
