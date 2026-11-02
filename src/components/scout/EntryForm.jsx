@@ -163,8 +163,11 @@ export function EntryForm({ teams, matches, initial, editing = false, onSave, on
       <div className="sc-f-foot">
         {saved && !editing && (
           <p className="sc-saved" role="status">
-            <Icon name="check" size={16} /> Saved <b className="mono">{saved.team}</b>
-            {saved.match ? ` in ${saved.match}` : ''}.
+            <Icon name="check" size={16} />
+            <span className="sc-saved-text">
+              Saved <b className="mono">{saved.team}</b>
+              {saved.match ? ` in ${saved.match}` : ''}.
+            </span>
             {nextMatchLabel(saved.match) && (
               <button type="button" className="text-btn" onClick={() => (setMatch(nextMatchLabel(saved.match)), setSaved(null))}>
                 Next match ({nextMatchLabel(saved.match)})

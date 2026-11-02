@@ -3270,12 +3270,15 @@ button.pm-row:hover { background: color-mix(in srgb, var(--text) 4%, transparent
 }
 .sc-tagbtn.good.on { background: color-mix(in srgb, var(--st-done) 20%, var(--surface)); border-color: var(--st-done); }
 .sc-tagbtn.bad.on { background: color-mix(in srgb, var(--danger) 16%, var(--surface)); border-color: var(--danger); }
-.sc-f-foot { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: flex-end; }
+.sc-f-foot { display: flex; align-items: center; gap: 12px; flex-wrap: nowrap; justify-content: flex-end; }
 /* Save stays in reach at the bottom while you tap through the form. */
-.sc-form:not(.editing) .sc-f-foot { position: sticky; bottom: 0; z-index: 2; margin: 0 -16px -16px; padding: 10px 16px 14px; background: var(--surface); border-top: 1px solid var(--hairline); border-radius: 0 0 14px 14px; }
-.sc-saved { margin: 0 auto 0 0; display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; color: var(--st-done); font-weight: 650; animation: sp-in 0.2s ease-out; }
-.sc-saved .text-btn { color: var(--accent); font-weight: 650; }
-.sc-save { min-height: 56px; min-width: 180px; font-size: 17px; }
+.sc-form:not(.editing) .sc-f-foot { min-height: 76px; position: sticky; bottom: 0; z-index: 2; margin: 0 -16px -16px; padding: 10px 16px 14px; background: var(--surface); border-top: 1px solid var(--hairline); border-radius: 0 0 14px 14px; }
+.sc-saved { margin: 0 auto 0 0; flex: 1 1 0; min-width: 0; display: flex; align-items: center; flex-wrap: nowrap; gap: 6px 10px; color: var(--st-done); font-weight: 650; animation: sp-in 0.2s ease-out; }
+.sc-saved .icon { flex: none; }
+/* One line, so the bar doesn't grow taller (and move the button) when you save. */
+.sc-saved-text { min-width: 0; flex: 0 1 auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sc-saved .text-btn { color: var(--accent); font-weight: 650; flex: none; white-space: nowrap; }
+.sc-save { min-height: 56px; min-width: 180px; font-size: 17px; justify-content: center; text-align: center; white-space: nowrap; flex: none; }
 .sc-form.editing .sc-save { min-height: 48px; min-width: 0; font-size: 15px; }
 .sc-recent { margin-top: 6px; }
 .sc-mini { list-style: none; margin: 0; padding: 0; }
