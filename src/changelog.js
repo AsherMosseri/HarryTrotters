@@ -4,6 +4,15 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '3.0.6',
+    date: '2026-11-02',
+    title: 'Smoother pictures, and a red panda',
+    items: [
+      'Your profile picture and everyone’s decorations, name effects and nameplates now move smoothly: only a few on screen move at once, they hold still when off screen, and they wake up again after you come back to the app.',
+      'New pet to adopt: the red panda.',
+    ],
+  },
+  {
     version: '3.0.5',
     date: '2026-11-02',
     title: 'Keyboard, take two',
