@@ -1825,7 +1825,7 @@ button.pm-row:hover { background: color-mix(in srgb, var(--text) 4%, transparent
 .ci-skip-days { flex-wrap: wrap; }
 .ci-skip-chip.skipped { text-decoration: line-through; color: var(--muted); background: var(--surface-2); border-color: var(--border); }
 /* Streaks on the profile card; six figures on the full profile. */
-.streak-line { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0; }
+.streak-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; margin: 0; }
 .streak-line b { font-size: 17px; font-weight: 700; }
 .pp-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 @media (max-width: 760px) {
