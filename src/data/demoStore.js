@@ -25,7 +25,8 @@ import { attemptSeed, newSeed } from '../../functions/shared/rng.js';
 import { asksOn } from '../../functions/shared/checkin.js';
 import * as market from '../../functions/shared/market.js';
 import { PERK_IDEAS } from '../../functions/shared/market.js';
-import { START_NEED, isSpecies } from '../../functions/shared/pets.js';
+import { giftAccept, giftEnd, giftOffer, petEdit, petsIn } from '../../functions/shared/pets.js';
+import { ROSTER, cleanName, sameName } from '../../functions/shared/team.js';
 import { demoLife } from './demoLife.js';
 import { demoLearn } from './demoLearn.js';
 
@@ -664,6 +665,7 @@ try {
 }
 if (!state.marketSeeded) seedMarket();
 if (!state.scoutSeeded) seedScout();
+if (!state.petsFamilySeeded) seedPetFamily();
 // Someone new waiting for team management to let them in (Roster, Today).
 if (!state.joinSeeded) {
   state.joinRequests = [{ id: 'riley-chen', name: 'Riley Chen', at: Date.now() - 25 * 60000 }];
@@ -738,6 +740,31 @@ function seedMarket() {
 }
 // Scouting in the demo: a dozen teams at the demo event with standings, twenty
 // scouting entries from a few people, and a short pick list.
+// Pets with levels and babies (functions/shared/pets.js): Asher's dog Bolt
+// gets weeks of lab time behind him, so he is a high-level pet to try the
+// style sheet, a baby and giving a pet away on (the same math as the real
+// app: lab time since adoption).
+function seedPetFamily() {
+  const now = Date.now();
+  const day = 86400000;
+  const hour = 3600000;
+  state.petGifts = state.petGifts || [];
+  const bolt = (state.pets || []).find((p) => p.person === 'Asher Mosseri');
+  if (bolt) {
+    bolt.adoptedAt = now - 40 * day;
+    bolt.gear = { head: 'cap', face: '', neck: 'bandana', extra: '', palette: '' };
+    state.shifts = [
+      ...(state.shifts || []),
+      ...Array.from({ length: 20 }, (_, i) => {
+        const d = new Date(now - (14 + i) * day);
+        d.setHours(15, 0, 0, 0);
+        return { id: uid(), person: 'Asher Mosseri', start: d.getTime(), end: d.getTime() + 8 * hour, note: '', subteam: '', taskIds: [], createdBy: 'Asher Mosseri', at: d.getTime() };
+      }),
+    ];
+  }
+  state.petsFamilySeeded = 1;
+}
+
 function seedScout() {
   const now = Date.now();
   const min = 60000;
@@ -1075,7 +1102,8 @@ export const demoStore = {
     location.search = '';
   },
   subscribeInbox(name, cb) {
-    return listen(() => cb([...(state.inbox || [])].sort((a, b) => b.at - a.at)));
+    // Pet offers carry who they are for; the rest is one shared inbox.
+    return listen(() => cb([...(state.inbox || [])].filter((n) => !n.to || n.to === name).sort((a, b) => b.at - a.at)));
   },
   async markInboxRead(name, ids) {
     state.inbox = (state.inbox || []).map((n) => (ids.includes(n.id) ? { ...n, read: true } : n));
@@ -1296,6 +1324,9 @@ export const demoStore = {
   subscribePets(cb) {
     return listen(() => cb([...(state.pets || [])]));
   },
+  subscribePetGifts(name, cb) {
+    return listen(() => cb((state.petGifts || []).filter((g) => g.from === name || g.to === name).map((g) => ({ ...g }))));
+  },
   subscribeTournaments(cb) {
     const tick = () => settleDemoTournaments() && commit();
     tick();
@@ -1323,7 +1354,7 @@ export const demoStore = {
         me,
         balance: balanceOf(me),
         now,
-        pet: kind === 'pet' ? myPet() || null : null,
+        pet: kind === 'pet' ? petsIn(myPet())[data.born == null ? 0 : petsIn(myPet()).findIndex((p) => p.adoptedAt === Number(data.born))] || null : null,
         perk: kind === 'perk' ? (state.perks || []).find((p) => p.id === id) || null : null,
         purchases: (state.purchases || []).filter((p) => p.item === item),
         text: data.text,
@@ -1350,7 +1381,14 @@ export const demoStore = {
             ...(state.inbox || []),
           ];
       }
-      if (r.pet) state.pets = state.pets.map((p) => (p.person === me ? { ...p, ...r.pet, cared: (p.cared || 0) + 1, caredAt: now } : p));
+      if (r.pet)
+        state.pets = state.pets.map((p) => {
+          if (p.person !== me) return p;
+          const second = data.born != null && p.extra && p.extra.adoptedAt === Number(data.born);
+          return second
+            ? { ...p, extra: { ...p.extra, ...r.pet, cared: (p.extra.cared || 0) + 1, caredAt: now } }
+            : { ...p, ...r.pet, cared: (p.cared || 0) + 1, caredAt: now };
+        });
       return done({ ok: true, price: r.price, purchase, pet: r.pet || null });
     }
 
@@ -1422,29 +1460,65 @@ export const demoStore = {
     }
 
     if (fn === 'pet') {
-      const pet = myPet();
-      const name = String(data.name ?? '')
-        .replace(/\s+/g, ' ')
-        .trim()
-        .slice(0, 24);
-      if (data.action === 'adopt') {
-        if (pet) return note('You already have a pet.', 'Rehome it first to adopt another.');
-        if (!isSpecies(data.species)) return note('Pick a pet.');
-        if (!name) return note('Give your pet a name.');
-        state.pets = [
-          ...(state.pets || []),
-          { id: personId(me), person: me, species: data.species, name, adoptedAt: now, food: { v: START_NEED, at: now }, fun: { v: START_NEED, at: now }, inChat: true, cared: 0 },
-        ];
-        return done({ ok: true });
+      // The same moves as functions/petfamily.js, on the demo's own docs.
+      const docOfName = (n) => (state.pets || []).find((p) => p.person === n) || null;
+      const putDoc = (n, doc) => {
+        state.pets = (state.pets || []).filter((p) => p.person !== n);
+        if (!doc) return;
+        const { id: _a, extra, ...rest } = doc;
+        const { id: _b, ...second } = extra || {};
+        state.pets.push({ ...rest, id: personId(n), ...(extra && { extra: second }) });
+      };
+      const tell = (to, title, body) => {
+        state.inbox = [{ id: uid(), type: 'market', icon: '🐾', title, body, open: 'view:market', at: now, read: false, to }, ...(state.inbox || [])];
+      };
+      const first = (n) => (n || '').split(' ')[0];
+      const gifts = state.petGifts || (state.petGifts = []);
+      const action = data.action;
+      if (['adopt', 'rename', 'inChat', 'release', 'style', 'hatch'].includes(action)) {
+        const r = petEdit(action, data, { me, doc: docOfName(me), shifts: state.shifts || [], now });
+        if (r.unknown) return note('Unknown action.');
+        if (r.note) return r;
+        putDoc(me, r.doc);
+        return done({ ok: true, ...(r.born && { born: r.born }) });
       }
-      if (!pet) return note('You don’t have a pet.');
-      if (data.action === 'rename') {
-        if (!name) return note('Give your pet a name.');
-        state.pets = state.pets.map((p) => (p === pet ? { ...p, name } : p));
-      } else if (data.action === 'inChat') state.pets = state.pets.map((p) => (p === pet ? { ...p, inChat: data.on === true } : p));
-      else if (data.action === 'release') state.pets = state.pets.filter((p) => p !== pet);
-      else return note('Unknown action.');
-      return done({ ok: true });
+      if (action === 'offer') {
+        const to = ROSTER.find((n) => sameName(n, cleanName(data.to))) || cleanName(data.to);
+        const r = giftOffer(data, {
+          me,
+          doc: docOfName(me),
+          to,
+          toOk: ROSTER.includes(to),
+          gifts: gifts.filter((g) => g.from === me),
+          shifts: state.shifts || [],
+          now,
+        });
+        if (r.note) return r;
+        const gift = { id: uid(), ...r.gift };
+        gifts.push(gift);
+        tell(gift.to, `${first(me)} wants to give you ${gift.pet.name}`, `A ${gift.pet.species}. Open Market, Pets to say yes or no thanks.`);
+        return done({ ok: true, id: gift.id });
+      }
+      if (action === 'cancelOffer' || action === 'decline' || action === 'accept') {
+        const gift = gifts.find((g) => g.id === data.id) || null;
+        if (action !== 'accept') {
+          const r = giftEnd(action === 'decline' ? 'decline' : 'cancel', gift, { me, now });
+          if (r.status) Object.assign(gift, { status: r.status, decidedAt: now });
+          if (r.note) return done(r);
+          if (r.status === 'declined') tell(gift.from, `${first(me)} said no thanks`, `${gift.pet.name} stays with you.`);
+          return done({ ok: true });
+        }
+        if (!gift || gift.to !== me) return note('That offer is gone.');
+        const r = giftAccept(gift, { me, doc: docOfName(me), giverDoc: docOfName(gift.from), giver: gift.from, now });
+        if (r.status && r.status !== 'accepted') Object.assign(gift, { status: r.status, decidedAt: now });
+        if (r.note) return done(r);
+        putDoc(me, r.doc);
+        putDoc(gift.from, r.giverDoc);
+        Object.assign(gift, { status: 'accepted', decidedAt: now });
+        tell(gift.from, `${first(me)} took ${gift.pet.name}`, `${gift.pet.name} has a new home.`);
+        return done({ ok: true, name: r.pet.name });
+      }
+      return note('Unknown action.');
     }
     return note('Unknown action.');
   },

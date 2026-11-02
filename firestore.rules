@@ -212,6 +212,12 @@ service cloud.firestore {
       allow read: if isMember();
       allow write: if false;
     }
+    // Offers to give a pet to a teammate: the two people (and team
+    // management) read them; the server writes them (functions/petfamily.js).
+    match /petGifts/{id} {
+      allow read: if isMember() && (isManager() || resource.data.from == myName() || resource.data.to == myName());
+      allow write: if false;
+    }
     match /tournaments/{id} {
       allow read: if isMember();
       allow write: if false;

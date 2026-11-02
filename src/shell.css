@@ -3336,3 +3336,83 @@ button.pm-row:hover { background: color-mix(in srgb, var(--text) 4%, transparent
 /* An unsent draft waiting in a channel or DM. */
 .sb-draft { display: inline-flex; flex: none; margin-left: 6px; opacity: 0.7; }
 .sb-row.strong .sb-draft, .sb-row:hover .sb-draft { opacity: 1; }
+
+/* ---------- Pet family (3.0): gear, titles, rings, babies, giving ----------
+   PetGear.jsx draws gear over the pet art; PetFamily.jsx is the Pets shelf's
+   style sheet, level path and offers. The halo drifts only with "Moving
+   things" on (transform only, fixed keyframes, for iPads). */
+.pet-geared { position: relative; display: inline-block; flex: none; line-height: 0; }
+.pet-geared > .pet-gear { position: absolute; left: 0; top: 0; pointer-events: none; }
+:root[data-anim~='move'] .gear-halo { animation: gear-halo 3.4s ease-in-out infinite; }
+@keyframes gear-halo { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-1.4px); } }
+/* Fur tints: a soft color filter on the pet art only (never on the gear). */
+.pet-tint-sunset { filter: sepia(0.35) hue-rotate(-24deg) saturate(1.7) brightness(1.03); }
+.pet-tint-midnight { filter: sepia(0.25) hue-rotate(185deg) saturate(1.15) brightness(0.82); }
+.pet-tint-golden { filter: sepia(0.5) saturate(1.5) brightness(1.08) hue-rotate(-4deg); }
+/* The ring around the small chat badge: bronze at level 10, silver 20, gold 30. */
+.pet-badge.ring-bronze, .pet-badge.ring-silver, .pet-badge.ring-gold { padding: 1px; border-radius: 50%; margin-left: 4px; }
+.pet-badge.ring-bronze { box-shadow: 0 0 0 1.5px #c9803a; }
+.pet-badge.ring-silver { box-shadow: 0 0 0 1.5px #aeb7c4; }
+.pet-badge.ring-gold { box-shadow: 0 0 0 1.5px #f2b82e, 0 0 0 3px color-mix(in srgb, #f2b82e 30%, transparent); }
+
+.pet-title { font-size: 12.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.pf-ring-chip { padding: 1px 8px; border-radius: 999px; font-size: 11px; letter-spacing: 0.02em; text-transform: none; font-weight: 650; color: var(--text); background: var(--surface-2); box-shadow: inset 0 0 0 1.5px var(--ring, var(--border)); }
+.pf-ring-chip.ring-bronze { --ring: #c9803a; }
+.pf-ring-chip.ring-silver { --ring: #aeb7c4; }
+.pf-ring-chip.ring-gold { --ring: #f2b82e; }
+.pf-pets { display: flex; flex-direction: column; gap: 14px; }
+.pf-next { display: flex; align-items: center; gap: 6px; color: var(--muted); }
+.pf-next .icon { flex: none; }
+.pf-note { display: inline-flex; align-items: center; gap: 5px; }
+.pf-toggle { display: inline-flex; align-items: center; gap: 4px; }
+.pf-for { display: flex; flex-wrap: wrap; align-self: flex-start; }
+.pf-mini { margin-top: 8px; padding: 8px 12px; gap: 12px; }
+.pf-mini .pet-name { font-size: 15px; }
+
+/* The style sheet. */
+.dialog.pf-style { width: min(660px, calc(100vw - 32px)); max-height: min(88vh, 800px); display: flex; flex-direction: column; gap: 0; padding: 0; overflow: hidden; }
+.panel-backdrop.center > .dialog.pf-style > .panel-head { margin: 0; padding: 14px 18px; flex: none; }
+.pf-style-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 14px 18px 8px; display: flex; flex-direction: column; gap: 16px; }
+.pf-preview { display: flex; align-items: center; gap: 16px; }
+.pf-preview-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.pf-preview-text b { font-size: 20px; }
+.pf-slot { border: 0; margin: 0; padding: 0; min-width: 0; }
+.pf-slot legend { padding: 0 0 6px; font-size: 12.5px; font-weight: 750; text-transform: uppercase; letter-spacing: 0.08em; }
+.pf-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+.pf-tile {
+  display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 4px 6px; border-radius: 12px; font: inherit; color: inherit; cursor: pointer;
+  background: var(--surface); border: 1.5px solid var(--border); min-width: 0;
+}
+.pf-tile.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
+.pf-tile.locked { cursor: default; background: var(--surface-2); }
+.pf-tile.locked .pf-tile-art, .pf-tile.locked .pf-tile-name { opacity: 0.45; filter: grayscale(1); }
+.pf-tile-art { display: grid; place-items: center; width: 50px; height: 50px; }
+.pf-tile-art.none { color: var(--muted); }
+.pf-swatch { width: 34px; height: 34px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgb(0 0 0 / 14%); }
+.pf-tile-name { font-size: 12.5px; font-weight: 650; text-align: center; line-height: 1.2; }
+.pf-tile-sub { font-size: 11.5px; color: var(--muted); }
+.pf-style-foot { flex: none; display: flex; justify-content: flex-end; gap: 10px; padding: 12px 18px max(14px, env(safe-area-inset-bottom)); border-top: 1px solid var(--hairline); }
+
+/* The level path. */
+.pf-path { list-style: none; margin: 0; padding: 0; }
+.pf-path > li { display: grid; grid-template-columns: 34px 1fr auto; align-items: start; gap: 10px; padding: 9px 0; }
+.pf-path > li + li { border-top: 1px solid var(--hairline); }
+.pf-path-level { font-size: 15px; font-weight: 700; color: var(--muted); text-align: right; }
+.pf-path > li.done .pf-path-level, .pf-path > li.next .pf-path-level { color: var(--text); }
+.pf-path > li.done { color: var(--muted); }
+.pf-path > li.done b { color: var(--text); }
+.pf-path-what { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.pf-path-what ul { list-style: none; margin: 0; padding: 0; }
+.pf-path-what li { display: flex; gap: 8px; align-items: baseline; font-size: 14px; }
+.pf-path-up { color: var(--accent); font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
+.pf-path > li.done > .icon { color: var(--st-done); }
+
+/* Offers, and the teammate picker. */
+.pf-offers .pf-offer { display: flex; align-items: center; gap: 12px; padding: 10px 0; flex-wrap: wrap; }
+.pf-offer-text { display: flex; flex-direction: column; gap: 2px; min-width: 160px; flex: 1; }
+.dialog.pf-give { width: min(420px, calc(100vw - 32px)); display: flex; flex-direction: column; gap: 12px; max-height: min(80vh, 640px); }
+.pf-roster { list-style: none; margin: 0; padding: 0; overflow-y: auto; min-height: 0; }
+.pf-person { width: 100%; display: flex; align-items: center; gap: 12px; padding: 9px 4px; border: 0; background: none; font: inherit; color: inherit; cursor: pointer; text-align: left; border-radius: 10px; }
+.pf-person-name { flex: 1; font-weight: 600; }
+.pf-person .avatar { flex: none; }
+.pf-person:hover { background: var(--surface-2); }

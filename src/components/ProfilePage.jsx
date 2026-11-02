@@ -11,6 +11,7 @@ import { hoursOf, mergedMs } from '../../functions/shared/hours.js';
 import { streaksOf } from '../../functions/shared/streaks.js';
 import CountUp from './CountUp.jsx';
 import { PetCard } from './Pet.jsx';
+import { PetExtras } from './PetFamily.jsx';
 import { useMarket } from '../market.js';
 
 // Hours are added up the same way as the Shifts page (shared/hours.js).
@@ -190,6 +191,7 @@ export default function ProfilePage({
                     <section className="profile-section">
                       <h3>Pet</h3>
                       <PetCard name={name} />
+                      <PetExtras name={name} />
                     </section>
                   )}
                   {profile.about && (

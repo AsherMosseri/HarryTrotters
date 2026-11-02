@@ -11,7 +11,8 @@
 //                                  perk, take down a shout-out, start or
 //                                  cancel a tournament, void a result, clear
 //                                  or void a run held for review
-//   pet({ action, … })             adopt, rename, show in chat, rehome
+//   pet({ action, … })             adopt, rename, show in chat, rehome, style,
+//                                  hatch a baby, give a pet to a teammate
 // Scheduled: payTournaments (every 10 minutes) pays out the ones that ended.
 // The checks themselves are in shared/market.js and shared/pets.js (demo
 // mode runs the same ones).
@@ -22,7 +23,8 @@ import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { logger } from 'firebase-functions';
 import { FieldPath, FieldValue } from 'firebase-admin/firestore';
 import * as market from './shared/market.js';
-import { START_NEED, isSpecies } from './shared/pets.js';
+import { petsIn } from './shared/pets.js';
+import { petFamily } from './petfamily.js';
 import { memberOk } from './shared/team.js';
 
 const OPEN = { maxInstances: 5, invoker: 'public' };
@@ -73,6 +75,9 @@ export function marketFunctions({ db, coinData, freshCoins, notify, bankRef, per
       // Reads first (a transaction reads before it writes).
       const myBank = (await tx.get(bankRef(me))).data() || {};
       const pet = kind === 'pet' ? await petRefOf(aliases, tx) : null;
+      // Which of your pets (the first, unless the app says which one).
+      const pets = pet?.snap ? petsIn(pet.snap.data()) : [];
+      const at = req.data?.born == null ? 0 : pets.findIndex((p) => p.adoptedAt === Number(req.data.born));
       const perkSnap = kind === 'perk' ? await tx.get(db.doc(`perks/${id}`)) : null;
       const bought = kind === 'pet' ? null : await tx.get(db.collection('purchases').where('item', '==', item));
       const { balance } = await freshCoins(me, myBank, data);
@@ -82,7 +87,7 @@ export function marketFunctions({ db, coinData, freshCoins, notify, bankRef, per
         aliases,
         balance,
         now,
-        pet: pet?.snap ? pet.snap.data() : null,
+        pet: pets[at] || null,
         perk: perkSnap?.exists ? perkSnap.data() : null,
         purchases: bought ? bought.docs.map((d) => d.data()) : [],
         text: req.data?.text,
@@ -96,7 +101,9 @@ export function marketFunctions({ db, coinData, freshCoins, notify, bankRef, per
         purchaseId = ref.id;
         tx.set(ref, r.purchase);
       }
-      if (r.pet) tx.update(pet.ref, { ...r.pet, person: me, cared: (pet.snap.get('cared') || 0) + 1, caredAt: now });
+      if (r.pet && at === 1)
+        tx.update(pet.ref, { person: me, 'extra.food': r.pet.food, 'extra.fun': r.pet.fun, 'extra.cared': (pets[1].cared || 0) + 1, 'extra.caredAt': now });
+      else if (r.pet) tx.update(pet.ref, { ...r.pet, person: me, cared: (pets[0].cared || 0) + 1, caredAt: now });
       return { ok: true, price: r.price, purchase: r.purchase ? { id: purchaseId, ...r.purchase } : null, pet: r.pet || null };
     });
     // A perk: tell team management (after the sale, outside the transaction).
@@ -315,49 +322,12 @@ export function marketFunctions({ db, coinData, freshCoins, notify, bankRef, per
     throw new HttpsError('invalid-argument', 'Unknown action.');
   });
 
-  // Pets: free to adopt, name, show and rehome. Care is bought (buy).
+  // Pets: free to adopt, name, show, dress up and rehome; a pet can have one
+  // baby, and can be given to a teammate (petfamily.js). Care is bought (buy).
+  const runPet = petFamily({ db, notify, personId });
   const pet = onCall(OPEN, async (req) => {
-    const { me, aliases } = await caller(req);
-    const { action } = req.data || {};
-    const name = String(req.data?.name ?? '')
-      .replace(/\s+/g, ' ')
-      .trim()
-      .slice(0, 24);
-    return db.runTransaction(async (tx) => {
-      const { ref, snap } = await petRefOf(aliases, tx);
-      const now = Date.now();
-      if (action === 'adopt') {
-        if (snap) return note('You already have a pet.', 'Rehome it first to adopt another.');
-        if (!isSpecies(req.data?.species)) return note('Pick a pet.');
-        if (!name) return note('Give your pet a name.');
-        tx.set(ref, {
-          person: me,
-          species: req.data.species,
-          name,
-          adoptedAt: now,
-          food: { v: START_NEED, at: now },
-          fun: { v: START_NEED, at: now },
-          inChat: true,
-          cared: 0,
-        });
-        return { ok: true };
-      }
-      if (!snap) return note('You don’t have a pet.');
-      if (action === 'rename') {
-        if (!name) return note('Give your pet a name.');
-        tx.update(ref, { name, person: me });
-        return { ok: true };
-      }
-      if (action === 'inChat') {
-        tx.update(ref, { inChat: req.data?.on === true, person: me });
-        return { ok: true };
-      }
-      if (action === 'release') {
-        tx.delete(ref);
-        return { ok: true };
-      }
-      throw new HttpsError('invalid-argument', 'Unknown action.');
-    });
+    const ctx = await caller(req);
+    return runPet(ctx, req.data || {});
   });
 
   return { buy, joinTournament, marketManage, pet, payTournaments, settleTournament: settle };

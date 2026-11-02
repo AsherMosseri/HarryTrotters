@@ -17,6 +17,7 @@
 import { teamDay } from './coins.js';
 import { addDay, shiftDays, streaksOf } from './streaks.js';
 import { isSchoolDay } from './school.js';
+import { sameName } from './team.js';
 
 export const SPECIES = [
   { id: 'cat', name: 'Cat' },
@@ -213,4 +214,261 @@ export function mascotState({ shifts = [], tasks = [], logs = [], roster = [], n
     .slice(0, 3)
     .map(tip);
   return { energy, mood, parts, tips };
+}
+
+// ---------------------------------------------------------------------------
+// Levels unlock cosmetic things (nothing here touches coins or helps anyone):
+// a title for each stretch of levels, gear to dress the pet in, fur tints,
+// a ring around its little chat badge, and one baby per pet at level 10.
+// The tables, the checks and the pet/gift moves are plain functions of the
+// data, so the app, demo mode and the server (functions/market.js) agree.
+// ---------------------------------------------------------------------------
+
+export const TITLES = [
+  { level: 1, title: 'Rookie' },
+  { level: 3, title: 'Sidekick' },
+  { level: 5, title: 'Regular' },
+  { level: 10, title: 'Veteran' },
+  { level: 13, title: 'Pit Crew' },
+  { level: 16, title: 'Ace' },
+  { level: 20, title: 'Champion' },
+  { level: 25, title: 'Legend' },
+  { level: 30, title: 'Hall of Famer' },
+];
+export const titleOf = (level) => [...TITLES].reverse().find((t) => t.level <= (level || 1))?.title || TITLES[0].title;
+
+// slot: where it goes. One of each slot at a time (the palette tints the fur).
+export const GEAR_SLOTS = [
+  { id: 'head', name: 'Head' },
+  { id: 'face', name: 'Face' },
+  { id: 'neck', name: 'Neck' },
+  { id: 'extra', name: 'Extra' },
+  { id: 'palette', name: 'Fur tint' },
+];
+export const GEAR = [
+  { id: 'bandana', name: 'Bandana', slot: 'neck', level: 2 },
+  { id: 'cap', name: 'Team cap', slot: 'head', level: 4 },
+  { id: 'bowtie', name: 'Bow tie', slot: 'neck', level: 6 },
+  { id: 'safety', name: 'Safety glasses', slot: 'face', level: 7 },
+  { id: 'sunset', name: 'Sunset', slot: 'palette', level: 8 },
+  { id: 'hardhat', name: 'Hard hat', slot: 'head', level: 10 },
+  { id: 'headset', name: 'Headset', slot: 'head', level: 12 },
+  { id: 'medal', name: 'Medal', slot: 'neck', level: 15 },
+  { id: 'midnight', name: 'Midnight', slot: 'palette', level: 15 },
+  { id: 'sunglasses', name: 'Sunglasses', slot: 'face', level: 18 },
+  { id: 'goldmedal', name: 'Gold medal', slot: 'neck', level: 22 },
+  { id: 'crown', name: 'Crown', slot: 'head', level: 25 },
+  { id: 'golden', name: 'Golden', slot: 'palette', level: 25 },
+  { id: 'monocle', name: 'Monocle', slot: 'face', level: 28 },
+  { id: 'halo', name: 'Halo', slot: 'extra', level: 30 },
+];
+export const gearItem = (id) => GEAR.find((g) => g.id === id) || null;
+export const unlockedGear = (level) => GEAR.filter((g) => g.level <= (level || 1));
+
+// The ring around the small badge next to a name in chat.
+export const RINGS = [
+  { level: 10, id: 'bronze', name: 'Bronze ring' },
+  { level: 20, id: 'silver', name: 'Silver ring' },
+  { level: 30, id: 'gold', name: 'Gold ring' },
+];
+export const ringOf = (level) => [...RINGS].reverse().find((r) => r.level <= (level || 1))?.id || '';
+
+// A pet can have one baby, once, from this level. A person holds two pets.
+export const BABY_LEVEL = 10;
+export const MAX_PETS = 2;
+
+// What the next level-up brings (gear or a ring), or null at the top.
+export function nextUnlock(level) {
+  const lv = level || 1;
+  const all = [
+    ...GEAR.map((g) => ({ kind: 'gear', id: g.id, name: g.name, slot: g.slot, level: g.level })),
+    ...RINGS.map((r) => ({ kind: 'ring', id: r.id, name: r.name, slot: 'ring', level: r.level })),
+  ].filter((u) => u.level > lv);
+  all.sort((a, b) => a.level - b.level);
+  return all[0] || null;
+}
+// Every level that brings something, for the "Level path" list.
+export function levelPath() {
+  const rows = new Map();
+  const row = (level) => {
+    if (!rows.has(level)) rows.set(level, { level, title: '', unlocks: [] });
+    return rows.get(level);
+  };
+  for (const t of TITLES) row(t.level).title = t.title;
+  for (const g of GEAR) row(g.level).unlocks.push({ kind: 'gear', name: g.name, slot: g.slot });
+  for (const r of RINGS) row(r.level).unlocks.push({ kind: 'ring', name: r.name, slot: 'ring' });
+  row(BABY_LEVEL).unlocks.push({ kind: 'baby', name: 'Can have a baby', slot: 'baby' });
+  return [...rows.values()].sort((a, b) => a.level - b.level);
+}
+
+// What a pet wears: an id or '' for each slot.
+export const emptyGear = () => ({ head: '', face: '', neck: '', extra: '', palette: '' });
+export function cleanGear(gear) {
+  const out = emptyGear();
+  for (const s of GEAR_SLOTS) {
+    const g = gearItem(gear?.[s.id]);
+    if (g && g.slot === s.id) out[s.id] = g.id;
+  }
+  return out;
+}
+// A gear choice, checked against the pet's level: { gear } or { error }.
+export function gearCheck(gear, level) {
+  if (!gear || typeof gear !== 'object') return { error: 'Pick what to wear.' };
+  const out = emptyGear();
+  for (const s of GEAR_SLOTS) {
+    const id = gear[s.id];
+    if (id === undefined || id === null || id === '') continue;
+    const g = gearItem(String(id));
+    if (!g || g.slot !== s.id) return { error: 'That doesn’t go there.' };
+    if (g.level > level) return { error: `${g.name} unlocks at level ${g.level}.` };
+    out[s.id] = g.id;
+  }
+  return { gear: out };
+}
+
+// ---- Pets in a doc: pets/{personId} holds a person's first pet at the top
+// and the second one (a baby, or a gift) in `extra`. Each pet is told apart
+// by when it was born or came to its owner (adoptedAt).
+const note = (title, body = '') => ({ note: { title, body } });
+const first = (n) => (n || 'Someone').split(' ')[0];
+export const cleanPetName = (s) =>
+  String(s ?? '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 24);
+
+export function petsIn(doc) {
+  if (!doc) return [];
+  const { extra, ...main } = doc;
+  return extra ? [main, { ...extra, person: doc.person }] : [main];
+}
+export function docOf(person, list) {
+  if (!list.length) return null;
+  const [a, b] = list;
+  const { person: _p, extra: _e, ...extra } = b || {};
+  return { ...a, person, ...(b && { extra }) };
+}
+const pickPet = (list, born) => (born === undefined || born === null ? 0 : list.findIndex((p) => p.adoptedAt === Number(born)));
+export const newPet = (species, name, now) => ({
+  species,
+  name,
+  adoptedAt: now,
+  food: { v: START_NEED, at: now },
+  fun: { v: START_NEED, at: now },
+  inChat: true,
+  cared: 0,
+  gear: emptyGear(),
+  babyBorn: false,
+});
+const levelAt = (pet, shifts, now) => levelOf(petXp(pet.person, shifts, pet.adoptedAt || 0, now)).level;
+
+// Why a pet can't have its baby yet, or null.
+export function hatchBlock(pet, level, count) {
+  if (level < BABY_LEVEL) return note(`${pet.name} isn’t ready yet.`, `A pet can have a baby at level ${BABY_LEVEL}.`);
+  if (pet.babyBorn) return note(`${pet.name} already had a baby.`, 'Each pet can have just one.');
+  if (count >= MAX_PETS) return note('You already have two pets.', 'Give one to a teammate first, then meet the baby.');
+  return null;
+}
+
+// The moves on your own pets: adopt, rename, inChat, release, style, hatch.
+// doc: your pets doc (or null). Returns { note }, { unknown } or
+// { ok, doc } (doc: what to save, or null to delete it), plus `born` for a baby.
+export function petEdit(action, input = {}, { me, doc, shifts = [], now = Date.now() }) {
+  const list = petsIn(doc);
+  const name = cleanPetName(input.name);
+  if (action === 'adopt') {
+    if (list.length) return note('You already have a pet.', 'Rehome it first to adopt another.');
+    if (!isSpecies(input.species)) return note('Pick a pet.');
+    if (!name) return note('Give your pet a name.');
+    return { ok: true, doc: docOf(me, [newPet(input.species, name, now)]) };
+  }
+  if (!['rename', 'inChat', 'release', 'style', 'hatch'].includes(action)) return { unknown: true };
+  if (!list.length) return note('You don’t have a pet.');
+  const i = pickPet(list, input.born);
+  if (i < 0) return note('That pet isn’t yours anymore.');
+  const pet = { ...list[i], person: me };
+  const swap = (patch, more = []) => ({
+    ok: true,
+    doc: docOf(me, [...list.map((p, k) => (k === i ? { ...p, ...patch } : p)), ...more]),
+  });
+  if (action === 'rename') return name ? swap({ name }) : note('Give your pet a name.');
+  if (action === 'inChat') return swap({ inChat: input.on === true });
+  // Releasing the first pet moves the second up to the top of the doc.
+  if (action === 'release') return { ok: true, doc: docOf(me, list.filter((_, k) => k !== i)) };
+  const level = levelAt(pet, shifts, now);
+  if (action === 'style') {
+    const g = gearCheck(input.gear, level);
+    return g.error ? note(g.error) : swap({ gear: g.gear });
+  }
+  // hatch: one baby per pet, from level 10, into a free slot.
+  const block = hatchBlock(pet, level, list.length);
+  if (block) return block;
+  if (!name) return note('Give the baby a name.');
+  const born = Math.max(now, ...list.map((p) => (p.adoptedAt || 0) + 1));
+  const r = swap({ babyBorn: true }, [{ ...newPet(pet.species, name, born), person: me }]);
+  return { ...r, born };
+}
+
+// ---- Giving a pet to a teammate (petGifts/{id}). An offer waits a week.
+export const GIFT_DAYS = 7;
+export const giftOpen = (g, now = Date.now()) => !!g && g.status === 'pending' && (g.at || 0) + GIFT_DAYS * DAY > now;
+
+// A new offer: { note } or { ok, gift }.
+// to: the teammate (current name); toOk: they have joined the app and are let
+// in. gifts: offers already made by you (any status).
+export function giftOffer(input = {}, { me, doc, to, toOk, gifts = [], shifts = [], now = Date.now() }) {
+  const list = petsIn(doc);
+  if (!list.length) return note('You don’t have a pet.');
+  const i = pickPet(list, input.born);
+  if (i < 0) return note('That pet isn’t yours anymore.');
+  const pet = { ...list[i], person: me };
+  if (!to) return note('Pick a teammate.');
+  if (sameName(to, me)) return note('That’s you.', 'Pick a teammate to give it to.');
+  if (!toOk) return note(`${first(to)} isn’t on the team in the app yet.`, 'They need to be signed in and let in first.');
+  if (gifts.some((g) => giftOpen(g, now) && g.pet?.adoptedAt === pet.adoptedAt))
+    return note(`${pet.name} is already offered.`, 'Cancel that offer to change it.');
+  return {
+    ok: true,
+    gift: {
+      from: me,
+      to,
+      pet: {
+        species: pet.species,
+        name: pet.name,
+        gear: cleanGear(pet.gear),
+        adoptedAt: pet.adoptedAt,
+        level: levelAt(pet, shifts, now),
+        babyBorn: pet.babyBorn === true,
+      },
+      at: now,
+      status: 'pending',
+    },
+  };
+}
+
+// The recipient says yes. doc: your pets doc; giverDoc: theirs; giver: their
+// current name. Returns { note } (with `status` when the offer itself is now
+// void or out of time) or { ok, doc, giverDoc, pet }.
+export function giftAccept(gift, { me, doc, giverDoc, giver, now = Date.now() }) {
+  if (!gift || gift.status !== 'pending') return note('That offer is already settled.');
+  if (!giftOpen(gift, now)) return { ...note('That offer ran out.', `Offers last ${GIFT_DAYS} days.`), status: 'expired' };
+  const list = petsIn(doc);
+  if (list.length >= MAX_PETS) return note('You already have two pets.', 'Give one away or rehome it first.');
+  const theirs = petsIn(giverDoc);
+  const j = theirs.findIndex((p) => p.adoptedAt === gift.pet?.adoptedAt);
+  if (j < 0) return { ...note(`${gift.pet?.name || 'That pet'} isn’t with ${first(giver)} anymore.`), status: 'void' };
+  const { person: _p, ...kept } = theirs[j];
+  // It keeps its name, needs and whether it had a baby; its level starts over
+  // with the new owner's lab time, and its gear was for the level it had.
+  const pet = { ...kept, adoptedAt: Math.max(now, ...list.map((p) => (p.adoptedAt || 0) + 1)), gear: emptyGear(), cared: 0, inChat: true };
+  return { ok: true, doc: docOf(me, [...list, pet]), giverDoc: docOf(giver, theirs.filter((_, k) => k !== j)), pet };
+}
+
+// Cancel (the giver) or decline (the recipient): { note } or { ok, status }.
+export function giftEnd(kind, gift, { me, rename = (n) => n, now = Date.now() }) {
+  if (!gift) return note('That offer is gone.');
+  if (rename(kind === 'cancel' ? gift.from : gift.to) !== me) return note('That isn’t yours to answer.');
+  if (gift.status !== 'pending') return note('That offer is already settled.');
+  if (!giftOpen(gift, now)) return { ...note('That offer ran out.', `Offers last ${GIFT_DAYS} days.`), status: 'expired' };
+  return { ok: true, status: kind === 'cancel' ? 'cancelled' : 'declined' };
 }

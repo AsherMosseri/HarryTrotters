@@ -115,7 +115,9 @@ const SECTIONS = [
     'Market',
     [
       'Spend Jackson coins on pet care, real perks, chat extras for a day, and tournament entries. Perks wait for team management to approve them; a decline gives your coins back.',
-      'Pets: adopt one if you want. It grows with your time at the lab, needs food and fun, and shows on your profile and next to your name.',
+      'Pets: adopt one if you want. It grows with your lab time (never with coins), needs food and fun, and shows on your profile and next to your name.',
+      'Levels unlock things just for show: a title (Rookie up to Hall of Famer), gear to dress your pet in (tap Style), fur tints, and a bronze, silver or gold ring around its badge in chat. Level path in the Pets shelf lists them all.',
+      'At level 10 a pet can have one baby (Meet the baby): a new pet that grows from your lab time since it was born. You can hold two pets. To give one to a teammate, tap Give to a teammate; they can accept or say no thanks within a week, and a pet that moves starts over at level 1 with its new owner.',
       'Tournaments: pay the entry and play in the app; the best Tetris or Minesweeper score wins the pot. Every score is checked by the server, and runs that look too fast wait for team management.',
     ],
   ],
