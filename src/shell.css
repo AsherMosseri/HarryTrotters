@@ -1834,11 +1834,16 @@ button.pm-row:hover { background: color-mix(in srgb, var(--text) 4%, transparent
 .pet-art .pet-bob { transform-box: fill-box; transform-origin: 50% 100%; }
 .pet-art .pet-eyes { transform-box: fill-box; transform-origin: 50% 50%; }
 .pet-art .pet-tail { transform-box: fill-box; transform-origin: 0% 100%; }
+.pet-art .pet-ear { transform-box: fill-box; transform-origin: 50% 90%; }
+.pet-art .pet-tongue { transform-box: fill-box; transform-origin: 50% 0%; }
 :root[data-anim~='move'] .pet-art.anim.pet-happy .pet-bob { animation: pet-hop 1.9s ease-in-out infinite; }
 :root[data-anim~='move'] .pet-art.anim.pet-ok .pet-bob { animation: pet-breathe 3.2s ease-in-out infinite; }
 :root[data-anim~='move'] .pet-art.anim.pet-sad .pet-bob { animation: pet-droop 4.4s ease-in-out infinite; }
 :root[data-anim~='move'] .pet-art.anim .pet-eyes { animation: pet-blink 5.2s linear infinite; }
 :root[data-anim~='move'] .pet-art.anim.pet-happy .pet-tail { animation: pet-wag 0.45s ease-in-out infinite alternate; }
+:root[data-anim~='move'] .pet-art.anim.pet-ok .pet-tail { animation: pet-sway 3.6s ease-in-out infinite alternate; }
+:root[data-anim~='move'] .pet-art.anim .pet-ear { animation: pet-twitch 6.4s ease-in-out infinite; }
+:root[data-anim~='move'] .pet-art.anim.pet-happy .pet-tongue { animation: pet-pant 0.7s ease-in-out infinite alternate; }
 @keyframes pet-hop {
   0%, 55%, 100% { transform: translateY(0) scale(1, 1); }
   66% { transform: translateY(0) scale(1.05, 0.94); }
@@ -1849,6 +1854,9 @@ button.pm-row:hover { background: color-mix(in srgb, var(--text) 4%, transparent
 @keyframes pet-droop { 0%, 100% { transform: rotate(0deg) translateY(0); } 50% { transform: rotate(-3deg) translateY(1px); } }
 @keyframes pet-blink { 0%, 93%, 100% { transform: scaleY(1); } 95.5% { transform: scaleY(0.1); } }
 @keyframes pet-wag { from { transform: rotate(-9deg); } to { transform: rotate(9deg); } }
+@keyframes pet-sway { from { transform: rotate(-3deg); } to { transform: rotate(4deg); } }
+@keyframes pet-twitch { 0%, 88%, 100% { transform: rotate(0deg); } 91% { transform: rotate(7deg); } 94% { transform: rotate(-3deg); } 97% { transform: rotate(4deg); } }
+@keyframes pet-pant { from { transform: scaleY(1); } to { transform: scaleY(1.18); } }
 .pet-badge { display: inline-flex; vertical-align: -3px; margin-left: 3px; }
 .pet-card { display: flex; align-items: center; gap: 16px; padding: 12px 14px; border-radius: 14px; background: var(--surface-2); min-width: 0; }
 .pet-card.big { gap: 24px; padding: 18px 20px; background: var(--surface); border: 1px solid var(--border); }
