@@ -3269,7 +3269,11 @@ button.pm-row:hover { background: color-mix(in srgb, var(--text) 4%, transparent
 
 /* /me: an action line, like "* Asher waves". */
 .msg-me { border-left: 3px solid var(--accent); padding-left: 9px; }
-.msg-me .me-who { font-style: normal; font-weight: 650; }
+.msg-me .me-name { font-style: normal; font-weight: 650; }
+/* The name has its own class: it used to be .me-who, which is also the Your menu row (full width, padded,
+   flex), so the name sat on a line of its own. The first line of the text (renderRich wraps it in a block)
+   follows the name on the same line. */
+.msg-me em > .md-p:first-of-type { display: inline; }
 
 /* Pinned: the bar under a channel's header, and the count on the pin button. */
 .pinned-bar { display: flex; align-items: center; gap: 8px; padding: 0 14px; min-height: 38px; border-bottom: 1px solid var(--hairline); background: color-mix(in srgb, var(--accent) 5%, var(--surface)); }

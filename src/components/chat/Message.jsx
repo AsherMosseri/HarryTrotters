@@ -35,10 +35,13 @@ function FloatingPicker({ anchor, onClose, children }) {
       if (window.innerWidth <= 760) return setPos({});
       const h = el.offsetHeight;
       const w = el.offsetWidth;
-      const vh = window.visualViewport?.height || window.innerHeight;
+      // What you can see: the keyboard covers the bottom, and iOS may pan the view.
+      const vv = window.visualViewport;
+      const vt = vv?.offsetTop || 0;
+      const vh = vt + (vv?.height || window.innerHeight);
       const below = a.bottom + 6;
       const above = a.top - 6 - h;
-      const top = below + h <= vh - 8 ? below : above >= 8 ? above : Math.max(8, vh - 8 - h);
+      const top = below + h <= vh - 8 ? below : above >= vt + 8 ? above : Math.max(vt + 8, vh - 8 - h);
       const left = Math.min(Math.max(8, a.right - w), window.innerWidth - w - 8);
       setPos({ top, left });
     };
@@ -46,9 +49,13 @@ function FloatingPicker({ anchor, onClose, children }) {
     const ro = new ResizeObserver(place);
     if (box.current) ro.observe(box.current);
     window.addEventListener('resize', place);
+    window.visualViewport?.addEventListener('resize', place);
+    window.visualViewport?.addEventListener('scroll', place);
     return () => {
       ro.disconnect();
       window.removeEventListener('resize', place);
+      window.visualViewport?.removeEventListener('resize', place);
+      window.visualViewport?.removeEventListener('scroll', place);
     };
   }, [anchor]);
   return (
@@ -584,7 +591,7 @@ export default function Message({
               <div className={`msg-text${jumbo ? ' jumbo' : ''}${m.cmd ? ' msg-me' : ''} ${frame.className}`} style={frame.style}>
                 {m.cmd ? (
                   <em>
-                    <b className="me-who">{(m.by || '').split(' ')[0]}</b> {renderRich(m.text, ctx)}
+                    <b className="me-name">{(m.by || '').split(' ')[0]}</b> {renderRich(m.text, ctx)}
                   </em>
                 ) : (
                   renderRich(m.text, ctx)
