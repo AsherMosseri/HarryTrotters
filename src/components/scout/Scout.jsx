@@ -193,14 +193,14 @@ function Teams({ rows, settings, isManager, event, api, onOpen, onAdd }) {
           <Icon name="search" size={16} />
           <input className="input" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Number or name" inputMode="search" aria-label="Find a team" />
         </label>
-        <div className="segmented sc-sorts" role="radiogroup" aria-label="Sort by">
+        <div className="segmented sc-sorts kb-fold" role="radiogroup" aria-label="Sort by">
           {SORTS.map(([id, label]) => (
             <button key={id} role="radio" aria-checked={sort === id} className={`plain-seg${sort === id ? ' on' : ''}`} onClick={() => setSort(id)}>
               {label}
             </button>
           ))}
         </div>
-        <button className="btn" onClick={onAdd}>
+        <button className="btn kb-fold" onClick={onAdd}>
           <Icon name="plus" size={16} /> Add team
         </button>
       </div>
@@ -278,12 +278,12 @@ function PullBar({ settings, isManager, event, api, hasTeams }) {
   const synced = settings.scoutSyncedAt;
   if (!isManager)
     return synced ? (
-      <p className="muted small sc-pull-note">
+      <p className="muted small sc-pull-note kb-fold">
         Teams and rankings last pulled <span className="mono">{clock(synced)}</span>. Team management refreshes them.
       </p>
     ) : null;
   return (
-    <div className="sc-pull">
+    <div className="sc-pull kb-fold">
       {!event && (
         <label className="mf-field small sc-code">
           <span>Event code</span>
