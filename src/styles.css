@@ -2989,6 +2989,7 @@ html.kb-open #root { position: fixed; left: 0; right: 0; top: var(--vvt); height
 html.kb-open .panel-backdrop,
 html.kb-open .checkin-gate,
 html.kb-open .update-gate,
+html.kb-open .sc-table,
 html.kb-open .dg-screen { inset: auto 0; top: var(--vvt); height: var(--vvh); }
 html.kb-open .panel-backdrop.center { padding-top: 12px; padding-bottom: 12px; }
 html.kb-open .panel-backdrop.center > .dialog { max-height: calc(var(--vvh) - 24px); }
@@ -2999,6 +3000,35 @@ html.kb-open .ad-banner-bottom { display: none; }
 html.kb-open .panel,
 html.kb-open .sheet { padding-bottom: 12px; }
 html.kb-open .toast { bottom: auto; top: calc(var(--vvt) + var(--vvh) - 64px); }
+/* Things fixed to the top or bottom of the page measure from the page, not from
+   what's visible: iOS pans the view (--vvt) and the keyboard covers the bottom
+   (--vvb), so they add those. Both are 0 (unset) when there's no keyboard. */
+@media (max-width: 760px) {
+  html.kb-open .composer :is(.composer-emoji, .sticker-picker, .gif-picker),
+  html.kb-open .msg-actions .reaction-picker { top: calc(var(--vvt, 0px) + env(safe-area-inset-top) + 64px); }
+  html.kb-open .floating-picker { top: calc(var(--vvt, 0px) + env(safe-area-inset-top) + 64px); }
+  html.kb-open .emoji-picker:not(.composer-emoji) { bottom: calc(90px + var(--vvb, 0px)); }
+  html.kb-open .inbox-pop, html.kb-open .shift-pop { top: calc(var(--vvt, 0px) + 58px); }
+  html.kb-open .notify-menu { top: calc(var(--vvt, 0px) + 120px); }
+  html.kb-open .theme-menu { top: calc(var(--vvt, 0px) + 60px); }
+}
+@media (max-width: 1199px) {
+  html.kb-open .app .chat-side { top: calc(var(--vvt, 0px) + 120px); bottom: calc(12px + var(--vvb, 0px)); }
+}
+@media (max-width: 760px) {
+  html.kb-open .app .chat-side { top: calc(var(--vvt, 0px) + 64px); bottom: calc(8px + var(--vvb, 0px)); }
+}
+/* With the keyboard up on a phone, the page title row gives its room to the
+   chat; the channel bar takes over the strip under the status bar. */
+html.kb-open .app:has(.chat-mobile-bar) .phone-top { display: none; }
+html.kb-open .phone-shell .chat-mobile-bar { padding-top: max(8px, env(safe-area-inset-top)); }
+/* iPad with a keyboard attached (just the suggestion bar): pop-ups that sit
+   at the bottom of the screen stay above it. */
+html.kb-bar .panel { padding-bottom: calc(env(safe-area-inset-bottom) + var(--kb-bar, 0px)); }
+html.kb-bar .sheet { padding-bottom: calc(max(18px, env(safe-area-inset-bottom)) + var(--kb-bar, 0px)); }
+html.kb-bar .panel-backdrop.center { padding-bottom: calc(16px + var(--kb-bar, 0px)); }
+html.kb-bar .panel-backdrop.center > .dialog { max-height: calc(100dvh - 6vh - 16px - var(--kb-bar, 0px)); }
+html.kb-bar .sc-table { padding-bottom: calc(max(20px, env(safe-area-inset-bottom)) + var(--kb-bar, 0px)); }
 
 /* ---------- slash commands (chat/Commands.jsx) ---------- */
 .suggest-cmds { max-height: min(340px, calc(var(--vvh, 100dvh) * 0.45)); overflow-y: auto; overscroll-behavior: contain; }
