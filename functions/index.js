@@ -38,6 +38,7 @@ import {
 import { rankingFromApi, teamFromApi } from './shared/scout.js';
 import { asksOn } from './shared/checkin.js';
 import { marketFunctions } from './market.js';
+import { petEventFunctions } from './petevents.js';
 import { lifeFunctions } from './life.js';
 import { learnFunctions } from './learn.js';
 
@@ -1254,6 +1255,16 @@ export const { buy, joinTournament, marketManage, pet, payTournaments } = market
   freshCoins,
   notify,
   bankRef,
+  personId,
+  owner: REQUESTS_TO,
+  timeZone: TIME_ZONE,
+});
+
+// Team events: the team's lab time fills a meter, tiers give pet gear.
+export const { petEvent, petEventTick } = petEventFunctions({
+  db,
+  coinData,
+  notify,
   personId,
   owner: REQUESTS_TO,
   timeZone: TIME_ZONE,

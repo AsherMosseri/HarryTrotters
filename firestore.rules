@@ -222,6 +222,17 @@ service cloud.firestore {
       allow read: if isMember();
       allow write: if false;
     }
+    // Team events (functions/petevents.js): the event, its progress and the
+    // tiers reached are all written by the server, even when team management
+    // makes or ends one. The event gear people earned is the same.
+    match /petEvents/{id} {
+      allow read: if isMember();
+      allow write: if false;
+    }
+    match /petUnlocks/{id} {
+      allow read: if isMember();
+      allow write: if false;
+    }
     // A tournament's seed (the pieces and boards come from it): the server only.
     match /tournamentSecrets/{id} {
       allow read, write: if false;

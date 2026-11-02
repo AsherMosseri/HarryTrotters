@@ -265,6 +265,19 @@ export const GEAR = [
 export const gearItem = (id) => GEAR.find((g) => g.id === id) || null;
 export const unlockedGear = (level) => GEAR.filter((g) => g.level <= (level || 1));
 
+// Event gear (team events, shared/events.js): limited items that a pet of any
+// level can wear, but only for a person who earned it in the event (the
+// server keeps that list in petUnlocks/{personId}). Not part of GEAR, so the
+// level path and "next unlock" never mention it. `earn` finishes the sentence
+// "Earn it in …" on the locked tile.
+export const EVENT_GEAR = [
+  { id: 'medal-nov14', name: 'Nov 14 medal', slot: 'neck', earn: 'Competition week' },
+  { id: 'pitcrew-cap', name: 'Pit crew cap', slot: 'head', earn: 'Competition week' },
+];
+export const eventGearItem = (id) => EVENT_GEAR.find((g) => g.id === id) || null;
+// Any piece a pet can wear, level gear or event gear.
+const anyGear = (id) => gearItem(id) || eventGearItem(id);
+
 // The ring around the small badge next to a name in chat.
 export const RINGS = [
   { level: 10, id: 'bronze', name: 'Bronze ring' },
@@ -306,18 +319,27 @@ export const emptyGear = () => ({ head: '', face: '', neck: '', extra: '', palet
 export function cleanGear(gear) {
   const out = emptyGear();
   for (const s of GEAR_SLOTS) {
-    const g = gearItem(gear?.[s.id]);
+    const g = anyGear(gear?.[s.id]);
     if (g && g.slot === s.id) out[s.id] = g.id;
   }
   return out;
 }
 // A gear choice, checked against the pet's level: { gear } or { error }.
-export function gearCheck(gear, level) {
+// earned: the event gear its owner has earned (ids); event gear needs it at
+// any level, and level gear never does.
+export function gearCheck(gear, level, earned = []) {
   if (!gear || typeof gear !== 'object') return { error: 'Pick what to wear.' };
   const out = emptyGear();
   for (const s of GEAR_SLOTS) {
     const id = gear[s.id];
     if (id === undefined || id === null || id === '') continue;
+    const e = eventGearItem(String(id));
+    if (e) {
+      if (e.slot !== s.id) return { error: 'That doesn’t go there.' };
+      if (!earned.includes(e.id)) return { error: `${e.name} is limited. Earn it in ${e.earn}.` };
+      out[s.id] = e.id;
+      continue;
+    }
     const g = gearItem(String(id));
     if (!g || g.slot !== s.id) return { error: 'That doesn’t go there.' };
     if (g.level > level) return { error: `${g.name} unlocks at level ${g.level}.` };
@@ -371,9 +393,10 @@ export function hatchBlock(pet, level, count) {
 }
 
 // The moves on your own pets: adopt, rename, inChat, release, style, hatch.
-// doc: your pets doc (or null). Returns { note }, { unknown } or
+// doc: your pets doc (or null). earned: the event gear you have earned.
+// Returns { note }, { unknown } or
 // { ok, doc } (doc: what to save, or null to delete it), plus `born` for a baby.
-export function petEdit(action, input = {}, { me, doc, shifts = [], now = Date.now() }) {
+export function petEdit(action, input = {}, { me, doc, shifts = [], earned = [], now = Date.now() }) {
   const list = petsIn(doc);
   const name = cleanPetName(input.name);
   if (action === 'adopt') {
@@ -397,7 +420,7 @@ export function petEdit(action, input = {}, { me, doc, shifts = [], now = Date.n
   if (action === 'release') return { ok: true, doc: docOf(me, list.filter((_, k) => k !== i)) };
   const level = levelAt(pet, shifts, now);
   if (action === 'style') {
-    const g = gearCheck(input.gear, level);
+    const g = gearCheck(input.gear, level, earned);
     return g.error ? note(g.error) : swap({ gear: g.gear });
   }
   // hatch: one baby per pet, from level 10, into a free slot.

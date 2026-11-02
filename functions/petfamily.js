@@ -5,12 +5,14 @@
 // same ones); this file only reads and writes the docs:
 //   pets/{personId}   a person's pets: the first at the top, the second in `extra`
 //   petGifts/{id}     an offer to give a pet away (read by the two people)
+//   petUnlocks/{id}   event gear a person earned (petevents.js); a style move checks it
 // Nothing here costs or pays coins.
 
 import { HttpsError } from 'firebase-functions/v2/https';
 import { logger } from 'firebase-functions';
 import { cleanName } from './shared/team.js';
 import { giftAccept, giftEnd, giftOffer, petEdit } from './shared/pets.js';
+import { earnedIds } from './shared/events.js';
 
 export function petFamily({ db, notify, personId }) {
   const note = (title, body = '') => ({ note: { title, body } });
@@ -27,6 +29,15 @@ export function petFamily({ db, notify, personId }) {
     return { ref: db.doc(`pets/${personId(aliases[0])}`), data: null };
   }
   const save = (tx, { ref }, doc) => (doc ? tx.set(ref, doc) : tx.delete(ref));
+  // The event gear (limited, from team events) this person has earned: the
+  // server alone writes petUnlocks, so a style move is checked against it.
+  async function earnedGear(tx, aliases) {
+    for (const n of aliases) {
+      const snap = await tx.get(db.doc(`petUnlocks/${personId(n)}`));
+      if (snap.exists) return earnedIds(snap.data());
+    }
+    return [];
+  }
   const giftRef = (id) => db.doc(`petGifts/${id}`);
   const badId = (id) => !/^[\w-]{1,40}$/.test(String(id || ''));
 
@@ -39,7 +50,8 @@ export function petFamily({ db, notify, personId }) {
     if (['adopt', 'rename', 'inChat', 'release', 'style', 'hatch'].includes(action)) {
       return db.runTransaction(async (tx) => {
         const mine = await docOf(tx, aliases);
-        const r = petEdit(action, input, { me, doc: mine.data, shifts: data.shifts, now });
+        const earned = action === 'style' ? await earnedGear(tx, aliases) : [];
+        const r = petEdit(action, input, { me, doc: mine.data, shifts: data.shifts, earned, now });
         if (r.note) return r;
         save(tx, mine, r.doc);
         return { ok: true, ...(r.born && { born: r.born }) };
