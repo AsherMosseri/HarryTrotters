@@ -75,7 +75,12 @@ export function Avatar({ name: saved, size = 26, photo, showOnline = false, deco
   } else if (decorationById[deco]?.anim) {
     // Animated decorations; tiny avatars (under 24px) get just a matching ring.
     pic = (
-      <span ref={watchDeco} data-deco-own={own ? '1' : undefined} className={`deco deco-anim deco-${deco}`} style={{ width: size, height: size, '--s': `${size}px` }}>
+      <span
+        ref={watchDeco}
+        data-deco-own={own ? '1' : undefined}
+        className={`deco deco-anim deco-${deco}`}
+        style={{ width: size, height: size, '--s': `${size}px` }}
+      >
         {size >= 24 && <DecorationBehind id={deco} />}
         {pic}
         {size >= 24 && <AnimatedDecoration id={deco} small={size < 56} />}
