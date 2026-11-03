@@ -21,7 +21,7 @@ import { awardCoins, prepareAward } from './award.js';
 import * as arcadeBank from './banks/arcade.js';
 import * as fun from './shared/funGames.js';
 import * as mines from './shared/minesweeper.js';
-import { newSeed } from './shared/rng.js';
+import { newSeed, secureRandom } from './shared/rng.js';
 import { MANAGER_NAMES, PASSWORD_MIN, ROSTER, cleanName, isManagerName, knownName, memberOk, nameKey, onTeam, sameName } from './shared/team.js';
 import {
   DEFAULT_COMPETITION_DATE,
@@ -1271,7 +1271,13 @@ function withBalance(handler) {
   return async (req) => {
     const res = await handler(req);
     const uid = req.auth?.uid;
-    if (!uid || !res || typeof res !== 'object' || ['peek', 'mine'].includes(req.data?.move)) return res;
+    // Nothing to check when no coins moved: a peek, a warm-up, or a move in a
+    // game that goes on (its bet was taken at the start).
+    if (!uid || !res || typeof res !== 'object' || ['peek', 'mine', 'warm'].includes(req.data?.move) || req.data?.action === 'warm') return res;
+    if (res.still) {
+      const { still, ...rest } = res;
+      return rest;
+    }
     try {
       const data = await coinData();
       const me = data.rename((await db.doc(`members/${uid}`).get()).get('name'));
@@ -1347,10 +1353,13 @@ async function workContext(me, data) {
 // Multiplayer games pay several people at once: read every bank first (a
 // transaction reads before it writes), then apply each change in order.
 // (Prizes from the free games are awards instead: payAwards.)
-async function payOut(tx, money, banks, now) {
+// card: { game, id }, so a bet held for the game and its result share one
+// line in each person's history (arcade.moneyLine).
+async function payOut(tx, money, banks, now, card) {
   const names = [...new Set(money.map((x) => x.name))];
   for (const n of names) if (!banks[n]) banks[n] = (await tx.get(bankRef(n))).data() || {};
-  for (const x of money) banks[x.name] = casino.bankAfter(banks[x.name], x.name, x.delta, x.entry, x.extra || {}, now);
+  for (const x of money)
+    banks[x.name] = casino.bankAfter(banks[x.name], x.name, x.delta, arcade.moneyLine(x, card.game, card.id), x.extra || {}, now);
   for (const n of names) tx.set(bankRef(n), banks[n]);
 }
 
@@ -1365,8 +1374,13 @@ function nextFriday(now = Date.now()) {
   return now + 7 * 86400000;
 }
 
-// Where a live game's card is, kept with its secret so settleGames can find it.
-const secretWith = (secret, conv, now) => ({ ...secret, where: { conv, at: now } });
+// Where a live game's card is, kept with its secret so settleGames can find
+// it, and who has a bet in it (so a deleted card's held bets can be closed).
+const secretWith = (secret, conv, now, players = []) => ({
+  ...secret,
+  where: { conv, at: now, players: [...new Set(players)].filter((n) => n && n !== arcade.BOT) },
+});
+const playersOf = (pub) => [pub.a, pub.b, ...(pub.crew || [])];
 
 // A move in a running game: a player's, or the house settling a game nobody
 // finished (house: true, from settleGames). verified: a race result funGame
@@ -1378,7 +1392,16 @@ async function runMove({ conv, msgId, me, move, data, now, house = false, verifi
     const [msg, secret] = await Promise.all([tx.get(msgRef), tx.get(secretRef)]);
     const c = msg.get('cmd');
     if (!msg.exists || !c || !secret.exists) {
-      if (house && secret.exists) tx.delete(secretRef);
+      if (house && secret.exists) {
+        // The card was deleted mid-game: its bets stay lost (as before), and
+        // the players' "Bet held" lines say so.
+        const players = (secret.get('where')?.players || []).map((n) => data.rename(n));
+        const banks = await Promise.all(players.map((n) => tx.get(bankRef(n))));
+        tx.delete(secretRef);
+        banks.forEach((b, k) => {
+          if ((b.get('recent') || []).some((x) => x.hold === msgId)) tx.set(bankRef(players[k]), casino.closeHold(b.data(), msgId));
+        });
+      }
       return note('That game is gone.');
     }
     // Multiplayer: the game decides who may move (arcade.js).
@@ -1400,9 +1423,9 @@ async function runMove({ conv, msgId, me, move, data, now, house = false, verifi
       });
       if (r.error) return note(r.error);
       if (!r.write) return { ok: true, serverNow: now };
-      await payOut(tx, r.money, house ? {} : { [me]: myBank }, now);
+      await payOut(tx, r.money, house ? {} : { [me]: myBank }, now, { game: c.name, id: msgId });
       const { status, ...game } = r.pub;
-      if (arcade.isLive(status)) tx.set(secretRef, secretWith(r.secret, conv, now));
+      if (arcade.isLive(status)) tx.set(secretRef, secretWith(r.secret, conv, now, playersOf(r.pub)));
       else tx.delete(secretRef);
       tx.update(msgRef, { 'cmd.game': game, 'cmd.status': status });
       return { ok: true, serverNow: now, awards: r.awards || [] };
@@ -1429,13 +1452,15 @@ async function runMove({ conv, msgId, me, move, data, now, house = false, verifi
         icon: ICON[c.name],
         label: `${LABEL[c.name]}: ${net > 0 ? `won ${net}` : net < 0 ? `lost ${-net}` : 'bet back'}`,
         shown: net,
+        settles: msgId,
       };
       tx.set(bankRef(player), casino.bankAfter(bank, player, r.payout - (r.extraBet || 0), entry, {}, now));
       Object.assign(update, { 'cmd.payout': r.payout, 'cmd.net': net });
       tx.delete(secretRef);
-    } else tx.set(secretRef, secretWith(r.secret, conv, now));
+    } else tx.set(secretRef, secretWith(r.secret, conv, now, [player]));
     tx.update(msgRef, update);
-    return { ok: true, serverNow: now };
+    // still: the game goes on and no coins moved (withBalance skips its reads).
+    return { ok: true, serverNow: now, ...(!r.done && { still: true }) };
   });
   const { awards, ...rest } = res || {};
   const cut = await payAwards(awards, msgId, now);
@@ -1484,6 +1509,9 @@ async function challengeContext(tx, { me, words, roster, myBank, now, data }) {
 }
 
 export const play = onCall({ maxInstances: 5, invoker: 'public' }, withBalance(async (req) => {
+  // The server's clock when the request arrived: it decides when a crash was
+  // cashed out (never a time the app sends), before any reads slow it down.
+  const now = Date.now();
   const uid = req.auth?.uid;
   if (!uid) throw new HttpsError('unauthenticated', 'Sign in first.');
   const member = await db.doc(`members/${uid}`).get();
@@ -1491,7 +1519,9 @@ export const play = onCall({ maxInstances: 5, invoker: 'public' }, withBalance(a
   const data = await coinData();
   const me = data.rename(member.get('name'));
   const { action, game, conv = '', args = [], msgId, move, replyTo = null } = req.data || {};
-  const now = Date.now();
+  // A warm-up when a live game starts: this instance is up and its caches
+  // are filled, so the next tap doesn't wait for them. Nothing else happens.
+  if (action === 'warm' || move === 'warm') return { ok: true, serverNow: now };
   const words = (Array.isArray(args) ? args : []).map(String).slice(0, 6);
 
   // A gift to a teammate, or a prize from an ad game or the prize wheel. The
@@ -1602,8 +1632,8 @@ export const play = onCall({ maxInstances: 5, invoker: 'public' }, withBalance(a
       if (r.error) return note(r.error);
       // Where this card is, so "one challenge waiting at a time" can be checked later.
       if (r.open) r.money[0].extra = { ...r.money[0].extra, chOpen: { conv, id: msgRef.id } };
-      await payOut(tx, r.money, { [me]: myBank }, now);
-      tx.set(db.doc(`gameSecrets/${msgRef.id}`), secretWith(r.secret, conv, now));
+      await payOut(tx, r.money, { [me]: myBank }, now, { game, id: msgRef.id });
+      tx.set(db.doc(`gameSecrets/${msgRef.id}`), secretWith(r.secret, conv, now, [me, ...playersOf(r.pub)]));
       const { status, ...g } = r.pub;
       post(tx, { game: g, status, bet: g.bet || 0 }, r.mentions);
       return { ok: true, serverNow: now };
@@ -1613,7 +1643,7 @@ export const play = onCall({ maxInstances: 5, invoker: 'public' }, withBalance(a
       const bet = casino.parseBet(words[0], balance);
       if (!bet || bet < 1) return note(`/${game} needs a bet`, `Try: /${game} 20 (or all, half, 25%). You have ${balance} coins.`);
       if (bet > balance) return note(`You only have ${balance} coins.`, 'Try /daily, /work, or /beg.');
-      const r = casino.startGame(game, bet, words.slice(1), Math.random, now);
+      const r = casino.startGame(game, bet, words.slice(1), secureRandom, now);
       if (r.error) return note(r.error);
       const { status = 'done', ...game2 } = r.pub;
       if (r.done) {
@@ -1631,9 +1661,10 @@ export const play = onCall({ maxInstances: 5, invoker: 'public' }, withBalance(a
         );
         post(tx, { game: game2, status, bet, payout: r.payout, net });
       } else {
-        // Take the bet now; the end of the game pays back what it won.
-        tx.set(bankRef(me), casino.bankAfter(myBank, me, -bet, null, {}, now));
-        tx.set(db.doc(`gameSecrets/${msgRef.id}`), secretWith(r.secret, conv, now));
+        // Take the bet now; the end of the game pays back what it won. The
+        // history shows it as held until then.
+        tx.set(bankRef(me), casino.bankAfter(myBank, me, -bet, casino.holdEntry(ICON[game], LABEL[game], bet, msgRef.id), {}, now));
+        tx.set(db.doc(`gameSecrets/${msgRef.id}`), secretWith(r.secret, conv, now, [me]));
         post(tx, { game: game2, status, bet });
       }
       return { ok: true, serverNow: now };
@@ -1688,7 +1719,7 @@ export const play = onCall({ maxInstances: 5, invoker: 'public' }, withBalance(a
       game === 'daily'
         ? casino.daily(myBank, nyDay(now), nyDay(now - 86400000))
         : game === 'work'
-          ? casino.work(myBank, now, Math.random, await workContext(me, data))
+          ? casino.work(myBank, now, secureRandom, await workContext(me, data))
           : casino.beg(myBank, now);
     if (r.error) return note(r.error);
     const label = { daily: `Daily coins (streak ${r.card.streak})`, work: `Work: ${r.card.job}`, beg: 'Begging' }[game];
@@ -2086,7 +2117,7 @@ export const drawLottery = onSchedule({ schedule: '0 18 * * 5', timeZone: TIME_Z
     }
     const entries = Object.entries(lot.tickets);
     const total = entries.reduce((t, [, n]) => t + n, 0);
-    let r = Math.floor(Math.random() * total);
+    let r = Math.floor(secureRandom() * total);
     const [winner, theirs] = entries.find(([, n]) => (r -= n) < 0) || entries[0];
     const bank = (await tx.get(bankRef(winner))).data() || {};
     if (openCard) tx.update(openRef, { 'cmd.closed': true, 'cmd.pot': lot.pot, 'cmd.people': entries.length, 'cmd.winner': winner });

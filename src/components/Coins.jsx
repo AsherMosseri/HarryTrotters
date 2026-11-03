@@ -21,6 +21,8 @@ export const Coins = ({ n, size }) => (
 );
 
 const WHO = (n) => n.split(' ')[0];
+// The exact day and time of a history line (casino lines come in quick runs).
+const whenAt = (at) => new Date(at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
 export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onMarket, onClose, isManager = false, onCheck, stale, onRefresh, disputes = [], initialTab = 'wallet' }) {
   useEscape(onClose);
@@ -105,14 +107,14 @@ export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onMarket
               (wallet.history.length ? (
                 <ul className="coins-history">
                   {wallet.history.map((x, i) => (
-                    <li key={`${x.kind}-${x.at}-${i}`}>
+                    <li key={`${x.kind}-${x.at}-${i}`} className={x.held ? 'held' : undefined}>
                       <span className="coins-icon" aria-hidden="true">
                         {x.icon}
                       </span>
                       <span className="grow">
                         <span className="coins-label">{x.label}</span>
                         <span className="muted tiny">
-                          {relTime(x.at)}
+                          {relTime(x.at)} · <span className="mono">{whenAt(x.at)}</span>
                           {x.capped ? ` · counted ${cfg.dayCap} h max a day` : ''}
                           {x.note ? ` · ${x.note}` : ''}
                         </span>

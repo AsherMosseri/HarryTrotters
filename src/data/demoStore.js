@@ -23,7 +23,7 @@ import { AWARD_CAPS, breakdown, giftEntry, prizeEntry, teamDay, teamMidnight } f
 import * as fun from '../../functions/shared/funGames.js';
 import * as mines from '../../functions/shared/minesweeper.js';
 const MINE_LEVELS = mines.LEVELS;
-import { attemptSeed, newSeed } from '../../functions/shared/rng.js';
+import { attemptSeed, newSeed, secureRandom } from '../../functions/shared/rng.js';
 import { asksOn } from '../../functions/shared/checkin.js';
 import * as market from '../../functions/shared/market.js';
 import { PERK_IDEAS } from '../../functions/shared/market.js';
@@ -1727,8 +1727,10 @@ export const demoStore = {
     };
     const done = (r) => (commit(), r);
     // Several people's coins at once (multiplayer games).
-    const payOut = (money) => {
-      for (const x of money) setBank(x.name, casino.bankAfter(bank(x.name), x.name, x.delta, x.entry, x.extra || {}, now));
+    // card: the game and its card's id, so a held bet and its result share a history line.
+    const payOut = (money, card) => {
+      for (const x of money)
+        setBank(x.name, casino.bankAfter(bank(x.name), x.name, x.delta, arcade.moneyLine(x, card.game, card.id), x.extra || {}, now));
     };
 
     // Gifts and ad prizes, checked the way the server checks them.
@@ -1743,6 +1745,8 @@ export const demoStore = {
     }
 
     if (action === 'move') {
+      // A warm-up (the server wakes up for a live game); nothing to do here.
+      if (move === 'warm') return { ok: true, serverNow: now };
       const list = (state.chat || {})[conv] || [];
       const m = list.find((x) => x.id === msgId);
       const secret = (state.gameSecrets || {})[msgId];
@@ -1762,7 +1766,7 @@ export const demoStore = {
         });
         if (r.error) return note(r.error);
         if (!r.write) return { ok: true, serverNow: now };
-        payOut(r.money);
+        payOut(r.money, { game: c.name, id: msgId });
         const cut = payDemoAwards(r.awards, msgId, now);
         const { status, ...g } = r.pub;
         if (Object.keys(cut).length) g.paid = cut;
@@ -1782,7 +1786,7 @@ export const demoStore = {
       const cmd = { ...c, game: g, status, bet };
       if (r.done) {
         const net = r.payout - bet;
-        setBank(m.by, casino.bankAfter(bank(m.by), m.by, r.payout - (r.extraBet || 0), { ...result(net, c.name), shown: net }, {}, now));
+        setBank(m.by, casino.bankAfter(bank(m.by), m.by, r.payout - (r.extraBet || 0), { ...result(net, c.name), shown: net, settles: msgId }, {}, now));
         Object.assign(cmd, { payout: r.payout, net });
         delete state.gameSecrets[msgId];
       } else state.gameSecrets = { ...state.gameSecrets, [msgId]: r.secret };
@@ -1810,9 +1814,9 @@ export const demoStore = {
       }
       const r = arcade.start(game, { me, words, roster, balance, bank: mine, now, content: DEMO_ARCADE, ...more });
       if (r.error) return note(r.error);
-      payOut(r.money);
       const { status, ...g } = r.pub;
       const m = post({ game: g, status, bet: g.bet || 0 }, r.mentions);
+      payOut(r.money, { game, id: m.id });
       if (r.open) setBank(me, { ...bank(me), chOpen: { conv, id: m.id } });
       state.gameSecrets = { ...(state.gameSecrets || {}), [m.id]: r.secret };
       return done({ ok: true, serverNow: now });
@@ -1845,7 +1849,7 @@ export const demoStore = {
       const bet = casino.parseBet(words[0], balance);
       if (!bet || bet < 1) return note(`/${game} needs a bet`, `Try: /${game} 20 (or all, half, 25%). You have ${balance} coins.`);
       if (bet > balance) return note(`You only have ${balance} coins.`, 'Try /daily, /work, or /beg.');
-      const r = casino.startGame(game, bet, words.slice(1), Math.random, now);
+      const r = casino.startGame(game, bet, words.slice(1), secureRandom, now);
       if (r.error) return note(r.error);
       const { status = 'done', ...g } = r.pub;
       if (r.done) {
@@ -1853,8 +1857,8 @@ export const demoStore = {
         setBank(me, casino.bankAfter(mine, me, net, result(net, game), {}, now));
         post({ game: g, status, bet, payout: r.payout, net });
       } else {
-        setBank(me, casino.bankAfter(mine, me, -bet, null, {}, now));
         const m = post({ game: g, status, bet });
+        setBank(me, casino.bankAfter(mine, me, -bet, casino.holdEntry(ICON[game], LABEL[game], bet, m.id), {}, now));
         state.gameSecrets = { ...(state.gameSecrets || {}), [m.id]: r.secret };
       }
       return done({ ok: true, serverNow: now });

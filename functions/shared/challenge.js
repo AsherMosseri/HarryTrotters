@@ -11,6 +11,7 @@
 
 import { MINUTE, parseBet } from './casino.js';
 import { teamDay } from './coins.js';
+import { secureRandom } from './rng.js';
 
 export const KINDS = {
   coinflip: { label: 'Coin flip', icon: '🪙' },
@@ -97,7 +98,7 @@ export function start({ me, words = [], roster = [], balance = 0, bank = {}, now
 }
 
 // Both results, rolled together. Returns { winner, rolls?, flip?, rerolls }.
-export function roll(kind, p, rng = Math.random) {
+export function roll(kind, p, rng = secureRandom) {
   if (kind === 'coinflip') {
     const flip = rng() < 0.5 ? 'heads' : 'tails';
     return { winner: flip === p.call ? p.a : p.b, flip };
@@ -116,7 +117,7 @@ export function roll(kind, p, rng = Math.random) {
 
 // A move on a challenge card: accept, decline, cancel, or peek (the timer ran
 // out). Returns { error }, or { write, pub, secret, money, awards } like arcade.move.
-export function move({ pub, me, move: mv, balance = 0, now = Date.now(), rng = Math.random }) {
+export function move({ pub, me, move: mv, balance = 0, now = Date.now(), rng = secureRandom }) {
   const p = { ...pub };
   const m = String(mv || '').slice(0, 40);
   const nothing = { write: false, pub, secret: {}, money: [] };

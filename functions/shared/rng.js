@@ -31,10 +31,21 @@ export function seeded(seed) {
 // same pieces or board, everyone's 2nd attempt the same (different) ones…
 export const attemptSeed = (seed, attempt) => (attempt > 1 ? `${seed}#${attempt}` : String(seed));
 
+// Unpredictable randomness for every game the server runs (slots, cards,
+// dice, crash points, bombs, lottery draws…): a float in [0, 1) with 53
+// random bits from the system's secure generator (Web Crypto, which Node and
+// browsers both have), so nobody can work out what comes next from what
+// came before. The odds are the same as before; only the source changed.
+const words = new Uint32Array(2);
+export function secureRandom() {
+  globalThis.crypto.getRandomValues(words);
+  return (words[0] * 2 ** 21 + (words[1] >>> 11)) / 2 ** 53;
+}
+
 // A fresh random seed (not for replays; for starting a game).
 export function newSeed() {
   const abc = 'abcdefghijkmnpqrstuvwxyz23456789';
   let s = '';
-  for (let i = 0; i < 12; i++) s += abc[Math.floor(Math.random() * abc.length)];
+  for (let i = 0; i < 12; i++) s += abc[Math.floor(secureRandom() * abc.length)];
   return s;
 }

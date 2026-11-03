@@ -16,6 +16,8 @@ import * as bs from './battleship.js';
 import { RACE_COUNTDOWN, RACE_PRIZE, rank, raceLimit } from './funGames.js';
 import { LEVELS } from './minesweeper.js';
 import * as challenge from './challenge.js';
+import { secureRandom } from './rng.js';
+import { holdEntry } from './casino.js';
 
 export const MULTI = ['rps', 'tictactoe', 'connect4', 'duel', 'trivia', 'hangman', 'typerace', 'heist', 'battleship', 'tetris', 'minesweep', 'challenge'];
 export const CHALLENGES = ['rps', 'tictactoe', 'connect4', 'duel', 'battleship', 'tetris', 'minesweep'];
@@ -103,6 +105,17 @@ export function parseChallenge(words, roster) {
 const entry = (game, label, shown) => ({ game, icon: ICON[game], label: `${LABEL[game]}: ${label}`, shown });
 const take = (name, amount) => (amount && name !== BOT ? [{ name, delta: -amount, entry: null }] : []);
 const refund = (name, amount) => (amount && name !== BOT ? [{ name, delta: amount, entry: null }] : []);
+
+// The history line for one of a game's coin moves (casino.bankAfter): a bet
+// taken is held under the game's card id until the game's end replaces it
+// with the result; a bet given back (declined, cancelled, nobody came) ends
+// it at 0. A move with no coins (a cooldown) has no line.
+export function moneyLine(x, game, id) {
+  if (x.entry) return { ...x.entry, settles: id };
+  if (x.delta < 0) return holdEntry(ICON[game] || '🎲', LABEL[game] || 'Game', -x.delta, id);
+  if (x.delta > 0) return { icon: ICON[game] || '🎲', label: `${LABEL[game] || 'Game'}: bet back`, shown: 0, settles: id };
+  return null;
+}
 
 // A challenge's bets: the winner gets both; a tie gives both back.
 function settle(game, p, winner) {
@@ -272,7 +285,7 @@ const cooldownLeft = (bank, game, now) => Math.max(0, (bank.cooldowns?.[game] ||
 // { trivia, words }, the questions and hangman words to pick from.
 export function start(
   game,
-  { me, words = [], roster = [], balance = 0, bank = {}, now = Date.now(), rng = Math.random, content = {}, peer = null, hasOpen = false },
+  { me, words = [], roster = [], balance = 0, bank = {}, now = Date.now(), rng = secureRandom, content = {}, peer = null, hasOpen = false },
 ) {
   // A coin flip or dice roll for the same bet, head to head (challenge.js).
   if (game === 'challenge') return challenge.start({ me, words, roster, balance, bank, now, peer, hasOpen });
@@ -378,7 +391,7 @@ function startDuel(p, secret, now, rng) {
 // { pub, secret, money, awards } (write: false when nothing changed, like an
 // early peek). awards: coins the server pays through awardCoins ('game').
 // verified: a race result the server replayed (funGame); never from the app.
-export function move(game, { pub, secret = {}, me, move: mv, balance = 0, now = Date.now(), rng = Math.random, verified = null }) {
+export function move(game, { pub, secret = {}, me, move: mv, balance = 0, now = Date.now(), rng = secureRandom, verified = null }) {
   const p = { ...pub };
   const s = { ...secret };
   const m = String(mv || '').slice(0, 400);

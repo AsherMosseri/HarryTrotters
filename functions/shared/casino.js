@@ -4,6 +4,8 @@
 // spots, crash points) where phones can't read them; demo mode runs the same
 // code locally. A game returns { pub, secret, done, payout }: pub goes on the
 // chat message, payout is everything paid back (0 = lost the bet, bet = push).
+import { secureRandom } from './rng.js';
+import { keepRecent } from './coins.js';
 
 export const TICKET = 5; // lottery ticket price
 export const MINUTE = 60000;
@@ -153,7 +155,7 @@ export const hlStep = (card, guess) => Math.floor((0.97 / hlChance(card, guess))
 
 // ---------- starting a game ----------
 // args: the words after the bet. Returns { error } or { pub, secret, done, payout }.
-export function startGame(game, bet, args, rng = Math.random, now = Date.now()) {
+export function startGame(game, bet, args, rng = secureRandom, now = Date.now()) {
   switch (game) {
     case 'slots': {
       const reels = [spinReel(rng), spinReel(rng), spinReel(rng)];
@@ -248,7 +250,7 @@ export function abandonMove(game, pub) {
 
 // ---------- moves ----------
 // Returns { error } or { pub, secret, done, payout, extraBet }.
-export function moveGame(game, pub, secret, move, bet, now = Date.now(), rng = Math.random) {
+export function moveGame(game, pub, secret, move, bet, now = Date.now(), rng = secureRandom) {
   if (pub.status !== 'playing') return { error: 'That game is over.' };
   switch (game) {
     case 'blackjack': {
@@ -378,7 +380,7 @@ export function daily(bank, day, yesterday) {
 
 // /work pays only while you're clocked in at the lab, for one of your real
 // open tasks (or a lab chore if you don't have any).
-export function work(bank, now, rng = Math.random, { onShift = false, tasks = [] } = {}) {
+export function work(bank, now, rng = secureRandom, { onShift = false, tasks = [] } = {}) {
   if (!onShift) return { error: 'Clock in at the lab first. /work only pays while you’re on a shift (try /shift).' };
   const left = cooldownLeft(bank, 'work', now);
   if (left) return { error: `You’re tired. Work again in ${minutesText(left)}.` };
@@ -388,7 +390,7 @@ export function work(bank, now, rng = Math.random, { onShift = false, tasks = []
   return { amount, card: { amount, icon, job, joke }, bank: { cooldowns: { ...bank.cooldowns, work: now } } };
 }
 
-export function beg(bank, now, rng = Math.random) {
+export function beg(bank, now, rng = secureRandom) {
   const left = cooldownLeft(bank, 'beg', now);
   if (left) return { error: `Have some dignity. Beg again in ${minutesText(left)}.` };
   const set = { cooldowns: { ...bank.cooldowns, beg: now } };
@@ -400,7 +402,7 @@ export function beg(bank, now, rng = Math.random) {
 
 // Robbing: 35% chance. Success takes 10–25% of their coins (up to 100);
 // failure fines you 10–20% of yours (5 to 60), paid to them.
-export function rob(bank, myBalance, theirBalance, now, rng = Math.random) {
+export function rob(bank, myBalance, theirBalance, now, rng = secureRandom) {
   const left = cooldownLeft(bank, 'rob', now);
   if (left) return { error: `The lab is watching you. Try again in ${minutesText(left)}.` };
   if (myBalance < 20) return { error: 'You need at least 20 coins to try (in case you get caught).' };
@@ -417,6 +419,14 @@ export function rob(bank, myBalance, theirBalance, now, rng = Math.random) {
 // A bank doc after a change: net moves by delta; entry (optional) goes in the
 // history and stats, showing entry.shown if given (a game that took its bet
 // at the start shows its overall result at the end). 15 latest kept.
+//
+// Every coin that moves gets a line in the person's history (bank.recent):
+// - a bet held for a game that's still going: entry.hold = the game's card id;
+//   the line says "Bet held: Mines 150 (playing)" for -150;
+// - the game's end: entry.settles = the same id; the held line is replaced
+//   by the result ("Mines: lost 150", -150 overall), so the lines always add
+//   up to the coins that really moved. A game that ends evenly (a push, a bet
+//   back) still gets its line, at 0.
 export function bankAfter(bank, name, delta, entry, extra = {}, now = Date.now()) {
   const shown = entry?.shown ?? delta;
   const stats = { ...(bank.stats || {}) };
@@ -432,11 +442,23 @@ export function bankAfter(bank, name, delta, entry, extra = {}, now = Date.now()
     if (shown < 0) g.lost = (g.lost || 0) - shown;
     stats.games = { ...(stats.games || {}), [entry.game]: g };
   }
-  const recent =
-    entry && shown
-      ? [{ at: now, amount: shown, icon: entry.icon, label: entry.label }, ...(bank.recent || [])].slice(0, 15)
-      : bank.recent || [];
+  let recent = bank.recent || [];
+  const held = !!entry?.settles && recent.some((x) => x.hold === entry.settles);
+  if (held) recent = recent.filter((x) => x.hold !== entry.settles);
+  const amount = entry?.hold ? delta : shown;
+  if (entry && (amount || held))
+    recent = keepRecent([{ at: now, amount, icon: entry.icon, label: entry.label, ...(entry.hold && { hold: entry.hold }) }, ...recent]);
   return { ...bank, ...extra, name, net: (bank.net || 0) + delta, stats, recent, since: bank.since || now };
+}
+
+// A live game's bet, taken when it starts (the line that explains it).
+export const holdEntry = (icon, label, bet, id) => ({ icon, label: `Bet held: ${label} ${bet} (playing)`, hold: id });
+// A game whose card was deleted before it ended: its bet stays lost, and the
+// held line says so (no coins move).
+export function closeHold(bank, id) {
+  const closed = (x) => String(x.label || '').replace(/^Bet held: (.+) (\d+) \(playing\)$/, '$1: card deleted, lost $2');
+  const recent = (bank.recent || []).map((x) => (x.hold === id ? { at: x.at, amount: x.amount, icon: x.icon, label: closed(x) } : x));
+  return { ...bank, recent };
 }
 
 // What /lottery tells you when the round's card is already open: the

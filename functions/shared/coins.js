@@ -14,6 +14,7 @@
 
 import { mergedMs } from './hours.js';
 import { nameKey } from './team.js';
+import { secureRandom } from './rng.js';
 
 // The team day 3.0's earning rules start (4 an hour in 15-minute steps, cut
 // at midnight, at most tasksPerDay paid tasks a day). Earlier days pay as
@@ -248,6 +249,15 @@ export function ledgerItems(name, ledger = []) {
   return out;
 }
 
+// How many casino and economy lines a bank doc keeps (a line is ~100 bytes).
+// Bets held for games still going are always kept, on top.
+export const RECENT_CAP = 60;
+export function keepRecent(list) {
+  const holds = list.filter((x) => x.hold);
+  const rest = list.filter((x) => !x.hold).slice(0, Math.max(0, RECENT_CAP - holds.length));
+  return [...holds, ...rest].sort((a, b) => b.at - a.at);
+}
+
 // Casino and economy commands (daily, work, bets…), from the person's bank
 // doc, which only the server writes: its latest entries, plus one line for
 // everything older so the total matches.
@@ -270,7 +280,14 @@ export function bankItems(name, bank = {}) {
   return recent;
 }
 const bankRecent = (b) =>
-  (b.recent || []).map((x) => ({ kind: 'casino', at: x.at, amount: x.amount, icon: x.icon || '🎰', label: x.label || 'Casino' }));
+  (b.recent || []).map((x) => ({
+    kind: 'casino',
+    at: x.at,
+    amount: x.amount,
+    icon: x.icon || '🎰',
+    label: x.label || 'Casino',
+    ...(x.hold && { held: true }),
+  }));
 
 export function wallet(name, data) {
   const earned = earnedItems(name, data);
@@ -363,7 +380,7 @@ export function coinsByName({ shifts = [], ledger = [], bank = [] }, rename = (n
           ...(b.name === name ? b : prev),
           name,
           net: (prev.net || 0) + (b.net || 0),
-          recent: [...(prev.recent || []), ...(b.recent || [])].sort((x, y) => y.at - x.at).slice(0, 15),
+          recent: keepRecent([...(prev.recent || []), ...(b.recent || [])]),
           since: Math.min(prev.since || b.since || 0, b.since || prev.since || 0) || undefined,
         };
   }
@@ -445,7 +462,7 @@ export const WHEEL = [
   { coins: 0, weight: 12 },
   { coins: 10, weight: 2 },
 ];
-export function spinWheel(rng = Math.random) {
+export function spinWheel(rng = secureRandom) {
   let r = rng() * WHEEL.reduce((t, s) => t + s.weight, 0);
   const i = WHEEL.findIndex((s) => (r -= s.weight) < 0);
   return i < 0 ? WHEEL.length - 1 : i;
@@ -463,7 +480,7 @@ export function giftEntry(from, { to, amount, note }, { roster, balance, now = D
   return { type: 'gift', from, to, amount: n, note: text(note, 140).trim(), at: now };
 }
 
-export function prizeEntry(name, { what, amount, label }, { ledger, gameCap, now = Date.now(), rng = Math.random }) {
+export function prizeEntry(name, { what, amount, label }, { ledger, gameCap, now = Date.now(), rng = secureRandom }) {
   if (what === 'wheel') {
     if (prizesToday(name, ledger, 'wheel', now).length) return { error: 'You already spun the wheel today.' };
     // seg: the slice it landed on, for the app to turn the wheel to.
