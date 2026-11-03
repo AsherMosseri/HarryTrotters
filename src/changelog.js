@@ -14,6 +14,7 @@ export const CHANGELOG = [
       'Challenge a teammate: tap Challenge someone on your coin flip or dice result (or type /challenge @name coinflip 20). If they accept, you both bet the same and the winner takes both bets.',
       'Something look wrong on a casino result? Tap Report; team management will look and can refund your bet.',
       'New Crimson fur tint for pets at level 15, and “Request a pet” on the adopt screen to ask for an animal you don’t see.',
+      'Learn: tapping an answer always counts now (taps could get lost while the quiz reloaded in the background), and the answer you tap lights up right away.',
     ],
   },
   {
