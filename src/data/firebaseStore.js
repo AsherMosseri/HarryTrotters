@@ -1260,6 +1260,36 @@ export const firebaseStore = {
     return setDoc(doc(channelsCol, id), { ...data, updatedAt: Date.now(), updatedBy: actor.name }, { merge: true });
   },
 
+  // Channel requests (functions/channels.js). Anyone asks; team management
+  // answers. Everything that writes goes through the channelRequest function.
+  // Private channels live in privateChannels (you only get the ones you're in;
+  // team management gets all). Their messages are channels/{id}/messages.
+  subscribeChannelRequests(actor, all, cb, onError) {
+    const col = collection(db, 'channelRequests');
+    const q = all ? col : query(col, where('by', '==', actor.name));
+    return onSnapshot(q, (snap) => cb(snap.docs.map(readDoc).sort((a, b) => (a.at || 0) - (b.at || 0))), onError);
+  },
+  subscribePrivateChannels(actor, all, cb, onError) {
+    const col = collection(db, 'privateChannels');
+    const q = all ? col : query(col, where('members', 'array-contains', actor.name));
+    return onSnapshot(q, (snap) => cb(snap.docs.map(readDoc)), onError);
+  },
+  // Team management renames, reorders or hides a private channel.
+  savePrivateChannel(id, data, actor) {
+    return updateDoc(doc(db, 'privateChannels', id), { ...data, updatedAt: Date.now(), updatedBy: actor.name });
+  },
+  async requestChannel(data) {
+    return (await callable('channelRequest')({ action: 'request', ...data })).data;
+  },
+  async cancelChannelRequest(id) {
+    return (await callable('channelRequest')({ action: 'cancel', id })).data;
+  },
+  // decision: { approve: true, name?, kind?, invitees? } or { decline: true, note? }
+  async decideChannelRequest(id, decision) {
+    const { approve, decline, ...rest } = decision;
+    return (await callable('channelRequest')({ action: approve ? 'approve' : 'decline', id, ...rest })).data;
+  },
+
   // Direct messages. 1-on-1 DMs have a fixed id so there's only ever one per pair.
   subscribeDms(actor, all, cb, onError) {
     const q = all ? dmsCol : query(dmsCol, where('people', 'array-contains', actor.name));

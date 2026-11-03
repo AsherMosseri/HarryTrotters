@@ -546,14 +546,37 @@ service cloud.firestore {
       allow read: if isMember();
       allow write: if isManager();
     }
+    // Private channels (made when team management approves a channel request, by
+    // the channelRequest function): only the people in `members` and team
+    // management see them. Messages are still channels/{id}/messages (below); the
+    // rules there look the member list up here. Team management can rename,
+    // reorder, or hide one (not change who's in it).
+    match /privateChannels/{channelId} {
+      allow read: if isMember() && (isManager() || inPeople(resource.data.members));
+      allow update: if isManager() && request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly(['name', 'topic', 'subteam', 'order', 'deleted', 'updatedAt', 'updatedBy']);
+      allow create, delete: if false;
+    }
+    function privatePath(id) { return /databases/$(database)/documents/privateChannels/$(id); }
+    // Public channels: everyone. Private ones: members (and team management, to read).
+    function canPostIn(id) { return !exists(privatePath(id)) || inPeople(get(privatePath(id)).data.members); }
+    function canReadIn(id) { return isManager() || canPostIn(id); }
     // Post only as yourself. Authors edit/delete their own messages (delete
     // leaves a placeholder); managers can change or remove any message.
     match /channels/{channelId}/messages/{msgId} {
-      allow read: if isMember();
-      allow create: if isMember() && validMessage() && (channelId != 'announcements' || isManager()) && !channelOff(channelId);
+      allow read: if isMember() && canReadIn(channelId);
+      allow create: if isMember() && validMessage() && (channelId != 'announcements' || isManager()) && !channelOff(channelId) && canPostIn(channelId);
       allow update: if isMember() && !channelOff(channelId) && changeAllowed()
-        && (isManager() || ((isAuthor() || sharedChange()) && keepsCmd()));
+        && (isManager() || (canPostIn(channelId) && (isAuthor() || sharedChange()) && keepsCmd()));
       allow delete: if isManager();
+    }
+
+    // Channel requests (functions/channels.js): you read your own, team
+    // management reads all. Asking, cancelling, and the answer all go through
+    // the channelRequest function, which keeps the limits.
+    match /channelRequests/{id} {
+      allow read: if isMember() && (isManager() || isMe(resource.data.by));
+      allow write: if false;
     }
 
     // Direct messages: the people in them can read and post. Team management can

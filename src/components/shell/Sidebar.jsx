@@ -58,7 +58,7 @@ const DMS_SHOWN = 8;
 
 // The folded sidebar's chat button: every channel and DM in a small list
 // beside it, so you can switch conversations without unfolding.
-function ConvPop({ anchor, convs, currentConv, page, unread, actor, dmsOn, onOpenConv, onNewDm, onClose }) {
+function ConvPop({ anchor, convs, currentConv, page, unread, actor, dmsOn, onOpenConv, onNewDm, onRequestChannel, onClose }) {
   const ref = useRef(null);
   useEffect(() => {
     const away = (e) => !ref.current?.contains(e.target) && !anchor.el.contains(e.target) && onClose();
@@ -90,10 +90,25 @@ function ConvPop({ anchor, convs, currentConv, page, unread, actor, dmsOn, onOpe
   );
   return (
     <div ref={ref} className="sb-conv-pop" role="dialog" aria-label="Conversations" style={{ left: r.right + 8, ...place }}>
-      <h3 className="cp-head">Channels</h3>
+      <div className="cp-head-row">
+        <h3 className="cp-head">Channels</h3>
+        {onRequestChannel && (
+          <button
+            className="sb-add"
+            onClick={() => {
+              onRequestChannel();
+              onClose();
+            }}
+            aria-label="Request a channel"
+            title="Request a channel"
+          >
+            <Icon name="plus" size={16} />
+          </button>
+        )}
+      </div>
       {convs.channels.map((c) => {
         const u = unread[c.key];
-        return row(c, <Icon name={c.announce ? 'announce' : 'hash'} />, c.name, u && !u.muted ? u.count : u?.mentions || 0, !!u?.mentions);
+        return row(c, <Icon name={c.private ? 'lock' : c.announce ? 'announce' : 'hash'} />, c.name, u && !u.muted ? u.count : u?.mentions || 0, !!u?.mentions);
       })}
       {dmsOn && (
         <>
@@ -133,6 +148,8 @@ export default function Sidebar({
   onOpenConv,
   onNewDm,
   onChatAsk, // managers: new channel, channel settings
+  onRequestChannel, // everyone else: ask team management for a channel (null when it's switched off)
+  chanWaiting = 0, // managers: channel requests waiting
   isManager,
   myOpen,
   joining = 0, // managers: new names waiting to be let in (Roster)
@@ -211,6 +228,7 @@ export default function Sidebar({
             dmsOn={dmsOn}
             onOpenConv={onOpenConv}
             onNewDm={onNewDm}
+            onRequestChannel={isManager ? null : onRequestChannel}
             onClose={() => setConvPop(null)}
           />
         )}
@@ -260,10 +278,22 @@ export default function Sidebar({
           <div className="sb-group">
             <div className="sb-head-row">
               <h3 className="sb-head">Channels</h3>
-              {isManager && (
-                <button className="sb-add" onClick={() => onChatAsk({ type: 'channel' })} aria-label="New channel" title="New channel">
+              {isManager ? (
+                <button
+                  className="sb-add"
+                  onClick={() => onChatAsk({ type: 'channel' })}
+                  aria-label={chanWaiting ? `New channel (${chanWaiting} requests waiting)` : 'New channel'}
+                  title={chanWaiting ? `New channel, ${chanWaiting} requests waiting` : 'New channel'}
+                >
                   <Icon name="plus" size={16} />
+                  {chanWaiting > 0 && <span className="sb-add-badge mono">{chanWaiting}</span>}
                 </button>
+              ) : (
+                onRequestChannel && (
+                  <button className="sb-add" onClick={onRequestChannel} aria-label="Request a channel" title="Request a channel">
+                    <Icon name="plus" size={16} />
+                  </button>
+                )
               )}
             </div>
             {convs.channels.map((c) => {
@@ -271,7 +301,7 @@ export default function Sidebar({
               return (
                 <Row
                   key={c.key}
-                  icon={<Icon name={c.announce ? 'announce' : 'hash'} />}
+                  icon={<Icon name={c.private ? 'lock' : c.announce ? 'announce' : 'hash'} />}
                   label={c.name}
                   active={page === 'chat' && currentConv?.key === c.key}
                   draft={drafts.has(c.key) && !(page === 'chat' && currentConv?.key === c.key)}
@@ -325,12 +355,22 @@ export default function Sidebar({
                 )}
               </>
             )}
-            {isManager && convs.teamDms.length > 0 && (
+            {isManager && convs.teamDms.length + convs.teamPrivate.length > 0 && (
               <>
                 <button className="sb-head-row sb-toggle" onClick={() => setTeamDmsOpen(!teamDmsOpen)} aria-expanded={teamDmsOpen}>
                   <h3 className="sb-head">Team messages</h3>
                   <Icon name="chevron" size={14} className={teamDmsOpen ? 'turned' : ''} />
                 </button>
+                {teamDmsOpen &&
+                  convs.teamPrivate.map((c) => (
+                    <Row
+                      key={c.key}
+                      icon={<Icon name="lock" />}
+                      label={`#${c.name}`}
+                      active={page === 'chat' && currentConv?.key === c.key}
+                      onClick={() => onOpenConv(c.key)}
+                    />
+                  ))}
                 {teamDmsOpen &&
                   convs.teamDms.map((c) => (
                     <Row

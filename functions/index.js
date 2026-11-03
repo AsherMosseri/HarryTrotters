@@ -41,6 +41,7 @@ import { marketFunctions } from './market.js';
 import { petEventFunctions } from './petevents.js';
 import { lifeFunctions } from './life.js';
 import { learnFunctions } from './learn.js';
+import { channelFunctions } from './channels.js';
 
 // Functions run next to the database. The deploy workflow writes location.json
 // from the database's location; nam5 (the US multi-region) pairs with us-central1.
@@ -210,7 +211,10 @@ export const onChatMessage = onDocumentCreated('channels/{channelId}/messages/{m
   const level = await notifyLevels(rename);
   const sender = rename(m.by || '');
   const open = `chat:${channelId}`;
-  const channel = (await db.doc(`channels/${channelId}`).get()).get('name') || channelId;
+  // A private channel (privateChannels) only tells its own members.
+  const priv = await db.doc(`privateChannels/${channelId}`).get();
+  const members = priv.exists ? new Set((priv.get('members') || []).map(rename)) : null;
+  const channel = (priv.exists ? priv : await db.doc(`channels/${channelId}`).get()).get('name') || channelId;
   const announce = channelId === 'announcements';
   const mentioned = new Set((m.mentions || []).map(rename));
   const how = m.everyone ? '@everyone' : m.roles?.length ? `@${m.roles[0]}` : 'you';
@@ -220,7 +224,7 @@ export const onChatMessage = onDocumentCreated('channels/{channelId}/messages/{m
   for (const p of (await db.collection('people').get()).docs) people.add(rename(p.get('name') || ''));
   const notes = [];
   for (const to of people) {
-    if (!to || to === sender) continue;
+    if (!to || to === sender || (members && !members.has(to))) continue;
     const wants = level(to, channelId, announce ? 'all' : 'mentions');
     if (wants === 'none') continue;
     if (announce) notes.push({ to, type: 'announcement', title: `Announcement from ${first(sender)}`, body, open, by: sender });
@@ -2220,3 +2224,6 @@ export const { quizNext, quizAnswer, quizProgress, quizReport, autoRun, dailyAns
   personId,
   timeZone: TIME_ZONE,
 });
+
+// Channel requests (functions/channels.js): anyone asks, team management approves.
+export const { channelRequest, channelRenames } = channelFunctions({ db, renamer, notify, owner: REQUESTS_TO });
