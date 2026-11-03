@@ -20,10 +20,18 @@ function Outcome({ c }) {
   const net = c.net ?? 0;
   return (
     <div className={`casino-outcome ${net > 0 ? 'win' : net < 0 ? 'lose' : 'push'}`}>
-      {net > 0 ? `Won ${coins(net)}` : net < 0 ? `Lost ${coins(-net)}` : `Push: bet back`}
-      {/* "Won" is what came on top of the bet; say what came back too, so
-          5 at 1.95× reads "Won 4 · bet 5 → 9 back" (payouts round down). */}
-      <span className="muted small"> · bet {c.bet}{net > 0 ? ` → ${c.bet + net} back` : ''}</span>
+      {/* Lead with what came back, so it matches the multiplier next to it:
+          5 at 1.95x reads "Got 9 back (+4)" (payouts round down). */}
+      {net > 0 ? (
+        <>
+          Got {coins(c.bet + net)} back <span className="casino-net">(+{net})</span>
+        </>
+      ) : net < 0 ? (
+        `Lost ${coins(-net)}`
+      ) : (
+        'Push: bet back'
+      )}
+      <span className="muted small"> · bet {c.bet}</span>
     </div>
   );
 }

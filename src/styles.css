@@ -3043,6 +3043,7 @@ html.kb-bar .sc-table { padding-bottom: calc(max(20px, env(safe-area-inset-botto
 .cmd-go { align-self: flex-start; }
 .casino-error { color: var(--danger); font-size: 13px; font-weight: 600; }
 .casino-outcome { font-weight: 800; }
+.casino-outcome .casino-net { font-weight: 650; }
 .casino-outcome.win { color: #16a34a; } .casino-outcome.lose { color: #dc2626; } .casino-outcome.push { color: var(--muted); }
 .casino-buttons { display: flex; flex-wrap: wrap; gap: 6px; }
 .casino-reveal { animation: casino-in 0.3s 1.4s both; }
