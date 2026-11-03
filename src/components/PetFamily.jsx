@@ -23,6 +23,7 @@ import { Avatar, CloseIcon, Overlay } from './common.jsx';
 import { Coins } from './Coins.jsx';
 import { alertDialog, confirmDialog, promptDialog } from './Dialogs.jsx';
 import { AdoptPet, Meter, nextLevelLine } from './Pet.jsx';
+import { RequestPetLink } from './PetRequest.jsx';
 import { PetWithGear } from './PetGear.jsx';
 import { EventsAdmin, ParkSection } from './PetPark.jsx';
 import { Icon } from './shell/icons.jsx';
@@ -95,6 +96,7 @@ export function PetsShelf({ actor, balance, buy, busy, onToast, roster = [] }) {
               />
             ))}
           </div>
+          <RequestPetLink />
         </section>
       )}
 

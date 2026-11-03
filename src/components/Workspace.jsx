@@ -82,6 +82,8 @@ import ControlsPage from './ControlsPage.jsx';
 import { PreviewBar } from './Preview.jsx';
 import { ControlsContext, commandCfgFor, makeControls, profileView } from '../controls.js';
 import { CoinsDialog, Coins } from './Coins.jsx';
+import CoinPill from './CoinPill.jsx';
+import { PetRequestContext } from './PetRequest.jsx';
 import MarketView from './Market.jsx';
 import { MarketContext, useMarketData } from '../market.js';
 import { playLine } from '../../functions/shared/market.js';
@@ -494,14 +496,16 @@ const CHAT_PAGE = 60;
 const EMPTY_FILTERS = { q: '', person: '', subteam: '', priority: '', statuses: [], hideDone: false, dueBefore: '' };
 
 // What components deep in the app read: people (profiles, who's online) and the lab log.
-function Contexts({ people, lab, lottery, controls, market, daily, children }) {
+function Contexts({ people, lab, lottery, controls, market, daily, petReq, children }) {
   return (
     <ControlsContext.Provider value={controls}>
       <PeopleContext.Provider value={people}>
         <LabLogContext.Provider value={lab}>
           <LotteryContext.Provider value={lottery}>
             <MarketContext.Provider value={market}>
-              <DailyContext.Provider value={daily}>{children}</DailyContext.Provider>
+              <DailyContext.Provider value={daily}>
+                <PetRequestContext.Provider value={petReq}>{children}</PetRequestContext.Provider>
+              </DailyContext.Provider>
             </MarketContext.Provider>
           </LotteryContext.Provider>
         </LabLogContext.Provider>
@@ -831,7 +835,18 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
   const [shifts, setShifts] = useState([]);
   const [shiftPlans, setShiftPlans] = useState([]);
   const [shiftPanel, setShiftPanel] = useState(false);
-  useEffect(() => store.subscribeShifts(setShifts, quiet('shifts')), [store, quiet]);
+  // The coin pill waits until everything the balance is counted from has
+  // arrived once, so it never shows a 0 and then jumps.
+  const [coinsSeen, setCoinsSeen] = useState({});
+  const seenCoins = useCallback((k) => setCoinsSeen((s) => (s[k] ? s : { ...s, [k]: true })), []);
+  useEffect(
+    () =>
+      store.subscribeShifts((list) => {
+        setShifts(list);
+        seenCoins('shifts');
+      }, quiet('shifts')),
+    [store, quiet, seenCoins],
+  );
   useEffect(() => store.subscribeShiftPlans(setShiftPlans, quiet('shift schedule')), [store, quiet]);
   // Asking for a longer or missed shift (team management approves), and the
   // record of every change to a finished shift (team management only).
@@ -1933,7 +1948,14 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
   // Jackson coins: earned from tasks and hours (ads don't pay anyone);
   // spending, gifts, and bonuses are in the ledger.
   const [ledger, setLedger] = useState([]);
-  useEffect(() => store.subscribeCoins(setLedger), [store]);
+  useEffect(
+    () =>
+      store.subscribeCoins((list) => {
+        setLedger(list);
+        seenCoins('ledger');
+      }),
+    [store, seenCoins],
+  );
   // Coins the server just paid you for a streak milestone, a bingo line or
   // the closest guess: a toast, and a burst for streaks and big wins. The
   // newest one seen is kept on this device so a reload doesn't repeat it.
@@ -1966,7 +1988,14 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
   // Casino and economy winnings/losses (bank) and the Friday lottery; the
   // play function writes them.
   const [bank, setBank] = useState({});
-  useEffect(() => store.subscribeBank(setBank), [store]);
+  useEffect(
+    () =>
+      store.subscribeBank((b) => {
+        setBank(b);
+        seenCoins('bank');
+      }),
+    [store, seenCoins],
+  );
   const [lottery, setLottery] = useState(null);
   useEffect(() => store.subscribeLottery(setLottery), [store]);
   // Under everyone's current name (shifts, the ledger, and banks keep the
@@ -2191,6 +2220,23 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
   // The sidebar can fold to a strip of icons (remembered on this device).
   const [sidebarRail, setSidebarRail] = useLocalStorage('sidebar-rail', false);
   const clearChatAsk = useCallback(() => setChatAsk(null), []);
+  // "Request a pet" in the Market's Pets tab files a normal feature request.
+  const petReq = useMemo(
+    () => ({
+      requests,
+      me: actor.name,
+      owner: REQUESTS_TO,
+      on: controls.isOn('requests'),
+      add: (text) => api.addRequest(text),
+      vote: (id) => api.voteRequest(id, 'up'),
+    }),
+    [requests, actor.name, controls, api],
+  );
+  // Your coins in the top right (off when team management switches coins off).
+  const coinPill =
+    controls.isOn('coins') && tasks && coinsSeen.shifts && coinsSeen.ledger && coinsSeen.bank ? (
+      <CoinPill balance={myWallet.balance} ready onOpen={() => setCoinsOpen(true)} />
+    ) : null;
   const frame = (inner) =>
     phone ? (
       <div className="shell phone-shell">
@@ -2378,7 +2424,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
     </div>
   );
   return (
-    <Contexts people={peopleCtx} lab={labCtx} lottery={lottery} controls={controls} market={market} daily={dailyCtx}>
+    <Contexts people={peopleCtx} lab={labCtx} lottery={lottery} controls={controls} market={market} daily={dailyCtx} petReq={petReq}>
       <AdsProvider value={ads.value}>
         <div
           className={`app${view === 'chat' || view === 'robot' ? ' chat-mode' : ''}${preview ? ' previewing' : ''}`}
@@ -2410,6 +2456,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
                       <Icon name="plus" size={22} />
                     </button>
                   )}
+                  {coinPill}
                   {shiftButton}
                   {inboxButton}
                   <button className="avatar-btn me-btn" onClick={() => setPhoneSheet('me')} aria-label="You: profile, theme, ideas, help">
@@ -2438,6 +2485,8 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
               <AdBanner position="top" />
               {/* Only this area scrolls; the header stays put above it. */}
               <div className="app-scroll" ref={scrollRef}>
+                {/* iPad and computer: the coin pill rides at the top right of the page (a zero-height sticky slot, so no page moves). */}
+                {!phone && coinPill && <div className="coin-slot">{coinPill}</div>}
                 {pageHead}
                 {taskView && announcement && (
                   <div className="announce-banner" role="status">
