@@ -38,6 +38,8 @@ import {
 import { rankingFromApi, teamFromApi } from './shared/scout.js';
 import { asksOn } from './shared/checkin.js';
 import { marketFunctions } from './market.js';
+import { disputeFunctions } from './disputes.js';
+import * as challenge from './shared/challenge.js';
 import { petEventFunctions } from './petevents.js';
 import { lifeFunctions } from './life.js';
 import { learnFunctions } from './learn.js';
@@ -1260,6 +1262,10 @@ export const { buy, joinTournament, marketManage, pet, payTournaments } = market
   timeZone: TIME_ZONE,
 });
 
+// Casino reports (functions/disputes.js): a teammate reports a result, team
+// management refunds by hand or dismisses it.
+export const { dispute, disputeDecide } = disputeFunctions({ db, coinData, notify, bankRef });
+
 // Team events: the team's lab time fills a meter, tiers give pet gear.
 export const { petEvent, petEventTick } = petEventFunctions({
   db,
@@ -1346,10 +1352,12 @@ async function runMove({ conv, msgId, me, move, data, now, house = false, verifi
       if (move === 'mine') return { ok: true, mine: arcade.myFleet(c.name, secret.data(), me) };
       if (!arcade.isLive(c.status)) return { ok: true };
       const myBank = house ? null : (await tx.get(bankRef(me))).data() || {};
+      // A challenge made before someone was renamed still has their old name on it.
+      const as = c.name === 'challenge' && me ? [c.game?.a, c.game?.b].find((n) => data.rename(n || '') === me) || me : me;
       const r = arcade.move(c.name, {
         pub: { ...c.game, status: c.status },
         secret: secret.data(),
-        me,
+        me: as,
         move,
         balance: house ? 0 : await balanceOf(me, myBank, data),
         now,
@@ -1418,6 +1426,28 @@ async function payAwards(awards, msgId, now) {
   return cut;
 }
 
+// What /challenge needs to know that the person's own data doesn't say: is
+// the person they asked on the team (signed in, not waiting to be let in),
+// what do they have, and is there already a challenge of yours waiting. All
+// read fresh, inside the transaction that takes the bet.
+async function challengeContext(tx, { me, words, roster, myBank, now, data }) {
+  const { them, known } = challenge.parseWords(words, roster);
+  let peer = null;
+  if (known && them !== me && them !== arcade.BOT) {
+    const aliases = data.rename.aliases(them).slice(0, 30);
+    const devices = await db.collection('members').where('name', 'in', aliases).get();
+    const theirBank = (await tx.get(bankRef(them))).data() || {};
+    peer = { name: them, active: devices.docs.some((d) => memberOk(d.data())), balance: await balanceOf(them, theirBank, data) };
+  }
+  let hasOpen = false;
+  if (myBank.chOpen?.conv && myBank.chOpen?.id) {
+    const old = await tx.get(db.doc(`channels/${myBank.chOpen.conv}/messages/${myBank.chOpen.id}`));
+    const c = old.get('cmd');
+    hasOpen = c?.name === 'challenge' && c.status === 'open' && (c.game?.expiresAt || 0) > now && data.rename(c.game?.a) === me;
+  }
+  return { peer, hasOpen };
+}
+
 export const play = onCall({ maxInstances: 5, invoker: 'public' }, async (req) => {
   const uid = req.auth?.uid;
   if (!uid) throw new HttpsError('unauthenticated', 'Sign in first.');
@@ -1457,6 +1487,14 @@ export const play = onCall({ maxInstances: 5, invoker: 'public' }, async (req) =
   // A move in a running game (or a peek at a crash).
   if (action === 'move') {
     if (!/^[\w-]{1,40}$/.test(conv) || !/^[\w-]{1,40}$/.test(msgId || '')) throw new HttpsError('invalid-argument', 'Which game?');
+    // Accepting a challenge puts coins in: not while coins are off (Controls).
+    if (String(move) === 'accept' && me !== REQUESTS_TO) {
+      const card = await db.doc(`channels/${conv}/messages/${msgId}`).get();
+      if (card.get('cmd')?.name === 'challenge') {
+        const controls = (await db.doc('settings/controls').get()).data() || {};
+        if ((controls.off || []).includes('coins')) return note('🪙 Jackson coins are off right now.');
+      }
+    }
     return runMove({ conv, msgId, me, move: String(move), data, now });
   }
 
@@ -1524,8 +1562,11 @@ export const play = onCall({ maxInstances: 5, invoker: 'public' }, async (req) =
 
     if (isArcade) {
       const content = { trivia: arcadeBank.TRIVIA, words: arcadeBank.WORDS };
-      const r = arcade.start(game, { me, words, roster, balance, bank: myBank, now, content });
+      const more = game === 'challenge' ? await challengeContext(tx, { me, words, roster, myBank, now, data }) : {};
+      const r = arcade.start(game, { me, words, roster, balance, bank: myBank, now, content, ...more });
       if (r.error) return note(r.error);
+      // Where this card is, so "one challenge waiting at a time" can be checked later.
+      if (r.open) r.money[0].extra = { ...r.money[0].extra, chOpen: { conv, id: msgRef.id } };
       await payOut(tx, r.money, { [me]: myBank }, now);
       tx.set(db.doc(`gameSecrets/${msgRef.id}`), secretWith(r.secret, conv, now));
       const { status, ...g } = r.pub;

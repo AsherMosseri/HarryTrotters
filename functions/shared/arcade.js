@@ -15,8 +15,9 @@ import { MINUTE, parseBet } from './casino.js';
 import * as bs from './battleship.js';
 import { RACE_COUNTDOWN, RACE_PRIZE, rank, raceLimit } from './funGames.js';
 import { LEVELS } from './minesweeper.js';
+import * as challenge from './challenge.js';
 
-export const MULTI = ['rps', 'tictactoe', 'connect4', 'duel', 'trivia', 'hangman', 'typerace', 'heist', 'battleship', 'tetris', 'minesweep'];
+export const MULTI = ['rps', 'tictactoe', 'connect4', 'duel', 'trivia', 'hangman', 'typerace', 'heist', 'battleship', 'tetris', 'minesweep', 'challenge'];
 export const CHALLENGES = ['rps', 'tictactoe', 'connect4', 'duel', 'battleship', 'tetris', 'minesweep'];
 // Tetris and Minesweeper races: both play the same pieces or board on their
 // own screens; the card keeps score (funGame sends in each verified result).
@@ -34,6 +35,7 @@ export const ICON = {
   battleship: '🚢',
   tetris: '🧱',
   minesweep: '💣',
+  challenge: '🎲',
 };
 export const LABEL = {
   rps: 'Rock paper scissors',
@@ -47,6 +49,7 @@ export const LABEL = {
   battleship: 'Battleship',
   tetris: 'Tetris race',
   minesweep: 'Minesweeper race',
+  challenge: 'Challenge',
 };
 // Coins for winning Battleship (the 'game' award, capped per day).
 export const BATTLESHIP_PRIZE = { bot: 2, person: 3 };
@@ -269,8 +272,10 @@ const cooldownLeft = (bank, game, now) => Math.max(0, (bank.cooldowns?.[game] ||
 // { trivia, words }, the questions and hangman words to pick from.
 export function start(
   game,
-  { me, words = [], roster = [], balance = 0, bank = {}, now = Date.now(), rng = Math.random, content = {} },
+  { me, words = [], roster = [], balance = 0, bank = {}, now = Date.now(), rng = Math.random, content = {}, peer = null, hasOpen = false },
 ) {
+  // A coin flip or dice roll for the same bet, head to head (challenge.js).
+  if (game === 'challenge') return challenge.start({ me, words, roster, balance, bank, now, peer, hasOpen });
   if (CHALLENGES.includes(game)) {
     // A Minesweeper race's board size: "/minesweep @Cooper expert 10".
     const level = game === 'minesweep' ? words.map((w) => w.toLowerCase()).find((w) => LEVELS[w]) || 'beginner' : '';
@@ -380,6 +385,7 @@ export function move(game, { pub, secret = {}, me, move: mv, balance = 0, now = 
   const nothing = { write: false, pub, secret, money: [] };
   const out = (money = [], awards = []) => ({ write: true, pub: p, secret: s, money, awards });
   if (!isLive(p.status)) return nothing;
+  if (game === 'challenge') return challenge.move({ pub, me, move: mv, balance, now, rng });
 
   if (CHALLENGES.includes(game)) {
     const player = me === p.a || me === p.b;

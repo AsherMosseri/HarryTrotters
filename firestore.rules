@@ -287,6 +287,19 @@ service cloud.firestore {
     match /lottery/{id} {
       allow read: if isMember();
     }
+    // Casino reports (functions/disputes.js): the person who made one and team
+    // management read them; reports, their daily counters, and refund keys are
+    // written by the server only.
+    match /disputes/{id} {
+      allow read: if isMember() && (isManager() || isMe(resource.data.by));
+      allow write: if false;
+    }
+    match /disputeDays/{id} {
+      allow read, write: if false;
+    }
+    match /refundKeys/{id} {
+      allow read, write: if false;
+    }
     // Decks, mine spots, and crash points: the server only.
     match /gameSecrets/{id} {
       allow read, write: if false;
@@ -516,7 +529,7 @@ service cloud.firestore {
     function serverCommand(m) {
       return 'cmd' in m && m.cmd is map && m.cmd.get('name', '') in
         ['slots', 'dice', 'coinflip', 'roulette', 'blackjack', 'crash', 'mines', 'highlow', 'lottery', 'daily', 'work', 'beg', 'rob',
-         'rps', 'tictactoe', 'connect4', 'duel', 'trivia', 'hangman', 'typerace', 'heist', 'labday', 'recap',
+         'rps', 'tictactoe', 'connect4', 'duel', 'challenge', 'trivia', 'hangman', 'typerace', 'heist', 'labday', 'recap',
          'battleship', 'tetris', 'minesweep'];
     }
     // ...or change one afterwards (team management can still edit/delete).
