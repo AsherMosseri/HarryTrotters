@@ -1084,13 +1084,16 @@ button, [role='button'] { -webkit-user-select: none; user-select: none; -webkit-
 .pit-line.bad .pit-dot { background: #ff5a4f; box-shadow: 0 0 0 3px rgb(255 90 79 / 22%); }
 .pit-line.warn .pit-dot { background: #ffb020; }
 .pit-line.good .pit-dot { background: #3ddc84; }
-.pit-actions { display: flex; gap: 8px; }
+.pit-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .pit-btn {
   display: inline-flex; align-items: center; gap: 7px; height: 36px; padding: 0 14px; border-radius: 8px; font: inherit; font-size: 14.5px; font-weight: 650;
   border: 1px solid rgb(255 255 255 / 30%); background: #fff; color: #14284b;
 }
 .pit-btn.on { background: rgb(255 255 255 / 10%); color: #fff; }
 .pit-btn .mono { font-family: var(--mono); font-weight: 500; }
+/* One line each ("On shift 1h 16m"); on a narrow phone the second button goes under the first instead of squeezing both. */
+.pit-btn { white-space: nowrap; flex: 0 1 auto; justify-content: center; }
+@media (max-width: 480px) { .pit-btn { flex: 1 1 auto; } }
 .pit-robot {
   position: relative; z-index: 0; width: 240px; height: auto; flex: none; align-self: flex-end; margin: -10px 22px -8px 0;
   filter: drop-shadow(0 18px 18px rgb(0 0 0 / 45%));
