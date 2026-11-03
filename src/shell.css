@@ -3548,6 +3548,7 @@ button.pm-row:hover { background: color-mix(in srgb, var(--text) 4%, transparent
 /* Fur tints: a soft color filter on the pet art only (never on the gear). */
 .pet-tint-sunset { filter: sepia(0.35) hue-rotate(-24deg) saturate(1.7) brightness(1.03); }
 .pet-tint-midnight { filter: sepia(0.25) hue-rotate(185deg) saturate(1.15) brightness(0.82); }
+.pet-tint-crimson { filter: brightness(0.78) sepia(0.8) hue-rotate(-46deg) saturate(3) brightness(1.05) contrast(1.1); }
 .pet-tint-golden { filter: sepia(0.5) saturate(1.5) brightness(1.08) hue-rotate(-4deg); }
 /* The ring around the small chat badge: bronze at level 10, silver 20, gold 30. */
 .pet-badge.ring-bronze, .pet-badge.ring-silver, .pet-badge.ring-gold { padding: 1px; border-radius: 50%; margin-left: 4px; }
