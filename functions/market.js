@@ -43,6 +43,16 @@ export function marketFunctions({ db, coinData, freshCoins, notify, bankRef, per
     const me = data.rename(member.get('name'));
     return { uid, me, admin: member.get('admin') === true, data, aliases: data.rename.aliases(me).slice(0, 30) };
   }
+  // The balance after a sale, sent back with the answer so the app can check
+  // its own number against it (null if it couldn't be worked out).
+  async function balanceAfter(me, data) {
+    try {
+      return (await freshCoins(me, (await bankRef(me).get()).data() || {}, data)).balance;
+    } catch (e) {
+      logger.warn('balanceAfter', e.message);
+      return null;
+    }
+  }
   // Coins switched off in Controls: nobody but Asher buys anything.
   async function coinsOff(me) {
     if (me === owner) return false;
@@ -122,6 +132,7 @@ export function marketFunctions({ db, coinData, freshCoins, notify, bankRef, per
         })),
       ).catch((e) => logger.warn('market notify', e.message));
     }
+    if (result.ok) result.balance = await balanceAfter(me, data);
     return result;
   });
 
@@ -131,7 +142,7 @@ export function marketFunctions({ db, coinData, freshCoins, notify, bankRef, per
     const id = String(req.data?.id || '');
     if (!/^[\w-]{1,40}$/.test(id)) return note('Which tournament?');
     const ref = db.doc(`tournaments/${id}`);
-    return db.runTransaction(async (tx) => {
+    const res = await db.runTransaction(async (tx) => {
       const [snap, bank] = await Promise.all([tx.get(ref), tx.get(bankRef(me))]);
       const myBank = bank.data() || {};
       const t = snap.exists ? snap.data() : null;
@@ -153,6 +164,7 @@ export function marketFunctions({ db, coinData, freshCoins, notify, bankRef, per
       tx.update(ref, 'pot', r.pot, new FieldPath('players', me), r.player);
       return { ok: true, pot: r.pot };
     });
+    return res.ok ? { ...res, balance: await balanceAfter(me, data) } : res;
   });
 
   // Pays one tournament that has ended (or is being cancelled). Returns the

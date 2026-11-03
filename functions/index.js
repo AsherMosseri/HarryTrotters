@@ -13,7 +13,7 @@ import { initializeApp } from 'firebase-admin/app';
 import { FieldPath, FieldValue, getFirestore } from 'firebase-admin/firestore';
 import { getMessaging } from 'firebase-admin/messaging';
 import { fetchPage, firstLink, readPreview } from './preview.js';
-import { AWARD_CAPS, coinSettings, coinsByName, giftEntry, prizeEntry, teamDay, wallet } from './shared/coins.js';
+import { AWARD_CAPS, coinSettings, coinsByName, coinTasks, freshWallet, giftEntry, oldBankIds, prizeEntry, teamDay } from './shared/coins.js';
 import * as casino from './shared/casino.js';
 import * as arcade from './shared/arcade.js';
 import { blocked, isOff, serverGroup } from './shared/commandRules.js';
@@ -38,6 +38,7 @@ import {
 import { rankingFromApi, teamFromApi } from './shared/scout.js';
 import { asksOn } from './shared/checkin.js';
 import { marketFunctions } from './market.js';
+import { coinCheckFunctions } from './coincheck.js';
 import { petEventFunctions } from './petevents.js';
 import { lifeFunctions } from './life.js';
 import { learnFunctions } from './learn.js';
@@ -1234,19 +1235,47 @@ async function balanceOf(name, bank, data) {
 }
 async function freshCoins(name, bank, data) {
   const aliases = data.rename.aliases(name).slice(0, 30);
-  const [found, old] = await Promise.all([
+  // Old names' bank docs, each once (a rename that only changes capitals or
+  // spacing is the same doc as the current one, which must not count twice).
+  const oldIds = oldBankIds(name, aliases);
+  const [found, old, theirShifts, theirTasks] = await Promise.all([
     Promise.all(['person', 'from', 'to'].map((f) => db.collection('coins').where(f, 'in', aliases).get())),
-    aliases.length > 1 ? db.getAll(...aliases.slice(1).map(bankRef)) : [],
+    oldIds.length ? db.getAll(...oldIds.map((id) => db.doc(`bank/${id}`))) : [],
+    // Their own shifts and tasks fresh too, so a task moved out of Done or a
+    // shift that just ended counts right away (the cache is 20 seconds old).
+    db.collection('shifts').where('person', 'in', aliases).get(),
+    db.collection('tasks').where('assignees', 'array-contains-any', aliases).get(),
   ]);
   const ledger = new Map();
   for (const q of found) for (const d of q.docs) ledger.set(d.id, d.data());
-  const banks = [{ ...bank, name }, ...old.filter((d) => d.exists).map((d) => d.data())];
-  const mine = coinsByName({ ledger: [...ledger.values()], bank: banks }, data.rename);
-  // Only the ledger and banks from here: coinsByName also hands back an empty
-  // shifts list, which would hide the lab hours data.shifts already has.
-  return { balance: wallet(name, { ...data, ledger: mine.ledger, bank: mine.bank }).balance, ledger: mine.ledger };
+  const banks = [{ ...bank, id: personId(name), name }, ...old.filter((d) => d.exists).map((d) => ({ ...d.data(), id: d.id }))];
+  const mine = {
+    ...data,
+    tasks: coinTasks(theirTasks.docs.map((d) => ({ id: d.id, ...d.data() })), data.rename),
+    shifts: coinsByName({ shifts: theirShifts.docs.map((d) => d.data()) }, data.rename).shifts,
+  };
+  return freshWallet(name, mine, { ledger: [...ledger.values()], banks });
 }
 const nyDay = (ms) => new Date(ms).toLocaleDateString('en-CA', { timeZone: TIME_ZONE });
+
+// The server's balance after a coin command, sent back with the answer so the
+// app can check its own number against it (and say so if they differ). Never
+// gets in the way: a failure just leaves it out.
+function withBalance(handler) {
+  return async (req) => {
+    const res = await handler(req);
+    const uid = req.auth?.uid;
+    if (!uid || !res || typeof res !== 'object' || ['peek', 'mine'].includes(req.data?.move)) return res;
+    try {
+      const data = await coinData();
+      const me = data.rename((await db.doc(`members/${uid}`).get()).get('name'));
+      return { ...res, balance: (await freshCoins(me, (await bankRef(me).get()).data() || {}, data)).balance };
+    } catch (e) {
+      logger.warn('withBalance', e.message);
+      return res;
+    }
+  };
+}
 
 // The market and pets (functions/market.js): buying, tournaments, pet care.
 export const { buy, joinTournament, marketManage, pet, payTournaments } = marketFunctions({
@@ -1259,6 +1288,9 @@ export const { buy, joinTournament, marketManage, pet, payTournaments } = market
   owner: REQUESTS_TO,
   timeZone: TIME_ZONE,
 });
+
+// Compare my balance with the server's (Coins screen).
+export const { coinCheck } = coinCheckFunctions({ db, coinData, freshCoins, bankRef, cacheAge: () => Date.now() - coinCache.at });
 
 // Team events: the team's lab time fills a meter, tiers give pet gear.
 export const { petEvent, petEventTick } = petEventFunctions({
@@ -1418,7 +1450,7 @@ async function payAwards(awards, msgId, now) {
   return cut;
 }
 
-export const play = onCall({ maxInstances: 5, invoker: 'public' }, async (req) => {
+export const play = onCall({ maxInstances: 5, invoker: 'public' }, withBalance(async (req) => {
   const uid = req.auth?.uid;
   if (!uid) throw new HttpsError('unauthenticated', 'Sign in first.');
   const member = await db.doc(`members/${uid}`).get();
@@ -1637,7 +1669,7 @@ export const play = onCall({ maxInstances: 5, invoker: 'public' }, async (req) =
     post(tx, r.card);
     return { ok: true };
   });
-});
+}));
 
 // ---------- Tetris and Minesweeper (functions/shared/funGames.js) ----------
 // A game starts here (the server picks the seed) and ends here: the moves are

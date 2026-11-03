@@ -3891,3 +3891,44 @@ html.kb-bar .chat-side-body { padding-bottom: calc(8px + var(--kb-bar, 0px)); }
 .poll-dialog .segmented { width: 100%; }
 .poll-dialog .segmented button[aria-checked='true'] { background: var(--accent-soft); color: var(--accent); font-weight: 600; box-shadow: inset 0 0 0 1.5px var(--accent); }
 .poll-dialog .segmented button:disabled { opacity: 0.5; }
+
+/* ---- Coins: compare with the server, and everyone's coins (team management) ---- */
+.cv-compare { border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); margin-top: 10px; }
+.cv-compare summary { cursor: pointer; padding: 0 12px; min-height: 44px; display: flex; align-items: center; justify-content: space-between; font-weight: 600; font-size: 13.5px; list-style: none; }
+.cv-compare summary::-webkit-details-marker { display: none; }
+.cv-compare summary::after { content: ''; width: 8px; height: 8px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(45deg) translateY(-2px); }
+.cv-compare[open] summary::after { transform: rotate(-135deg) translateY(-2px); }
+.cv-compare-body { padding: 4px 12px 12px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.cv-compare-body > * { max-width: 100%; }
+.cv-verdict { margin: 0; font-weight: 700; font-size: 14px; }
+.cv-verdict.ok { color: var(--st-done); }
+.cv-verdict.bad { color: var(--danger); }
+.cv-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.cv-table th { text-align: right; font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); font-weight: 600; padding: 2px 6px; }
+.cv-table td { padding: 5px 6px; border-top: 1px solid var(--border); text-align: right; }
+.cv-table td:first-child, .cv-table th:first-child { text-align: left; }
+.cv-table tr.off td { color: var(--danger); font-weight: 700; background: color-mix(in srgb, var(--danger) 8%, transparent); }
+.cv-table tr.total td { font-weight: 700; border-top: 2px solid var(--border); }
+.cv-stale { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; padding: 10px 12px; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--danger) 45%, var(--border)); background: color-mix(in srgb, var(--danger) 8%, var(--surface)); color: var(--text); font-weight: 600; font-size: 13.5px; min-height: 44px; }
+.cv-stale .muted { display: block; font-weight: 400; }
+.cv-search { display: flex; align-items: center; gap: 8px; color: var(--muted); }
+.cv-search .input { flex: 1; }
+.cv-people { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.cv-people li { display: block; }
+.cv-people li.cv-head { display: flex; }
+.cv-head, .cv-person { display: flex; align-items: center; gap: 10px; }
+.cv-head { padding: 0 10px; font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.cv-head span:not(.grow), .cv-person > :nth-child(n+3) { width: 56px; text-align: right; flex: none; }
+.cv-person { width: 100%; min-height: 48px; padding: 6px 10px; border-radius: 10px; border: 0; background: var(--surface-2); color: var(--text); font: inherit; font-weight: 600; text-align: left; cursor: pointer; }
+.cv-person:hover { background: color-mix(in srgb, var(--accent) 10%, var(--surface-2)); }
+.cv-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cv-who { display: flex; align-items: center; gap: 10px; }
+.cv-who .grow { display: flex; flex-direction: column; min-width: 0; }
+.cv-back .icon { transform: rotate(180deg); }
+.cv-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.cv-chips .chip { min-height: 34px; padding: 0 12px; }
+.cv-amt { display: flex; flex-direction: column; align-items: flex-end; flex: none; line-height: 1.25; }
+.cv-total { display: flex; justify-content: space-between; align-items: baseline; margin: 0; padding: 8px 4px 0; border-top: 2px solid var(--border); font-size: 13.5px; }
+@media (max-width: 420px) {
+  .cv-head span:not(.grow), .cv-person > :nth-child(n+3) { width: 44px; font-size: 13px; }
+}

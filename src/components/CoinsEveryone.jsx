@@ -1,0 +1,256 @@
+// Coins screen extras: comparing the app's balance with the server's, and
+// (team management only) everyone's coin history.
+import { useMemo, useState } from 'react';
+import { breakdown, breakdownGaps, historyGroup, wallet as walletOf } from '../coins.js';
+import { Avatar } from './common.jsx';
+import { Icon } from './shell/icons.jsx';
+
+const KIND = {
+  task: 'Finished tasks',
+  hours: 'Lab hours',
+  award: 'Games and quizzes',
+  grant: 'Bonuses from team management',
+  spend: 'Spending',
+  refund: 'Refunds',
+  'gift-in': 'Gifts received',
+  'gift-out': 'Gifts sent',
+  prize: 'Prizes',
+  casino: 'Casino and economy',
+};
+const sign = (n) => (n > 0 ? `+${n}` : n < 0 ? `−${Math.abs(n)}` : '0');
+const when = (at) => new Date(at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+
+// "They match", or by how much and where they don't.
+export function compareLine(app, server) {
+  const gaps = breakdownGaps(breakdown(app.history), server.breakdown || {});
+  const off = server.balance - app.balance;
+  // A running shift counts by the minute on both sides: a coin of slack.
+  if (Math.abs(off) <= 1) return { match: true, gaps: [], text: 'They match.' };
+  const where = gaps.filter((g) => g.diff).map((g) => KIND[g.kind] || g.kind);
+  return {
+    match: false,
+    gaps,
+    text: `The app and the server disagree by ${Math.abs(off)}${where.length ? `: ${where.join(', ')}` : ''}.`,
+  };
+}
+
+// A collapsed section: the server's numbers next to the app's, per kind.
+export function CompareWithServer({ name, mine, onCheck }) {
+  const [state, setState] = useState({ busy: false, result: null, error: '' });
+  const run = async () => {
+    setState((s) => ({ ...s, busy: true, error: '' }));
+    try {
+      const result = await onCheck(name);
+      setState({ busy: false, result, error: '' });
+    } catch (e) {
+      setState({ busy: false, result: null, error: e?.message || 'Couldn’t reach the server.' });
+    }
+  };
+  const { result } = state;
+  const line = result && result.name === name ? compareLine(mine, result) : null;
+  const rows = useMemo(() => {
+    if (!result) return [];
+    const app = breakdown(mine.history);
+    const kinds = [...new Set([...Object.keys(app), ...Object.keys(result.breakdown || {})])];
+    return kinds
+      .map((k) => ({ k, app: app[k]?.coins || 0, server: result.breakdown?.[k]?.coins || 0 }))
+      .sort((a, b) => Object.keys(KIND).indexOf(a.k) - Object.keys(KIND).indexOf(b.k));
+  }, [result, mine]);
+  return (
+    <details className="cv-compare" onToggle={(e) => e.currentTarget.open && !result && !state.busy && run()}>
+      <summary>Compare with the server</summary>
+      <div className="cv-compare-body">
+        {state.busy && !result && <p className="muted small">Asking the server…</p>}
+        {state.error && <p className="danger small">{state.error}</p>}
+        {line && (
+          <>
+            <p className={`cv-verdict${line.match ? ' ok' : ' bad'}`} role="status">
+              {line.text}
+            </p>
+            <table className="cv-table">
+              <thead>
+                <tr>
+                  <th />
+                  <th>App</th>
+                  <th>Server</th>
+                  <th>Gap</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r) => (
+                  <tr key={r.k} className={r.app !== r.server ? 'off' : ''}>
+                    <td>{KIND[r.k] || r.k}</td>
+                    <td className="mono">{sign(r.app)}</td>
+                    <td className="mono">{sign(r.server)}</td>
+                    <td className="mono">{r.app === r.server ? '' : sign(r.app - r.server)}</td>
+                  </tr>
+                ))}
+                <tr className={`total${mine.balance !== result.balance ? ' off' : ''}`}>
+                  <td>Balance</td>
+                  <td className="mono">{mine.balance}</td>
+                  <td className="mono">{result.balance}</td>
+                  <td className="mono">{mine.balance === result.balance ? '' : sign(mine.balance - result.balance)}</td>
+                </tr>
+              </tbody>
+            </table>
+            <p className="muted tiny">
+              {result.demo
+                ? 'Demo mode: there is no server, so the numbers come from the app.'
+                : `The server counted ${result.items.length} entries${
+                    result.bank?.docs?.length ? ` and ${result.bank.docs.length} casino record${result.bank.docs.length === 1 ? '' : 's'}` : ''
+                  }. Tasks and lab hours it reads fresh; ${
+                    result.cacheAgeMs > 1000 ? `team settings are ${Math.round(result.cacheAgeMs / 1000)} seconds old` : 'team settings just loaded'
+                  }.`}
+            </p>
+          </>
+        )}
+        <button className="btn small" onClick={run} disabled={state.busy}>
+          {state.busy ? 'Checking…' : result ? 'Check again' : 'Check now'}
+        </button>
+      </div>
+    </details>
+  );
+}
+
+// "Balance may be out of date": the server's answer didn't match the app's number.
+export function StaleBanner({ stale, onRefresh }) {
+  if (!stale) return null;
+  return (
+    <button className="cv-stale" onClick={onRefresh}>
+      <Icon name="repeat" size={16} />
+      <span>
+        Balance may be out of date: tap to refresh
+        <span className="muted tiny"> The server says {stale.server}, this app says {stale.app}.</span>
+      </span>
+    </button>
+  );
+}
+
+const CHIPS = [
+  ['all', 'All'],
+  ['earned', 'Earned'],
+  ['spent', 'Spent'],
+  ['casino', 'Casino'],
+  ['gifts', 'Gifts'],
+  ['prizes', 'Prizes'],
+  ['market', 'Market'],
+];
+
+// Team management: everyone's coins. A list of people, then one person's full history.
+export function EveryoneCoins({ roster, data, cfg, onCheck }) {
+  const [who, setWho] = useState(null);
+  const [q, setQ] = useState('');
+  const wallets = useMemo(() => Object.fromEntries(roster.map((n) => [n, walletOf(n, data)])), [roster, data]);
+  const rows = useMemo(
+    () =>
+      roster
+        .filter((n) => n.toLowerCase().includes(q.trim().toLowerCase()))
+        .map((name) => ({ name, w: wallets[name], casino: data.bank[name]?.net || 0 }))
+        .sort((a, b) => b.w.balance - a.w.balance || a.name.localeCompare(b.name)),
+    [roster, wallets, data, q],
+  );
+  if (who && wallets[who]) return <Person name={who} w={wallets[who]} casino={data.bank[who]?.net || 0} cfg={cfg} onCheck={onCheck} onBack={() => setWho(null)} />;
+  return (
+    <>
+      <label className="cv-search">
+        <Icon name="search" size={16} />
+        <input className="input" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Find someone" aria-label="Find someone" />
+      </label>
+      <ul className="cv-people">
+        <li className="cv-head" aria-hidden="true">
+          <span className="grow">Person</span>
+          <span>Balance</span>
+          <span>Earned</span>
+          <span>Casino</span>
+        </li>
+        {rows.map((r) => (
+          <li key={r.name}>
+            <button className="cv-person" onClick={() => setWho(r.name)}>
+              <Avatar name={r.name} size={28} />
+              <span className="grow cv-name">{r.name}</span>
+              <b className="mono">{r.w.balance}</b>
+              <span className="mono muted">{r.w.earned}</span>
+              <span className={`mono ${r.casino < 0 ? 'coins-minus' : r.casino > 0 ? 'coins-plus' : 'muted'}`}>{r.casino ? sign(r.casino) : '0'}</span>
+            </button>
+          </li>
+        ))}
+        {!rows.length && <li className="muted">Nobody by that name.</li>}
+      </ul>
+      <p className="muted tiny">Balance is everything counted now. Earned is tasks, lab hours, quizzes and bonuses. Casino is the net from /slots, /daily and the other commands.</p>
+    </>
+  );
+}
+
+function Person({ name, w, casino, cfg, onCheck, onBack }) {
+  const [chip, setChip] = useState('all');
+  // The balance after each entry: start from today's and walk back.
+  const all = useMemo(() => {
+    let run = w.balance;
+    return w.history.map((x) => {
+      const row = { ...x, after: run };
+      run -= x.amount;
+      return row;
+    });
+  }, [w]);
+  const shown = chip === 'all' ? all : all.filter((x) => historyGroup(x) === chip);
+  const total = shown.reduce((t, x) => t + x.amount, 0);
+  return (
+    <>
+      <div className="cv-who">
+        <button className="icon-btn cv-back" onClick={onBack} aria-label="Back to everyone">
+          <Icon name="chevron" size={18} />
+        </button>
+        <Avatar name={name} size={36} />
+        <span className="grow">
+          <b>{name}</b>
+          <span className="muted tiny">
+            <span className="mono">{w.balance}</span> now · <span className="mono">{w.earned}</span> earned ·{' '}
+            <span className="mono">{casino ? sign(casino) : '0'}</span> casino
+          </span>
+        </span>
+      </div>
+      <div className="cv-chips" role="group" aria-label="Show">
+        {CHIPS.map(([id, label]) => (
+          <button key={id} className={`chip${chip === id ? ' on' : ''}`} aria-pressed={chip === id} onClick={() => setChip(id)}>
+            {label}
+          </button>
+        ))}
+      </div>
+      {shown.length ? (
+        <ul className="coins-history cv-history">
+          {shown.map((x, i) => (
+            <li key={`${x.kind}-${x.at}-${i}`}>
+              <span className="coins-icon" aria-hidden="true">
+                {x.icon}
+              </span>
+              <span className="grow">
+                <span className="coins-label">{x.label}</span>
+                <span className="muted tiny">
+                  <span className="mono">{when(x.at)}</span>
+                  {x.capped ? ` · counted ${cfg.dayCap} h max a day` : ''}
+                  {x.note ? ` · ${x.note}` : ''}
+                </span>
+              </span>
+              <span className="cv-amt">
+                <b className={`mono ${x.amount < 0 ? 'coins-minus' : x.amount > 0 ? 'coins-plus' : 'muted'}`}>{sign(x.amount)}</b>
+                <span className="mono muted tiny" title="Balance after this">
+                  {x.after}
+                </span>
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="muted">Nothing in this part.</p>
+      )}
+      <p className="cv-total">
+        <span>
+          {shown.length} {shown.length === 1 ? 'entry' : 'entries'}
+          {chip === 'all' ? '' : ` in ${CHIPS.find(([id]) => id === chip)[1]}`}
+        </span>
+        <b className="mono">{sign(total)}</b>
+      </p>
+      <CompareWithServer key={name} name={name} mine={w} onCheck={onCheck} />
+    </>
+  );
+}

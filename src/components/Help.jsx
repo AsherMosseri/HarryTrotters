@@ -182,7 +182,7 @@ const SECTIONS = [
       'Appearance (in your menu: your name at the bottom of the sidebar, or your picture on a phone) picks light, dark, or automatic, a color theme, Calm chat, and Animations for this device.',
       'Custom… in Appearance makes your own theme: any colors (even moving), a picture, GIF, or emoji pattern behind the app, and floating emoji or GIFs. Surprise me picks for you, and My profile matches your profile.',
       'Edit tabs (in your menu on a phone): drag the tabs into your order. It follows you to every device; on a phone, your first four are the tab bar.',
-      'Jackson coins: 15 for each task you were given that gets done (when someone else made it; up to 5 tasks a day) and 4 an hour at the lab (1 for every full 15 minutes, added up per day; time before 3.0 earned 5 an hour), up to 10 hours a day. Games, trivia, and /daily pay up to 20 a day together, plus lab bingo, streak milestones, and the daily question. Your balance, history, Send, and the leaderboard are in your menu; spend them in the Market.',
+      'Jackson coins: 15 for each task you were given that gets done (when someone else made it; up to 5 tasks a day) and 4 an hour at the lab (1 for every full 15 minutes, added up per day; time before 3.0 earned 5 an hour), up to 10 hours a day. Games, trivia, and /daily pay up to 20 a day together, plus lab bingo, streak milestones, and the daily question. Your balance, history, Send, and the leaderboard are in your menu; spend them in the Market. If a number ever looks wrong, open Compare with the server at the bottom of History: it shows what the server counts next to what this app shows, and says where they differ.',
       'New friends showing up around the app? Their buttons take bookings, orders, and submissions. Want a spot of your own? Tap “Get your spot here” on one of them. Need a break? Look for the button that clears them away for a while.',
       'Orders & bookings (in your menu): what you ordered or booked from them, with tracking. Each one asks its own questions, and when it’s delivered or it’s time, you get a notification (quietly at night) and something to do: open it, play it, or answer back.',
       'When the site is updated, you’ll be asked to tap Update now.',
@@ -191,6 +191,7 @@ const SECTIONS = [
 ];
 
 const MANAGER_TIPS = [
+  'Everyone’s coins: in the Coins screen, the Everyone tab lists each person’s balance, earned coins and casino net (search by name). Tap someone for their whole history with the balance after each entry, filters (Earned, Spent, Casino, Gifts, Prizes, Market), a total, and Compare with the server for that person.',
   'Roster: Edit anyone’s role, subteams, responsibilities, and name. Add or remove people. Removing someone signs them out everywhere and deletes their password; their messages, tasks, shifts and coins stay. Someone new (or removed) who signs in waits at the top under Waiting to join until you tap Approve (or Turn away).',
   'Market: add perks (or pick from the ideas), approve or decline purchases, and start tournaments. In a tournament’s results you can void anyone’s result, and Clear or Void runs that need a check.',
   'Competition mode (on Today): turn it on for an event or scrimmage, pick the event and drive team, and type in the match schedule or pull it from FTC Events.',

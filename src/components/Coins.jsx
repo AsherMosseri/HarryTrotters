@@ -4,6 +4,7 @@ import { mondayOf } from '../milestones.js';
 import { relTime, useEscape } from '../util.js';
 import { Avatar, CloseIcon, Overlay } from './common.jsx';
 import { Icon } from './shell/icons.jsx';
+import { CompareWithServer, EveryoneCoins, StaleBanner } from './CoinsEveryone.jsx';
 
 // A Jackson coin: a little gold coin with a J.
 export const Coin = ({ size = 16 }) => (
@@ -20,7 +21,7 @@ export const Coins = ({ n, size }) => (
 
 const WHO = (n) => n.split(' ')[0];
 
-export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onMarket, onClose }) {
+export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onMarket, onClose, isManager = false, onCheck, stale, onRefresh }) {
   useEscape(onClose);
   const [tab, setTab] = useState('wallet');
   const [range, setRange] = useState('week');
@@ -80,6 +81,8 @@ export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onMarket
               ['wallet', 'History'],
               ['send', 'Send'],
               ['board', 'Leaderboard'],
+              // Team management sees everyone's coins.
+              ...(isManager && onCheck ? [['everyone', 'Everyone']] : []),
             ].map(([id, label]) => (
               <button
                 key={id}
@@ -92,7 +95,9 @@ export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onMarket
               </button>
             ))}
           </div>
+          <StaleBanner stale={stale} onRefresh={onRefresh} />
           <div className="coins-body">
+            {tab === 'everyone' && isManager && onCheck && <EveryoneCoins roster={roster} data={data} cfg={cfg} onCheck={onCheck} />}
             {tab === 'wallet' &&
               (wallet.history.length ? (
                 <ul className="coins-history">
@@ -119,6 +124,7 @@ export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onMarket
               ) : (
                 <p className="muted">Nothing yet. Finish a task someone gave you, or clock in at the lab.</p>
               ))}
+            {tab === 'wallet' && onCheck && <CompareWithServer name={actor.name} mine={wallet} onCheck={onCheck} />}
 
             {tab === 'send' &&
               (sent ? (
