@@ -14,6 +14,7 @@ import { nameKey } from '../../../functions/shared/team.js';
 import { useMarket } from '../../market.js';
 import { glows } from '../../../functions/shared/market.js';
 import { PetBadge } from '../Pet.jsx';
+import { ReportDialog, reportInfo } from '../Disputes.jsx';
 
 export const QUICK_REACTIONS = ['👍', '✅', '😂', '❤️', '🔥', '👀'];
 // Commands that post a poll: the poll is the card (Trotbot's name on top).
@@ -573,6 +574,9 @@ export default function Message({
   const [picker, setPicker] = useState(false);
   const [removing, setRemoving] = useState(false);
   const [editPoll, setEditPoll] = useState(false);
+  // Report a casino result to team management (Disputes.jsx).
+  const [reporting, setReporting] = useState(false);
+  const canReport = !!reportInfo(m, actor.name, usePeople()?.rename) && !!api.dispute;
   const actionsRef = useRef(null);
   const quick = quickOf(usePeople()?.profileOf(actor.name));
   const feat = useControls().isOn;
@@ -726,6 +730,8 @@ export default function Message({
                 me={actor.name}
                 onMove={(move) => api.play({ action: 'move', conv, msgId: m.id, move })}
                 onBuy={(n) => api.play({ action: 'run', game: 'lottery', args: [String(n)], conv })}
+                onChallenge={(args) => api.play({ action: 'run', game: 'challenge', args, conv })}
+                onReport={canReport ? () => setReporting(true) : null}
               />
             )}
             {POLL_COMMANDS.includes(m.cmd?.name) && <Trotbot name={m.cmd.name} />}
@@ -903,6 +909,11 @@ export default function Message({
               <Icon name="smileOff" size={18} />
             </button>
           )}
+          {canReport && (
+            <button onClick={() => setReporting(true)} title="Report this result to team management" aria-label="Report this result">
+              <Icon name="flag" size={18} /> <span className="act-label">Report</span>
+            </button>
+          )}
           {(mine || isManager) && (
             <button onClick={() => onStartPick(m)} title="Select messages (to delete several)" aria-label="Select messages">
               <Icon name="select" size={18} />
@@ -940,6 +951,14 @@ export default function Message({
             </FloatingPicker>
           )}
         </div>
+      )}
+      {reporting && (
+        <ReportDialog
+          m={m}
+          conv={conv}
+          api={api}
+          onClose={() => setReporting(false)}
+        />
       )}
       {editPoll && (
         <PollDialog

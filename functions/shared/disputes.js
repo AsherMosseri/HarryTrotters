@@ -63,7 +63,8 @@ export function describeCard(cmd) {
   const g = cmd?.game || {};
   const n = cmd?.name;
   if (n === 'slots') return `${(g.reels || []).join(' ')} · ${g.line || ''}`.trim();
-  if (n === 'dice') return `You rolled ${(g.you || []).reduce((t, x) => t + x, 0)}, the house ${(g.house || []).reduce((t, x) => t + x, 0)}`;
+  if (n === 'dice')
+    return `You rolled ${(g.you || []).reduce((t, x) => t + x, 0)}, the house ${(g.house || []).reduce((t, x) => t + x, 0)}`;
   if (n === 'coinflip') return `Called ${g.call}, landed ${g.side}`;
   if (n === 'roulette') return `Bet on ${g.spot}, the ball landed on ${g.n} (${g.color})`;
   if (n === 'blackjack') return `Your cards ${(g.you || []).join(' ')} · dealer ${(g.dealer || []).join(' ')} · ${cmd.status}`;
@@ -71,7 +72,10 @@ export function describeCard(cmd) {
   if (n === 'mines') return `Mines: ${g.bombs} bombs, ${(g.open || []).length} opened, ${cmd.status}`;
   if (n === 'highlow') return `High-low: ${(g.history || []).length} guesses, ${cmd.status}`;
   if (n === 'challenge') {
-    const r = g.kind === 'dice' ? `rolled ${(g.rolls?.a || []).join('+')} vs ${(g.rolls?.b || []).join('+')}` : `called ${g.call}, flipped ${g.flip || '?'}`;
+    const r =
+      g.kind === 'dice'
+        ? `rolled ${(g.rolls?.a || []).join('+')} vs ${(g.rolls?.b || []).join('+')}`
+        : `called ${g.call}, flipped ${g.flip || '?'}`;
     return `${g.a} vs ${g.b}, ${g.kind}: ${g.how === 'rolled' ? `${r}, ${g.winner ? `${g.winner} won` : 'a tie'}` : g.how || g.status}`;
   }
   return '';

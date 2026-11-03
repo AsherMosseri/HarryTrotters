@@ -98,6 +98,8 @@ export default function Today({
   onOpenShift,
   onPerson,
   onEditProfile,
+  disputes = 0,
+  onDisputes,
 }) {
   const people = usePeople();
   const today = todayISO();
@@ -127,7 +129,7 @@ export default function Today({
     <UsualToday
       {...{ actor, tasks, milestones, competition, shifts, runs, myShift, convs, unread, chat, on, onOpenTask, onOpenConv, onPage, onNewTask, roster, joinRequests }}
       {...{ settings, checklists, parts, onShowTasks, onShowParts }}
-      {...{ onStartShift, onOpenShift, onPerson, onEditProfile, people, today, api }}
+      {...{ onStartShift, onOpenShift, onPerson, onEditProfile, people, today, api, disputes, onDisputes }}
       pitButton={
         compOn ? (
           <button className="pit-btn on" onClick={() => setUsualOn('')}>
@@ -174,6 +176,8 @@ function UsualToday({
   pitButton,
   roster = [],
   joinRequests = [],
+  disputes = 0,
+  onDisputes,
 }) {
   const lab = useContext(LabLogContext);
   const market = useMarket();
@@ -226,6 +230,13 @@ function UsualToday({
         tone: 'warn',
         text: joinRequests.length === 1 ? `${joinRequests[0].name} wants to join the team` : `${joinRequests.length} new people want to join the team`,
         go: () => onPage('team'),
+      },
+    // Team management: casino results someone reported (Casino reports).
+    actor.admin &&
+      disputes > 0 && {
+        tone: 'warn',
+        text: disputes === 1 ? 'A casino result was reported' : `${disputes} casino results were reported`,
+        go: onDisputes,
       },
     on.includes('tasks') &&
       (overdue === 1

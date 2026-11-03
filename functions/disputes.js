@@ -37,7 +37,14 @@ export function disputeFunctions({ db, coinData, notify, bankRef }) {
   }
   async function managers(rename) {
     const snap = await db.collection('members').where('admin', '==', true).get();
-    return [...new Set(snap.docs.filter((m) => memberOk(m.data())).map((m) => rename(m.get('name') || '')).filter(Boolean))];
+    return [
+      ...new Set(
+        snap.docs
+          .filter((m) => memberOk(m.data()))
+          .map((m) => rename(m.get('name') || ''))
+          .filter(Boolean),
+      ),
+    ];
   }
 
   const dispute = onCall(OPEN, async (req) => {
@@ -69,7 +76,9 @@ export function disputeFunctions({ db, coinData, notify, bankRef }) {
         at: now,
         day,
         reason,
-        note: String(text || '').trim().slice(0, d.LIMITS.note),
+        note: String(text || '')
+          .trim()
+          .slice(0, d.LIMITS.note),
         status: 'open',
         snapshot,
       });
@@ -99,7 +108,9 @@ export function disputeFunctions({ db, coinData, notify, bankRef }) {
     if (!validId(id)) return note('Which report?');
     if (decision !== 'refund' && decision !== 'dismiss') return note('Refund or dismiss?');
     const dref = db.doc(`disputes/${id}`);
-    const resolution = String(text || '').trim().slice(0, d.LIMITS.resolution);
+    const resolution = String(text || '')
+      .trim()
+      .slice(0, d.LIMITS.resolution);
     // The person's recent casino history (their bank doc, under any name they've had).
     const peek = await dref.get();
     if (!peek.exists) return note('That report is gone.');
@@ -110,7 +121,8 @@ export function disputeFunctions({ db, coinData, notify, bankRef }) {
       const snap = await tx.get(dref);
       const x = snap.data();
       if (!x) return note('That report is gone.');
-      if (x.status !== 'open') return note('Already handled.', x.status === 'refunded' ? `Refunded ${x.refund} coins.` : 'It was dismissed.');
+      if (x.status !== 'open')
+        return note('Already handled.', x.status === 'refunded' ? `Refunded ${x.refund} coins.` : 'It was dismissed.');
       const now = Date.now();
       const who = data.rename(x.by);
       if (decision === 'dismiss') {
@@ -129,10 +141,13 @@ export function disputeFunctions({ db, coinData, notify, bankRef }) {
       if (!(loss > 0))
         return note(
           'There’s no loss to refund.',
-          live && !live.final ? 'The game isn’t finished yet. Wait for it to settle, or dismiss.' : 'That card doesn’t show them losing coins.',
+          live && !live.final
+            ? 'The game isn’t finished yet. Wait for it to settle, or dismiss.'
+            : 'That card doesn’t show them losing coins.',
         );
       const seen = d.historyCheck(recent, x.cmd, loss, kept.cardAt || x.at);
-      if (seen === 'missing') return note('I can’t find that loss in their coin history.', 'Dismiss it, or add the coins yourself as a bonus.');
+      if (seen === 'missing')
+        return note('I can’t find that loss in their coin history.', 'Dismiss it, or add the coins yourself as a bonus.');
       tx.set(keyRef, { dispute: id, person: who, amount: loss, at: now });
       tx.set(db.collection('coins').doc(`dispute-${id}`), d.refundEntry(who, loss, x.cmd, id, now));
       tx.update(dref, { status: 'refunded', handledBy: me, handledAt: now, refund: loss, resolutionNote: resolution, history: seen });

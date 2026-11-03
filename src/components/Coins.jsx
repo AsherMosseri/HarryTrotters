@@ -4,6 +4,7 @@ import { mondayOf } from '../milestones.js';
 import { relTime, useEscape } from '../util.js';
 import { Avatar, CloseIcon, Overlay } from './common.jsx';
 import { Icon } from './shell/icons.jsx';
+import { MyReports } from './Disputes.jsx';
 
 // A Jackson coin: a little gold coin with a J.
 export const Coin = ({ size = 16 }) => (
@@ -20,9 +21,9 @@ export const Coins = ({ n, size }) => (
 
 const WHO = (n) => n.split(' ')[0];
 
-export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onMarket, onClose }) {
+export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onMarket, onClose, disputes = [], initialTab = 'wallet' }) {
   useEscape(onClose);
-  const [tab, setTab] = useState('wallet');
+  const [tab, setTab] = useState(initialTab);
   const [range, setRange] = useState('week');
   // Two boards: what everyone has now (matches balances and /leaderboard),
   // and what they earned by working (tasks, lab hours, grants).
@@ -80,6 +81,8 @@ export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onMarket
               ['wallet', 'History'],
               ['send', 'Send'],
               ['board', 'Leaderboard'],
+              // Casino results you reported, and what team management decided.
+              ...(disputes.length ? [['reports', 'Reports']] : []),
             ].map(([id, label]) => (
               <button
                 key={id}
@@ -198,6 +201,8 @@ export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onMarket
                   </div>
                 </div>
               ))}
+
+            {tab === 'reports' && <MyReports list={disputes} />}
 
             {tab === 'board' && (
               <>

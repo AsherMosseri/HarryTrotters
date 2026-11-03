@@ -82,6 +82,7 @@ import ControlsPage from './ControlsPage.jsx';
 import { PreviewBar } from './Preview.jsx';
 import { ControlsContext, commandCfgFor, makeControls, profileView } from '../controls.js';
 import { CoinsDialog, Coins } from './Coins.jsx';
+import { DisputesDialog } from './Disputes.jsx';
 import MarketView from './Market.jsx';
 import { MarketContext, useMarketData } from '../market.js';
 import { playLine } from '../../functions/shared/market.js';
@@ -1407,6 +1408,9 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
       saveRobotLayout: (data) => store.saveRobotLayout(data, actor).catch(fail),
       deleteRobotLayout: (id) => store.deleteRobotLayout(id).catch(fail),
       ping: () => store.ping(),
+      // Casino reports (Disputes.jsx).
+      dispute: (req) => store.dispute(req, actor).catch((e) => ({ note: noteFor(e, 'That didn’t go through') })),
+      disputeDecide: (req) => store.disputeDecide(req, actor).catch((e) => ({ note: noteFor(e, 'That didn’t go through') })),
       play: (req) =>
         store
           .play(req, actor, { balanceOf: (n) => cmdData.current.wallet(n).balance, roster: cmdData.current.roster })
@@ -1767,9 +1771,19 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
     [api, actor.name],
   );
 
+  // Casino reports (Disputes.jsx): team management sees every report and
+  // decides; everyone else sees their own under Jackson coins, Reports.
+  const [disputes, setDisputes] = useState([]);
+  const [disputesOpen, setDisputesOpen] = useState(false);
+  const [coinsTab, setCoinsTab] = useState('wallet');
+  useEffect(() => (store.subscribeDisputes ? store.subscribeDisputes(actor, setDisputes) : undefined), [store, actor.name, actor.admin]);
+  const openDisputes = disputes.filter((x) => x.status === 'open').length;
+
   // Where a notification points: 'task:<id>', 'chat:<channel>', or 'view:<tab>'.
   const liveTasks = useRef(tasks);
   liveTasks.current = tasks;
+  const liveAdmin = useRef(actor.admin);
+  liveAdmin.current = actor.admin;
   // What happens after you book / order from an ad (adOrders.js): only yours.
   const [adOrders, setAdOrders] = useState([]);
   useEffect(() => store.subscribeAdOrders(actor.name, setAdOrders), [store, actor.name]);
@@ -1785,7 +1799,13 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
         setChatChannel(id);
         setView('chat');
       } else if (kind === 'view') setView(id);
-      else if (kind === 'requests') setShowRequests(id || true);
+      else if (kind === 'disputes') {
+        if (liveAdmin.current) setDisputesOpen(true);
+        else {
+          setCoinsTab('reports');
+          setCoinsOpen(true);
+        }
+      } else if (kind === 'requests') setShowRequests(id || true);
       else if (kind === 'adorder') setTrackId(id);
       else if (kind === 'shutdown') setShutdownPage(true);
       else if (kind === 'shift') {
@@ -2345,6 +2365,11 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
         {onPhone && <button onClick={go('tabs', () => setEditTabs(true))}>Edit tabs</button>}
         <button onClick={go('help', () => setShowHelp(true))}>Help</button>
         <button onClick={go('password', () => setPasswordOpen(true))}>Change password</button>
+        {actor.admin && controls.isOn('coins') && (
+          <button onClick={go('disputes', () => setDisputesOpen(true))}>
+            Casino reports {openDisputes > 0 && <span className="me-badge">{openDisputes}</span>}
+          </button>
+        )}
         {isOwner && <button onClick={go('controls', () => setControlsPage(true))}>Controls</button>}
       </div>
       <button
@@ -2557,6 +2582,8 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
                     checklists={checklists}
                     roster={roster}
                     joinRequests={joinRequests}
+                    disputes={actor.admin && controls.isOn('coins') ? openDisputes : 0}
+                    onDisputes={() => setDisputesOpen(true)}
                     api={api}
                     shifts={namedShifts}
                     runs={runs}
@@ -3151,8 +3178,22 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
               onClose={ads.closeBlock}
             />
           )}
+          {disputesOpen && actor.admin && (
+            <DisputesDialog
+              list={disputes}
+              api={api}
+              wallet={walletOf}
+              onToast={(text) => setToast({ text })}
+              onClose={() => {
+                setDisputesOpen(false);
+                goBack('disputes');
+              }}
+            />
+          )}
           {coinsOpen && (
             <CoinsDialog
+              disputes={disputes}
+              initialTab={coinsTab}
               actor={actor}
               wallet={myWallet}
               roster={roster}
@@ -3169,6 +3210,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
               }
               onClose={() => {
                 setCoinsOpen(false);
+                setCoinsTab('wallet');
                 goBack('coins');
               }}
             />

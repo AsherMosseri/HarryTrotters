@@ -4,12 +4,14 @@ import { BOT, C4_COLS, C4_ROWS, RACES, RPS, TIMES, isLive } from '../../../funct
 import { AWARD_CAPS } from '../../../functions/shared/coins.js';
 import { serverNow } from '../../serverTime.js';
 import { Battleship, FunShare, RaceCard } from './FunCards.jsx';
+import { Die } from './Die.jsx';
+import { KINDS } from '../../../functions/shared/challenge.js';
 
 // Multiplayer game cards in #arcade (the play function runs the games; see
 // functions/shared/arcade.js). Buttons send moves; timers ask the server to
 // move things along ("peek") when a countdown runs out.
 
-export const ARCADE_CARDS = ['rps', 'tictactoe', 'connect4', 'duel', 'trivia', 'hangman', 'typerace', 'heist', 'battleship', 'tetris', 'minesweep'];
+export const ARCADE_CARDS = ['rps', 'tictactoe', 'connect4', 'duel', 'trivia', 'hangman', 'typerace', 'heist', 'battleship', 'tetris', 'minesweep', 'challenge'];
 const coins = (n) => `${n} 🪙`;
 
 // Prizes the daily game limit cut short (the server puts what it paid in g.paid).
@@ -128,6 +130,52 @@ export function Result({ g, Name }) {
       🏆 <Who name={g.winner} Name={Name} /> wins{pot}
       {g.how === 'resigned' && <span className="muted small"> (the other player resigned)</span>}
       {g.how === 'timeout' && <span className="muted small"> (the other player ran out of time)</span>}
+    </div>
+  );
+}
+
+// /challenge: the same coin flip or dice roll for the same bet, head to head.
+// The server rolls both when the other person accepts.
+function Challenge({ g, me, act, Name, now }) {
+  const kind = KINDS[g.kind] || KINDS.coinflip;
+  const total = (d) => (d || []).reduce((t, x) => t + x, 0);
+  const rolled = g.status === 'done' && g.how === 'rolled';
+  return (
+    <div className="arc-challenge">
+      <Versus g={g} Name={Name} />
+      <div className="muted small">
+        {kind.label} · {g.kind === 'coinflip' ? `${g.a.split(' ')[0]} calls ${g.call}, ${g.b.split(' ')[0]} gets ${g.call === 'heads' ? 'tails' : 'heads'}` : 'higher roll wins, ties roll again'}
+      </div>
+      {isLive(g.status) && <Invite g={g} me={me} act={act} game="challenge" now={now} />}
+      {rolled && g.kind === 'dice' && (
+        <div className="casino-vs ch-rolls">
+          {[g.a, g.b].map((n, k) => {
+            const d = g.rolls[k ? 'b' : 'a'];
+            return (
+              <div key={n} className={g.winner === n ? 'ch-won' : ''}>
+                <div className="muted tiny">{n.split(' ')[0]}</div>
+                <div className="dice-row">
+                  <Die n={d[0]} i={0} />
+                  <Die n={d[1]} i={1} />
+                  <b className="cmd-total">{total(d)}</b>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {rolled && g.kind === 'coinflip' && (
+        <div className="cmd-flip">
+          <span className={`cmd-coin ${g.flip} still`} aria-hidden="true">
+            🪙
+          </span>
+          <span>
+            It’s <b>{g.flip}</b>.
+          </span>
+        </div>
+      )}
+      {rolled && g.rerolls > 0 && <div className="muted tiny">Tied {g.rerolls === 1 ? 'once' : `${g.rerolls} times`}, so they rolled again.</div>}
+      <Result g={g} Name={Name} />
     </div>
   );
 }
@@ -642,6 +690,7 @@ export function ArcadeBody({ m, me, Name, onMove, conv }) {
     battleship: <Battleship {...props} />,
     tetris: <RaceCard {...props} name="tetris" conv={conv} msgId={m.id} />,
     minesweep: <RaceCard {...props} name="minesweep" conv={conv} msgId={m.id} />,
+    challenge: <Challenge {...props} />,
   }[c.name];
   return (
     <>

@@ -16,6 +16,8 @@ import { deliver } from '../adOrders.js';
 import * as casino from '../../functions/shared/casino.js';
 import { dayOf, logFields, taskArea } from '../labLog.js';
 import * as arcade from '../../functions/shared/arcade.js';
+import * as challenge from '../../functions/shared/challenge.js';
+import * as dispute from '../../functions/shared/disputes.js';
 import { blocked, serverGroup } from '../../functions/shared/commandRules.js';
 import { AWARD_CAPS, giftEntry, prizeEntry, teamDay, teamMidnight } from '../../functions/shared/coins.js';
 import * as fun from '../../functions/shared/funGames.js';
@@ -26,7 +28,7 @@ import { asksOn } from '../../functions/shared/checkin.js';
 import * as market from '../../functions/shared/market.js';
 import { PERK_IDEAS } from '../../functions/shared/market.js';
 import { giftAccept, giftEnd, giftOffer, petEdit, petsIn } from '../../functions/shared/pets.js';
-import { ROSTER, cleanName, sameName } from '../../functions/shared/team.js';
+import { MANAGER_NAMES, ROSTER, cleanName, sameName } from '../../functions/shared/team.js';
 import { checkPicks, myPicks, personOptionId, usesVoteButton } from '../../functions/shared/polls.js';
 import { demoLife } from './demoLife.js';
 import { demoLearn } from './demoLearn.js';
@@ -1761,11 +1763,22 @@ export const demoStore = {
     const balance = balanceOf(me);
     const mine = bank(me);
     if (arcade.MULTI.includes(game)) {
-      const r = arcade.start(game, { me, words, roster, balance, bank: mine, now, content: DEMO_ARCADE });
+      // /challenge: who they asked, and whether you already have one waiting (like the server).
+      let more = {};
+      if (game === 'challenge') {
+        const { them, known } = challenge.parseWords(words, roster);
+        const old = mine.chOpen ? ((state.chat || {})[mine.chOpen.conv] || []).find((x) => x.id === mine.chOpen.id)?.cmd : null;
+        more = {
+          peer: known && them !== me && them !== arcade.BOT ? { name: them, active: roster.includes(them), balance: balanceOf(them) } : null,
+          hasOpen: old?.name === 'challenge' && old.status === 'open' && old.game.expiresAt > now,
+        };
+      }
+      const r = arcade.start(game, { me, words, roster, balance, bank: mine, now, content: DEMO_ARCADE, ...more });
       if (r.error) return note(r.error);
       payOut(r.money);
       const { status, ...g } = r.pub;
       const m = post({ game: g, status, bet: g.bet || 0 }, r.mentions);
+      if (r.open) setBank(me, { ...bank(me), chOpen: { conv, id: m.id } });
       state.gameSecrets = { ...(state.gameSecrets || {}), [m.id]: r.secret };
       return done({ ok: true, serverNow: now });
     }
@@ -1881,6 +1894,94 @@ export const demoStore = {
   },
   subscribeBank(cb) {
     return listen(() => cb({ ...(state.bank || {}) }));
+  },
+  // Casino reports, checked the way functions/disputes.js checks them
+  // (shared/disputes.js). Team management sees every report, others their own.
+  subscribeDisputes(actor, cb) {
+    return listen(() => cb((state.disputes || []).filter((x) => actor.admin || x.by === actor.name).sort((a, b) => b.at - a.at)));
+  },
+  async dispute(req, actor) {
+    const now = Date.now();
+    const me = actor.name;
+    const note = (title, body = '') => ({ note: { title, body } });
+    const { conv, msgId, reason, note: text } = req;
+    if (!dispute.REASONS[reason]) return note('What looks wrong?', 'Pick one of the reasons.');
+    const m = ((state.chat || {})[conv] || []).find((x) => x.id === msgId);
+    const problem = dispute.reportProblem(m, me);
+    if (problem) return note('Can’t report that.', problem);
+    const id = dispute.reportId(msgId, me);
+    const list = state.disputes || [];
+    if (list.some((x) => x.id === id)) return note('You already reported this one.', 'Team management will get to it.');
+    const day = teamDay(now);
+    if (list.filter((x) => x.by === me && x.day === day).length >= dispute.LIMITS.perDay)
+      return note(`That’s ${dispute.LIMITS.perDay} reports today.`, 'Try again tomorrow.');
+    const snapshot = dispute.snapshotOf(m, me);
+    state.disputes = [
+      ...list,
+      { id, conv, msgId, cmd: m.cmd.name, by: me, at: now, day, reason, note: String(text || '').trim().slice(0, dispute.LIMITS.note), status: 'open', snapshot },
+    ];
+    const first = me.split(' ')[0];
+    state.inbox = [
+      ...MANAGER_NAMES.filter((n) => n !== me).map((to) => ({
+        id: uid(),
+        type: 'dispute',
+        title: `${first} reported a ${dispute.GAME_LABEL[snapshot.game]} result`,
+        body: dispute.REASONS[reason],
+        open: 'disputes:',
+        at: now,
+        read: false,
+        to,
+      })),
+      ...(state.inbox || []),
+    ];
+    commit();
+    return { ok: true, id };
+  },
+  async disputeDecide(req, actor) {
+    const now = Date.now();
+    const note = (title, body = '') => ({ note: { title, body } });
+    if (!actor.admin) return note('Team management only.');
+    const { id, decision } = req;
+    const resolution = String(req.note || '').trim().slice(0, dispute.LIMITS.resolution);
+    const x = (state.disputes || []).find((y) => y.id === id);
+    if (!x) return note('That report is gone.');
+    if (x.status !== 'open') return note('Already handled.', x.status === 'refunded' ? `Refunded ${x.refund} coins.` : 'It was dismissed.');
+    if (decision !== 'refund' && decision !== 'dismiss') return note('Refund or dismiss?');
+    let refund = 0;
+    if (decision === 'refund') {
+      const m = ((state.chat || {})[x.conv] || []).find((y) => y.id === x.msgId);
+      const keys = (state.refundKeys ||= {});
+      const key = `${x.msgId}-${x.by}`;
+      if (keys[key]) return note('That result was already refunded.');
+      const live = m?.cmd ? dispute.cardLoss(m.cmd, x.by) : null;
+      const kept = x.snapshot || {};
+      refund = live ? (kept.final ? Math.min(live.loss, kept.loss || 0) : live.loss) : kept.loss || 0;
+      if (!(refund > 0))
+        return note('There’s no loss to refund.', live && !live.final ? 'The game isn’t finished yet. Wait for it to settle, or dismiss.' : 'That card doesn’t show them losing coins.');
+      const seen = dispute.historyCheck(state.bank?.[x.by]?.recent || [], x.cmd, refund, kept.cardAt || x.at);
+      if (seen === 'missing') return note('I can’t find that loss in their coin history.', 'Dismiss it, or add the coins yourself as a bonus.');
+      keys[key] = now;
+      state.coins = [...(state.coins || []), { id: `dispute-${id}`, ...dispute.refundEntry(x.by, refund, x.cmd, id, now) }];
+    }
+    Object.assign(x, { status: decision === 'refund' ? 'refunded' : 'dismissed', handledBy: actor.name, handledAt: now, refund, resolutionNote: resolution });
+    state.inbox = [
+      {
+        id: uid(),
+        type: 'dispute',
+        ...(refund && { icon: '↩️' }),
+        title: refund ? `${refund} coins refunded` : 'Your report was looked at',
+        body: refund
+          ? `Team management refunded your ${dispute.GAME_LABEL[x.cmd] || 'casino'} result.${resolution ? ` ${resolution}` : ''}`
+          : `Team management kept the result as it was.${resolution ? ` ${resolution}` : ''}`,
+        open: 'disputes:',
+        at: now,
+        read: false,
+        to: x.by,
+      },
+      ...(state.inbox || []),
+    ];
+    commit();
+    return { ok: true, status: x.status, refund };
   },
   // Tetris and Minesweeper, run here the way the funGame function runs them
   // (functions/shared/funGames.js): a game gets its seed here and its moves

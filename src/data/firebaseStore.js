@@ -1301,6 +1301,23 @@ export const firebaseStore = {
   async play(req) {
     return (await callable('play')(req)).data;
   },
+  // Casino reports (functions/disputes.js): report a result, and team
+  // management's refund / dismiss. Team management sees every report, anyone
+  // else their own. dispute(req) and disputeDecide(req) return { ok } or { note }.
+  async dispute(req) {
+    return (await callable('dispute')(req)).data;
+  },
+  async disputeDecide(req) {
+    return (await callable('disputeDecide')(req)).data;
+  },
+  subscribeDisputes(actor, cb) {
+    const q = actor.admin ? collection(db, 'disputes') : query(collection(db, 'disputes'), where('by', '==', actor.name));
+    return onSnapshot(
+      q,
+      (snap) => cb(snap.docs.map(readDoc).sort((a, b) => b.at - a.at)),
+      (e) => console.warn('disputes', e),
+    );
+  },
   // Tetris and Minesweeper (functions/shared/funGames.js): the funGame
   // function starts a game (the seed) and finishes it (replays the moves).
   async funGame(req) {
