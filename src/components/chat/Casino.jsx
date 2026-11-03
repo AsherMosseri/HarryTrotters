@@ -21,7 +21,9 @@ function Outcome({ c }) {
   return (
     <div className={`casino-outcome ${net > 0 ? 'win' : net < 0 ? 'lose' : 'push'}`}>
       {net > 0 ? `Won ${coins(net)}` : net < 0 ? `Lost ${coins(-net)}` : `Push: bet back`}
-      <span className="muted small"> · bet {c.bet}</span>
+      {/* "Won" is what came on top of the bet; say what came back too, so
+          5 at 1.95× reads "Won 4 · bet 5 → 9 back" (payouts round down). */}
+      <span className="muted small"> · bet {c.bet}{net > 0 ? ` → ${c.bet + net} back` : ''}</span>
     </div>
   );
 }
