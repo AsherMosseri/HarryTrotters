@@ -4190,3 +4190,9 @@ html.kb-open .report-note { min-height: 56px; }
   .pp-review-img { width: 88px; height: 88px; }
   .pp-previews { gap: 6px; }
 }
+
+/* The owner's add / take away / set coins, on a person's page in Coins, Everyone. */
+.cv-adjust { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; margin: 8px 0; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); }
+.cv-adjust-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.cv-adjust-row .input.mono { width: 110px; flex: none; }
+.cv-adjust-row .input.grow { flex: 1; min-width: 140px; }

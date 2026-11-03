@@ -3331,6 +3331,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
               onGift={(g) => api.play({ action: 'gift', ...g })}
               isManager={!!actor.admin}
               onCheck={api.coinCheck}
+              onAdjust={isOwner ? (g) => api.addCoins({ type: 'grant', by: actor.name, ...g }) : undefined}
               stale={sync.stale}
               onRefresh={() => {
                 setCoinReload((n) => n + 1);

@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { breakdown, breakdownGaps, historyGroup, wallet as walletOf } from '../coins.js';
 import { Avatar } from './common.jsx';
 import { Icon } from './shell/icons.jsx';
+import { confirmDialog } from './Dialogs.jsx';
 
 const KIND = {
   task: 'Finished tasks',
@@ -137,7 +138,7 @@ const CHIPS = [
 ];
 
 // Team management: everyone's coins. A list of people, then one person's full history.
-export function EveryoneCoins({ roster, data, cfg, onCheck }) {
+export function EveryoneCoins({ roster, data, cfg, onCheck, onAdjust }) {
   const [who, setWho] = useState(null);
   const [q, setQ] = useState('');
   const wallets = useMemo(() => Object.fromEntries(roster.map((n) => [n, walletOf(n, data)])), [roster, data]);
@@ -149,7 +150,7 @@ export function EveryoneCoins({ roster, data, cfg, onCheck }) {
         .sort((a, b) => b.w.balance - a.w.balance || a.name.localeCompare(b.name)),
     [roster, wallets, data, q],
   );
-  if (who && wallets[who]) return <Person name={who} w={wallets[who]} casino={data.bank[who]?.net || 0} cfg={cfg} onCheck={onCheck} onBack={() => setWho(null)} />;
+  if (who && wallets[who]) return <Person name={who} w={wallets[who]} casino={data.bank[who]?.net || 0} cfg={cfg} onCheck={onCheck} onAdjust={onAdjust} onBack={() => setWho(null)} />;
   return (
     <>
       <label className="cv-search">
@@ -181,7 +182,7 @@ export function EveryoneCoins({ roster, data, cfg, onCheck }) {
   );
 }
 
-function Person({ name, w, casino, cfg, onCheck, onBack }) {
+function Person({ name, w, casino, cfg, onCheck, onAdjust, onBack }) {
   const [chip, setChip] = useState('all');
   // The balance after each entry: start from today's and walk back.
   const all = useMemo(() => {
@@ -209,6 +210,7 @@ function Person({ name, w, casino, cfg, onCheck, onBack }) {
           </span>
         </span>
       </div>
+      {onAdjust && <AdjustCoins key={name} name={name} balance={w.balance} onCheck={onCheck} onAdjust={onAdjust} />}
       <div className="cv-chips" role="group" aria-label="Show">
         {CHIPS.map(([id, label]) => (
           <button key={id} className={`chip${chip === id ? ' on' : ''}`} aria-pressed={chip === id} onClick={() => setChip(id)}>
@@ -252,5 +254,75 @@ function Person({ name, w, casino, cfg, onCheck, onBack }) {
       </p>
       <CompareWithServer key={name} name={name} mine={w} onCheck={onCheck} />
     </>
+  );
+}
+
+// The owner only: add, take away, or set someone's Jackson coins. It goes in
+// as a grant (bonus or "taken away") with a note, like the Ads page's grants;
+// "set" works out the difference from the server's balance when it can.
+function AdjustCoins({ name, balance, onCheck, onAdjust }) {
+  const [mode, setMode] = useState('add');
+  const [amount, setAmount] = useState('');
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+  const n = Math.floor(Number(amount));
+  const ok = Number.isFinite(n) && amount !== '' && (mode === 'set' ? n >= 0 : n > 0) && n <= 100000;
+  const go = async () => {
+    if (!ok || busy) return;
+    setBusy(true);
+    setMsg('');
+    try {
+      let now = balance;
+      if (mode === 'set' && onCheck) {
+        const r = await onCheck(name).catch(() => null);
+        if (Number.isFinite(r?.balance)) now = r.balance;
+      }
+      const delta = mode === 'add' ? n : mode === 'remove' ? -n : n - now;
+      if (!delta) {
+        setMsg(`${name.split(' ')[0]} already has ${now}.`);
+        return;
+      }
+      const after = now + delta;
+      const yes = await confirmDialog({
+        title: mode === 'set' ? `Set ${name.split(' ')[0]} to ${n}?` : `${delta > 0 ? 'Give' : 'Take'} ${Math.abs(delta)} coins?`,
+        body: `${name} goes from ${now} to ${after} coins.${after < 0 ? ' That’s below zero.' : ''}`,
+        okLabel: delta > 0 ? 'Give' : 'Take',
+        danger: delta < 0,
+      });
+      if (!yes) return;
+      const label = note.trim() || (mode === 'set' ? `Balance set to ${n}` : delta > 0 ? 'Bonus' : 'Taken away');
+      const done = await onAdjust({ to: name, amount: delta, note: label.slice(0, 140), at: Date.now() });
+      if (done !== false) {
+        setMsg(`Done: ${name.split(' ')[0]} has ${after} now.`);
+        setAmount('');
+        setNote('');
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="cv-adjust">
+      <div className="segmented" role="group" aria-label="Change coins">
+        {[
+          ['add', 'Add'],
+          ['remove', 'Take away'],
+          ['set', 'Set to'],
+        ].map(([id, label]) => (
+          <button key={id} className={`plain-seg${mode === id ? ' on' : ''}`} aria-pressed={mode === id} onClick={() => setMode(id)}>
+            {label}
+          </button>
+        ))}
+      </div>
+      <div className="cv-adjust-row">
+        <input className="input mono" type="number" inputMode="numeric" min={0} max={100000} value={amount} onChange={(e) => setAmount(e.target.value)} placeholder={mode === 'set' ? String(balance) : '0'} aria-label="Coins" />
+        <input className="input grow" maxLength={140} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Note (they see it in their history)" aria-label="Note" />
+        <button className="btn primary" disabled={!ok || busy} onClick={go}>
+          {busy ? '…' : 'Save'}
+        </button>
+      </div>
+      {msg && <p className="muted tiny">{msg}</p>}
+    </div>
   );
 }
