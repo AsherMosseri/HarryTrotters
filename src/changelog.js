@@ -4,6 +4,17 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '3.0.9',
+    date: '2026-11-03',
+    title: 'Coins add up',
+    items: [
+      'Fixed: your coin count could disagree with what the casino and the Market let you spend (after a name change the server could count your casino losses twice). The app and the server now add up coins exactly the same way.',
+      'New on your Coins screen: Compare with the server, which checks your balance against the server and shows where any difference comes from.',
+      'Casino results lead with what you got back, like “Got 9 back (+4)”, so the number matches the multiplier.',
+      'Team management can see everyone’s coin history in Coins, Everyone.',
+    ],
+  },
+  {
     version: '3.0.8',
     date: '2026-11-02',
     title: 'Polls about people, and pick a few',
