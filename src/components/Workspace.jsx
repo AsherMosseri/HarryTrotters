@@ -53,6 +53,7 @@ import { DailyContext } from './learn/DailyCard.jsx';
 import { HelpDialog, WelcomeCard } from './Help.jsx';
 import { VersionLogDialog, WhatsNew } from './VersionLog.jsx';
 import { RequestsDialog } from './Requests.jsx';
+import { ChannelRequestsDialog, RequestChannelDialog } from './ChannelRequests.jsx';
 import { BottomNav, MoreSheet, Sheet } from './PhoneChrome.jsx';
 import ShiftsView, { ShiftButton } from './Shifts.jsx';
 import { CheckinGate, PollGate, answerOf } from './Checkin.jsx';
@@ -804,6 +805,24 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
   const [teamEmoji, setTeamEmoji] = useState([]);
   const [stickers, setStickers] = useState([]);
   useEffect(() => store.subscribeChannels(setChannelDocs, quiet('channels')), [store, quiet]);
+  // Private channels (you only get yours; team management gets all) and channel
+  // requests (functions/channels.js): quiet on failure, so it works before the
+  // new rules are published.
+  const [privateDocs, setPrivateDocs] = useState([]);
+  const [channelRequests, setChannelRequests] = useState([]);
+  const [chanDlg, setChanDlg] = useState(null); // 'request' | 'review'
+  const requestsOn = controls.isOn('channelRequests');
+  useEffect(
+    () => store.subscribePrivateChannels(actor, actor.admin, setPrivateDocs, quiet('private channels')),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [store, actor.name, actor.admin, quiet],
+  );
+  useEffect(() => {
+    if (!requestsOn) return setChannelRequests([]);
+    return store.subscribeChannelRequests(actor, actor.admin, setChannelRequests, quiet('channel requests'));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [store, actor.name, actor.admin, quiet, requestsOn]);
+  const chanWaiting = actor.admin ? channelRequests.filter((r) => r.status === 'pending').length : 0;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => store.subscribeDms(actor, actor.admin, setDmDocs, quiet('dms')), [store, actor.name, actor.admin, quiet]);
   useEffect(() => store.subscribeProfiles(setProfileDocs, quiet('profiles')), [store, quiet]);
@@ -857,6 +876,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
         const [kind, id] = (n.open || '').split(/:(.*)/s);
         if (kind === 'chat') return id?.startsWith('dm:') ? controls.isOn('dms') : controls.channelOn(id);
         if (kind === 'requests') return controls.isOn('requests');
+        if (n.type === 'channelRequest') return controls.isOn('channelRequests');
         if (n.type === 'checkin') return controls.isOn('checkins');
         return true;
       }),
@@ -977,10 +997,20 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
     );
     for (const d of channelDocs)
       merged.set(d.id, { ...(merged.get(d.id) || { name: d.id, order: 99 }), ...d, announce: d.id === 'announcements' });
+    // Private channels: yours, and (team management) the ones you're not in.
+    const priv = privateDocs
+      .filter((d) => !d.deleted)
+      .map((d) => ({ ...d, announce: false, private: true, members: (d.members || []).map(rename) }))
+      .map((d) => ({ ...d, mine: d.members.includes(actor.name) }));
+    for (const d of priv) merged.set(d.id, d);
+    const shown = (c) => (!c.deleted || c.id === 'announcements' || c.id === 'general') && controls.channelOn(c.id);
     const channels = [...merged.values()]
-      .filter((c) => (!c.deleted || c.id === 'announcements' || c.id === 'general') && controls.channelOn(c.id))
+      .filter((c) => shown(c) && (!c.private || c.mine))
       .sort((a, b) => (a.order ?? 99) - (b.order ?? 99) || a.name.localeCompare(b.name))
       .map((c) => ({ ...c, key: c.id, kind: 'channel', label: `#${c.name}` }));
+    const teamPrivate = actor.admin
+      ? priv.filter((c) => !c.mine && shown(c)).sort((a, b) => a.name.localeCompare(b.name)).map((c) => ({ ...c, key: c.id, kind: 'channel', label: `#${c.name}` }))
+      : [];
     const dms = dmDocs
       .map((d) => {
         const ppl = [...new Set((d.people || []).map(rename))];
@@ -995,10 +1025,11 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
       channels,
       dms: dmsOn ? dms.filter((d) => d.mine) : [],
       teamDms: dmsOn ? dms.filter((d) => !d.mine) : [],
-      allChannelIds: [...merged.keys(), ...Object.keys(docs)],
+      teamPrivate,
+      allChannelIds: [...merged.keys(), ...Object.keys(docs), ...privateDocs.map((d) => d.id)],
     };
-  }, [channelDocs, dmDocs, rename, actor.name, controls]);
-  const allConvs = useMemo(() => [...convs.channels, ...convs.dms, ...convs.teamDms], [convs]);
+  }, [channelDocs, privateDocs, dmDocs, rename, actor.name, actor.admin, controls]);
+  const allConvs = useMemo(() => [...convs.channels, ...convs.dms, ...convs.teamDms, ...convs.teamPrivate], [convs]);
   const currentConv = allConvs.find((c) => c.key === chatChannel) || convs.channels.find((c) => c.id === 'general') || convs.channels[0];
   // #parts also shows inside the Parts tab; the conversation on screen is that or the Chat tab's.
   // (Not when the Chat tab is switched off in Controls: chat is hidden everywhere.)
@@ -1464,7 +1495,12 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
           console.warn('search', conv, e);
           return [];
         }),
-      saveChannel: (id, data) => store.saveChannel(id, data, actor).catch(fail),
+      saveChannel: (id, data) =>
+        (privateDocs.some((d) => d.id === id) ? store.savePrivateChannel(id, data, actor) : store.saveChannel(id, data, actor)).catch(fail),
+      // Channel requests (functions/channels.js): these answer { error } so the dialog says what's wrong.
+      requestChannel: (data) => store.requestChannel(data, actor).then(() => ({}), (e) => ({ error: e?.message || 'That didn’t go through.' })),
+      cancelChannelRequest: (id) => store.cancelChannelRequest(id, actor).catch(fail),
+      decideChannelRequest: (id, decision) => store.decideChannelRequest(id, decision, actor).catch((e) => ({ error: e?.message || 'That didn’t go through.' })),
       openDm: (names, name) => store.openDm(names, actor, name).catch((e) => (fail(e), null)),
       saveProfile: (name, patch) => store.saveProfile(name, patch).catch(fail),
       uploadAvatar: (name, blob, oldPath) => store.uploadAvatar(name, blob, oldPath).catch(fail),
@@ -1605,7 +1641,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
       subscribeQuizReports: (cb) => store.subscribeQuizReports(cb),
       handleQuizReport: (id, status) => store.handleQuizReport(id, status, actor).catch(fail),
     }),
-    [store, actor, fail, ok, quiet, setFilters, renames, rename],
+    [store, actor, fail, ok, quiet, setFilters, renames, rename, privateDocs],
   );
 
   const filtered = useMemo(
@@ -1791,6 +1827,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
         setView('chat');
       } else if (kind === 'view') setView(id);
       else if (kind === 'requests') setShowRequests(id || true);
+      else if (kind === 'channels') setChanDlg(id === 'requests' ? 'review' : 'request');
       else if (kind === 'adorder') setTrackId(id);
       else if (kind === 'shutdown') setShutdownPage(true);
       else if (kind === 'shift') {
@@ -2220,6 +2257,8 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
             setView('chat');
             setChatAsk({ ...ask, n: Date.now() });
           }}
+          onRequestChannel={requestsOn ? () => setChanDlg('request') : null}
+          chanWaiting={chanWaiting}
           isManager={actor.admin}
           myOpen={myOpenTasks.length}
           joining={joinRequests.length}
@@ -2562,6 +2601,8 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
                     checklists={checklists}
                     roster={roster}
                     joinRequests={joinRequests}
+                    chanWaiting={requestsOn ? chanWaiting : 0}
+                    onChannelRequests={() => setChanDlg('review')}
                     api={api}
                     shifts={namedShifts}
                     runs={runs}
@@ -2670,6 +2711,9 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
                     noList={!phone}
                     ask={chatAsk}
                     onAsked={clearChatAsk}
+                    onRequestChannel={requestsOn ? () => setChanDlg('request') : null}
+                    chanWaiting={chanWaiting}
+                    onReviewChannels={() => setChanDlg('review')}
                     messages={chat}
                     unread={unread}
                     readAt={chatRead || {}}
@@ -2912,6 +2956,35 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
                         description: `Feature request from ${r.by}:\n${r.text}`,
                       });
                     }}
+                  />
+                )}
+                {chanDlg === 'request' && requestsOn && (
+                  <RequestChannelDialog
+                    roster={roster}
+                    actor={actor}
+                    channels={convs.channels}
+                    requests={channelRequests}
+                    onSend={api.requestChannel}
+                    onCancel={api.cancelChannelRequest}
+                    onClose={() => setChanDlg(null)}
+                  />
+                )}
+                {chanDlg === 'review' && actor.admin && requestsOn && (
+                  <ChannelRequestsDialog
+                    requests={channelRequests}
+                    roster={roster}
+                    channels={convs.channels}
+                    onDecide={async (r, decision) => {
+                      const res = await api.decideChannelRequest(r.id, decision);
+                      if (!res?.error) setToast({ text: decision.decline ? `Declined #${r.name}.` : `#${decision.name || r.name} is ready.` });
+                      return res;
+                    }}
+                    onNewChannel={() => {
+                      setChanDlg(null);
+                      setView('chat');
+                      setChatAsk({ type: 'channel', n: Date.now() });
+                    }}
+                    onClose={() => setChanDlg(null)}
                   />
                 )}
                 {showLog && (

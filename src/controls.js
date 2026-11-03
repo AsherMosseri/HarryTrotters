@@ -57,6 +57,7 @@ export const FEATURE_GROUPS = [
       ['checkins', 'Lab check-ins', 'Who’s-going-to-the-lab questions'],
       ['requiredPolls', 'Required polls', 'Polls in #announcements that everyone has to answer'],
       ['requests', 'Feature requests', 'Sending ideas to you'],
+      ['channelRequests', 'Channel requests', 'Teammates asking for a channel (public or private) and team management answering'],
       ['electrical', 'Electrical diagram', 'The diagram in Resources'],
     ],
   ],

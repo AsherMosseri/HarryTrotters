@@ -78,6 +78,8 @@ export default function Today({
   checklists = [],
   roster = [],
   joinRequests = [],
+  chanWaiting = 0,
+  onChannelRequests,
   api,
   shifts,
   runs = [],
@@ -125,7 +127,7 @@ export default function Today({
     );
   return (
     <UsualToday
-      {...{ actor, tasks, milestones, competition, shifts, runs, myShift, convs, unread, chat, on, onOpenTask, onOpenConv, onPage, onNewTask, roster, joinRequests }}
+      {...{ actor, tasks, milestones, competition, shifts, runs, myShift, convs, unread, chat, on, onOpenTask, onOpenConv, onPage, onNewTask, roster, joinRequests, chanWaiting, onChannelRequests }}
       {...{ settings, checklists, parts, onShowTasks, onShowParts }}
       {...{ onStartShift, onOpenShift, onPerson, onEditProfile, people, today, api }}
       pitButton={
@@ -174,6 +176,8 @@ function UsualToday({
   pitButton,
   roster = [],
   joinRequests = [],
+  chanWaiting = 0, // team management: channel requests waiting
+  onChannelRequests,
 }) {
   const lab = useContext(LabLogContext);
   const market = useMarket();
@@ -226,6 +230,13 @@ function UsualToday({
         tone: 'warn',
         text: joinRequests.length === 1 ? `${joinRequests[0].name} wants to join the team` : `${joinRequests.length} new people want to join the team`,
         go: () => onPage('team'),
+      },
+    // Team management: someone asked for a channel.
+    actor.admin &&
+      chanWaiting > 0 && {
+        tone: 'warn',
+        text: chanWaiting === 1 ? 'A channel request is waiting' : `${chanWaiting} channel requests are waiting`,
+        go: onChannelRequests,
       },
     on.includes('tasks') &&
       (overdue === 1

@@ -118,6 +118,10 @@ export default function ChatView({
   noList = false,
   ask,
   onAsked,
+  // Channel requests: everyone else asks (null when switched off); team management sees what's waiting.
+  onRequestChannel,
+  chanWaiting = 0,
+  onReviewChannels,
 }) {
   // Asher's Controls: what's switched off isn't shown here at all.
   const feat = useControls().isOn;
@@ -398,9 +402,10 @@ export default function ChatView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [api, conv.key]);
   const myConvs = useMemo(() => [...convs.channels, ...convs.dms], [convs]);
-  const canPost = conv.kind === 'dm' ? conv.mine : !conv.announce || isManager;
+  // A private channel team management isn't in: they can read it, not post.
+  const canPost = conv.kind === 'dm' ? conv.mine : conv.private && !conv.mine ? false : !conv.announce || isManager;
   const level = levelOf(conv);
-  const memberNames = conv.kind === 'dm' ? conv.people : roster;
+  const memberNames = conv.kind === 'dm' ? conv.people : conv.private ? conv.members : roster;
   let lastDay = '';
   let newShown = false;
   const myNotes = notes[conv.key] || NONE;
@@ -492,6 +497,7 @@ export default function ChatView({
               {convs.channels.map((c) => (
                 <option key={c.key} value={c.key}>
                   #{c.name}
+                  {c.private ? ' (private)' : ''}
                   {unread[c.key]?.count && !unread[c.key].muted ? ` (${unread[c.key].count})` : ''}
                   {draftKeys.has(c.key) && c.key !== conv.key ? ' · draft' : ''}
                 </option>
@@ -517,11 +523,37 @@ export default function ChatView({
                 ))}
               </optgroup>
             )}
+            {isManager && convs.teamPrivate.length > 0 && (
+              <optgroup label="Private channels (view only)">
+                {convs.teamPrivate.map((c) => (
+                  <option key={c.key} value={c.key}>
+                    #{c.name}
+                  </option>
+                ))}
+              </optgroup>
+            )}
           </select>
           {feat('dms') && (
             <button className="btn" onClick={() => setDialog({ type: 'dm' })} aria-label="New direct message">
               <Icon name="plus" size={16} /> New
             </button>
+          )}
+          {isManager ? (
+            <button
+              className="btn chan-new"
+              onClick={() => setDialog({ type: 'channel' })}
+              aria-label={chanWaiting ? `New channel (${chanWaiting} requests waiting)` : 'New channel'}
+              title="New channel"
+            >
+              <Icon name="plus" size={16} /> Channel
+              {chanWaiting > 0 && <span className="sb-add-badge mono">{chanWaiting}</span>}
+            </button>
+          ) : (
+            onRequestChannel && (
+              <button className="btn chan-new" onClick={onRequestChannel} aria-label="Request a channel" title="Request a channel">
+                <Icon name="plus" size={16} /> Channel
+              </button>
+            )
           )}
         </div>
       )}
@@ -549,8 +581,16 @@ export default function ChatView({
                 ? conv.mine
                   ? 'Direct message'
                   : 'Viewing as team management (only the people in it can post)'
-                : conv.topic ||
-                  (conv.announce ? 'Only team management posts here' : conv.subteam ? `${conv.subteam} subteam` : 'The whole team')}
+                : conv.private && !conv.mine
+                  ? 'Private. Viewing as team management (only the people in it can post)'
+                  : conv.topic ||
+                    (conv.private
+                      ? 'Private: only people invited can see this'
+                      : conv.announce
+                        ? 'Only team management posts here'
+                        : conv.subteam
+                          ? `${conv.subteam} subteam`
+                          : 'The whole team')}
             </span>
           </div>
           <div className="chat-tools">
@@ -788,7 +828,9 @@ export default function ChatView({
           <div className="composer read-only">
             {conv.kind === 'dm'
               ? 'You can read this DM because you’re on team management.'
-              : 'Only team management can post announcements. You can still react.'}
+              : conv.private
+                ? 'You can read this channel because you’re on team management. Only the people in it can post.'
+                : 'Only team management can post announcements. You can still react.'}
           </div>
         ) : (
           <Composer
@@ -835,6 +877,11 @@ export default function ChatView({
 
       {dialog?.type === 'channel' && (
         <ChannelDialog
+          waiting={dialog.channel ? 0 : chanWaiting}
+          onReview={() => {
+            setDialog(null);
+            onReviewChannels?.();
+          }}
           channel={dialog.channel}
           channels={convs.channels}
           onClose={() => setDialog(null)}

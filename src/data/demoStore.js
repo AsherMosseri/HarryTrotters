@@ -27,6 +27,7 @@ import * as market from '../../functions/shared/market.js';
 import { PERK_IDEAS } from '../../functions/shared/market.js';
 import { giftAccept, giftEnd, giftOffer, petEdit, petsIn } from '../../functions/shared/pets.js';
 import { ROSTER, cleanName, sameName } from '../../functions/shared/team.js';
+import * as chan from '../../functions/shared/channels.js';
 import { checkPicks, myPicks, personOptionId, usesVoteButton } from '../../functions/shared/polls.js';
 import { demoLife } from './demoLife.js';
 import { demoLearn } from './demoLearn.js';
@@ -718,6 +719,22 @@ if (!state.joinSeeded) {
   state.joinSeeded = 1;
 }
 
+// Channel requests waiting for team management (the real ones are made and
+// answered by functions/channels.js; the demo runs the same checks).
+if (!state.channelRequestsSeeded) {
+  const at = Date.now();
+  const sample = (id, by, name, purpose, kind, invitees, ago) => ({
+    id, name, purpose, kind, invitees, by, byUid: 'demo', at: at - ago, status: 'pending', decidedBy: '', decidedAt: null, note: '', channelId: '',
+  });
+  state.channelRequests = [
+    ...(state.channelRequests || []),
+    sample('cr-sophia', 'Sophia Bermudez', 'prototypes', 'Early sketches and ideas before we build them', 'public', [], 3 * 3600000),
+    sample('cr-jackson', 'Jackson Lucks', 'driver-prep', 'Driver practice plans, only for the drive team', 'private', ['Cooper Mlezcko', 'Michael Meidan'], 40 * 60000),
+  ];
+  state.privateChannels = state.privateChannels || [];
+  state.channelRequestsSeeded = 1;
+}
+
 // The market and pets in the demo: a few perks, Asher's dog, a shout-out, a
 // perk waiting for approval and an open tournament (the real ones are made
 // by team management and functions/market.js).
@@ -1070,6 +1087,9 @@ function startReminders() {
   reminderTimer = setInterval(tick, 5000);
 }
 if ((state.reminders || []).length) startReminders();
+
+// Who counts as on the team in the demo (the starting roster and anyone added).
+const demoNames = () => [...new Set([...ROSTER, ...(state.roles || []).filter((r) => r.name && !r.removed).map((r) => r.name)])];
 
 export const demoStore = {
   ...learn,
@@ -2567,6 +2587,97 @@ export const demoStore = {
     const prev = (state.channels || []).find((c) => c.id === id) || {};
     state.channels = [...rest, { ...prev, ...data, id }];
     commit();
+  },
+
+  // Channel requests, like functions/channels.js (same checks from shared/channels.js).
+  subscribeChannelRequests(actor, all, cb) {
+    return listen(() => cb((state.channelRequests || []).filter((r) => all || r.by === actor.name).sort((a, b) => a.at - b.at)));
+  },
+  subscribePrivateChannels(actor, all, cb) {
+    return listen(() => cb((state.privateChannels || []).filter((c) => all || (c.members || []).includes(actor.name))));
+  },
+  async savePrivateChannel(id, data, actor) {
+    state.privateChannels = (state.privateChannels || []).map((c) => (c.id === id ? { ...c, ...data, updatedAt: Date.now(), updatedBy: actor.name } : c));
+    commit();
+  },
+  async requestChannel(data, actor) {
+    const mine = (state.channelRequests || []).filter((r) => r.by === actor.name);
+    const limit = chan.limitError(mine, Date.now(), teamDay);
+    if (limit) throw new Error(limit);
+    const checked = chan.checkRequest(data, {
+      me: actor.name,
+      known: demoNames(),
+      taken: chan.takenNames({ channels: state.channels || [], privates: state.privateChannels || [], requests: state.channelRequests || [] }),
+    });
+    if (checked.error) throw new Error(checked.error);
+    const id = `cr-${uid()}`;
+    const at = Date.now();
+    state.channelRequests = [
+      ...(state.channelRequests || []),
+      { id, ...checked.value, by: actor.name, byUid: actor.uid || 'demo', at, status: 'pending', decidedBy: '', decidedAt: null, note: '', channelId: '' },
+    ];
+    // Team management's bell.
+    state.inbox = [
+      { id: uid(), type: 'channelRequest', title: `${actor.name.split(' ')[0]} asked for #${checked.value.name}`, body: checked.value.purpose, open: 'channels:requests', at, read: false, to: REQUESTS_TO },
+      ...(state.inbox || []),
+    ];
+    commit();
+    return { ok: true, id };
+  },
+  async cancelChannelRequest(id, actor) {
+    const r = (state.channelRequests || []).find((x) => x.id === id);
+    if (!r || r.by !== actor.name) throw new Error('That isn’t your request.');
+    if (r.status !== 'pending') throw new Error(`It was already ${r.status}.`);
+    state.channelRequests = state.channelRequests.map((x) => (x.id === id ? { ...x, status: 'cancelled', decidedBy: actor.name, decidedAt: Date.now() } : x));
+    commit();
+    return { ok: true };
+  },
+  // decision: { approve: true, name?, kind?, invitees? } or { decline: true, note? }
+  async decideChannelRequest(id, decision, actor) {
+    if (!actor.admin) throw new Error('Only team management decides.');
+    const r = (state.channelRequests || []).find((x) => x.id === id);
+    if (!r) throw new Error('That request is gone.');
+    if (r.status !== 'pending') throw new Error(`It was already ${r.status}.`);
+    const now = Date.now();
+    const tell = (title, body, open) => {
+      state.inbox = [{ id: uid(), type: 'channelRequest', title, body, open, at: now, read: false, to: r.by }, ...(state.inbox || [])];
+    };
+    if (decision.decline) {
+      const note = chan.cleanNote(decision.note);
+      state.channelRequests = state.channelRequests.map((x) => (x.id === id ? { ...x, status: 'declined', decidedBy: actor.name, decidedAt: now, note } : x));
+      tell(`Your channel request for #${r.name} was declined`, note ? `${actor.name.split(' ')[0]}: ${note}` : 'Ask team management if you want to know more.', '');
+      commit();
+      return { ok: true };
+    }
+    const chans = state.channels || [];
+    const privs = state.privateChannels || [];
+    const checked = chan.checkRequest(
+      { name: decision.name ?? r.name, purpose: r.purpose, kind: decision.kind ?? r.kind, invitees: decision.invitees ?? r.invitees },
+      { me: r.by, known: demoNames(), taken: chan.takenNames({ channels: chans, privates: privs }) },
+    );
+    if (checked.error) throw new Error(checked.error);
+    const v = checked.value;
+    const cid = chan.freeId(v.name, chan.usedIds({ channels: chans, privates: privs }));
+    const members = [r.by, ...v.invitees];
+    const order = Math.max(20, ...[...chans, ...privs].map((c) => (typeof c.order === 'number' ? c.order : 0))) + 1;
+    const channel = { id: cid, name: v.name, topic: v.purpose, subteam: '', order, deleted: false, createdBy: r.by, requestId: id, updatedAt: now, updatedBy: actor.name };
+    if (v.kind === 'private') state.privateChannels = [...privs, { ...channel, members }];
+    else state.channels = [...chans, channel];
+    state.chat = {
+      ...(state.chat || {}),
+      [cid]: [
+        {
+          id: uid(), text: chan.createdText(r.by, v.purpose, v.kind, members.length), by: 'Trotbot', byUid: 'trotbot', bot: true, at: now,
+          mentions: [], taskIds: [], replyTo: null, reactions: {}, photo: null,
+        },
+      ],
+    };
+    state.channelRequests = state.channelRequests.map((x) =>
+      x.id === id ? { ...x, status: 'approved', name: v.name, kind: v.kind, invitees: v.invitees, decidedBy: actor.name, decidedAt: now, note: '', channelId: cid } : x,
+    );
+    tell(`Your channel #${v.name} was approved`, v.kind === 'private' ? 'It’s private: only the people you invited can see it.' : 'It’s ready in your channel list.', `chat:${cid}`);
+    commit();
+    return { ok: true, channelId: cid };
   },
 
   subscribeDms(actor, all, cb) {

@@ -232,7 +232,7 @@ export const slugChannel = (name) =>
     .slice(0, 30);
 
 // Team management: add or edit a channel.
-export function ChannelDialog({ channel, channels, onSave, onDelete, onMove, onClose }) {
+export function ChannelDialog({ channel, channels, onSave, onDelete, onMove, onClose, waiting = 0, onReview }) {
   useEscape(onClose);
   const [name, setName] = useState(channel?.name || '');
   const [topic, setTopic] = useState(channel?.topic || '');
@@ -258,6 +258,15 @@ export function ChannelDialog({ channel, channels, onSave, onDelete, onMove, onC
               <CloseIcon />
             </button>
           </div>
+          {waiting > 0 && onReview && (
+            <button type="button" className="cr-banner" onClick={onReview}>
+              <Icon name="hash" size={16} />
+              <span className="grow">
+                <b className="mono">{waiting}</b> channel {waiting === 1 ? 'request is' : 'requests are'} waiting
+              </span>
+              <span className="cr-banner-go">Review</span>
+            </button>
+          )}
           <label className="field-label" htmlFor="ch-name">
             Name
           </label>
@@ -383,7 +392,7 @@ export function ChannelIcon({ conv }) {
   if (conv.kind === 'dm') return null;
   return (
     <span className="hash" style={{ color: SUBTEAM_COLORS[conv.subteam] || 'var(--muted)' }}>
-      {conv.announce ? <Icon name="announce" size={20} /> : '#'}
+      {conv.announce ? <Icon name="announce" size={20} /> : conv.private ? <Icon name="lock" size={18} /> : '#'}
     </span>
   );
 }

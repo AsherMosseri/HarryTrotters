@@ -4,6 +4,16 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '3.0.10',
+    date: '2026-11-03',
+    title: 'Ask for a channel',
+    items: [
+      'Ask for your own channel: tap ＋ next to Channels (on a phone, Channel at the top of Chat), pick a name, say what it’s for, and choose Everyone or Private with the people you invite.',
+      'Team management approves or declines each request with one tap, and you get a notification when your channel is ready.',
+      'Private channels show a lock, and only the people invited (and team management) can read them.',
+    ],
+  },
+  {
     version: '3.0.9',
     date: '2026-11-03',
     title: 'Coins add up',
