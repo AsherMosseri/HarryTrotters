@@ -1,15 +1,19 @@
-// A six-sided die drawn with pips (the ⚀–⚅ characters render tiny and boxed
-// on iPad). Used by /roll and the casino's /dice.
+import { DieFace, ensureCasinoDefs } from './casinoArt.jsx';
 
-// Which of the 3×3 spots have a pip, for 1–6.
-const PIPS = { 1: [4], 2: [2, 6], 3: [2, 4, 6], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
-
-export function Die({ n, i = 0 }) {
+// A six-sided die, drawn (the ⚀–⚅ characters render tiny and boxed on
+// iPad). Used by /roll, the casino's /dice and dice challenges. roll: tumble
+// in (only when it was just rolled, so scrolling back doesn't replay it);
+// i staggers dice rolled together.
+export function Die({ n, i = 0, roll = false }) {
+  ensureCasinoDefs();
   return (
-    <span className="die" role="img" aria-label={String(n)} style={{ '--i': i }}>
-      {Array.from({ length: 9 }, (_, k) => (
-        <span key={k} className={PIPS[n]?.includes(k) ? 'pip' : undefined} />
-      ))}
+    <span
+      className={`die${roll ? ' roll' : ''}${i % 2 ? ' odd' : ''}`}
+      role="img"
+      aria-label={String(n)}
+      style={{ animationDelay: `${i * 0.07}s` }}
+    >
+      <DieFace n={n} />
     </span>
   );
 }

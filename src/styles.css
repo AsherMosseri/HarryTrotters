@@ -2977,14 +2977,7 @@ html.kb-bar .sc-table { padding-bottom: calc(max(20px, env(safe-area-inset-botto
 .cmd-plus { font-weight: 800; font-size: 17px; color: var(--muted); padding: 0 4px; }
 .cmd-roll { display: flex; flex-direction: column; gap: 8px; }
 .cmd-roll-total { font-size: 15px; }
-/* Dice with pips (chat/Die.jsx). */
-.die {
-  --die: 40px; width: var(--die); height: var(--die); flex: none; display: inline-grid; grid-template: repeat(3, 1fr) / repeat(3, 1fr);
-  padding: calc(var(--die) * 0.13); border-radius: calc(var(--die) * 0.22); background: #fff;
-  box-shadow: inset 0 -3px 0 rgb(0 0 0 / 14%), 0 1px 3px rgb(0 0 0 / 35%);
-  animation: cmd-roll 0.6s calc(var(--i) * 0.08s) ease-out both;
-}
-.die > .pip { place-self: center; width: 72%; aspect-ratio: 1; border-radius: 50%; background: #1f2937; }
+/* Dice (chat/Die.jsx): shell.css, "Casino cards". */
 .dice-row { display: flex; align-items: center; gap: 6px; margin-top: 2px; }
 @keyframes cmd-roll { from { transform: rotate(-400deg) scale(0.3); opacity: 0; } }
 .cmd-total { font-size: 18px; }
@@ -3042,59 +3035,8 @@ html.kb-bar .sc-table { padding-bottom: calc(max(20px, env(safe-area-inset-botto
 .cmd-bot.big { width: 36px; height: 36px; font-size: 20px; }
 .cmd-go { align-self: flex-start; }
 .casino-error { color: var(--danger); font-size: 13px; font-weight: 600; }
-.casino-outcome { font-weight: 800; }
-.casino-outcome .casino-net { font-weight: 650; }
-.casino-outcome.win { color: #16a34a; } .casino-outcome.lose { color: #dc2626; } .casino-outcome.push { color: var(--muted); }
 .casino-buttons { display: flex; flex-wrap: wrap; gap: 6px; }
-.casino-reveal { animation: casino-in 0.3s 1.4s both; }
-@keyframes casino-in { from { opacity: 0; transform: translateY(4px); } }
-.slot-reels { display: flex; gap: 6px; }
-.slot-reel { width: 54px; height: 54px; overflow: hidden; border-radius: 10px; background: var(--surface); border: 2px solid #eab308; }
-.slot-strip { display: flex; flex-direction: column; }
-.slot-strip > span { height: 50px; display: grid; place-items: center; font-size: 30px; flex: none; }
-.slot-strip.spin { animation: slot-spin calc(0.8s + var(--i) * 0.3s) cubic-bezier(0.2, 0.7, 0.3, 1) both; }
-@keyframes slot-spin { from { transform: translateY(0); } to { transform: translateY(-400px); } }
-.slot-strip.spin { transform: translateY(-400px); }
-.casino-vs { display: flex; gap: 22px; }
-.casino-vs .die { --die: 36px; }
-.cmd-coin.still { animation: none; }
-.casino-roulette { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.roulette-wheel { font-size: 34px; display: inline-block; }
-.roulette-wheel.spin { animation: roulette 1.6s cubic-bezier(0.2, 0.7, 0.3, 1); }
-@keyframes roulette { from { transform: rotate(-1440deg); } }
-.roulette-ball { min-width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; font-weight: 900; color: #fff; }
-.roulette-ball.red { background: #dc2626; } .roulette-ball.black { background: #111827; } .roulette-ball.green { background: #16a34a; }
-.casino-bj { display: flex; flex-direction: column; gap: 8px; }
-.bj-hand > div { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 2px; }
-.pcard { display: inline-grid; place-items: center; min-width: 40px; height: 54px; padding: 0 6px; border-radius: 7px; background: #fff; color: #111827; border: 1px solid #d1d5db; font-weight: 800; font-size: 16px; box-shadow: 0 1px 2px rgb(0 0 0 / 15%); }
-.pcard.red { color: #dc2626; }
-.pcard.back { background: repeating-linear-gradient(45deg, #5865f2 0 6px, #4752c4 6px 12px); color: transparent; }
-.pcard.small { min-width: 28px; height: 36px; font-size: 13px; opacity: 0.7; }
-.pcard.wrong { outline: 2px solid #dc2626; }
-.pcard.big { min-width: 56px; height: 76px; font-size: 26px; }
-.casino-crash { display: flex; flex-direction: column; gap: 8px; }
-.crash-sky { position: relative; height: 120px; border-radius: 10px; overflow: hidden; background: linear-gradient(180deg, #0f172a, #312e81 60%, #7c3aed); }
-.casino-crash.crashed .crash-sky { background: linear-gradient(180deg, #450a0a, #7f1d1d); }
-.crash-rocket { position: absolute; font-size: 26px; transform: rotate(-45deg); transition: bottom 0.1s linear, left 0.1s linear; }
-.crash-mult { position: absolute; right: 12px; top: 8px; font-size: 30px; color: #fff; font-variant-numeric: tabular-nums; text-shadow: 0 2px 8px rgb(0 0 0 / 40%); }
-.casino-mines { display: flex; flex-direction: column; gap: 8px; }
-.mines-grid { display: grid; grid-template-columns: repeat(5, 44px); gap: 5px; }
-.mine-tile { width: 44px; height: 44px; border-radius: 8px; border: 0; background: linear-gradient(135deg, #475569, #334155); font-size: 20px; padding: 0; }
-.mine-tile:not(:disabled):hover { filter: brightness(1.2); }
-.mine-tile.open { background: #065f46; animation: ad-pop 0.25s; }
-.mine-tile.bomb { background: #7f1d1d; }
-.mine-tile.hit { background: #dc2626; animation: cmd-shake 0.4s 2; }
-.mine-tile:disabled { cursor: default; opacity: 1; }
-.casino-hl { display: flex; flex-direction: column; gap: 8px; }
-.hl-row { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
-.casino-lottery { display: flex; flex-direction: column; gap: 6px; }
-.casino-lottery.closed { opacity: 0.7; }
-.cmd-leaders { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
-.cmd-leaders li { display: flex; align-items: center; gap: 8px; }
-.cmd-medal { width: 24px; text-align: center; }
-@media (prefers-reduced-motion: reduce) {
-  :root:not([data-motion='on']) .slot-strip.spin, :root:not([data-motion='on']) .roulette-wheel.spin, :root:not([data-motion='on']) .casino-reveal { animation: none !important; }
-}
+/* The cards' games and economy look: shell.css, "Casino cards". */
 
 /* ---------- Multiplayer games in #arcade (chat/Arcade.jsx) ---------- */
 .cmd-card.cmd-arcade { border-left-color: #ec4899; }
@@ -3341,7 +3283,6 @@ html.kb-bar .sc-table { padding-bottom: calc(max(20px, env(safe-area-inset-botto
  :root[data-motion='off'] .np-gear::before, :root[data-motion='off'] .np-gear::after { animation: none; } 
   :root[data-motion='off'] .cmd-card *, :root[data-motion='off'] .cmd-card { animation: none !important; }
 
-  :root[data-motion='off'] .slot-strip.spin, :root[data-motion='off'] .roulette-wheel.spin, :root[data-motion='off'] .casino-reveal { animation: none !important; }
 
   :root[data-motion='off'] .c4-cell.last, :root[data-motion='off'] .rps-reveal > span, :root[data-motion='off'] .duel-sky.draw { animation: none !important; }
 

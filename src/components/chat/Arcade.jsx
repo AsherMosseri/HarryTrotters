@@ -5,6 +5,9 @@ import { AWARD_CAPS } from '../../../functions/shared/coins.js';
 import { serverNow } from '../../serverTime.js';
 import { Battleship, FunShare, RaceCard } from './FunCards.jsx';
 import { Die } from './Die.jsx';
+import { ActBtn, Amt } from './Casino.jsx';
+import { FlipCoin, ensureCasinoDefs } from './casinoArt.jsx';
+import { useMove } from './useMove.js';
 import { KINDS } from '../../../functions/shared/challenge.js';
 
 // Multiplayer game cards in #arcade (the play function runs the games; see
@@ -12,7 +15,7 @@ import { KINDS } from '../../../functions/shared/challenge.js';
 // move things along ("peek") when a countdown runs out.
 
 export const ARCADE_CARDS = ['rps', 'tictactoe', 'connect4', 'duel', 'trivia', 'hangman', 'typerace', 'heist', 'battleship', 'tetris', 'minesweep', 'challenge'];
-const coins = (n) => `${n} 🪙`;
+const coins = (n) => <Amt n={n} />;
 
 // Prizes the daily game limit cut short (the server puts what it paid in g.paid).
 function LimitLine({ g, me }) {
@@ -81,17 +84,23 @@ export function Versus({ g, Name, marks }) {
 }
 
 // Waiting for the other person: accept / decline / cancel.
-export function Invite({ g, me, act, game, now }) {
+export function Invite({ g, me, act, game, now, mv: given }) {
   const left = g.expiresAt - now;
+  const mv = given || { pending: null, send: act };
   if (me === g.b && game !== 'rps')
     return (
-      <div className="casino-buttons">
-        <button className="btn primary" onClick={() => act('accept')}>
-          Accept{g.bet ? ` (${coins(g.bet)})` : ''}
-        </button>
-        <button className="btn" onClick={() => act('decline')}>
+      <div className="cz-actions">
+        <ActBtn mv={mv} move="accept" primary>
+          Accept
+          {g.bet ? (
+            <span className="cz-sub">
+              <Amt n={g.bet} />
+            </span>
+          ) : null}
+        </ActBtn>
+        <ActBtn mv={mv} move="decline">
           Decline
-        </button>
+        </ActBtn>
       </div>
     );
   return (
@@ -99,23 +108,36 @@ export function Invite({ g, me, act, game, now }) {
       <span className="muted small">
         {me === g.b ? 'Pick to accept' : `Waiting for ${g.b.split(' ')[0]} to accept`} · {clock(left)} left
       </span>
-      {me === g.a && (
-        <button className="link-btn small" onClick={() => act('cancel')}>
-          Cancel
-        </button>
-      )}
-      {me === g.b && (
-        <button className="link-btn small" onClick={() => act('decline')}>
-          Decline
-        </button>
-      )}
+      {me === g.a && <LinkAct mv={mv} move="cancel" label="Cancel" busy="Cancelling…" />}
+      {me === g.b && <LinkAct mv={mv} move="decline" label="Decline" busy="Declining…" />}
     </div>
+  );
+}
+
+// A small text button that shows its move is on the way.
+function LinkAct({ mv, move, label, busy }) {
+  const on = mv.pending === move;
+  return (
+    <button
+      type="button"
+      className={`link-btn small${on ? ' is-pending' : ''}`}
+      aria-busy={on ? 'true' : undefined}
+      disabled={mv.pending != null && !on}
+      onClick={() => mv.send(move)}
+    >
+      {on ? busy : label}
+    </button>
   );
 }
 
 export function Result({ g, Name }) {
   if (isLive(g.status)) return null;
-  const pot = g.bet ? ` · ${coins(g.bet * 2)}` : '';
+  const pot = g.bet ? (
+    <>
+      {' '}
+      · <Amt n={g.bet * 2} />
+    </>
+  ) : null;
   const text = {
     declined: `${g.b.split(' ')[0]} declined.`,
     cancelled: 'Cancelled.',
@@ -136,44 +158,59 @@ export function Result({ g, Name }) {
 
 // /challenge: the same coin flip or dice roll for the same bet, head to head.
 // The server rolls both when the other person accepts.
-function Challenge({ g, me, act, Name, now }) {
+function Challenge({ g, me, act, Name, now, mv }) {
   const kind = KINDS[g.kind] || KINDS.coinflip;
+  // The roll animates only if it happened while the card was on screen.
+  const [wasLive] = useState(() => isLive(g.status));
   const total = (d) => (d || []).reduce((t, x) => t + x, 0);
   const rolled = g.status === 'done' && g.how === 'rolled';
+  const clash = rolled && wasLive;
+  const side = (n, k) => {
+    const d = rolled && g.kind === 'dice' ? g.rolls[k ? 'b' : 'a'] : null;
+    const calls = g.kind === 'coinflip' ? (k ? (g.call === 'heads' ? 'tails' : 'heads') : g.call) : null;
+    return (
+      <div key={n} className={`ch-side ${k ? 'b' : 'a'}${rolled && g.winner === n ? ' ch-won' : ''}${rolled && g.winner && g.winner !== n ? ' ch-lost' : ''}`}>
+        <Avatar name={n} size={40} decoration="" />
+        <span className="ch-name">{n === BOT ? 'Trotbot' : n.split(' ')[0]}</span>
+        {calls && <span className="cz-label">{calls}</span>}
+        {d && (
+          <span className="dice-row">
+            <Die n={d[0]} i={k * 2} roll={wasLive} />
+            <Die n={d[1]} i={k * 2 + 1} roll={wasLive} />
+            <b className="cz-total mono">{total(d)}</b>
+          </span>
+        )}
+      </div>
+    );
+  };
   return (
     <div className="arc-challenge">
-      <Versus g={g} Name={Name} />
-      <div className="muted small">
-        {kind.label} · {g.kind === 'coinflip' ? `${g.a.split(' ')[0]} calls ${g.call}, ${g.b.split(' ')[0]} gets ${g.call === 'heads' ? 'tails' : 'heads'}` : 'higher roll wins, ties roll again'}
+      <div className={`cz-table ch-table${clash ? ' clash' : ''}`}>
+        {side(g.a, 0)}
+        <span className="ch-vs">
+          <span className="cz-vs-badge">vs</span>
+          {g.bet > 0 && (
+            <span className="cz-chip">
+              <Amt n={g.bet} /> each
+            </span>
+          )}
+          {rolled && g.kind === 'coinflip' && <FlipCoin side={g.flip} spin={wasLive} />}
+        </span>
+        {side(g.b, 1)}
       </div>
-      {isLive(g.status) && <Invite g={g} me={me} act={act} game="challenge" now={now} />}
-      {rolled && g.kind === 'dice' && (
-        <div className="casino-vs ch-rolls">
-          {[g.a, g.b].map((n, k) => {
-            const d = g.rolls[k ? 'b' : 'a'];
-            return (
-              <div key={n} className={g.winner === n ? 'ch-won' : ''}>
-                <div className="muted tiny">{n.split(' ')[0]}</div>
-                <div className="dice-row">
-                  <Die n={d[0]} i={0} />
-                  <Die n={d[1]} i={1} />
-                  <b className="cmd-total">{total(d)}</b>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-      {rolled && g.kind === 'coinflip' && (
-        <div className="cmd-flip">
-          <span className={`cmd-coin ${g.flip} still`} aria-hidden="true">
-            🪙
-          </span>
-          <span>
-            It’s <b>{g.flip}</b>.
-          </span>
-        </div>
-      )}
+      <div className="muted small">
+        {kind.label} ·{' '}
+        {g.kind === 'coinflip'
+          ? `${g.a.split(' ')[0]} calls ${g.call}, ${g.b.split(' ')[0]} gets ${g.call === 'heads' ? 'tails' : 'heads'}`
+          : 'higher roll wins, ties roll again'}
+        {rolled && g.kind === 'coinflip' && (
+          <>
+            {' '}
+            · It’s <b>{g.flip}</b>.
+          </>
+        )}
+      </div>
+      {isLive(g.status) && <Invite g={g} me={me} act={act} game="challenge" now={now} mv={mv} />}
       {rolled && g.rerolls > 0 && <div className="muted tiny">Tied {g.rerolls === 1 ? 'once' : `${g.rerolls} times`}, so they rolled again.</div>}
       <Result g={g} Name={Name} />
     </div>
@@ -634,7 +671,7 @@ function Heist({ g, me, act, Name, now }) {
         <>
           <div className="small">{g.story}</div>
           <div className={`arc-result ${g.ok ? 'win' : 'lose'}`}>
-            {g.ok ? `💰 Got away! Everyone gets ${coins(g.each)}` : `🚓 Caught. Everyone lost ${coins(g.bet)}`}
+            {g.ok ? <>💰 Got away! Everyone gets {coins(g.each)}</> : <>🚓 Caught. Everyone lost {coins(g.bet)}</>}
             <span className="muted small"> · {g.odds}% odds</span>
           </div>
         </>
@@ -648,19 +685,12 @@ export function ArcadeBody({ m, me, Name, onMove, conv }) {
   const g = { ...c.game, status: c.status };
   const live = isLive(c.status);
   const now = useNow(live);
-  const [error, setError] = useState('');
-  const busy = useRef(false);
-  const act = async (mv, quiet) => {
-    if (busy.current && !quiet) return;
-    busy.current = !quiet;
-    try {
-      const r = await onMove(mv);
-      if (!quiet) setError(r?.note ? r.note.title : '');
-      return r;
-    } finally {
-      if (!quiet) busy.current = false;
-    }
-  };
+  useEffect(ensureCasinoDefs, []);
+  // One move at a time, shown at once; the card takes the next tap as soon as
+  // its new state arrives (useMove). Timers' quiet asks never block a tap.
+  const mv = useMove(onMove, `${c.status}|${JSON.stringify(c.game)}`);
+  const act = (move, quiet) => (quiet ? mv.peek(move) : mv.send(move));
+  const error = mv.error;
   // Timers that need the server to move things along.
   const at = {
     open: c.name === 'typerace' ? g.startAt : c.name === 'heist' ? g.endsAt : g.expiresAt,
@@ -675,7 +705,7 @@ export function ArcadeBody({ m, me, Name, onMove, conv }) {
     placing: g.placeBy,
   }[c.status];
   usePeekAt(at, live, act);
-  const props = { g, me, act, Name, now };
+  const props = { g, me, act, Name, now, mv };
   // A Tetris or Minesweeper result someone posted (not a race).
   if (c.share) return <FunShare c={c} by={m.by} Name={Name} />;
   const body = {

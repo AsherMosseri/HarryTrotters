@@ -1460,11 +1460,13 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
       // Casino reports (Disputes.jsx).
       dispute: (req) => store.dispute(req, actor).catch((e) => ({ note: noteFor(e, 'That didn’t go through') })),
       disputeDecide: (req) => store.disputeDecide(req, actor).catch((e) => ({ note: noteFor(e, 'That didn’t go through') })),
-      play: (req) =>
-        store
+      play: (req) => {
+        const sent = Date.now();
+        return store
           .play(req, actor, { balanceOf: (n) => cmdData.current.wallet(n).balance, roster: cmdData.current.roster })
-          .then((r) => (setServerSkew(r?.serverNow), coinSync.current?.noteServer(r?.balance), r))
-          .catch((e) => ({ note: noteFor(e, 'Trotbot couldn’t do that') })),
+          .then((r) => (setServerSkew(r?.serverNow, sent), coinSync.current?.noteServer(r?.balance), r))
+          .catch((e) => ({ note: noteFor(e, 'Trotbot couldn’t do that') }));
+      },
       // What the server counts for someone (Coins screen: Compare with the server).
       coinCheck: (name) => store.coinCheck({ name }, actor, { walletOf: (n) => coinSync.current?.walletOf(n) }),
       // Tetris and Minesweeper: the funGame function starts and checks each game.
