@@ -52,15 +52,15 @@ export function CoinsToday({ today, compact }) {
 }
 
 // ---------- one game ----------
-function Choices({ q, result, busy, onPick }) {
+function Choices({ q, result, busy, pending, onPick }) {
   const tf = isTrueFalse(q);
   const people = q.bank === 'who';
   return (
     <div className={`lq-choices${tf ? ' tf' : ''}${q.choices.some((c) => c.length > 60) ? ' long' : ''}`}>
       {q.choices.map((c, i) => {
-        const st = result ? (i === result.answer ? ' is-right' : i === result.given ? ' is-wrong' : ' dim') : '';
+        const st = result ? (i === result.answer ? ' is-right' : i === result.given ? ' is-wrong' : ' dim') : pending === i ? ' is-picked' : '';
         return (
-          <button key={i} className={`lq-choice${st}`} onClick={() => onPick(i)} disabled={!!result || busy}>
+          <button key={i} className={`lq-choice${st}`} onClick={() => onPick(i)} disabled={!!result || busy} aria-busy={pending === i || undefined}>
             {!tf && !people && <span className="lq-choice-n mono">{String.fromCharCode(65 + i)}</span>}
             {people ? <PersonChoice name={c} /> : <span className="lq-choice-text">{c}</span>}
             {result && i === result.answer && <Icon name="check" size={18} className="lq-choice-mark" />}
@@ -129,15 +129,22 @@ function Game({ game, api, onBack, onProgress, today, setToday }) {
   const [streak, setStreak] = useState(0);
   const [pick, setPick] = useState(null);
   const [reported, setReported] = useState(false);
+  // The answer you tapped, shown right away while the server checks it.
+  const [pending, setPending] = useState(null);
   const streakRef = useRef(null);
   const topRef = useRef(null);
+  // The app hands down a new api object whenever it re-renders for other
+  // reasons; reading it through a ref keeps that from loading a new question
+  // in the middle of the one you're answering.
+  const apiRef = useRef(api);
+  apiRef.current = api;
 
   const load = useCallback(
     async (skip = false) => {
       setBusy(true);
       setError('');
       try {
-        const r = await api.quizNext({ bank: game, ...(skip ? { skip: true } : {}) });
+        const r = await apiRef.current.quizNext({ bank: game, ...(skip ? { skip: true } : {}) });
         setQ(r.question);
         setEmpty(r.empty || '');
         setResult(null);
@@ -153,7 +160,7 @@ function Game({ game, api, onBack, onProgress, today, setToday }) {
       }
       setBusy(false);
     },
-    [api, game, onProgress],
+    [game, onProgress],
   );
   useEffect(() => {
     if (game !== 'auto') load();
@@ -161,10 +168,11 @@ function Game({ game, api, onBack, onProgress, today, setToday }) {
 
   const answer = async (given) => {
     if (!q || result || busy) return;
+    setPending(given);
     setBusy(true);
     setError('');
     try {
-      const r = await api.quizAnswer({ id: q.id, answer: given });
+      const r = await apiRef.current.quizAnswer({ id: q.id, answer: given });
       setResult({ ...r, given });
       if (r.progress) {
         onProgress(r.progress);
@@ -176,6 +184,7 @@ function Game({ game, api, onBack, onProgress, today, setToday }) {
       setError(e.message || String(e));
     }
     setBusy(false);
+    setPending(null);
   };
   const report = async () => {
     const note = await promptDialog({
@@ -229,7 +238,7 @@ function Game({ game, api, onBack, onProgress, today, setToday }) {
           ) : (
             <RuleCard q={q} />
           )}
-          <Choices q={q} result={result} busy={busy} onPick={answer} />
+          <Choices q={q} result={result} busy={busy} pending={pending} onPick={answer} />
         </>
       );
   }

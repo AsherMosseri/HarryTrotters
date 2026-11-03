@@ -2355,6 +2355,13 @@ button.pm-row:hover { background: color-mix(in srgb, var(--text) 4%, transparent
 }
 .lq-choice:not(:disabled):active { transform: scale(0.985); }
 .lq-choice:disabled { cursor: default; }
+/* The answer you tapped lights up at once (the server checks it in the
+   background), so a tap never looks like it didn't land. */
+.lq-choice.is-picked { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--surface)); box-shadow: inset 0 0 0 1px var(--accent); }
+.lq-choice.is-picked .lq-choice-n { background: var(--accent); color: #fff; }
+.lq-choice.is-picked::after { content: ''; position: absolute; right: 12px; top: 50%; width: 14px; height: 14px; margin-top: -7px; border-radius: 50%; border: 2px solid color-mix(in srgb, var(--accent) 35%, transparent); border-top-color: var(--accent); animation: lq-spin 0.7s linear infinite; }
+@keyframes lq-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .lq-choice.is-picked::after { animation-duration: 2s; } }
 .lq-choice-n {
   flex: none; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 7px; background: var(--surface-2);
   color: var(--muted); font-size: 13px; font-weight: 600;
