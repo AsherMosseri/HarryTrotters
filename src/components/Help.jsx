@@ -114,8 +114,9 @@ const SECTIONS = [
   [
     'Market',
     [
+      'Your coin balance is the gold pill at the top right of every screen. Tap it for your coins: history, sending, and the leaderboard.',
       'Spend Jackson coins on pet care, real perks, chat extras for a day, and tournament entries. Perks wait for team management to approve them; a decline gives your coins back.',
-      'Pets: adopt one if you want. It grows with your lab time (never with coins), needs food and fun, and shows on your profile and next to your name.',
+      'Pets: adopt one if you want. It grows with your lab time (never with coins), needs food and fun, and shows on your profile and next to your name. Don’t see the animal you want? Tap Request a pet under the adopt screen; it goes in the feature requests so others can 👍 it.',
       'Levels unlock things just for show: a title (Rookie up to Hall of Famer), gear to dress your pet in (tap Style), fur tints, and a bronze, silver or gold ring around its badge in chat. Level path in the Pets shelf lists them all.',
       'At level 10 a pet can have one baby (Meet the baby): a new pet that grows from your lab time since it was born. You can hold two pets. To give one to a teammate, tap Give to a teammate; they can accept or say no thanks within a week, and a pet that moves starts over at level 1 with its new owner.',
       'Pet park (top of the Pets shelf, and a card on Today): everyone’s pets in one scene. Tap one to see its owner, level, title and what it wears.',

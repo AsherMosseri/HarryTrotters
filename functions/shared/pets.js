@@ -258,6 +258,7 @@ export const GEAR = [
   { id: 'headset', name: 'Headset', slot: 'head', level: 12 },
   { id: 'medal', name: 'Medal', slot: 'neck', level: 15 },
   { id: 'midnight', name: 'Midnight', slot: 'palette', level: 15 },
+  { id: 'crimson', name: 'Crimson', slot: 'palette', level: 15 },
   { id: 'sunglasses', name: 'Sunglasses', slot: 'face', level: 18 },
   { id: 'goldmedal', name: 'Gold medal', slot: 'neck', level: 22 },
   { id: 'crown', name: 'Crown', slot: 'head', level: 25 },

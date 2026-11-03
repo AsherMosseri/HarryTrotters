@@ -23,6 +23,7 @@ import { Avatar, CloseIcon, Overlay } from './common.jsx';
 import { Coins } from './Coins.jsx';
 import { alertDialog, confirmDialog, promptDialog } from './Dialogs.jsx';
 import { AdoptPet, Meter, nextLevelLine } from './Pet.jsx';
+import { RequestPetLink } from './PetRequest.jsx';
 import { PetWithGear } from './PetGear.jsx';
 import { EventsAdmin, ParkSection } from './PetPark.jsx';
 import { Icon } from './shell/icons.jsx';
@@ -39,7 +40,7 @@ const speciesName = (id) => SPECIES.find((s) => s.id === id)?.name || id;
 const RING_NAME = { bronze: 'Bronze ring', silver: 'Silver ring', gold: 'Gold ring' };
 const SLOT_NAME = { ...Object.fromEntries(GEAR_SLOTS.map((s) => [s.id, s.name])), ring: 'Chat ring', baby: 'Baby' };
 // Soft swatches for the fur tints (the pet itself is tinted with CSS).
-const SWATCH = { sunset: 'linear-gradient(135deg, #ffb36b, #f0627f)', midnight: 'linear-gradient(135deg, #5a6bd8, #1c2552)', golden: 'linear-gradient(135deg, #ffe27a, #d9a21b)' };
+const SWATCH = { sunset: 'linear-gradient(135deg, #ffb36b, #f0627f)', midnight: 'linear-gradient(135deg, #5a6bd8, #1c2552)', crimson: 'linear-gradient(135deg, #f0707a, #8c1530)', golden: 'linear-gradient(135deg, #ffe27a, #d9a21b)' };
 
 // ---------- the Pets shelf ----------
 export function PetsShelf({ actor, balance, buy, busy, onToast, roster = [] }) {
@@ -95,6 +96,7 @@ export function PetsShelf({ actor, balance, buy, busy, onToast, roster = [] }) {
               />
             ))}
           </div>
+          <RequestPetLink />
         </section>
       )}
 

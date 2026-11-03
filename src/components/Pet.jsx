@@ -6,6 +6,7 @@ import { useMarket } from '../market.js';
 import { Icon } from './shell/icons.jsx';
 import { confirmDialog, promptDialog } from './Dialogs.jsx';
 import { PetWithGear } from './PetGear.jsx';
+import { RequestPetLink } from './PetRequest.jsx';
 
 // Pets (H3): the art lives in PetArt.jsx. They breathe, hop when happy and
 // droop when sad, only while "Moving things" plays (shell.css), with
@@ -167,6 +168,7 @@ export function AdoptPet() {
         </button>
       </div>
       {error && <p className="danger small">{error}</p>}
+      <RequestPetLink />
     </div>
   );
 }
