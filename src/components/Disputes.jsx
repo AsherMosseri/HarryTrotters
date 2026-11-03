@@ -4,14 +4,18 @@ import { relTime, useEscape } from '../util.js';
 import { Avatar, CloseIcon, Overlay } from './common.jsx';
 import { confirmDialog } from './Dialogs.jsx';
 import { Icon } from './shell/icons.jsx';
+import { REQUESTS_TO } from '../config.js';
 
-// Casino reports. Someone says a result looks wrong; team management looks at
-// it and refunds by hand, or keeps the result. Nothing is refunded by itself.
-// The checks and the money are on the server (functions/disputes.js).
+// Casino reports. Someone says a result looks wrong; the owner (Asher, the
+// same person feature requests go to) looks at it and refunds by hand, or
+// keeps the result. Other team managers don't get them. Nothing is refunded
+// by itself. The checks and the money are on the server (functions/disputes.js).
 
 export { DISPUTABLE, reportProblem };
 
 const first = (n) => (n || '').split(' ')[0];
+// Who handles reports, by first name ("Asher").
+export const REPORTS_TO = first(REQUESTS_TO);
 const WHEN = (ms) => new Date(ms).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
 // Can I report this message, and what does the card say I lost?
@@ -27,7 +31,7 @@ export function statusText(x) {
     ? `Refunded ${x.refund} coins`
     : x.status === 'dismissed'
       ? 'Kept as it was'
-      : 'Waiting for team management';
+      : `Waiting for ${REPORTS_TO}`;
 }
 
 // "What looks wrong?": a reason, and an optional note.
@@ -64,9 +68,9 @@ export function ReportDialog({ m, conv, api, onClose }) {
               <div className="ad-pop coins-sent-ic" aria-hidden="true">
                 ✓
               </div>
-              <h3>Sent to team management</h3>
+              <h3>Sent to {REPORTS_TO}</h3>
               <p className="muted small">
-                They’ll look at it and tell you what they decide. You can follow it under Jackson coins, Reports.
+                {REPORTS_TO} will look at it and let you know. You can follow it under Jackson coins, Reports.
               </p>
               <button className="btn primary" onClick={onClose}>
                 Done
@@ -75,7 +79,7 @@ export function ReportDialog({ m, conv, api, onClose }) {
           ) : (
             <>
               <p className="muted small report-about">
-                {GAME_LABEL[m.cmd.name]} · {WHEN(m.at)}. Team management will look at it. Nothing changes until they do.
+                {GAME_LABEL[m.cmd.name]} · {WHEN(m.at)}. Only {REPORTS_TO} sees it, and nothing changes until he looks.
               </p>
               <div className="report-reasons" role="radiogroup" aria-label="What looks wrong?">
                 {Object.entries(REASONS).map(([id, label]) => (
@@ -142,7 +146,7 @@ export function MyReports({ list }) {
   );
 }
 
-// Team management: reports waiting, and the ones already handled.
+// The owner: reports waiting, and the ones already handled.
 export function DisputesDialog({ list, api, wallet, onToast, onClose }) {
   useEscape(onClose);
   const [tab, setTab] = useState('open');

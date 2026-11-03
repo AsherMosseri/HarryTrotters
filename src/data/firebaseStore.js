@@ -36,7 +36,7 @@ import {
   deleteObject as fsDeleteObject,
 } from 'firebase/storage';
 import { getFunctions, httpsCallable } from 'firebase/functions';
-import { FUNCTIONS_REGION, firebaseConfig, VAPID_KEY } from '../config.js';
+import { FUNCTIONS_REGION, REQUESTS_TO, firebaseConfig, VAPID_KEY } from '../config.js';
 import { pushSupport } from './push.js';
 import {
   describeChanges,
@@ -1368,9 +1368,10 @@ export const firebaseStore = {
   async play(req) {
     return (await callable('play')(req)).data;
   },
-  // Casino reports (functions/disputes.js): report a result, and team
-  // management's refund / dismiss. Team management sees every report, anyone
-  // else their own. dispute(req) and disputeDecide(req) return { ok } or { note }.
+  // Casino reports (functions/disputes.js): report a result, and the owner's
+  // (Asher's) refund / dismiss. The owner sees every report, anyone else
+  // (other team managers too) their own. dispute(req) and disputeDecide(req)
+  // return { ok } or { note }.
   async dispute(req) {
     return (await callable('dispute')(req)).data;
   },
@@ -1378,7 +1379,8 @@ export const firebaseStore = {
     return (await callable('disputeDecide')(req)).data;
   },
   subscribeDisputes(actor, cb) {
-    const q = actor.admin ? collection(db, 'disputes') : query(collection(db, 'disputes'), where('by', '==', actor.name));
+    const owner = actor.admin && actor.name === REQUESTS_TO;
+    const q = owner ? collection(db, 'disputes') : query(collection(db, 'disputes'), where('by', '==', actor.name));
     return onSnapshot(
       q,
       (snap) => cb(snap.docs.map(readDoc).sort((a, b) => b.at - a.at)),

@@ -1,8 +1,8 @@
-// Casino reports: someone says a result looks wrong, team management looks at
-// it and refunds by hand or says no. No Firebase in here: the server
+// Casino reports: someone says a result looks wrong, the team owner (Asher)
+// looks at it and refunds by hand or says no. No Firebase in here: the server
 // (functions/disputes.js) and demo mode use the same checks.
 //
-// A report never moves coins by itself. Team management's "Refund" pays back
+// A report never moves coins by itself. The owner's "Refund" pays back
 // at most what the card (written by the server, so it can't be faked) shows
 // the person lost, once, as a 'refund' entry in the coins ledger.
 
@@ -27,7 +27,7 @@ export const REASONS = {
   errored: 'I lost coins and the game errored',
   other: 'Something else',
 };
-export const LIMITS = { perDay: 3, note: 300, resolution: 200, window: 2 * 3600000 };
+export const LIMITS = { perDay: 10, note: 300, resolution: 200, window: 2 * 3600000 };
 
 // Everyone the card is about (the person who played, or both people in a challenge).
 export function cardPlayers(cmd, by, rename = (n) => n) {
@@ -58,7 +58,7 @@ export function reportProblem(m, me, rename = (n) => n) {
   return '';
 }
 
-// A few plain words about the card, for team management.
+// A few plain words about the card, for the owner.
 export function describeCard(cmd) {
   const g = cmd?.game || {};
   const n = cmd?.name;

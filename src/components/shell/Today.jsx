@@ -242,7 +242,8 @@ function UsualToday({
         text: chanWaiting === 1 ? 'A channel request is waiting' : `${chanWaiting} channel requests are waiting`,
         go: onChannelRequests,
       },
-    // Team management: casino results someone reported (Casino reports).
+    // The owner only (Asher; Workspace passes 0 to everyone else): casino
+    // results someone reported (Casino reports).
     actor.admin &&
       disputes > 0 && {
         tone: 'warn',
