@@ -12,7 +12,8 @@
 //                                  cancel a tournament, void a result, clear
 //                                  or void a run held for review
 //   pet({ action, … })             adopt, rename, show in chat, rehome, style,
-//                                  hatch a baby, give a pet to a teammate
+//                                  hatch a baby, give a pet to a teammate,
+//                                  photos of real pets (petphotos.js)
 // Scheduled: payTournaments (every 10 minutes) pays out the ones that ended.
 // The checks themselves are in shared/market.js and shared/pets.js (demo
 // mode runs the same ones).
@@ -25,6 +26,8 @@ import { FieldPath, FieldValue } from 'firebase-admin/firestore';
 import * as market from './shared/market.js';
 import { petsIn } from './shared/pets.js';
 import { petFamily } from './petfamily.js';
+import { petPhotos } from './petphotos.js';
+import { PHOTO_ACTIONS } from './shared/petphotos.js';
 import { memberOk } from './shared/team.js';
 
 const OPEN = { maxInstances: 5, invoker: 'public' };
@@ -325,8 +328,11 @@ export function marketFunctions({ db, coinData, freshCoins, notify, bankRef, per
   // Pets: free to adopt, name, show, dress up and rehome; a pet can have one
   // baby, and can be given to a teammate (petfamily.js). Care is bought (buy).
   const runPet = petFamily({ db, notify, personId });
+  // Photos of real pets (petphotos.js) ride on the same callable.
+  const runPhotos = petPhotos({ db, notify, personId, managers, owner });
   const pet = onCall(OPEN, async (req) => {
     const ctx = await caller(req);
+    if (PHOTO_ACTIONS.includes(req.data?.action)) return runPhotos(ctx, req.data);
     return runPet(ctx, req.data || {});
   });
 

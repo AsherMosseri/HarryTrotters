@@ -227,6 +227,14 @@ function UsualToday({
         text: joinRequests.length === 1 ? `${joinRequests[0].name} wants to join the team` : `${joinRequests.length} new people want to join the team`,
         go: () => onPage('team'),
       },
+    // Team management: photos of real pets waiting for a yes or no (Market, Pets).
+    actor.admin &&
+      openPark &&
+      market?.photos?.waiting.length > 0 && {
+        tone: 'warn',
+        text: `${market.photos.waiting.length} pet photo${market.photos.waiting.length === 1 ? '' : 's'} waiting for you`,
+        go: openPark,
+      },
     on.includes('tasks') &&
       (overdue === 1
         ? { tone: 'bad', text: `${firstOverdue.title || 'A task'} is overdue`, go: () => onOpenTask(firstOverdue.id) }

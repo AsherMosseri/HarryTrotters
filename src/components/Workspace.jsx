@@ -1988,9 +1988,11 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
   const market = useMarketData(store, {
     actor,
     rename,
+    renames,
     shifts: namedShifts,
     balanceOf: (n) => walletOf(n).balance,
     coinsOn: controls.isOn('coins'),
+    photosOn: controls.isOn('photos'),
     onToast: (text) => setToast({ text }),
   });
   cmdData.current = {

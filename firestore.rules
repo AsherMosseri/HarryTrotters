@@ -233,6 +233,18 @@ service cloud.firestore {
       allow read: if isMember();
       allow write: if false;
     }
+    // Photos of real pets (functions/petphotos.js): petPhotos holds the
+    // approved ones everyone sees; petPhotoRequests holds each person's latest
+    // photo and where it stands (read by them and team management only). The
+    // server writes both. Hidden when Photos is switched off in Controls.
+    match /petPhotos/{id} {
+      allow read: if isMember() && !featureOff('photos');
+      allow write: if false;
+    }
+    match /petPhotoRequests/{id} {
+      allow read: if isMember() && !featureOff('photos') && (isManager() || isMe(resource.data.by));
+      allow write: if false;
+    }
     // A tournament's seed (the pieces and boards come from it): the server only.
     match /tournamentSecrets/{id} {
       allow read, write: if false;

@@ -51,6 +51,29 @@ service firebase.storage {
       );
     }
 
+    // Photos of real pets: the small PNG sticker the app cuts out on the
+    // device (the original photo never leaves it), at petphotos/<uid>/<file>.png.
+    // Only that device uploads, a new file only, PNG up to 400 KB. When it
+    // asks to use one, the server checks it and moves it to petphotos-checked/,
+    // which nobody can write to, so an approved photo can't be swapped.
+    // Nobody deletes from the app: the server removes files when a photo is
+    // replaced, declined or taken down (functions/petphotos.js). Off when
+    // Photos is switched off in Controls.
+    function photosOff() {
+      return firestore.exists(/databases/(default)/documents/settings/controls)
+        && 'photos' in firestore.get(/databases/(default)/documents/settings/controls).data.get('off', [])
+        && !(isManager() && myPersonId() == 'asher-mosseri');
+    }
+    match /petphotos/{uid}/{file} {
+      allow get: if isMember();
+      allow create: if isMember() && request.auth.uid == uid && !photosOff()
+        && file.matches('[A-Za-z0-9_-]{1,60}[.]png')
+        && request.resource.contentType == 'image/png' && request.resource.size < 400 * 1024;
+    }
+    match /petphotos-checked/{file} {
+      allow get: if isMember();
+    }
+
     // Profile banners, same idea as pictures.
     match /banners/{file} {
       allow get: if isMember();

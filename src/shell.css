@@ -3891,3 +3891,82 @@ html.kb-bar .chat-side-body { padding-bottom: calc(8px + var(--kb-bar, 0px)); }
 .poll-dialog .segmented { width: 100%; }
 .poll-dialog .segmented button[aria-checked='true'] { background: var(--accent-soft); color: var(--accent); font-weight: 600; box-shadow: inset 0 0 0 1.5px var(--accent); }
 .poll-dialog .segmented button:disabled { opacity: 0.5; }
+
+/* ---------- Photos of real pets (3.0.9) ----------
+   PetPhoto.jsx, PetPhotoDialog.jsx: a framed sticker beside the drawn pet (the
+   owned-pet card, profiles, the pet park), your buttons and status under your
+   pet, the touch-up and preview steps, and team management's review list.
+   Stickers are fixed-size images, tilted a little and never animated. */
+.pp-pair { flex: none; display: flex; align-items: flex-end; gap: 6px; min-width: 0; }
+.pet-card.big .pp-pair { align-self: center; }
+.pp-sticker {
+  --pp: 96px; --ar: 1; position: relative; flex: none; display: grid; place-items: center; box-sizing: border-box;
+  height: var(--pp); width: auto; aspect-ratio: var(--ar); border-radius: 14px; overflow: hidden;
+  background: var(--surface-2); border: 1px solid var(--border); box-shadow: 0 1px 3px rgb(0 0 0 / 0.14);
+  transform: rotate(-3deg);
+}
+.pp-sticker img { display: block; width: 100%; height: 100%; padding: 4px; box-sizing: border-box; object-fit: contain; user-select: none; -webkit-user-drag: none; }
+.pp-sticker.pending { border-style: dashed; border-color: var(--muted); }
+.pp-sticker.pending img { opacity: 0.7; }
+/* In the park the sticker is tucked beside the pet. */
+.park-pet { position: relative; }
+.pp-sticker.mini { position: absolute; right: -14px; bottom: 14px; z-index: 1; border-radius: 8px; transform: rotate(6deg); box-shadow: 0 1px 2px rgb(0 0 0 / 0.25); }
+.pp-sticker.mini img { padding: 2px; }
+.park.compact .pp-sticker.mini { right: -10px; bottom: 6px; }
+.pp-caption { margin: 0; text-align: center; color: var(--muted); font-size: 13px; font-weight: 600; }
+
+.pp-row { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin: 6px 0 2px; }
+.pp-row p { margin: 0; }
+.pp-row-top { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
+.pp-badge {
+  display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px 3px 8px; border-radius: 999px;
+  background: color-mix(in srgb, #f59e0b 18%, var(--surface)); color: var(--text); font-size: 12.5px; font-weight: 650;
+}
+.pp-declined { display: flex; align-items: flex-start; gap: 6px; color: var(--danger); }
+.pp-declined svg { flex: none; margin-top: 3px; }
+
+.dialog.pp-dialog { width: min(540px, calc(100vw - 32px)); max-height: calc(100dvh - 24px); overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+.pp-body { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.pp-body p { margin: 0; }
+.pp-why { padding: 8px 10px; border-radius: 10px; background: color-mix(in srgb, #f59e0b 14%, var(--surface)); }
+.pp-forget { align-self: flex-start; text-align: left; }
+.pp-bar { position: relative; display: block; height: 8px; border-radius: 4px; background: var(--border); overflow: hidden; }
+.pp-bar > span { position: absolute; inset: 0; transform-origin: 0 50%; border-radius: inherit; background: var(--accent); transition: transform 0.25s ease; }
+.pp-bar.indeterminate > span { opacity: 0.55; }
+:root[data-anim~='move'] .pp-bar.indeterminate > span { opacity: 1; right: auto; width: 35%; transform: translateX(-100%); animation: pp-slide 1.3s ease-in-out infinite; }
+@keyframes pp-slide { from { transform: translateX(-100%); } to { transform: translateX(300%); } }
+
+/* The checkerboard shows what is see-through. */
+.pp-checker {
+  --c: color-mix(in srgb, var(--text) 10%, var(--surface));
+  background-color: var(--surface);
+  background-image: linear-gradient(45deg, var(--c) 25%, transparent 25%, transparent 75%, var(--c) 75%), linear-gradient(45deg, var(--c) 25%, transparent 25%, transparent 75%, var(--c) 75%);
+  background-size: 16px 16px; background-position: 0 0, 8px 8px;
+}
+.pp-canvas-wrap { width: 100%; max-width: 520px; align-self: center; border-radius: 12px; overflow: hidden; border: 1px solid var(--border); }
+.pp-canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
+.pp-tools { display: flex; flex-direction: column; gap: 8px; }
+.pp-tools .segmented { align-self: flex-start; }
+.pp-tools .segmented button { min-height: 40px; }
+.pp-size { max-width: 320px; }
+.pp-previews { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.pp-tile { aspect-ratio: 1; display: grid; place-items: center; box-sizing: border-box; padding: 8px; border-radius: 12px; border: 1px solid var(--border); overflow: hidden; }
+.pp-tile.light { background: #f6f7fa; }
+.pp-tile.dark { background: #1a1e2a; }
+.pp-tile img { display: block; width: auto; height: auto; max-width: 100%; max-height: 100%; }
+.pp-beside { display: flex; align-items: flex-end; justify-content: center; gap: 8px; }
+.pp-crop { border-radius: 18%; box-shadow: 0 0 0 3px var(--accent-soft); }
+
+.pp-review-list { display: flex; flex-direction: column; gap: 10px; }
+.pp-review { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 12px; align-items: start; padding: 10px; border-radius: 12px; background: var(--surface); border: 1px solid var(--border); list-style: none; }
+.pp-review-img { display: block; width: 112px; height: 112px; border-radius: 10px; border: 1px solid var(--border); overflow: hidden; }
+.pp-review-img img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.pp-review-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.pp-review-main .mk-row-btns { margin-top: 8px; }
+.pp-showing { margin-top: 10px; }
+.pp-showing summary { cursor: pointer; font-weight: 650; font-size: 14px; padding: 6px 0; }
+@media (max-width: 420px) {
+  .pp-review { grid-template-columns: 88px minmax(0, 1fr); }
+  .pp-review-img { width: 88px; height: 88px; }
+  .pp-previews { gap: 6px; }
+}

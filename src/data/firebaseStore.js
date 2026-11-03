@@ -727,6 +727,43 @@ export const firebaseStore = {
   async petEvent(req) {
     return (await callable('petEvent')(req)).data;
   },
+  // Photos of real pets (functions/petphotos.js). The approved ones everyone
+  // sees; the waiting and answered ones are yours (or all of them, for team
+  // management). The device uploads its own small PNG sticker; the pet
+  // callable's submitPhoto then checks the file and makes the photo's link.
+  subscribePetPhotos(cb) {
+    return onSnapshot(
+      collection(db, 'petPhotos'),
+      (snap) => cb(snap.docs.map(readDoc)),
+      (e) => console.warn('petPhotos', e),
+    );
+  },
+  subscribePetPhotoRequests(actor, names, cb) {
+    if (actor.admin)
+      return onSnapshot(
+        collection(db, 'petPhotoRequests'),
+        (snap) => cb(snap.docs.map(readDoc)),
+        (e) => console.warn('petPhotoRequests', e),
+      );
+    // One listener a name (the rules read a doc by the name it was made under).
+    const parts = {};
+    const offs = names.map((n) =>
+      onSnapshot(
+        query(collection(db, 'petPhotoRequests'), where('by', '==', n)),
+        (snap) => {
+          parts[n] = snap.docs.map(readDoc);
+          cb(Object.values(parts).flat());
+        },
+        (e) => console.warn('petPhotoRequests', e),
+      ),
+    );
+    return () => offs.forEach((off) => off());
+  },
+  async uploadPetPhoto(blob, actor) {
+    const path = `petphotos/${actor.uid}/${itemId()}.png`;
+    await uploadBytes(fileRef(storage, path), blob, { contentType: 'image/png' });
+    return { path };
+  },
   subscribeTournaments(cb) {
     return onSnapshot(
       collection(db, 'tournaments'),
