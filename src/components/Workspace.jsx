@@ -91,7 +91,8 @@ import { addLocalTouch, dayOf, hoursOn, localTouches, logId, missingLogDay, payo
 import { OrderTracker, OrdersDialog, orderActive } from './AdOrders.jsx';
 import { setServerSkew } from '../serverTime.js';
 import { AdBlockWall, GameDialog, PrizeWheel, VideoAd } from './AdGames.jsx';
-import { coinSettings, coinsByName, wallet } from '../coins.js';
+import { coinInput, coinSettings, wallet } from '../coins.js';
+import { useCoinSync } from '../coinSync.js';
 import { hoursOf, mergedMs } from '../../functions/shared/hours.js';
 import { teamDay } from '../../functions/shared/coins.js';
 import { hasLabel, newBattery, putOnRobot, statusPatch } from '../batteries.js';
@@ -1248,6 +1249,8 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
   // What slash commands look up (commands.js): filled in further down, once
   // coins and shifts are known; api reads it when a command runs.
   const cmdData = useRef({});
+  // The server's balance from each coin answer, checked against ours (coinSync.js).
+  const coinSync = useRef(null);
   const api = useMemo(
     () => ({
       create: async (data) => {
@@ -1410,8 +1413,10 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
       play: (req) =>
         store
           .play(req, actor, { balanceOf: (n) => cmdData.current.wallet(n).balance, roster: cmdData.current.roster })
-          .then((r) => (setServerSkew(r?.serverNow), r))
+          .then((r) => (setServerSkew(r?.serverNow), coinSync.current?.noteServer(r?.balance), r))
           .catch((e) => ({ note: noteFor(e, 'Trotbot couldn’t do that') })),
+      // What the server counts for someone (Coins screen: Compare with the server).
+      coinCheck: (name) => store.coinCheck({ name }, actor, { walletOf: (n) => coinSync.current?.walletOf(n) }),
       // Tetris and Minesweeper: the funGame function starts and checks each game.
       funGame: (req) =>
         store
@@ -1933,7 +1938,9 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
   // Jackson coins: earned from tasks and hours (ads don't pay anyone);
   // spending, gifts, and bonuses are in the ledger.
   const [ledger, setLedger] = useState([]);
-  useEffect(() => store.subscribeCoins(setLedger), [store]);
+  // coinReload: start the coins and bank listeners over (Coins screen: refresh).
+  const [coinReload, setCoinReload] = useState(0);
+  useEffect(() => store.subscribeCoins(setLedger), [store, coinReload]);
   // Coins the server just paid you for a streak milestone, a bingo line or
   // the closest guess: a toast, and a burst for streaks and big wins. The
   // newest one seen is kept on this device so a reload doesn't repeat it.
@@ -1966,7 +1973,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
   // Casino and economy winnings/losses (bank) and the Friday lottery; the
   // play function writes them.
   const [bank, setBank] = useState({});
-  useEffect(() => store.subscribeBank(setBank), [store]);
+  useEffect(() => store.subscribeBank(setBank), [store, coinReload]);
   const [lottery, setLottery] = useState(null);
   useEffect(() => store.subscribeLottery(setLottery), [store]);
   // Under everyone's current name (shifts, the ledger, and banks keep the
@@ -1974,16 +1981,13 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
   // running shift keeps adding up.
   const coinMinute = Math.floor(now / 60000) * 60000;
   const coinData = useMemo(
-    () => ({
-      tasks: tasks || [],
-      ...coinsByName({ shifts, ledger, bank: Object.values(bank) }, rename),
-      cfg: coinCfg,
-      now: coinMinute,
-    }),
-    [tasks, shifts, ledger, bank, coinCfg, rename, coinMinute],
+    () => coinInput({ tasks: tasks || [], shifts, ledger, bank: Object.values(bank), rename, cfg: coinCfg, names: roster, now: coinMinute }),
+    [tasks, shifts, ledger, bank, coinCfg, rename, roster, coinMinute],
   );
   const walletOf = useCallback((name) => wallet(name, coinData), [coinData]);
   const myWallet = useMemo(() => walletOf(actor.name), [walletOf, actor.name]);
+  const sync = useCoinSync(myWallet);
+  coinSync.current = { noteServer: sync.noteServer, walletOf };
   // The market and pets (market.js): perks, purchases, pets, tournaments.
   const market = useMarketData(store, {
     actor,
@@ -1992,6 +1996,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
     balanceOf: (n) => walletOf(n).balance,
     coinsOn: controls.isOn('coins'),
     onToast: (text) => setToast({ text }),
+    onBalance: (b) => sync.noteServer(b),
   });
   cmdData.current = {
     roster,
@@ -3159,6 +3164,13 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
               data={coinData}
               cfg={coinCfg}
               onGift={(g) => api.play({ action: 'gift', ...g })}
+              isManager={!!actor.admin}
+              onCheck={api.coinCheck}
+              stale={sync.stale}
+              onRefresh={() => {
+                setCoinReload((n) => n + 1);
+                sync.clear();
+              }}
               onMarket={
                 views.some(([id]) => id === 'market')
                   ? () => {

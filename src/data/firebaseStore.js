@@ -1303,6 +1303,10 @@ export const firebaseStore = {
   },
   // Tetris and Minesweeper (functions/shared/funGames.js): the funGame
   // function starts a game (the seed) and finishes it (replays the moves).
+  // What the server counts for someone: your own, or anyone's for team management.
+  async coinCheck(req) {
+    return (await callable('coinCheck')(req)).data;
+  },
   async funGame(req) {
     return (await callable('funGame')(req)).data;
   },
@@ -1325,7 +1329,8 @@ export const firebaseStore = {
   subscribeBank(cb) {
     return onSnapshot(
       collection(db, 'bank'),
-      (snap) => cb(Object.fromEntries(snap.docs.map((d) => [d.data().name, d.data()]))),
+      // By doc id, with the id on each (two docs can't hide each other, and one is counted once).
+      (snap) => cb(Object.fromEntries(snap.docs.map((d) => [d.id, { ...d.data(), id: d.id }]))),
       (e) => console.warn('bank', e),
     );
   },

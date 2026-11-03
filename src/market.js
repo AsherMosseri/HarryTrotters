@@ -30,7 +30,7 @@ const saveNum = (key, n) => {
 
 // shifts: under current names. balanceOf(name): coins from the app's wallet
 // (only demo mode uses it; the server reads balances itself).
-export function useMarketData(store, { actor, rename, shifts, balanceOf, coinsOn, onToast }) {
+export function useMarketData(store, { actor, rename, shifts, balanceOf, coinsOn, onToast, onBalance }) {
   const [perks, setPerks] = useState([]);
   const [rawPurchases, setPurchases] = useState([]);
   const [rawPets, setPets] = useState([]);
@@ -163,10 +163,15 @@ export function useMarketData(store, { actor, rename, shifts, balanceOf, coinsOn
 
   const balanceRef = useRef(balanceOf);
   balanceRef.current = balanceOf;
+  // The server's balance after a buy, for the app to check its own against.
+  const onBalanceRef = useRef(onBalance);
+  onBalanceRef.current = onBalance;
   const run = useCallback(
     async (fn, data) => {
       try {
-        return await store.market(fn, data, actor, { balanceOf: (n) => balanceRef.current(n), coinsOff: !coinsOn });
+        const r = await store.market(fn, data, actor, { balanceOf: (n) => balanceRef.current(n), coinsOff: !coinsOn });
+        onBalanceRef.current?.(r?.balance);
+        return r;
       } catch (e) {
         return { note: noteFor(e, 'That didn’t go through') };
       }

@@ -17,7 +17,7 @@ import * as casino from '../../functions/shared/casino.js';
 import { dayOf, logFields, taskArea } from '../labLog.js';
 import * as arcade from '../../functions/shared/arcade.js';
 import { blocked, serverGroup } from '../../functions/shared/commandRules.js';
-import { AWARD_CAPS, giftEntry, prizeEntry, teamDay, teamMidnight } from '../../functions/shared/coins.js';
+import { AWARD_CAPS, breakdown, giftEntry, prizeEntry, teamDay, teamMidnight } from '../../functions/shared/coins.js';
 import * as fun from '../../functions/shared/funGames.js';
 import * as mines from '../../functions/shared/minesweeper.js';
 const MINE_LEVELS = mines.LEVELS;
@@ -1885,6 +1885,26 @@ export const demoStore = {
   // Tetris and Minesweeper, run here the way the funGame function runs them
   // (functions/shared/funGames.js): a game gets its seed here and its moves
   // are replayed here before anything is paid or counted.
+  // Demo mode has no server: its numbers are worked out here, so the check
+  // reads the same wallet the app shows (and always matches).
+  async coinCheck(req, actor, { walletOf }) {
+    const name = req?.name || actor.name;
+    if (name !== actor.name && !actor.admin) throw new Error('You can only check your own balance.');
+    const w = walletOf(name);
+    return {
+      ok: true,
+      demo: true,
+      name,
+      serverNow: Date.now(),
+      cacheAgeMs: 0,
+      aliases: [name],
+      balance: w.balance,
+      earned: w.earned,
+      breakdown: breakdown(w.history),
+      items: w.history.slice(0, 400).map((x) => ({ at: x.at, kind: x.kind, amount: x.amount, label: x.label, ...(x.day && { day: x.day }) })),
+      bank: { net: (state.bank || {})[name]?.net || 0, since: (state.bank || {})[name]?.since || null, docs: [], recent: [] },
+    };
+  },
   async funGame(req, actor, ctx) {
     const now = Date.now();
     const me = actor.name;

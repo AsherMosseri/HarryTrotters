@@ -13,6 +13,7 @@
 // dashboard; they just don't pay).
 
 import { mergedMs } from './hours.js';
+import { nameKey } from './team.js';
 
 // The team day 3.0's earning rules start (4 an hour in 15-minute steps, cut
 // at midnight, at most tasksPerDay paid tasks a day). Earlier days pay as
@@ -215,7 +216,7 @@ export function ledgerItems(name, ledger = []) {
   const out = [];
   for (const x of ledger) {
     if (x.type === 'spend' && x.person === name)
-      out.push({ kind: 'spend', at: x.at, amount: -x.amount, icon: SPEND_ICON[x.what] || '🚫', label: x.label || 'Spent' });
+      out.push({ kind: 'spend', at: x.at, amount: -x.amount, icon: SPEND_ICON[x.what] || '🚫', label: x.label || 'Spent', what: x.what || '' });
     // Coins back from the market (functions/market.js): a declined perk, a
     // cancelled tournament. Only the server writes these.
     else if (x.type === 'refund' && x.person === name)
@@ -233,6 +234,7 @@ export function ledgerItems(name, ledger = []) {
         amount: x.amount,
         icon: x.what === 'wheel' ? '🎡' : x.what === 'tournament' ? '🏆' : '🎮',
         label: x.label || 'Prize',
+        what: x.what || '',
       });
     else if (x.type === 'grant' && x.to === name)
       out.push({
@@ -251,9 +253,12 @@ export function ledgerItems(name, ledger = []) {
 // everything older so the total matches.
 export function bankItems(name, bank = {}) {
   const b = bank[name];
-  if (!b || !b.net) return b?.recent?.length ? bankRecent(b) : [];
+  if (!b) return [];
   const recent = bankRecent(b);
-  const older = b.net - recent.reduce((t, x) => t + x.amount, 0);
+  // Whatever the latest entries don't cover. Also when the net is 0 (a bet
+  // held for a game still running can cancel out an earlier win): the history
+  // always adds up to the bank's net, which is what the server counts.
+  const older = (b.net || 0) - recent.reduce((t, x) => t + x.amount, 0);
   if (older)
     recent.push({
       kind: 'casino',
@@ -273,6 +278,37 @@ export function wallet(name, data) {
   const history = [...earned, ...ledger].sort((a, b) => b.at - a.at);
   const sum = (list) => list.reduce((t, x) => t + x.amount, 0);
   return { balance: sum(history), earned: sum(earned), history };
+}
+
+// Which part of the history an entry belongs to (the Everyone view's chips).
+export function historyGroup(x) {
+  if (x.kind === 'casino') return 'casino';
+  if (x.kind === 'gift-in' || x.kind === 'gift-out') return 'gifts';
+  if (x.kind === 'prize') return 'prizes';
+  if (x.kind === 'refund' || (x.kind === 'spend' && (x.what === 'market' || x.what === 'tournament'))) return 'market';
+  if (x.kind === 'spend') return 'spent';
+  return 'earned'; // tasks, hours, awards, bonuses
+}
+
+// Where a balance comes from: entries and coins by kind, for comparing the
+// app's numbers with the server's (the coinCheck function) category by
+// category. Kinds with nothing in them are left out.
+export function breakdown(history) {
+  const out = {};
+  for (const x of history) {
+    const k = out[x.kind] || (out[x.kind] = { n: 0, coins: 0 });
+    k.n += 1;
+    k.coins += x.amount;
+  }
+  return out;
+}
+
+// The kinds where two breakdowns differ: [{ kind, app, server, diff }].
+export function breakdownGaps(app, server) {
+  return [...new Set([...Object.keys(app), ...Object.keys(server)])]
+    .map((kind) => ({ kind, app: app[kind]?.coins || 0, server: server[kind]?.coins || 0, appN: app[kind]?.n || 0, serverN: server[kind]?.n || 0 }))
+    .map((r) => ({ ...r, diff: r.app - r.server }))
+    .filter((r) => r.diff || r.appN !== r.serverN);
 }
 
 // Who earned the most (tasks, hours, and bonuses; gifts don't count).
@@ -302,13 +338,24 @@ export function prizesToday(name, ledger = [], what, now = Date.now()) {
 // Everything under people's current names, so coins follow a rename: shifts
 // and ledger entries keep the name they were saved with, and the server keeps
 // writing to the bank doc of the current name (an old one stays as it was and
-// is added in). bank: the bank docs, as a list.
-export function coinsByName({ shifts = [], ledger = [], bank = [] }, rename = (n) => n) {
+// is added in). bank: the bank docs, as a list; a doc that has an `id` counts
+// once however many times it's listed (a rename that only changes capitals or
+// spacing points at the same doc as the new name). names: the team's current
+// names; a bank doc whose id is one of theirs (bank/{nameKey}) is theirs even
+// if the name saved in it is spelled differently, the way the server reads it.
+export function coinsByName({ shifts = [], ledger = [], bank = [] }, rename = (n) => n, names = []) {
   const same = (n) => (n ? rename(n) : n);
+  const owner = new Map(names.map((n) => [nameKey(n), n]));
   const banks = {};
+  const seen = new Set();
   for (const b of bank) {
-    if (!b?.name) continue;
-    const name = same(b.name);
+    if (!b) continue;
+    if (b.id) {
+      if (seen.has(b.id)) continue;
+      seen.add(b.id);
+    }
+    const name = (b.id && owner.get(b.id)) || (b.name ? same(b.name) : '');
+    if (!name) continue;
     const prev = banks[name];
     banks[name] = !prev
       ? { ...b, name }
@@ -329,6 +376,56 @@ export function coinsByName({ shifts = [], ledger = [], bank = [] }, rename = (n
     ),
     bank: banks,
   };
+}
+
+// Finished-task data under current names, deleted tasks left out.
+export function coinTasks(tasks = [], rename = (n) => n) {
+  return tasks
+    .filter((t) => !t.deletedAt)
+    .map((t) =>
+      t.assignees?.some((n) => rename(n) !== n) || (t.createdBy && rename(t.createdBy) !== t.createdBy)
+        ? { ...t, assignees: [...new Set((t.assignees || []).map(rename))], ...(t.createdBy && { createdBy: rename(t.createdBy) }) }
+        : t,
+    );
+}
+
+// The one way raw documents become wallet() input. The app (every screen) and
+// the server (every bet, buy and gift) both build it here, so the same
+// documents always give the same balance. bank: the bank docs as a list, each
+// with its id; names: everyone's current name.
+export function coinInput({ tasks, shifts, ledger, bank, rename, cfg, names, now }) {
+  return {
+    tasks: coinTasks(tasks, rename),
+    ...coinsByName({ shifts, ledger, bank }, rename, names),
+    cfg,
+    ...(now !== undefined && { now }),
+  };
+}
+
+// What the server works out for one person from the documents it just read:
+// their ledger entries (any spelling they've had) and bank docs. data: the
+// cached tasks, shifts and settings (functions/index.js coinData).
+export function freshWallet(name, data, { ledger = [], banks = [], now = Date.now() } = {}) {
+  const input = coinInput({
+    tasks: data.tasks,
+    shifts: data.shifts,
+    ledger,
+    bank: banks,
+    rename: data.rename,
+    cfg: data.cfg,
+    names: [name],
+    // Counted to the minute, like the app, so a running shift reads the same.
+    now: Math.floor(now / 60000) * 60000,
+  });
+  return { ...wallet(name, input), ledger: input.ledger, bank: input.bank[name] || null, bankDocs: banks.map((b) => ({ id: b.id || '', name: b.name, net: b.net || 0 })) };
+}
+
+// The bank docs to read for someone besides their own (bank/{nameKey}):
+// the ones under their old names, each once. Names that differ only in
+// capitals, spaces or punctuation are the same doc.
+export function oldBankIds(name, aliases) {
+  const mine = nameKey(name);
+  return [...new Set(aliases.map(nameKey))].filter((id) => id && id !== mine);
 }
 
 // Gifts and ad prizes are paid by the server (the play function), which
