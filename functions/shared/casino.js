@@ -18,6 +18,7 @@ export const SERVER_COMMANDS = [
   'tictactoe',
   'connect4',
   'duel',
+  'challenge',
   'trivia',
   'hangman',
   'typerace',

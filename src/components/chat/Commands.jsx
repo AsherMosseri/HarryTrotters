@@ -3,6 +3,8 @@ import { Avatar, DisplayName } from '../common.jsx';
 import { COMMANDS, GROUPS } from '../../commands.js';
 import { CASINO_CARDS, CasinoBody, ECONOMY_CARDS } from './Casino.jsx';
 import { ARCADE_CARDS, ArcadeBody } from './Arcade.jsx';
+import { CardActions } from './CardActions.jsx';
+import { DISPUTABLE } from '../../../functions/shared/disputes.js';
 import { Die } from './Die.jsx';
 import { MoreBody } from './MoreCards.jsx';
 import { LabDay } from '../LabLog.jsx';
@@ -396,7 +398,7 @@ function Body({ c, by, onPerson }) {
   }
 }
 
-export function CommandCard({ m, onPerson, me, onMove, onBuy, conv }) {
+export function CommandCard({ m, onPerson, me, onMove, onBuy, onChallenge, onReport, conv }) {
   const n = m.cmd.name;
   const kind = ARCADE_CARDS.includes(n)
     ? 'arcade'
@@ -420,6 +422,7 @@ export function CommandCard({ m, onPerson, me, onMove, onBuy, conv }) {
       ) : (
         <Body c={m.cmd} by={m.by} onPerson={onPerson} />
       )}
+      {DISPUTABLE.includes(n) && <CardActions m={m} me={me} onChallenge={onChallenge} onReport={onReport} />}
     </div>
   );
 }

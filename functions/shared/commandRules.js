@@ -12,8 +12,10 @@ export const DEFAULT_WHERE = { casino: ['arcade'], arcade: ['arcade'] };
 // Always on (so there's a way to see what's there).
 export const ALWAYS_ON = ['help'];
 
+// /challenge (a coin flip or dice for the same bet) is a casino command, so it
+// works where the casino does.
 export const serverGroup = (name) =>
-  CASINO.includes(name) ? 'casino' : MULTI.includes(name) ? 'arcade' : ECONOMY.includes(name) ? 'economy' : '';
+  CASINO.includes(name) || name === 'challenge' ? 'casino' : MULTI.includes(name) ? 'arcade' : ECONOMY.includes(name) ? 'economy' : '';
 
 export const whereFor = (group, cfg) => {
   const set = cfg?.where?.[group];

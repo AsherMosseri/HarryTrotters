@@ -68,6 +68,7 @@ export const COMMANDS = [
   { name: 'slots', group: 'casino', args: 'bet', desc: 'Spin: three of a kind pays up to 500×', server: true },
   { name: 'dice', group: 'casino', args: 'bet', desc: 'Your 2 dice vs the house’s', server: true },
   { name: 'coinflip', group: 'casino', args: 'bet heads|tails', desc: 'Double or nothing', server: true },
+  { name: 'challenge', group: 'casino', args: '@person coinflip|dice bet', desc: 'Dare someone to the same flip or roll: winner takes both bets', server: true },
   { name: 'roulette', group: 'casino', args: 'bet red|black|even|odd|low|high|0–36', desc: 'Spin the wheel', server: true },
   { name: 'blackjack', group: 'casino', args: 'bet', desc: 'Beat the dealer to 21', server: true },
   { name: 'crash', group: 'casino', args: 'bet', desc: 'Cash out before the rocket crashes', server: true },
