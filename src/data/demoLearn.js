@@ -24,6 +24,17 @@ const NAMES = {
 const fail = (message) => {
   throw new Error(message);
 };
+// Demo answers come back at once; the real server takes a moment. Tests set
+// 'demo-learn-latency' (ms) to play Learn at a real round trip's pace.
+const roundTrip = () => {
+  let ms = 0;
+  try {
+    ms = Number(localStorage.getItem('demo-learn-latency')) || 0;
+  } catch {
+    ms = 0;
+  }
+  return ms > 0 ? new Promise((r) => setTimeout(r, Math.min(ms, 5000))) : null;
+};
 
 export function demoLearn(get, commit, listen) {
   const st = (name) => {
@@ -107,6 +118,7 @@ export function demoLearn(get, commit, listen) {
   return {
     ensureDaily,
     async quizNext({ bank, skip }, actor) {
+      await roundTrip();
       if (!NAMES[bank]) fail('Which game?');
       const me = actor.name;
       const q = st(me);
@@ -151,6 +163,7 @@ export function demoLearn(get, commit, listen) {
       return { question, progress: progressOf(q) };
     },
     async quizAnswer({ id, answer }, actor) {
+      await roundTrip();
       const me = actor.name;
       const q = st(me);
       const bank = Object.keys(q.pending).find((b) => q.pending[b]?.id === id);
@@ -244,6 +257,7 @@ export function demoLearn(get, commit, listen) {
       return { ...run, best: q.auto.best, newBest: run.score > prev, coins, progress: progressOf(q), today: today(me) };
     },
     async dailyAnswer({ day, answer }, actor) {
+      await roundTrip();
       const s = get();
       const me = actor.name;
       if (day !== teamDay(Date.now())) fail('That question is closed. A new one comes out each school day.');

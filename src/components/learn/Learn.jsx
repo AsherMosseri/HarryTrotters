@@ -2,13 +2,14 @@
 // progress, then each game's screen. Questions come from the server one at
 // a time without their answers (functions/learn.js); the server grades each
 // answer, explains it and pays the coins.
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Icon } from '../shell/icons.jsx';
 import CountUp from '../CountUp.jsx';
 import { celebrate } from '../../motion.js';
 import { promptDialog } from '../Dialogs.jsx';
 import AutoPlanner from './AutoPlanner.jsx';
 import { openGame } from '../games/launch.js';
+import { AFTER_GRADE, AFTER_NEW, useTapGuard } from './tapGuard.js';
 import { CodeFix, CodeView, GearVisual, HubPuzzle, PartCard, PersonChoice, RuleCard, SpotScene, Timeline, WhoCard, Citation, isTrueFalse } from './Visuals.jsx';
 
 export const GAMES = [
@@ -72,25 +73,14 @@ function Choices({ q, result, busy, pending, onPick }) {
   );
 }
 
-function Feedback({ result, q, onNext, onReport, reported, busy }) {
+// What the answer was and why, under the action bar (so it never pushes the
+// choices or Next around when it appears).
+function Feedback({ result, q, onReport, reported }) {
   const right = result.correct;
   const capped = right && !result.coins && result.today && result.today.paid >= result.today.cap;
   return (
-    <div className={`lq-feedback ${right ? 'is-right' : 'is-wrong'}`} role="status">
-      <div className="lq-fb-head">
-        <span className="lq-fb-icon">
-          <Icon name={right ? 'check' : 'cross'} size={20} />
-        </span>
-        <b>{right ? 'Right' : 'Not quite'}</b>
-        {result.coins > 0 && (
-          <span className="chip lq-chip-coin">
-            <Icon name="coin" size={13} /> <span className="mono">+{result.coins}</span>
-          </span>
-        )}
-        {right && !result.coins && (
-          <span className="muted small">{capped ? 'Coins for today are maxed' : 'No coins: answered right before'}</span>
-        )}
-      </div>
+    <div className={`lq-feedback ${right ? 'is-right' : 'is-wrong'}`}>
+      {right && !result.coins && <span className="muted small">{capped ? 'Coins for today are maxed' : 'No coins: answered right before'}</span>}
       {q.bank === 'code' && <CodeFix result={result} lines={q.lines} lang={q.lang} />}
       {result.explain && <p className="lq-fb-explain">{result.explain}</p>}
       {result.fix && (
@@ -107,14 +97,51 @@ function Feedback({ result, q, onNext, onReport, reported, busy }) {
           </a>
         )}
       </div>
-      <div className="lq-fb-actions">
-        <button className="link-btn small lq-report" onClick={onReport} disabled={reported}>
-          <Icon name="flag" size={14} /> {reported ? 'Reported. Thanks!' : 'Report a problem with this question'}
-        </button>
-        <button className="btn primary" onClick={onNext} disabled={busy} autoFocus>
+      <button className="link-btn small lq-report" onClick={onReport} disabled={reported}>
+        <Icon name="flag" size={14} /> {reported ? 'Reported. Thanks!' : 'Report a problem with this question'}
+      </button>
+    </div>
+  );
+}
+
+// The bar under the board, in the same spot before and after you answer:
+// Skip on the left and the difficulty on the right while you answer; the
+// verdict on the left and Next on the right after. Next never shares a spot
+// with Skip, and it sticks to the bottom of the screen on long questions, so
+// a second tap on it lands on the bar (the difficulty), never on a choice.
+function ActionBar({ q, result, busy, onNext, onSkip, nextRef }) {
+  if (result) {
+    const right = result.correct;
+    return (
+      <div className={`lq-actions done ${right ? 'is-right' : 'is-wrong'}`} role="status">
+        <span className="lq-verdict">
+          <span className="lq-fb-icon">
+            <Icon name={right ? 'check' : 'cross'} size={18} />
+          </span>
+          <b>{right ? 'Right' : 'Not quite'}</b>
+          {result.coins > 0 && (
+            <span className="chip lq-chip-coin">
+              <Icon name="coin" size={13} /> <span className="mono">+{result.coins}</span>
+            </span>
+          )}
+        </span>
+        <button className="btn primary lq-next" onClick={onNext} disabled={busy} ref={nextRef}>
           Next <Icon name="chevron" size={16} />
         </button>
       </div>
+    );
+  }
+  return (
+    <div className="lq-actions">
+      <button className="link-btn small lq-skip-btn" onClick={onSkip} disabled={busy}>
+        Skip (ends your streak)
+      </button>
+      {q.difficulty ? (
+        <span className="lq-level mono" title="Difficulty">
+          {'●'.repeat(q.difficulty)}
+          <span className="muted">{'●'.repeat(Math.max(0, 3 - q.difficulty))}</span>
+        </span>
+      ) : null}
     </div>
   );
 }
@@ -133,6 +160,8 @@ function Game({ game, api, onBack, onProgress, today, setToday }) {
   const [pending, setPending] = useState(null);
   const streakRef = useRef(null);
   const topRef = useRef(null);
+  const nextRef = useRef(null);
+  const guard = useTapGuard();
   // The app hands down a new api object whenever it re-renders for other
   // reasons; reading it through a ref keeps that from loading a new question
   // in the middle of the one you're answering.
@@ -154,7 +183,6 @@ function Game({ game, api, onBack, onProgress, today, setToday }) {
           onProgress(r.progress);
           setStreak(r.progress.streak);
         }
-        topRef.current?.scrollIntoView?.({ block: 'nearest' });
       } catch (e) {
         setError(e.message || String(e));
       }
@@ -166,13 +194,38 @@ function Game({ game, api, onBack, onProgress, today, setToday }) {
     if (game !== 'auto') load();
   }, [game, load]);
 
+  // A new question: taps that land in the next moment were meant for what was
+  // there before. If you'd scrolled down past its top, it starts at the top,
+  // but before it's drawn, so nothing moves while you look at it.
+  const qid = q?.id;
+  useLayoutEffect(() => {
+    if (!qid) return;
+    guard.arm(AFTER_NEW);
+    const main = topRef.current;
+    const stage = main?.querySelector('.lq-stage');
+    const scroller = main?.closest('.app-scroll');
+    if (stage && scroller && stage.getBoundingClientRect().top < scroller.getBoundingClientRect().top) main.scrollIntoView({ block: 'start' });
+  }, [qid, guard]);
+  // Graded: Next takes the keyboard focus (Enter goes on) without scrolling
+  // the page under your finger.
+  const graded = !!result;
+  useEffect(() => {
+    if (graded) nextRef.current?.focus({ preventScroll: true });
+  }, [graded]);
+
+  const next = (skip = false) => {
+    if (busy || !guard.ok()) return;
+    guard.arm(AFTER_NEW);
+    load(skip);
+  };
   const answer = async (given) => {
-    if (!q || result || busy) return;
+    if (!q || result || busy || !guard.ok()) return;
     setPending(given);
     setBusy(true);
     setError('');
     try {
       const r = await apiRef.current.quizAnswer({ id: q.id, answer: given });
+      guard.arm(AFTER_GRADE);
       setResult({ ...r, given });
       if (r.progress) {
         onProgress(r.progress);
@@ -187,6 +240,7 @@ function Game({ game, api, onBack, onProgress, today, setToday }) {
     setPending(null);
   };
   const report = async () => {
+    if (!guard.ok()) return;
     const note = await promptDialog({
       title: 'Report a problem',
       body: 'What’s wrong with this question? Team management will check it.',
@@ -209,20 +263,19 @@ function Game({ game, api, onBack, onProgress, today, setToday }) {
       board = (
         <>
           <p className="lq-prompt">{q.prompt.replace(/\s*One line has a bug: which one\?$/, '')}</p>
-          <CodeView lines={q.lines} lang={q.lang} pick={pick} onPick={setPick} result={result} />
-          {!result && (
-            <div className="lq-plug">
-              <span className={pick == null ? 'muted' : ''}>{pick == null ? 'Tap the broken line.' : `Line ${pick + 1}`}</span>
-              <button className="btn primary" disabled={pick == null || busy} onClick={() => answer(pick)}>
-                That’s the bug
-              </button>
-            </div>
-          )}
+          <CodeView lines={q.lines} lang={q.lang} pick={pick} onPick={(i) => guard.ok() && setPick(i)} result={result} />
+          {/* Stays after you answer (only disabled), so nothing below moves up under your finger. */}
+          <div className="lq-plug">
+            <span className={pick == null ? 'muted' : ''}>{pick == null ? 'Tap the broken line.' : `Line ${pick + 1}`}</span>
+            <button className="btn primary" disabled={pick == null || busy || !!result} onClick={() => answer(pick)}>
+              That’s the bug
+            </button>
+          </div>
         </>
       );
-    else if (q.bank === 'wiring') board = <HubPuzzle key={q.id} q={q} result={result} busy={busy} onPick={answer} />;
+    else if (q.bank === 'wiring') board = <HubPuzzle key={q.id} q={q} result={result} busy={busy} onPick={answer} ok={guard.ok} />;
     else if (q.bank === 'spot') board = <SpotScene q={q} result={result} busy={busy} onPick={answer} />;
-    else if (q.kind === 'order') board = <Timeline key={q.id} q={q} result={result} busy={busy} onSubmit={answer} />;
+    else if (q.kind === 'order') board = <Timeline key={q.id} q={q} result={result} busy={busy} onSubmit={answer} ok={guard.ok} />;
     else
       board = (
         <>
@@ -264,6 +317,7 @@ function Game({ game, api, onBack, onProgress, today, setToday }) {
       {game === 'auto' ? (
         <AutoPlanner
           api={api}
+          guard={guard}
           onResult={(r) => {
             if (r.progress) onProgress(r.progress);
             if (r.today) setToday(r.today);
@@ -280,20 +334,8 @@ function Game({ game, api, onBack, onProgress, today, setToday }) {
             </div>
           )}
           {board}
-          {result && <Feedback result={result} q={q} onNext={() => load()} onReport={report} reported={reported} busy={busy} />}
-          {q && !result && (
-            <div className="lq-skip">
-              {q.difficulty && (
-                <span className="lq-level mono" title="Difficulty">
-                  {'●'.repeat(q.difficulty)}
-                  <span className="muted">{'●'.repeat(Math.max(0, 3 - q.difficulty))}</span>
-                </span>
-              )}
-              <button className="link-btn small" onClick={() => load(true)} disabled={busy}>
-                Skip (ends your streak)
-              </button>
-            </div>
-          )}
+          {q && <ActionBar q={q} result={result} busy={busy} onNext={() => next()} onSkip={() => next(true)} nextRef={nextRef} />}
+          {result && <Feedback result={result} q={q} onReport={report} reported={reported} />}
         </div>
       )}
     </main>

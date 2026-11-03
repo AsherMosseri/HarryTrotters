@@ -5,6 +5,7 @@ import { createContext, useContext, useEffect, useState } from 'react';
 import { Icon } from '../shell/icons.jsx';
 import { celebrate } from '../../motion.js';
 import { CodeView, Citation, ManualText, isTrueFalse } from './Visuals.jsx';
+import { AFTER_GRADE, useTapGuard } from './tapGuard.js';
 import { teamDay } from '../../../functions/shared/coins.js';
 
 // { me, answer({ day, answer }), subscribe(day, cb) } from Workspace.
@@ -17,15 +18,18 @@ export function DailyCard({ c, onPerson }) {
   const [mine, setMine] = useState(undefined); // undefined: loading, null: not answered
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const guard = useTapGuard();
   useEffect(() => (ctx ? ctx.subscribe(c.day, setMine) : undefined), [ctx, c.day]);
   const q = c.q || {};
   const open = c.day === teamDay(Date.now());
   const choose = async (i) => {
-    if (!ctx || busy || mine) return;
+    if (!ctx || busy || mine || !guard.ok()) return;
     setBusy(true);
     setError('');
     try {
       const r = await ctx.answer({ day: c.day, answer: i });
+      // The answer and why appear under the choices: the next moment's taps were meant for before.
+      guard.arm(AFTER_GRADE);
       setMine({ ...r, given: i });
       if (r.correct && (r.rank === 1 || [5, 10, 20, 30, 50].includes(r.streak))) celebrate({ count: 22 });
     } catch (e) {
@@ -103,7 +107,7 @@ export function DailyCard({ c, onPerson }) {
             {c.firstCorrect.map((n, i) => (
               <span key={n}>
                 {i ? ', ' : ''}
-                <button className="name-btn" onClick={(e) => onPerson?.(n, e)}>
+                <button className="name-btn" onClick={(e) => guard.ok() && onPerson?.(n, e)}>
                   {n.split(' ')[0]}
                 </button>
               </span>

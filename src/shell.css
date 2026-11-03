@@ -4190,3 +4190,35 @@ html.kb-open .report-note { min-height: 56px; }
   .pp-review-img { width: 88px; height: 88px; }
   .pp-previews { gap: 6px; }
 }
+
+/* ==========================================================================
+   Learn: steady taps. The bar under each question stays in one spot from
+   question to answer (Skip | difficulty, then the verdict | Next), Next never
+   sits where Skip or a choice will be, and on long questions the bar sticks
+   to the bottom of the screen (opaque, so a tap there is always the bar).
+   The explanation shows up under the bar, so nothing above it moves; pictures
+   keep their size before they load. Taps right after a change are ignored for
+   a moment in the code (learn/tapGuard.js).
+   ========================================================================== */
+.lq-actions {
+  position: sticky; bottom: 0; z-index: 3; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  min-height: 56px; margin: -4px 0; padding: 6px 0; background: var(--surface); border-top: 1px solid var(--border);
+}
+.lq-actions .lq-skip-btn { color: var(--muted); font-weight: 500; padding: 10px 0; }
+.lq-actions .lq-level { margin-right: 4px; }
+.lq-verdict { display: flex; align-items: center; gap: 10px; min-width: 0; flex-wrap: wrap; }
+.lq-verdict b { font-size: 17px; }
+.lq-verdict .lq-fb-icon { width: 28px; height: 28px; }
+.lq-actions.is-wrong .lq-fb-icon { background: var(--lq-bad); }
+.lq-actions .lq-next { min-height: 44px; padding: 0 20px; gap: 4px; flex: none; }
+.lq-feedback .lq-report { align-self: flex-start; padding: 4px 0; }
+/* Part photos: the box has its size before the picture loads. */
+.lq-photo img { height: 260px; max-height: none; }
+.lq-daily-img { width: 220px; height: 160px; max-width: 100%; }
+/* After an auto run: Draw another on the left, not where Run it was. */
+.lq-auto-tools .btn.primary.lq-again { margin-left: 0; }
+@media (max-width: 760px) {
+  .lq-actions { min-height: 60px; }
+  .lq-actions .lq-next { min-height: 46px; padding: 0 22px; }
+  .lq-photo img { height: min(260px, 56vw); }
+}
