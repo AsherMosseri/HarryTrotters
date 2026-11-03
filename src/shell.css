@@ -3910,7 +3910,8 @@ html.kb-bar .chat-side-body { padding-bottom: calc(8px + var(--kb-bar, 0px)); }
 .pp-sticker.pending img { opacity: 0.7; }
 /* In the park the sticker is tucked beside the pet. */
 .park-pet { position: relative; }
-.pp-sticker.mini { position: absolute; right: -14px; bottom: 14px; z-index: 1; border-radius: 8px; transform: rotate(6deg); box-shadow: 0 1px 2px rgb(0 0 0 / 0.25); }
+/* A light backing in both themes: it sits on grass, not on a card. */
+.pp-sticker.mini { position: absolute; right: -22px; bottom: 12px; z-index: 1; border-radius: 8px; transform: rotate(6deg); background: #f6f7fa; border-color: rgb(0 0 0 / 0.12); box-shadow: 0 1px 3px rgb(0 0 0 / 0.3); }
 .pp-sticker.mini img { padding: 2px; }
 .park.compact .pp-sticker.mini { right: -10px; bottom: 6px; }
 .pp-caption { margin: 0; text-align: center; color: var(--muted); font-size: 13px; font-weight: 600; }
