@@ -6,11 +6,14 @@ export const CHANGELOG = [
   {
     version: '3.0.10',
     date: '2026-11-03',
-    title: 'Ask for a channel',
+    title: 'Channels, challenges and your coins up top',
     items: [
-      'Ask for your own channel: tap ＋ next to Channels (on a phone, Channel at the top of Chat), pick a name, say what it’s for, and choose Everyone or Private with the people you invite.',
-      'Team management approves or declines each request with one tap, and you get a notification when your channel is ready.',
+      'Ask for your own channel: tap ＋ next to Channels (on a phone, Channel at the top of Chat), pick a name, say what it’s for, and choose Everyone or Private with the people you invite. Team management approves it with one tap and you get a notification.',
       'Private channels show a lock, and only the people invited (and team management) can read them.',
+      'Your Jackson coin balance now shows in the top right of every screen; tap it to open your coins.',
+      'Challenge a teammate: tap Challenge someone on your coin flip or dice result (or type /challenge @name coinflip 20). If they accept, you both bet the same and the winner takes both bets.',
+      'Something look wrong on a casino result? Tap Report; team management will look and can refund your bet.',
+      'New Crimson fur tint for pets at level 15, and “Request a pet” on the adopt screen to ask for an animal you don’t see.',
     ],
   },
   {
