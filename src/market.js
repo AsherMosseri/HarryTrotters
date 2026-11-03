@@ -9,6 +9,7 @@ import { eventGearItem, giftOpen, petState, petsIn } from '../functions/shared/p
 import { earnedIds, shownEvents, unseenIds } from '../functions/shared/events.js';
 import { celebrate } from './motion.js';
 import { noteFor } from './connection.js';
+import { usePetPhotos } from './petPhotos.js';
 
 export const MarketContext = createContext(null);
 export const useMarket = () => useContext(MarketContext);
@@ -30,7 +31,7 @@ const saveNum = (key, n) => {
 
 // shifts: under current names. balanceOf(name): coins from the app's wallet
 // (only demo mode uses it; the server reads balances itself).
-export function useMarketData(store, { actor, rename, shifts, balanceOf, coinsOn, onToast, onBalance }) {
+export function useMarketData(store, { actor, rename, renames, shifts, balanceOf, coinsOn, photosOn = true, onToast, onBalance }) {
   const [perks, setPerks] = useState([]);
   const [rawPurchases, setPurchases] = useState([]);
   const [rawPets, setPets] = useState([]);
@@ -191,12 +192,15 @@ export function useMarketData(store, { actor, rename, shifts, balanceOf, coinsOn
     [store, actor],
   );
 
+  // Photos of real pets beside their drawn ones (petPhotos.js).
+  const photos = usePetPhotos(store, { actor, rename, renames, on: photosOn, run });
+
   // Perks: team management writes them directly (the rules check who).
   const savePerk = useCallback((id, data) => store.savePerk(id, data, actor), [store, actor]);
   const deletePerk = useCallback((id) => store.deletePerk(id), [store]);
 
   return useMemo(
-    () => ({ perks, purchases, pets, tournaments, extras, petOf, petsOf, gifts, run, now, coinsOn, savePerk, deletePerk, events, allEvents: rawEvents, unlocks, askEvents: ask, petEvent, me: actor.name, rename }),
-    [perks, purchases, pets, tournaments, extras, petOf, petsOf, gifts, run, now, coinsOn, savePerk, deletePerk, events, rawEvents, unlocks, ask, petEvent, actor.name, rename],
+    () => ({ perks, purchases, pets, tournaments, extras, petOf, petsOf, gifts, run, now, coinsOn, savePerk, deletePerk, events, allEvents: rawEvents, unlocks, askEvents: ask, petEvent, photos, me: actor.name, rename }),
+    [perks, purchases, pets, tournaments, extras, petOf, petsOf, gifts, run, now, coinsOn, savePerk, deletePerk, events, rawEvents, unlocks, ask, petEvent, photos, actor.name, rename],
   );
 }

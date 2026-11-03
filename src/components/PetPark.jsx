@@ -9,6 +9,7 @@ import { CloseIcon, Overlay } from './common.jsx';
 import { confirmDialog } from './Dialogs.jsx';
 import CountUp from './CountUp.jsx';
 import { PetWithGear } from './PetGear.jsx';
+import { PetSticker, usePetPhoto } from './PetPhoto.jsx';
 import { Icon } from './shell/icons.jsx';
 
 // The pet park and team events (3.0.4). The park is a calm scene with every
@@ -71,7 +72,7 @@ export function ParkScene({ ev = null, compact = false, moving = 12, initial = 2
   const party = useParty(ev, root);
   const all = useMemo(() => {
     const out = [];
-    for (const owner of market.pets.keys()) for (const { pet, st } of market.petsOf(owner)) out.push({ key: `${owner}:${pet.adoptedAt}`, owner, pet, st });
+    for (const owner of market.pets.keys()) market.petsOf(owner).forEach(({ pet, st }, i) => out.push({ key: `${owner}:${pet.adoptedAt}`, owner, pet, st, lead: i === 0 }));
     return out.sort((a, b) => b.st.level - a.st.level || a.owner.localeCompare(b.owner) || a.pet.adoptedAt - b.pet.adoptedAt);
   }, [market.pets, market.petsOf]);
   const cap = compact ? 7 : more ? all.length : initial;
@@ -104,6 +105,7 @@ export function ParkScene({ ev = null, compact = false, moving = 12, initial = 2
               aria-label={`${e.pet.name}, ${e.owner}’s ${e.pet.species}, level ${e.st.level}`}
             >
               <PetWithGear species={e.pet.species} mood={party ? 'happy' : e.st.mood} stage={e.st.stage} size={size} gear={e.pet.gear} still={i >= moving} />
+              {e.lead && <PetSticker photo={market.photos?.of(e.owner)} size={compact ? 28 : 38} mini />}
               {!compact && <span className="park-name">{e.pet.name}</span>}
             </button>
           );
@@ -123,6 +125,7 @@ export function ParkScene({ ev = null, compact = false, moving = 12, initial = 2
 export function ParkCard({ entry, onClose }) {
   useEscape(onClose);
   const { pet, st, owner } = entry;
+  const photo = usePetPhoto(owner);
   const worn = Object.values(cleanGear(pet.gear))
     .filter(Boolean)
     .map((id) => (gearItem(id) || eventGearItem(id))?.name)
@@ -139,9 +142,13 @@ export function ParkCard({ entry, onClose }) {
             </button>
           </div>
           <div className="park-card-body">
-            <div className="pet-stage">
-              <PetWithGear species={pet.species} mood={st.mood} stage={st.stage} size={120} gear={pet.gear} title={`${pet.name} the ${pet.species}`} />
+            <div className="pp-pair">
+              <div className="pet-stage">
+                <PetWithGear species={pet.species} mood={st.mood} stage={st.stage} size={120} gear={pet.gear} title={`${pet.name} the ${pet.species}`} />
+              </div>
+              {entry.lead && <PetSticker photo={photo} size={84} />}
             </div>
+            {entry.lead && photo?.caption && <p className="pp-caption">{photo.caption}, the real pet</p>}
             <dl className="park-facts">
               <dt>Owner</dt>
               <dd>{owner}</dd>

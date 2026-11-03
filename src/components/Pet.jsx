@@ -7,6 +7,7 @@ import { Icon } from './shell/icons.jsx';
 import { confirmDialog, promptDialog } from './Dialogs.jsx';
 import { PetWithGear } from './PetGear.jsx';
 import { RequestPetLink } from './PetRequest.jsx';
+import { PetSticker, usePetPhoto } from './PetPhoto.jsx';
 
 // Pets (H3): the art lives in PetArt.jsx. They breathe, hop when happy and
 // droop when sad, only while "Moving things" plays (shell.css), with
@@ -54,6 +55,7 @@ export function PetCard({ name, big = false, owner = false, onCare }) {
   const market = useMarket();
   const mine = market?.petOf(name);
   const [busy, setBusy] = useState(false);
+  const photo = usePetPhoto(name);
   if (!mine) return null;
   const { pet, st } = mine;
   const act = async (data) => {
@@ -63,8 +65,11 @@ export function PetCard({ name, big = false, owner = false, onCare }) {
   };
   return (
     <div className={`pet-card${big ? ' big' : ''} mood-${st.mood}`}>
-      <div className="pet-stage">
-        <PetWithGear species={pet.species} mood={st.mood} stage={st.stage} size={big ? 148 : 92} title={`${pet.name} the ${pet.species}`} gear={pet.gear} />
+      <div className="pp-pair">
+        <div className="pet-stage">
+          <PetWithGear species={pet.species} mood={st.mood} stage={st.stage} size={big ? 148 : 92} title={`${pet.name} the ${pet.species}`} gear={pet.gear} />
+        </div>
+        <PetSticker photo={photo} size={big ? 96 : 64} />
       </div>
       <div className="pet-info">
         <div className="pet-name-row">

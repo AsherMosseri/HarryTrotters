@@ -249,6 +249,14 @@ function UsualToday({
         text: disputes === 1 ? 'A casino result was reported' : `${disputes} casino results were reported`,
         go: onDisputes,
       },
+    // Team management: photos of real pets waiting for a yes or no (Market, Pets).
+    actor.admin &&
+      openPark &&
+      market?.photos?.waiting.length > 0 && {
+        tone: 'warn',
+        text: `${market.photos.waiting.length} pet photo${market.photos.waiting.length === 1 ? '' : 's'} waiting for you`,
+        go: openPark,
+      },
     on.includes('tasks') &&
       (overdue === 1
         ? { tone: 'bad', text: `${firstOverdue.title || 'A task'} is overdue`, go: () => onOpenTask(firstOverdue.id) }

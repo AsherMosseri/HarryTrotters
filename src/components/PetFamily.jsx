@@ -26,6 +26,7 @@ import { AdoptPet, Meter, nextLevelLine } from './Pet.jsx';
 import { RequestPetLink } from './PetRequest.jsx';
 import { PetWithGear } from './PetGear.jsx';
 import { EventsAdmin, ParkSection } from './PetPark.jsx';
+import { OwnSticker, PetPhotoReview, PetPhotoRow } from './PetPhoto.jsx';
 import { Icon } from './shell/icons.jsx';
 
 // Pets in the market, and their family (3.0): your pets with what they wear,
@@ -125,6 +126,7 @@ export function PetsShelf({ actor, balance, buy, busy, onToast, roster = [] }) {
       </section>
 
       {actor.admin && <EventsAdmin onToast={onToast} />}
+      {actor.admin && <PetPhotoReview onToast={onToast} />}
 
       {target && (
         <section className="mk-sec">
@@ -218,8 +220,11 @@ function OwnedPet({ entry, lead, count, roster, actor, offered, onToast }) {
 
   return (
     <div className={`pet-card big pf-pet mood-${st.mood}`} ref={card}>
-      <div className="pet-stage">
-        <PetWithGear species={pet.species} mood={st.mood} stage={st.stage} size={148} title={`${pet.name} the ${pet.species}`} gear={gear} />
+      <div className="pp-pair">
+        <div className="pet-stage">
+          <PetWithGear species={pet.species} mood={st.mood} stage={st.stage} size={148} title={`${pet.name} the ${pet.species}`} gear={gear} />
+        </div>
+        {lead && <OwnSticker />}
       </div>
       <div className="pet-info">
         <div className="pet-name-row">
@@ -274,6 +279,7 @@ function OwnedPet({ entry, lead, count, roster, actor, offered, onToast }) {
             </button>
           )}
         </div>
+        {lead && <PetPhotoRow pet={pet} onToast={onToast} />}
         <div className="pet-actions">
           {lead && (
             <label className="pet-toggle">

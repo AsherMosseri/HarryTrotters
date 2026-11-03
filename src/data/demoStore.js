@@ -34,6 +34,8 @@ import { checkPicks, myPicks, personOptionId, usesVoteButton } from '../../funct
 import { demoLife } from './demoLife.js';
 import { demoLearn } from './demoLearn.js';
 import { demoEvents } from './demoEvents.js';
+import { demoPetPhotos } from './demoPetPhotos.js';
+import { PHOTO_ACTIONS } from '../../functions/shared/petphotos.js';
 import { earnedIds } from '../../functions/shared/events.js';
 
 const KEY = 'ftc32313-demo-v13';
@@ -947,6 +949,7 @@ life.seedSamples();
 
 // Team events and the pet park (demoEvents.js): a running event with progress.
 const events = demoEvents({ get: () => state, commit: () => commit(), uid });
+const petPhotos = demoPetPhotos({ get: () => state, commit: () => commit(), uid });
 events.seedSamples();
 
 function commit() {
@@ -1409,6 +1412,16 @@ export const demoStore = {
   async petEvent(req, actor) {
     return events.petEvent(req, actor);
   },
+  // Photos of real pets (demoPetPhotos.js).
+  subscribePetPhotos(cb) {
+    return petPhotos.subscribeLive(listen, cb);
+  },
+  subscribePetPhotoRequests(actor, names, cb) {
+    return petPhotos.subscribeRequests(listen, actor, cb);
+  },
+  uploadPetPhoto(blob) {
+    return petPhotos.upload(blob);
+  },
   subscribeTournaments(cb) {
     const tick = () => settleDemoTournaments() && commit();
     tick();
@@ -1540,6 +1553,8 @@ export const demoStore = {
       }
       return note('Unknown action.');
     }
+
+    if (fn === 'pet' && PHOTO_ACTIONS.includes(data.action)) return petPhotos.run(data, actor);
 
     if (fn === 'pet') {
       // The same moves as functions/petfamily.js, on the demo's own docs.
