@@ -4,6 +4,16 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '3.0.11',
+    date: '2026-11-03',
+    title: 'A photo of your real pet',
+    items: [
+      'Add a photo of your real pet: in Market, Pets, tap “Add a photo of your real pet”. The app cuts your pet out of the picture on your own device (the first time it gets a 47 MB tool, one time), and your original photo never leaves it.',
+      'Touch up the cut-out with an eraser and brush, see it on light and dark, name your pet, and send it. If the cut-out tool can’t run, you can crop the picture yourself instead.',
+      'Team management approves each pet photo first. Approved photos show as a little sticker beside your pet on your pet card, your profile and in the pet park. It never replaces the drawn pet.',
+    ],
+  },
+  {
     version: '3.0.10',
     date: '2026-11-03',
     title: 'Channels, challenges and your coins up top',
