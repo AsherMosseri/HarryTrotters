@@ -10,18 +10,19 @@ export const RUN_ROLES = [
 const EMPTY = { driver: '', operator: '', coach: '', human: '' };
 
 // The pit screen's drive team, as run roles.
-export const rolesFromTeam = (t = {}) => ({
-  driver: t.drivers?.[0] || '',
-  operator: t.drivers?.[1] || '',
-  coach: t.coach || '',
-  human: t.human || '',
-});
+// No drive team set yet (null or missing): every role starts empty.
+export const rolesFromTeam = (team) => {
+  const t = team && typeof team === 'object' ? team : {};
+  const drivers = Array.isArray(t.drivers) ? t.drivers : [];
+  return { driver: drivers[0] || '', operator: drivers[1] || '', coach: t.coach || '', human: t.human || '' };
+};
 
 // A run's roles, or null for an older run that only listed its drivers.
-export const rolesOf = (run) => (run?.roles && Object.values(run.roles).some(Boolean) ? { ...EMPTY, ...run.roles } : null);
+export const rolesOf = (run) =>
+  run?.roles && typeof run.roles === 'object' && Object.values(run.roles).some(Boolean) ? { ...EMPTY, ...run.roles } : null;
 
 // The drivers list older screens and stats read: whoever drove and operated.
-export const driversOf = (roles) => [...new Set([roles.driver, roles.operator].filter(Boolean))];
+export const driversOf = (roles) => [...new Set([roles?.driver, roles?.operator].filter(Boolean))];
 
 // Per person: how many runs in each role, and the average total of the runs
 // they drove. runs: [{ roles, total }].
