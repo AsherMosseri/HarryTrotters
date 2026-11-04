@@ -2,7 +2,7 @@
 // "2.25m", "2b". The app and the server read amounts with this same code, so
 // a word means the same number on both sides. No React or Firebase in here.
 //
-// - k, m and b (any case) are thousand, million and billion.
+// - k, m, b and t (any case) are thousand, million, billion and trillion.
 // - Commas only separate thousands: "1,000" and "200,000", never "1,00".
 // - The result is a whole number of coins. "1.5k" is 1500; "1.2345k" would
 //   be 1234.5, which is refused (readAmount says the nearest whole amount),
@@ -11,8 +11,8 @@
 // Limits (bet caps, the /give cap, loan caps, balances) are the caller's,
 // checked after this, the same as for the number typed out.
 
-const RE = /^(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d+))?([kmb])?$/i;
-const SCALE = { '': 1n, k: 1000n, m: 1000000n, b: 1000000000n };
+const RE = /^(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d+))?([kmbt])?$/i;
+const SCALE = { '': 1n, k: 1000n, m: 1000000n, b: 1000000000n, t: 1000000000000n };
 const MAX = BigInt(Number.MAX_SAFE_INTEGER);
 
 // The whole story of one word:
@@ -50,7 +50,7 @@ export function parseAmount(word, { positive = false } = {}) {
 
 // Looks like someone meant a number ("2k", "1,000", "1.5", "-3", "1e6"),
 // whether or not it is one. For telling an amount word from a name.
-export const looksLikeAmount = (word) => /^[-+]?(?:\d[\d,]*(?:\.\d*)?|\.\d+)(?:e\d+|[kmb])?$/i.test(String(word || '').trim());
+export const looksLikeAmount = (word) => /^[-+]?(?:\d[\d,]*(?:\.\d*)?|\.\d+)(?:e\d+|[kmbt])?$/i.test(String(word || '').trim());
 
 // Why a word that looks like an amount isn't one, for the note that says
 // so: "1.2345k is 1234.5 coins. Coins are whole: try 1235." '' when there's
