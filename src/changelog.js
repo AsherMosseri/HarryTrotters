@@ -4,6 +4,24 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '3.1',
+    date: '2026-11-04',
+    title: 'A new casino, loans and /request',
+    items: [
+      'The casino is all new: a felt table for every game, real playing cards, a chrome slot machine with a lever, 3D dice, a full roulette wheel, a flipping Jackson coin, gem-and-bomb mines, a crash rocket, a scratch-off lottery ticket, and a banner and confetti for big wins.',
+      'Casino buttons react the instant you tap them: a quick double tap never plays twice, taps on a slow connection aren’t lost, and cards stay the same size so your next tap lands where you aimed. Crash freezes the multiplier the moment you cash out.',
+      'Every casino and arcade game shows its bet at the top for everyone, and your coin history shows a bet as soon as it’s taken (“Bet held: Mines 150”), keeps 60 casino lines, and shows the time of each.',
+      'Loans: open your coins, then Loans, and ask the bank or a teammate. Pick how much, the interest and when you’ll pay it back; they can say yes, no, or offer different terms. Pay back any time; on the due date whatever is left is taken, and if that puts you below zero, betting, the Market and sending coins are locked until you’re back to 0.',
+      'New /request: /request your idea sends a feature request, /request channel, /request pet and /request style open those forms, and /request @Cooper 25 for pizza asks a teammate for coins (only they can Pay or Decline). /request on its own opens a picker.',
+      'Commands work with groups: /give @Programming 10 gives 10 to each person, /highfive @CAD names the whole group, /hours @everyone shows a row per person, and /request @Programming 5 asks each of them on one card.',
+      'Battleship: pick Classic or Hit again (a hit gets another turn) when you challenge, place ships by tapping, and play in a big view over the chat. Anyone can Watch a game live without seeing the fleets.',
+      'Chat stays where you are: new messages only move you if you’re at the bottom, never while you’re touching the chat or playing, and a “new messages ↓” button takes you down.',
+      'New pet: the Gem, a little mint-green crystal that sparkles and grows from a rough stone into a cut gem. And you can add a photo of your real pet even if you don’t have a pet in the app yet.',
+      'Commands that work on their own, like /balance, /wire and /hours, now send with one Return.',
+      'Smaller fixes: the bandana no longer covers the proboscis monkey’s nose or the chicken’s and cassowary’s wattles, the hours in #lab-log are a neat small tag, and the notification bell stays visible while it’s open.',
+    ],
+  },
+  {
     version: '3.0.12',
     date: '2026-11-04',
     title: 'Report as many casino results as you need',
