@@ -32,6 +32,8 @@ export const SPECIES = [
   { id: 'redpanda', name: 'Red panda' },
   { id: 'hedgehog', name: 'Hedgehog' },
   { id: 'chicken', name: 'Chicken' },
+  // also: other words for it, so "Request a pet" knows it's already here.
+  { id: 'gem', name: 'Gem', also: ['gemstone', 'crystal', 'jewel', 'green amethyst', 'prasiolite'] },
 ];
 export const isSpecies = (id) => SPECIES.some((s) => s.id === id);
 

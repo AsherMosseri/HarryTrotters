@@ -31,7 +31,7 @@ export function speciesFor(animal) {
   if (!k) return null;
   const words = k.split(' ');
   return (
-    SPECIES.find((s) => animalKey(s.id) === k || animalKey(s.name) === k) ||
+    SPECIES.find((s) => animalKey(s.id) === k || animalKey(s.name) === k || (s.also || []).some((w) => animalKey(w) === k)) ||
     SPECIES.find((s) => {
       const sw = animalKey(s.name).split(' ');
       return words.every((w) => sw.includes(w));

@@ -1,5 +1,5 @@
 import { useId } from 'react';
-import { PET_STAGE } from './petAnchors.js';
+import { petStage } from './petAnchors.js';
 
 // The pets' art (H3). One 64x64 sticker-style mascot per species: soft
 // gradients, a darker same-hue outline, glossy eyes, a lighter highlight on the
@@ -8,7 +8,8 @@ import { PET_STAGE } from './petAnchors.js';
 // head and eyes, small body; grown: scarf and a gold pin). Below 40px the fine
 // details (whiskers, fur tufts, toes, scallops, blush) are left out so the
 // silhouette and the eyes carry it. The classes pet-bob / pet-eyes / pet-tail /
-// pet-ear / pet-tongue are animation hooks (shell.css; transform-only).
+// pet-ear / pet-tongue (and the gem's pet-glint / pet-shimmer) are animation
+// hooks (shell.css; transform and opacity only).
 
 const INK = '#2a2730';
 const BLUSH = '#ff7f95';
@@ -41,6 +42,8 @@ const LOOK = {
   hedgehog: { body: '#8a5a3a', dark: '#4e301d', light: '#c99d6a', shade: '#5c3a22', belly: '#f3dcc0', inner: '#f2aa9a', nose: '#2a1a18', line: '#5e3b22', tip: '#e2b985', foot: '#5a3a26' },
   // A warm cream hen with a soft tan outline and light-orange shading, a red comb and wattle, an orange beak and legs.
   chicken: { body: '#f6ecd6', dark: '#e9a95c', light: '#fffaf0', shade: '#ead3a6', belly: '#fffbf0', inner: '#e0483c', nose: '#f2a31e', line: '#c9a272', comb: '#e44a3c', combLine: '#a8302a', leg: '#f08a24', legLine: '#c4661a', wing: '#f0d3a0' },
+  // A pale mint pear-cut gem (green amethyst): seafoam facets from deep to near-white, a lighter table.
+  gem: { body: '#a3e2c6', dark: '#3f9e80', light: '#effdf6', shade: '#6cc6a4', belly: '#dcf8ea', inner: '#ff9fb2', nose: INK, line: '#3c937a', deep: '#47a888', table: '#d4f6e6' },
 };
 
 // --- shared face parts ----------------------------------------------------
@@ -175,6 +178,102 @@ function spikeTips(pts, k = 0.5) {
   }
   return d;
 }
+
+// --- the gem's shape -------------------------------------------------------
+
+// A pear (teardrop) lying on its side, point to the right: t = 0 is the point,
+// t = π the round end. g: { cx, cy, a (half length), b (half height) }.
+const PEAR_M = 0.82;
+const TAU = 2 * Math.PI;
+const pearF = (t) => {
+  t = ((t % TAU) + TAU) % TAU;
+  return Math.sin(t) * Math.pow(Math.sin(t / 2), PEAR_M);
+};
+const PEAR_FMAX = (() => {
+  let m = 0;
+  for (let i = 0; i <= 720; i++) m = Math.max(m, pearF((i * Math.PI) / 360));
+  return m;
+})();
+const pearPt = (t, g) => [g.cx + g.a * Math.cos(t), g.cy - (g.b * pearF(t)) / PEAR_FMAX];
+const ptsPath = (pts) => pts.map((q, i) => `${i ? 'L' : 'M'}${f1(q[0])} ${f1(q[1])}`).join(' ') + ' Z';
+// The light comes from the upper left: 0 (facing away) to 1 (facing it).
+const LIGHT = [-0.56, -0.83];
+const facing = (pts, o) => {
+  const mx = pts.reduce((v, q) => v + q[0], 0) / pts.length - o[0];
+  const my = pts.reduce((v, q) => v + q[1], 0) / pts.length - o[1];
+  const n = Math.hypot(mx, my) || 1;
+  return 0.5 + 0.5 * ((mx * LIGHT[0] + my * LIGHT[1]) / n);
+};
+const clamp01 = (v) => Math.max(0, Math.min(1, v));
+
+// A cut stone seen from above, like the photo: a table (a smaller pear in the
+// middle), star facets around it, and the outer facets out to the girdle (each
+// split in two, light and dark, when `split`). Returns the outline, the table
+// and the facets as [path, light 0..1]. Cached: the shape never changes.
+const GEM_CUT = {};
+function gemCut(n, split) {
+  const key = n + (split ? 's' : '');
+  if (GEM_CUT[key]) return GEM_CUT[key];
+  const g = { cx: 33.6, cy: 37.8, a: 23.2, b: 16.4 };
+  const tk = 0.56; // the table's size
+  const to = [29.6, 37]; // the table's middle, toward the round end
+  const O = (t) => pearPt(t, g);
+  const T = (t) => {
+    const [x, y] = pearPt(t, g);
+    return [to[0] + (x - g.cx) * tk, to[1] + (y - g.cy) * tk];
+  };
+  const arc = (t0, t1, k) => Array.from({ length: k + 1 }, (_, i) => O(t0 + ((t1 - t0) * i) / k));
+  const tt = (i) => (TAU * i) / n;
+  const facets = [];
+  for (let i = 0; i < n; i++) {
+    const star = [T(tt(i)), T(tt(i + 1)), O(tt(i + 0.5))];
+    facets.push([star, clamp01(facing(star, to) * 0.8 + 0.26)]);
+    if (split) {
+      const a1 = [T(tt(i)), ...arc(tt(i - 0.5), tt(i), 4)];
+      const a2 = [T(tt(i)), ...arc(tt(i), tt(i + 0.5), 4)];
+      const f = facing([...a1, ...a2], to);
+      facets.push([a1, clamp01(f + 0.1)], [a2, clamp01(f - 0.3)]);
+    } else {
+      const kite = [T(tt(i)), ...arc(tt(i - 0.5), tt(i + 0.5), 8)];
+      facets.push([kite, clamp01(facing(kite, to) + (i % 2 ? -0.16 : 0.02))]);
+    }
+  }
+  const out = Array.from({ length: 96 }, (_, i) => O((TAU * i) / 96));
+  const table = Array.from({ length: n }, (_, i) => T(tt(i)));
+  return (GEM_CUT[key] = { outline: ptsPath(out), table: ptsPath(table), facets: facets.map(([p, v]) => [ptsPath(p), v]) });
+}
+
+// The baby: a rough, uncut crystal (a lumpy stone with a few big flat planes).
+const ROUGH_OUT = [[11.6, 42], [14.4, 30.2], [21.8, 22.6], [33.6, 19.8], [45, 22.6], [53.2, 30.4], [55.2, 41.4], [49, 51.4], [35.4, 55.4], [20.4, 53.6]];
+const ROUGH_IN = [[19.4, 35.2], [24.4, 28], [34.6, 26.4], [44, 30], [47.4, 39.4], [43, 47.2], [33, 49.6], [22.4, 46.6]];
+function roughCut() {
+  if (GEM_CUT.rough) return GEM_CUT.rough;
+  const o = [33, 38];
+  const facets = [];
+  for (let i = 0; i < ROUGH_OUT.length; i++) {
+    // Each outer edge meets the inner face at the nearest inner corners.
+    const a = ROUGH_OUT[i];
+    const b = ROUGH_OUT[(i + 1) % ROUGH_OUT.length];
+    const j = Math.round((i * ROUGH_IN.length) / ROUGH_OUT.length) % ROUGH_IN.length;
+    const k = Math.round(((i + 1) * ROUGH_IN.length) / ROUGH_OUT.length) % ROUGH_IN.length;
+    const p = j === k ? [a, b, ROUGH_IN[j]] : [a, b, ROUGH_IN[k], ROUGH_IN[j]];
+    facets.push([ptsPath(p), clamp01(facing(p, o) * 0.8 + (i % 2 ? 0.02 : 0.12))]);
+  }
+  return (GEM_CUT.rough = { outline: ptsPath(ROUGH_OUT), table: ptsPath(ROUGH_IN), facets });
+}
+
+// A four-point sparkle centered at (x, y).
+const Glint = ({ x, y, r, className, o = 1 }) => {
+  const k = r * 0.16;
+  return (
+    <path
+      className={className}
+      d={`M${f1(x)} ${f1(y - r)} Q${f1(x + k)} ${f1(y - k)} ${f1(x + r)} ${f1(y)} Q${f1(x + k)} ${f1(y + k)} ${f1(x)} ${f1(y + r)} Q${f1(x - k)} ${f1(y + k)} ${f1(x - r)} ${f1(y)} Q${f1(x - k)} ${f1(y - k)} ${f1(x)} ${f1(y - r)}Z`}
+      fill="#fff"
+      opacity={o}
+    />
+  );
+};
 
 // --- species --------------------------------------------------------------
 
@@ -777,6 +876,69 @@ const DRAW = {
     };
   },
 
+  // A living pear-cut gem: mint and seafoam facets, a lighter table with the
+  // face on it, white glints that twinkle now and then (pet-glint) and a slow
+  // shimmer across the stone (pet-shimmer), on two stubby feet. The baby is a
+  // small rough crystal; it gets cut as it grows, and fully faceted when grown.
+  gem({ c, id, mood, detail, ek, L, stage }) {
+    const sad = mood === 'sad';
+    const happy = mood === 'happy';
+    const rough = stage === 'baby';
+    const cut = rough ? roughCut() : gemCut(detail ? (stage === 'grown' ? 10 : 8) : 6, detail && stage === 'grown');
+    // Sad: the stone goes a little cloudy (duller facets, no sparkle). The rough baby is frostier.
+    const tone = (v) => {
+      const k = sad ? 0.25 + v * 0.55 : rough ? 0.18 + v * 0.66 : v;
+      return k < 0.5 ? mix(c.deep, c.body, k / 0.5) : mix(c.body, c.light, (k - 0.5) / 0.5);
+    };
+    const edge = rough ? 0.18 : 0.42;
+    return {
+      body: (
+        <>
+          <ellipse cx="25" cy="56.6" rx="4" ry="2.7" fill={c.shade} {...L} />
+          <ellipse cx="39" cy="56.6" rx="4" ry="2.7" fill={c.shade} {...L} />
+          {detail && <ellipse cx="24.3" cy="55.8" rx="1.8" ry="0.8" fill="#fff" opacity="0.5" />}
+          {detail && <ellipse cx="38.3" cy="55.8" rx="1.8" ry="0.8" fill="#fff" opacity="0.5" />}
+        </>
+      ),
+      head: (
+        <>
+          <clipPath id={`${id}gc`}>
+            <path d={cut.outline} />
+          </clipPath>
+          <path d={cut.outline} fill={c.body} />
+          <g clipPath={`url(#${id}gc)`}>
+            {cut.facets.map(([d, v], i) => (
+              <path key={i} d={d} fill={tone(v)} stroke="#fff" strokeOpacity={detail ? edge : edge * 0.6} strokeWidth={detail ? 0.55 : 0.8} strokeLinejoin="round" />
+            ))}
+            <path d={cut.table} fill={`url(#${id}t)`} stroke="#fff" strokeOpacity={rough ? 0.35 : 0.85} strokeWidth={detail ? 0.7 : 0.9} strokeLinejoin="round" />
+            {/* A slow band of light across the stone (hidden until it moves). */}
+            <g className="pet-shimmer" opacity="0">
+              <path d="M6 64 L20 64 L36 10 L22 10 Z" fill="#fff" opacity="0.5" />
+              <path d="M23 64 L27 64 L43 10 L39 10 Z" fill="#fff" opacity="0.35" />
+            </g>
+            {/* glassy rim light along the upper left */}
+            <path d={cut.outline} fill="none" stroke="#fff" strokeOpacity={rough ? 0.25 : 0.55} strokeWidth={detail ? 1 : 1.4} transform="translate(0.9 1.1)" />
+          </g>
+          <path d={cut.outline} fill="none" stroke={c.line} strokeWidth={L.strokeWidth} strokeLinejoin="round" />
+          {detail && !rough && <ellipse cx="20.6" cy="28.2" rx="5.6" ry="2" transform="rotate(-38 20.6 28.2)" fill="#fff" opacity="0.6" />}
+          {detail && rough && <ellipse cx="22.6" cy="27.4" rx="4" ry="1.6" transform="rotate(-36 22.6 27.4)" fill="#fff" opacity="0.4" />}
+          {detail && <Blush y={39} x={30} dx={10.6} rx={2.8} ry={1.8} o={0.5} />}
+          <Eyes mood={mood} xs={[23.5, 36.5]} y={34} r={2.9} ek={ek} brow={c.line} detail={detail} />
+          <Mouth mood={mood} x={30} y={39.2} w={2.8} h={2.2} tongue={false} />
+          {/* Sparkles: one that twinkles now and then; more when it's happy, none when it's sad. */}
+          {!sad && <Glint className="pet-glint" x={rough ? 44.6 : 46.8} y={rough ? 27.6 : 29.2} r={detail ? 3.6 : 4.4} />}
+          {!sad && detail && !rough && <Glint className="pet-glint g2" x={15.2} y={43.4} r={2.4} o={0.9} />}
+          {happy && detail && <Glint className="pet-glint g3" x={57.4} y={22.4} r={2.8} o={0.95} />}
+          {happy && detail && <Glint className="pet-glint g4" x={8.6} y={23.6} r={2} o={0.85} />}
+        </>
+      ),
+      // It's all one piece: the grown scarf goes over the stone, a bit lower, like a bib.
+      scarfY: 3,
+      over: true,
+    };
+  },
+
+
   monkey({ c, id, mood, detail, ek, L }) {
     return {
       back: (
@@ -869,6 +1031,13 @@ function Defs({ id, c }) {
           </linearGradient>
         </>
       )}
+      {c.table && (
+        <radialGradient id={`${id}t`} cx="0.34" cy="0.3" r="0.85">
+          <stop offset="0" stopColor="#f6fffb" />
+          <stop offset="0.6" stopColor={c.table} />
+          <stop offset="1" stopColor={mix(c.table, c.deep, 0.22)} />
+        </radialGradient>
+      )}
       {c.face && (
         <radialGradient id={`${id}f2`} cx="0.4" cy="0.3" r="0.9">
           <stop offset="0" stopColor={mix(c.face, '#ffffff', 0.45)} />
@@ -908,10 +1077,16 @@ export function PetArt({ species = 'cat', mood = 'ok', stage = 'young', size = 6
   const detail = size >= 40;
   const baby = stage === 'baby';
   const grown = stage === 'grown';
-  const st = PET_STAGE[stage] || PET_STAGE.young;
+  const st = petStage(species, stage);
   const s = st.s;
   const L = { stroke: c.line, strokeWidth: detail ? 1.35 : 1.9, strokeLinejoin: 'round' };
-  const part = (DRAW[species] || DRAW.cat)({ c, id, mood, detail, ek: (baby ? 1.28 : 1) * (detail ? 1 : 1.16), L });
+  const part = (DRAW[species] || DRAW.cat)({ c, id, mood, detail, ek: (baby ? 1.28 : 1) * (detail ? 1 : 1.16), L, stage });
+  // A pet that's all one piece (the gem) wears its scarf over itself, lower down, and has no neck shadow.
+  const scarf = grown && (
+    <g transform={part.scarfY ? `translate(0 ${part.scarfY})` : undefined}>
+      <Scarf detail={detail} />
+    </g>
+  );
   const headT = st.head !== 1 ? `translate(32 41) scale(${st.head}) translate(-32 -41)` : undefined;
   const bodyT = st.body !== 1 ? `translate(32 58) scale(${st.body}) translate(-32 -58)` : undefined;
   return (
@@ -931,9 +1106,10 @@ export function PetArt({ species = 'cat', mood = 'ok', stage = 'young', size = 6
           {part.back}
           <g transform={bodyT}>{part.body}</g>
           {/* a soft shadow where the head sits on the body */}
-          <ellipse cx="32" cy="41.6" rx="12" ry="3.4" fill={c.dark} opacity="0.22" />
-          {grown && <Scarf detail={detail} />}
+          {!part.over && <ellipse cx="32" cy="41.6" rx="12" ry="3.4" fill={c.dark} opacity="0.22" />}
+          {!part.over && scarf}
           <g transform={headT}>{part.head}</g>
+          {part.over && scarf}
         </g>
       </g>
     </svg>
