@@ -141,7 +141,7 @@ export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onMarket
                       </span>
                       <span className="grow">
                         <span className="coins-label">
-                          {x.label} <ReversedTag rev={rev} x={x} />
+                          {f.label(x.label)} <ReversedTag rev={rev} x={x} />
                         </span>
                         <span className="muted tiny">
                           {relTime(x.at)} · <span className="mono">{whenAt(x.at)}</span>

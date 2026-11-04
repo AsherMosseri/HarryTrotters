@@ -66,6 +66,17 @@ export function coinTitle(n, style) {
   return formatCoins(n, 'short') === formatCoins(n, 'plain') ? undefined : exactCoins(n);
 }
 
+// A coin history line's label with its amount in a style. Labels are saved
+// with the plain number ("Slots: lost 12345", "Won the lottery (1500 coins)")
+// and stay that way (they are part of each line's key for reversing), so the
+// known coin amounts in them are rewritten only when shown. Other numbers in
+// a label (hours, streaks, names, notes) are left alone.
+const LABEL_COINS =
+  /(: won |: lost |, lost |\(won |\(lost |Heist: got away with |Prize wheel: \+|^Gave |^Balance set to |Won the lottery \()(\d{4,})(?=$|\)| coins\)| each to )|^(Bet held: .+ )(\d{4,})(?= \(playing\)$)/g;
+export function coinLabel(label, style = 'commas') {
+  return String(label ?? '').replace(LABEL_COINS, (m, a, n, b, n2) => (a ? a + formatCoins(n, style) : b + formatCoins(n2, style)));
+}
+
 // ---------- the setting (this device, localStorage "coin-format") ----------
 
 const KEY = 'coin-format';

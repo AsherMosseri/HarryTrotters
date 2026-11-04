@@ -1,6 +1,7 @@
 // "Targeted" ads that know a little too much: each one uses the viewer's own
 // numbers (hours this week, overdue tasks, coins…) and only shows when its
 // condition is true for them. Ids start with t- so their views count too.
+import { coinStyled } from './coinFormat.js';
 
 const T = (id, when, make) => ({ id: `t-${id}`, when, make });
 
@@ -74,7 +75,7 @@ export const TARGETS = [
       colors: ['#00b894', '#0984e3'],
       anim: 'bounce',
       sticker: 'VIP',
-      headline: `${v.first}, ${v.balance} Jackson coins is a lot of coins`,
+      headline: `${v.first}, ${coinStyled(v.balance)} Jackson coins is a lot of coins`,
       body: 'They’re burning a hole in your pocket. We accept coins. We accept all coins.',
       cta: 'Spend it all',
       action: { kind: 'subscribe', done: 'Thanks for your loyalty. Your first box ships forever.' },

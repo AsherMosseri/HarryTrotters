@@ -11,12 +11,15 @@ export default function CoinPill({ balance, ready, onOpen, className = '' }) {
   const f = useCoinFormat();
   if (!ready) return null;
   const n = Math.max(0, Math.floor(Number(balance) || 0));
+  // data-chars: how wide it is, in characters, so headers under it on iPad
+  // leave room (shell.css, Coin numbers).
   return (
     <button
       type="button"
       className={`coin-pill ${className}`}
       onClick={onOpen}
       title={f.title(n)}
+      data-chars={f.n(n).length}
       aria-label={`${f.exact(n)} Jackson coins, open coins`}
     >
       <Coin size={16} />

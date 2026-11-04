@@ -6,7 +6,7 @@ import { Avatar } from './common.jsx';
 import { Icon } from './shell/icons.jsx';
 import { confirmDialog } from './Dialogs.jsx';
 import { useCoinFormat } from './CoinNum.jsx';
-import { exactCoins } from '../coinFormat.js';
+import { coinLabel, exactCoins } from '../coinFormat.js';
 
 const KIND = {
   task: 'Finished tasks',
@@ -235,7 +235,7 @@ function Person({ name, w, casino, cfg, onCheck, onAdjust, onBack }) {
               </span>
               <span className="grow">
                 <span className="coins-label">
-                  {x.label} <ReversedTag rev={rev} x={x} />
+                  {f.label(x.label)} <ReversedTag rev={rev} x={x} />
                 </span>
                 <span className="muted tiny">
                   <span className="mono">{when(x.at)}</span>
@@ -353,7 +353,7 @@ export function useReverse(name, history, onAdjust) {
     const first = name.split(' ')[0];
     const ok = await confirmDialog({
       title: refund ? `Refund ${n} coins to ${first}?` : `Take ${n} coins away from ${first}?`,
-      body: `“${x.label}” (${when(x.at)}). ${first}’s history keeps the line, marked Reversed, with a “Reversed” line for the ${refund ? 'refund' : 'take-away'}.`,
+      body: `“${coinLabel(x.label)}” (${when(x.at)}). ${first}’s history keeps the line, marked Reversed, with a “Reversed” line for the ${refund ? 'refund' : 'take-away'}.`,
       okLabel: refund ? 'Refund' : 'Take away',
       danger: !refund,
     });

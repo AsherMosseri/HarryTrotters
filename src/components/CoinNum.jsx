@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react';
-import { COIN_STYLES, coinTitle, exactCoins, formatCoins, getCoinStyle, setCoinStyle, signedCoins, subscribeCoinStyle } from '../coinFormat.js';
+import { COIN_STYLES, coinLabel, coinTitle, exactCoins, formatCoins, getCoinStyle, setCoinStyle, signedCoins, subscribeCoinStyle } from '../coinFormat.js';
 
 // This device's coin number style (Appearance → Coin numbers). Every
 // component that shows coins reads it here, so a change shows everywhere at
@@ -9,7 +9,8 @@ export function useCoinStyle() {
 }
 
 // Formatters in this device's style: c.n(1234) "1,234", c.signed(-5) "−5",
-// c.title(n) the exact number for a hover when the style hides it, and
+// c.title(n) the exact number for a hover when the style hides it,
+// c.label(text) a history label with its coin amount in the style, and
 // c.exact(n) (always with commas, for confirm dialogs).
 export function useCoinFormat() {
   const style = useCoinStyle();
@@ -18,6 +19,7 @@ export function useCoinFormat() {
     n: (n) => formatCoins(n, style),
     signed: (n) => signedCoins(n, style),
     title: (n) => coinTitle(n, style),
+    label: (text) => coinLabel(text, style),
     exact: exactCoins,
   };
 }

@@ -2,7 +2,7 @@
 // and short (1k, 1.1k, 82.2k, 2.3m, 1.5b), signs, rounding, and the exact
 // hover text.
 // Run: node scripts/test-coin-format.mjs
-import { coinTitle, exactCoins, formatCoins, signedCoins } from '../src/coinFormat.js';
+import { coinLabel, coinTitle, exactCoins, formatCoins, signedCoins } from '../src/coinFormat.js';
 
 let failures = 0;
 let passes = 0;
@@ -97,6 +97,34 @@ eq(coinTitle(1234567, 'short'), '1,234,567', 'title with short');
 eq(coinTitle(-1234, 'short'), '−1,234', 'negative title');
 eq(coinTitle(999, 'short'), undefined, 'no title when short is exact');
 eq(coinTitle(1000, 'short'), '1,000', 'title for 1k');
+
+// History labels: the coin amounts saved in them, shown in a style.
+const LABELS = [
+  ['Slots: lost 12345', 'Slots: lost 12,345', 'Slots: lost 12.3k'],
+  ['Slots: won 999', 'Slots: won 999', 'Slots: won 999'],
+  ['Crash: won 1050', 'Crash: won 1,050', 'Crash: won 1.1k'],
+  ['Challenge: beat Cooper (won 2500)', 'Challenge: beat Cooper (won 2,500)', 'Challenge: beat Cooper (won 2.5k)'],
+  ['Heist: got away with 4000', 'Heist: got away with 4,000', 'Heist: got away with 4k'],
+  ['Heist: caught (lost 1500)', 'Heist: caught (lost 1,500)', 'Heist: caught (lost 1.5k)'],
+  ['Won the lottery (1234567 coins)', 'Won the lottery (1,234,567 coins)', 'Won the lottery (1.2m coins)'],
+  ['Prize wheel: +1000', 'Prize wheel: +1,000', 'Prize wheel: +1k'],
+  ['Gave 1500 each to Programming (4 people)', 'Gave 1,500 each to Programming (4 people)', 'Gave 1.5k each to Programming (4 people)'],
+  ['Bet held: Slots 12345 (playing)', 'Bet held: Slots 12,345 (playing)', 'Bet held: Slots 12.3k (playing)'],
+  ['Slots: card deleted, lost 20000', 'Slots: card deleted, lost 20,000', 'Slots: card deleted, lost 20k'],
+  ['Balance set to 50000', 'Balance set to 50,000', 'Balance set to 50k'],
+  // Not coins: left alone.
+  ['8 h at the lab', '8 h at the lab', '8 h at the lab'],
+  ['Streak: 1000 school days in a row', 'Streak: 1000 school days in a row', 'Streak: 1000 school days in a row'],
+  ['From Cooper: “FTC 32313 rules, won 12345 times”', 'From Cooper: “FTC 32313 rules, won 12345 times”', 'From Cooper: “FTC 32313 rules, won 12345 times”'],
+  ['Market: Pizza for 2025', 'Market: Pizza for 2025', 'Market: Pizza for 2025'],
+  ['Type race: 1st of 3', 'Type race: 1st of 3', 'Type race: 1st of 3'],
+];
+for (const [raw, c, s] of LABELS) {
+  eq(coinLabel(raw), c, `label commas “${raw}”`);
+  eq(coinLabel(raw, 'plain'), raw, `label plain “${raw}”`);
+  eq(coinLabel(raw, 'short'), s, `label short “${raw}”`);
+}
+eq(coinLabel(undefined), '', 'label of nothing');
 
 console.log(failures ? `${failures} FAILED, ${passes} passed` : `ALL PASSED (${passes})`);
 process.exit(failures ? 1 : 0);

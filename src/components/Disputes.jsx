@@ -264,7 +264,7 @@ function Report({ x, api, wallet, onToast }) {
           {near.map((h, i) => (
             <li key={`${h.kind}-${h.at}-${i}`}>
               <span aria-hidden="true">{h.icon}</span>
-              <span className="grow">{h.label}</span>
+              <span className="grow">{f.label(h.label)}</span>
               <span className="muted tiny mono">{WHEN(h.at)}</span>
               <CoinNum as="b" signed n={h.amount} className={`mono ${h.amount < 0 ? 'coins-minus' : 'coins-plus'}`} />
             </li>
