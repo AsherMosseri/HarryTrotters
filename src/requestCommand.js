@@ -12,6 +12,7 @@
 
 import { parseAsk } from '../functions/shared/coinRequests.js';
 import { GIFT_MAX } from '../functions/shared/coins.js';
+import { amountTip, parseAmount } from '../functions/shared/amount.js';
 import { SUBTEAMS } from '../functions/shared/team.js';
 import { groupTargets } from './groups.js';
 
@@ -74,7 +75,8 @@ export async function coins(text, ctx) {
   if (p.ambiguous) return note('Which one?', `${p.ambiguous.join(', ')}. Use their full name, like /request @${p.ambiguous[0]} ${p.amount || 10}`);
   if (!p.known) return note(`Who’s “${p.them}”?`, usage);
   if (p.amount === null) return note(`How many coins?`, `Try: /request @${p.them} 25 for pizza`);
-  if (Number.isNaN(p.amount) || p.amount < 1) return note('Ask for a whole number of coins, at least 1.', usage);
+  if (Number.isNaN(p.amount) || p.amount < 1)
+    return note('Ask for a whole number of coins, at least 1.', text.split(/\s+/).map(amountTip).find(Boolean) || usage);
   const r = await ctx.coinRequest({ action: 'create', to: p.them, amount: p.amount, reason: p.reason });
   return r?.note ? { note: r.note } : { done: true };
 }
@@ -92,9 +94,10 @@ async function groupCoins(t, ctx) {
   const words = t.rest.split(/\s+/).filter(Boolean);
   const at = words.findIndex((x) => /^[-+]?\.?\d/.test(x));
   if (at < 0) return note('How many coins each?', usage);
+  // "5", "2k", "1,000" (functions/shared/amount.js, the same as the server).
   const w = words[at].replace('🪙', '');
-  if (!/^\d+$/.test(w) || Number(w) < 1) return note('Ask for a whole number of coins each, at least 1.', usage);
-  const amount = Number(w);
+  const amount = parseAmount(w, { positive: true });
+  if (amount === null) return note('Ask for a whole number of coins each, at least 1.', amountTip(w) || usage);
   if (amount > GIFT_MAX) return note('That’s a lot.', `Up to ${GIFT_MAX} each, the same as /give.`);
   const reason = words.slice(at + 1).join(' ');
   const r = await ctx.coinRequest({ action: 'create', group: t.ask, amount, reason, key: ctx.key });

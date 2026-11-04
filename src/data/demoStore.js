@@ -2026,6 +2026,9 @@ export const demoStore = {
     const isCasino = casino.CASINO.includes(game);
     const stop = blocked(game, serverGroup(game), conv, state.settings?.commands);
     if (stop) return { note: stop };
+    // A bet that isn't a whole number of coins ("1.2345k"), like the server.
+    const whole = casino.wholeCoinsNote(words);
+    if (whole) return note(...whole);
     // Controls, "Casino and games during shifts" off: not while you're clocked in (like the server; Asher is exempt).
     if (
       casino.shiftLocked(game) &&

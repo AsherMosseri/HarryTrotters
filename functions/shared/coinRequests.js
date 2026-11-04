@@ -10,6 +10,7 @@
 // cancelled and expired requests move nothing.
 
 import { GIFT_MAX, giftEntry } from './coins.js';
+import { looksLikeAmount, parseAmount } from './amount.js';
 import { GROUP_MAX, namesShort } from './groups.js';
 
 export const EXPIRES = 24 * 3600000; // a request is open for a day
@@ -34,18 +35,19 @@ export const cleanReason = (s) =>
 // "@Cooper Mlezcko 25 for pizza" -> { them, known, amount, reason }. The
 // first whole word that looks like a number is the amount; the words before it
 // name the person and the words after it are the reason. amount is a number
-// when the word is a whole number, NaN when it looks like one but isn't
-// ("2.5", "-3"), null when there's none. ambiguous: names that fit a first
+// when the word is a whole amount ("25", "2k", "1,000"; amount.js), NaN when
+// it looks like one but isn't ("2.5", "-3", "1.2345k"), null when there's
+// none. ambiguous: names that fit a first
 // name or the start of one ("@Ira" when there are two Iras).
 export function parseAsk(text, roster = []) {
   const words = String(text || '')
     .trim()
     .split(/\s+/)
     .filter(Boolean);
-  const at = words.findIndex((w) => /^[-+]?\d+(\.\d*)?(?:🪙)?$/u.test(w) || /^[-+]?\.\d+$/.test(w));
+  const at = words.findIndex((w) => looksLikeAmount(w.replace(/🪙$/u, '')));
   const nameWords = at < 0 ? words : words.slice(0, at);
   const amountWord = at < 0 ? '' : words[at].replace('🪙', '');
-  const amount = at < 0 ? null : /^\d+$/.test(amountWord) ? Number(amountWord) : NaN;
+  const amount = at < 0 ? null : (parseAmount(amountWord) ?? NaN);
   const reason = at < 0 ? '' : cleanReason(words.slice(at + 1).join(' '));
   const who = nameWords.join(' ').replace(/@/g, '').trim();
   const lower = who.toLowerCase();
