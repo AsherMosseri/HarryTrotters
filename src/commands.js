@@ -135,7 +135,7 @@ export function matchCommands(typed, cfg) {
 
 const pick = (list) => list[Math.floor(Math.random() * list.length)];
 // Anything left after the game words ("bot", "hard", "expert"…) is a person to race.
-const GAME_WORDS = /^(bot|trotbot|easy|medium|hard|beginner|intermediate|expert|marathon|sprint|ultra|\d+)$/i;
+const GAME_WORDS = /^(bot|trotbot|easy|medium|hard|insane|beginner|intermediate|expert|marathon|sprint|ultra|\d+)$/i;
 const namesSomeone = (args) =>
   !/\btournament\s+\S/i.test(args) &&
   args

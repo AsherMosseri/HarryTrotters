@@ -162,9 +162,9 @@ export default function FunGame({ start, api, actor, roster, isOn, onClose }) {
 
 const modeLabel = (game, p) =>
   [
-    fun.MODES[game][p.mode],
+    // "Race Insane Trotbot (40 lines)", "Race Beginner Trotbot · Expert"
+    p.mode === 'bot' ? fun.MODES[game].bot.replace('Trotbot', `${fun.botLabel({ botLevel: p.botLevel })} Trotbot`) : fun.MODES[game][p.mode],
     game === 'minesweep' && p.level ? M.LEVELS[p.level]?.label : '',
-    p.mode === 'bot' ? fun.botLabel({ botLevel: p.botLevel }) : '',
   ]
     .filter(Boolean)
     .join(' · ');
