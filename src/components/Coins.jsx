@@ -120,7 +120,7 @@ export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onMarket
             {tab === 'everyone' &&
               isManager &&
               onCheck &&
-              (everyone ? <EveryoneCoins roster={roster} data={data} cfg={cfg} onCheck={onCheck} onAdjust={onAdjust} /> : <p className="empty">Loading…</p>)}
+              (everyone ? <EveryoneCoins roster={roster} data={data} cfg={cfg} onCheck={onCheck} onAdjust={onAdjust} /> : <p className="empty">Loading everyone’s coins…</p>)}
             {tab === 'wallet' &&
               (wallet.history.length ? (
                 <ul className="coins-history">
@@ -277,7 +277,7 @@ export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onMarket
                     ))}
                   </ol>
                 ) : (
-                  <p className="empty">Loading…</p>
+                  <p className="empty">Loading everyone’s coins…</p>
                 )}
                 <p className="muted tiny">
                   {kind === 'coins'

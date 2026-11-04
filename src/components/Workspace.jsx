@@ -1515,7 +1515,8 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
       setRaceLive: (race, data) => store.setRaceLive(race, data, actor).catch(() => {}),
       subscribeRaceLive: (race, cb) => store.subscribeRaceLive(race, cb),
       wallet: (name) => cmdData.current.wallet(name),
-      // Before someone else's coins: loads the whole ledger (once a visit).
+      // Before someone else's coins: loads the whole ledger (once a visit);
+      // false if it can't (offline, or too slow).
       everyoneCoins: () => cmdData.current.everyoneCoins?.(),
       richest: () => cmdData.current.richest(),
       lottery: () => cmdData.current.lottery,
@@ -2140,10 +2141,10 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
     if (wholeLedger)
       return store.subscribeCoins((list, meta) => {
         setLedger(list);
-        // A first answer from this device's saved copy can be only part of
-        // the ledger (what was saved from your own entries); online, wait for
-        // the server's.
-        if (!meta?.cached || !isOnline()) setLedgerAll(true);
+        // An answer from this device's saved copy can be only part of the
+        // ledger (what was saved from your own entries): everyone's coins
+        // count as here once the server's answer is.
+        if (!meta?.cached) setLedgerAll(true);
         seenCoins('ledger');
       });
     setLedgerAll(false);
@@ -2152,22 +2153,24 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
       seenCoins('ledger');
     });
   }, [store, seenCoins, coinReload, wholeLedger, myNames]);
-  // /balance @someone, /leaderboard, /whois: resolves once everyone's coins
-  // are here (or after a while, offline).
+  // /balance @someone, /leaderboard, /whois: true once everyone's coins are
+  // here; false offline or if they take too long (the command says so
+  // instead of posting a wrong number).
   const everyoneWaits = useRef([]);
   useEffect(() => {
     if (!ledgerAll) return;
-    everyoneWaits.current.forEach((done) => done());
+    everyoneWaits.current.forEach((done) => done(true));
     everyoneWaits.current = [];
   }, [ledgerAll]);
   const ledgerAllRef = useRef(ledgerAll);
   ledgerAllRef.current = ledgerAll;
   const loadEveryoneCoins = useCallback(() => {
-    if (ledgerAllRef.current) return Promise.resolve();
+    if (ledgerAllRef.current) return Promise.resolve(true);
     setEveryoneCoins(true);
+    if (!isOnline()) return Promise.resolve(false);
     return new Promise((done) => {
       everyoneWaits.current.push(done);
-      setTimeout(done, 10000);
+      setTimeout(() => done(false), 45000);
     });
   }, []);
   const coinCfg = useMemo(() => coinSettings(settings.coins), [settings.coins]);
