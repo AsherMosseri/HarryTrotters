@@ -5,6 +5,8 @@ import { Avatar, CloseIcon, Overlay } from './common.jsx';
 import { confirmDialog } from './Dialogs.jsx';
 import { Icon } from './shell/icons.jsx';
 import { REQUESTS_TO } from '../config.js';
+import { CoinNum, useCoinFormat } from './CoinNum.jsx';
+import { exactCoins } from '../coinFormat.js';
 
 // Casino reports. Someone says a result looks wrong; the owner (Asher, the
 // same person feature requests go to) looks at it and refunds by hand, or
@@ -26,9 +28,10 @@ export function reportInfo(m, me, rename) {
   return { game: m.cmd.name, ...cardLoss(m.cmd, me, rename) };
 }
 
-export function statusText(x) {
+// `n` writes the refund in this device's coin style (exact with commas by default).
+export function statusText(x, n = exactCoins) {
   return x.status === 'refunded'
-    ? `Refunded ${x.refund} coins`
+    ? `Refunded ${n(x.refund)} coins`
     : x.status === 'dismissed'
       ? 'Kept as it was'
       : `Waiting for ${REPORTS_TO}`;
@@ -124,6 +127,7 @@ export function ReportDialog({ m, conv, api, onClose }) {
 
 // Your own reports and what happened to them (a tab in the coins screen).
 export function MyReports({ list }) {
+  const f = useCoinFormat();
   if (!list.length) return <p className="muted">Nothing reported. If a casino result looks wrong, use the flag on it in chat.</p>;
   return (
     <ul className="coins-history report-list">
@@ -139,7 +143,7 @@ export function MyReports({ list }) {
             </span>
             {x.resolutionNote && <span className="muted tiny">“{x.resolutionNote}”</span>}
           </span>
-          <span className={`report-status ${x.status}`}>{statusText(x)}</span>
+          <span className={`report-status ${x.status}`}>{statusText(x, f.n)}</span>
         </li>
       ))}
     </ul>
@@ -196,6 +200,7 @@ export function DisputesDialog({ list, api, wallet, onToast, onClose }) {
 }
 
 function Report({ x, api, wallet, onToast }) {
+  const f = useCoinFormat();
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -208,7 +213,7 @@ function Report({ x, api, wallet, onToast }) {
   const decide = async (decision) => {
     if (decision === 'refund') {
       const ok = await confirmDialog({
-        title: `Refund ${s.final ? s.loss : 'the loss'} coins to ${first(x.by)}?`,
+        title: `Refund ${s.final ? exactCoins(s.loss) : 'the loss'} coins to ${first(x.by)}?`,
         body: 'It pays back what the result shows they lost, once. It can’t be undone.',
         okLabel: 'Refund',
       });
@@ -218,7 +223,7 @@ function Report({ x, api, wallet, onToast }) {
     setError('');
     const r = await api.disputeDecide({ id: x.id, decision, note: text.trim() });
     setBusy(false);
-    if (r?.ok) onToast?.(decision === 'refund' ? `Refunded ${r.refund} coins to ${first(x.by)}.` : 'Kept as it was.');
+    if (r?.ok) onToast?.(decision === 'refund' ? `Refunded ${exactCoins(r.refund)} coins to ${first(x.by)}.` : 'Kept as it was.');
     else setError(r?.note ? [r.note.title, r.note.body].filter(Boolean).join(' ') : 'That didn’t go through.');
   };
   return (
@@ -231,7 +236,7 @@ function Report({ x, api, wallet, onToast }) {
             {GAME_LABEL[x.cmd] || 'Casino'} · reported {relTime(x.at)}
           </span>
         </span>
-        {!waiting && <span className={`report-status ${x.status}`}>{statusText(x)}</span>}
+        {!waiting && <span className={`report-status ${x.status}`}>{statusText(x, f.n)}</span>}
       </header>
       <div className="report-reason-line">{REASONS[x.reason]}</div>
       {x.note && <blockquote className="report-quote">{x.note}</blockquote>}
@@ -242,11 +247,11 @@ function Report({ x, api, wallet, onToast }) {
         </div>
         <div>
           <dt>Bet</dt>
-          <dd className="mono">{s.bet}</dd>
+          <dd className="mono" title={f.title(s.bet)}>{s.bet == null ? '' : f.n(s.bet)}</dd>
         </div>
         <div>
           <dt>Shows they lost</dt>
-          <dd className="mono">{s.final ? (s.loss ? s.loss : '0 (not a loss)') : 'not finished'}</dd>
+          <dd className="mono">{s.final ? (s.loss ? f.n(s.loss) : '0 (not a loss)') : 'not finished'}</dd>
         </div>
         <div>
           <dt>Played</dt>
@@ -261,10 +266,7 @@ function Report({ x, api, wallet, onToast }) {
               <span aria-hidden="true">{h.icon}</span>
               <span className="grow">{h.label}</span>
               <span className="muted tiny mono">{WHEN(h.at)}</span>
-              <b className={`mono ${h.amount < 0 ? 'coins-minus' : 'coins-plus'}`}>
-                {h.amount > 0 ? '+' : h.amount < 0 ? '−' : ''}
-                {Math.abs(h.amount)}
-              </b>
+              <CoinNum as="b" signed n={h.amount} className={`mono ${h.amount < 0 ? 'coins-minus' : 'coins-plus'}`} />
             </li>
           ))}
         </ul>
@@ -284,7 +286,7 @@ function Report({ x, api, wallet, onToast }) {
           {error && <div className="casino-error">{error}</div>}
           <div className="row gap wrap report-buttons">
             <button className="btn primary" disabled={busy} onClick={() => decide('refund')}>
-              Refund the bet{s.final && s.loss ? ` (${s.loss})` : ''}
+              Refund the bet{s.final && s.loss ? ` (${exactCoins(s.loss)})` : ''}
             </button>
             <button className="btn" disabled={busy} onClick={() => decide('dismiss')}>
               Dismiss

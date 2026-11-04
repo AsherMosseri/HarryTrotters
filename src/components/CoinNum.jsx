@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react';
-import { coinTitle, exactCoins, formatCoins, getCoinStyle, signedCoins, subscribeCoinStyle } from '../coinFormat.js';
+import { COIN_STYLES, coinTitle, exactCoins, formatCoins, getCoinStyle, setCoinStyle, signedCoins, subscribeCoinStyle } from '../coinFormat.js';
 
 // This device's coin number style (Appearance → Coin numbers). Every
 // component that shows coins reads it here, so a change shows everywhere at
@@ -30,5 +30,34 @@ export function CoinNum({ n, signed = false, as: Tag = 'span', className, ...res
     <Tag className={className} title={coinTitle(n, style)} {...rest}>
       {signed ? signedCoins(n, style) : formatCoins(n, style)}
     </Tag>
+  );
+}
+
+// Appearance → Coin numbers: 1,234 (the default) · 1234 · 1.2k, for this device.
+export function CoinFormatSetting() {
+  const style = useCoinStyle();
+  return (
+    <div className="appearance-row coin-format-row">
+      <div>
+        <b>Coin numbers</b>
+        <span className="muted small">
+          {style === 'short' ? 'Short. Hold or hover a number for the exact amount.' : style === 'plain' ? 'No commas.' : 'With commas.'}
+        </span>
+      </div>
+      <div className="seg" role="radiogroup" aria-label="Coin numbers">
+        {COIN_STYLES.map(([id, label, name]) => (
+          <button
+            key={id}
+            role="radio"
+            aria-checked={style === id}
+            aria-label={`${name}: ${label}`}
+            className={style === id ? 'on' : ''}
+            onClick={() => setCoinStyle(id)}
+          >
+            <span className="mono">{label}</span>
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }

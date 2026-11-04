@@ -104,6 +104,7 @@ import { streaksOf } from '../../functions/shared/streaks.js';
 import { confirmDialog } from './Dialogs.jsx';
 import { LoanSettings, loanLines, useLoans } from './Loans.jsx';
 import { RequestForms } from './RequestForms.jsx';
+import { CoinFormatSetting } from './CoinNum.jsx';
 
 // Versions were renumbered once (2.0 became 1.9, 2.1 became 2.0, and so
 // on). Move this device's "last seen" version along so What's new doesn't
@@ -400,6 +401,7 @@ function AppearanceDialog({ themeMenuProps, onClose }) {
               </label>
             ))}
           </div>
+          <CoinFormatSetting />
         </div>
       </div>
     </Overlay>
