@@ -49,6 +49,7 @@ import {
   personId,
 } from './diff.js';
 import { checkPicks, myPicks, usesVoteButton } from '../../functions/shared/polls.js';
+import { API_FNS } from '../../functions/shared/api.js';
 import { NEXT } from '../next.js';
 import { swOptions } from '../offline.js';
 import { browserIsOnline, isOnline, needsInternet, setServerReachable } from '../connection.js';
@@ -93,10 +94,49 @@ function uploadBytesResumable(...a) {
   return fsUploadBytesResumable(...a);
 }
 
+// The app's callables go through one always-warm server function, `api`
+// (functions/api.js), which runs the same code as the function of that name,
+// so a tap never waits for a sleeping one to start. The names it takes are in
+// functions/shared/api.js; the others (ftcEvents, recap) are called directly.
+// Before the first one, the app asks `api` once whether it's live and which
+// names it takes. Not deployed yet (or an older one): those calls go to the
+// functions by name, as before, and it asks again in a couple of minutes.
+// The question comes first so a request is never sent twice.
+const API_ROUTED = new Set(API_FNS);
+const API_RETRY = 2 * 60000;
+let apiProbe = null; // { at, live, names: Promise<Set | null> }
+function apiNames() {
+  if (apiProbe && (apiProbe.live || Date.now() - apiProbe.at < API_RETRY)) return apiProbe.names;
+  const probe = { at: Date.now(), live: false };
+  probe.names = httpsCallable(getFunctions(app, FUNCTIONS_REGION), 'api', { timeout: 10000 })({ fn: 'ping' }).then(
+    (r) => {
+      probe.live = true;
+      return new Set(Array.isArray(r.data?.fns) ? r.data.fns : []);
+    },
+    () => null,
+  );
+  apiProbe = probe;
+  return probe.names;
+}
+
 // Server functions (coins, games, market, accounts…) only work online. Offline
 // they say so plainly at once instead of spinning.
 function callable(name, { timeout = 30000, offline } = {}) {
-  const call = httpsCallable(getFunctions(app, FUNCTIONS_REGION), name, { timeout });
+  const fns = getFunctions(app, FUNCTIONS_REGION);
+  const direct = httpsCallable(fns, name, { timeout });
+  const viaApi = API_ROUTED.has(name) ? httpsCallable(fns, 'api', { timeout }) : null;
+  async function call(data) {
+    if (viaApi && (await apiNames())?.has(name)) {
+      try {
+        return await viaApi({ fn: name, data });
+      } catch (e) {
+        // `api` doesn't take this name (nothing ran): ask the function itself.
+        if (e?.code === 'functions/invalid-argument' && e.details?.unknownFn) return direct(data);
+        throw e;
+      }
+    }
+    return direct(data);
+  }
   return async (data) => {
     if (!browserIsOnline()) throw needsInternet(offline);
     try {
