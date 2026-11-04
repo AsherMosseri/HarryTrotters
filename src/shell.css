@@ -5223,3 +5223,12 @@ button.bs-cell:focus-visible { outline: 2px solid var(--accent); outline-offset:
 }
 .who-did-what .grid td .avatar { vertical-align: middle; margin-right: 4px; }
 @media (max-width: 480px) { .run-roles { grid-template-columns: 1fr; } }
+
+/* ---------- 3.1.1: nothing moves under a tap in a game ---------- */
+/* While a game is played, "N new messages" sits in the line under the chat
+   (ChatView), never over a card where the next tap lands. */
+.typing-line { position: relative; }
+.new-below.docked {
+  position: absolute; left: auto; right: 10px; top: 50%; bottom: auto; transform: translateY(-50%);
+  padding: 1px 10px; font-size: 12px; line-height: 18px; box-shadow: none;
+}

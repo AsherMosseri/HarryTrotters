@@ -656,10 +656,12 @@ export default function Message({
       }}
       onClick={(e) => {
         if (e.target.closest('a,button,input,.emoji-picker,.spoiler:not(.shown)')) return;
-        // A game being played: a tap that just misses a square or a button
-        // isn't a tap on the message (its buttons would open under the board).
-        // The card's top line still opens them.
-        if (e.target.closest('.cmd-arcade') && !e.target.closest('.cmd-head')) return;
+        // A game or casino card: a tap that just misses a tile or a button (or
+        // lands on one that's disabled) isn't a tap on the message. Its buttons
+        // would open under the card, and on a phone the chat would scroll up to
+        // show them, moving the card under the next tap. The card's top line
+        // still opens them.
+        if (e.target.closest('.cmd-arcade, .cmd-money, .cmd-card-request, .cmd-card-dailyq') && !e.target.closest('.cmd-head')) return;
         onSelect(selected ? null : m.id);
       }}
     >

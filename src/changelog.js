@@ -4,6 +4,16 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '3.1.2',
+    date: '2026-11-04',
+    title: 'Mines fixed: taps land where you aim',
+    items: [
+      'Fixed: while you play a casino game, other people’s messages and games no longer move the chat, so your card stays put under your finger. New messages show a “new messages” button instead.',
+      'Fixed: “Pick a closed tile” on a tile that looked closed. The card now shows each tile you open right away, so it can’t be sent twice.',
+      'Tapping just beside a tile no longer opens the message’s buttons and scrolls the chat.',
+    ],
+  },
+  {
     version: '3.1.1',
     date: '2026-11-04',
     title: 'Who drove, operated and coached',
