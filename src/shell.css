@@ -2083,11 +2083,8 @@ button.pm-row:hover { background: color-mix(in srgb, var(--text) 4%, transparent
 }
 .adopt-tile.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
 .adopt-row { display: flex; gap: 10px; }
-/* Twelve species, always an even grid: 6 + 6 on a wide iPad, 4 x 3 on a narrow one (the sidebar leaves ~510px), 3 x 4 on a phone. */
 .adopt-grid > .adopt-tile { min-width: 0; }
-@media (min-width: 1000px) { .adopt-grid { grid-template-columns: repeat(6, 1fr); } }
-@media (min-width: 700px) and (max-width: 999px) { .adopt-grid { grid-template-columns: repeat(4, 1fr); } }
-@media (max-width: 699px) { .adopt-grid { grid-template-columns: repeat(3, 1fr); } }
+/* How the species tiles are laid out: see "Pets: the gem" at the end. */
 
 /* The team robot on Today. */
 .mascot-energy { font-size: 13px; font-weight: 700; }
@@ -4239,3 +4236,52 @@ html.kb-open .report-note { min-height: 56px; }
 
 /* Market, Pets: a photo of your real pet with no pet in the app. */
 .pp-solo { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+
+/* ---- Pets: the gem (the 13th species) ---- */
+/* A glint twinkles now and then (a few more when it's happy) and a band of light
+   sweeps across the stone. Transform and opacity only, and only when things may
+   move (the Animations setting, "Moving things" and Reduce Motion all drop 'move'). */
+.pet-art .pet-glint { transform-box: fill-box; transform-origin: 50% 50%; }
+:root[data-anim~='move'] .pet-art.anim .pet-glint { animation: pet-glint 4.4s ease-in-out infinite; }
+:root[data-anim~='move'] .pet-art.anim .pet-glint.g2 { animation-duration: 5.8s; animation-delay: -2.2s; }
+:root[data-anim~='move'] .pet-art.anim .pet-glint.g3 { animation-duration: 3.2s; animation-delay: -1.1s; }
+:root[data-anim~='move'] .pet-art.anim .pet-glint.g4 { animation-duration: 3.8s; animation-delay: -2.6s; }
+:root[data-anim~='move'] .pet-art.anim .pet-shimmer { animation: pet-shimmer 7.5s ease-in-out infinite; }
+@keyframes pet-glint {
+  0%, 68% { transform: scale(0.5) rotate(0deg); opacity: 0.55; }
+  80% { transform: scale(1.3) rotate(45deg); opacity: 1; }
+  100% { transform: scale(0.5) rotate(90deg); opacity: 0.55; }
+}
+@keyframes pet-shimmer {
+  0%, 58% { transform: translateX(-36px); opacity: 0; }
+  62% { opacity: 1; }
+  84% { transform: translateX(40px); opacity: 1; }
+  88%, 100% { transform: translateX(40px); opacity: 0; }
+}
+/* In the park each pet keeps its own rhythm. */
+:root[data-anim~='move'] .park .pet-art.anim .pet-glint,
+:root[data-anim~='move'] .park .pet-art.anim .pet-shimmer { animation-delay: var(--pd, 0s) !important; }
+:root[data-anim~='move'] .park .pet-art.anim .pet-glint.g2 { animation-delay: calc(var(--pd, 0s) - 2.2s) !important; }
+:root[data-anim~='move'] .park .pet-art.anim .pet-glint.g3 { animation-delay: calc(var(--pd, 0s) - 1.1s) !important; }
+:root[data-anim~='move'] .park .pet-art.anim .pet-glint.g4 { animation-delay: calc(var(--pd, 0s) - 2.6s) !important; }
+
+/* Adopt a pet: 13 species in balanced rows, by the room the list really has
+   (the sidebar takes part of an iPad): 7 + 6 on a wide iPad, 4 + 5 + 4 on a
+   narrow one, and 3 + 2 + 3 + 2 + 3 on a phone. Each tile spans two half
+   columns, so a shorter row can start half a tile in and sit centered. */
+.adopt { container-type: inline-size; }
+.adopt-grid { grid-template-columns: repeat(6, 1fr); }
+.adopt-grid > .adopt-tile { grid-column: span 2; }
+.adopt-grid > .adopt-tile:nth-child(5n + 4) { grid-column: 2 / span 2; }
+@container (min-width: 460px) {
+  .adopt-grid { grid-template-columns: repeat(10, 1fr); }
+  .adopt-grid > .adopt-tile:nth-child(5n + 4) { grid-column: span 2; }
+  .adopt-grid > .adopt-tile:nth-child(1),
+  .adopt-grid > .adopt-tile:nth-child(10) { grid-column: 2 / span 2; }
+}
+@container (min-width: 690px) {
+  .adopt-grid { grid-template-columns: repeat(14, 1fr); }
+  .adopt-grid > .adopt-tile:nth-child(1),
+  .adopt-grid > .adopt-tile:nth-child(10) { grid-column: span 2; }
+  .adopt-grid > .adopt-tile:nth-child(8) { grid-column: 2 / span 2; }
+}

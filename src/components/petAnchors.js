@@ -21,6 +21,10 @@ export const PET_ANCHORS = {
   chicken: { head: { x: 32, y: 29, r: 16 }, eyes: { x: 32, y: 28.2, gap: 14.8 }, neck: { x: 32, y: 44.5, w: 26 }, up: 5 },
   // The head sits high on a long neck: the blue ball; the casque rises to y 5.6 above it, the wattle hangs to y 43.
   cassowary: { head: { x: 32, y: 22.6, r: 12.4 }, eyes: { x: 32, y: 22.8, gap: 12 }, neck: { x: 32, y: 41, w: 17 } },
+  // A pear-cut gem on its side, point to the right: the face sits on the table,
+  // a little left of center (the round end); the top of the stone is the head's top.
+  // The neck is low (a bib under the mouth), since the stone is all one piece.
+  gem: { head: { x: 30, y: 34, r: 14.6 }, eyes: { x: 30, y: 34, gap: 13 }, neck: { x: 31, y: 47.5, w: 24 } },
 };
 
 // How PetArt places the figure per stage. `s` scales the whole figure about
@@ -31,12 +35,23 @@ export const PET_STAGE = {
   young: { s: 0.94, head: 1, body: 1 },
   grown: { s: 1, head: 1, body: 1.03 },
 };
+// A gem is all one piece (no head on a body), so it just grows as a whole:
+// a small rough crystal, then a cut stone, then a full-size polished one.
+const GEM_STAGE = {
+  baby: { s: 0.86, head: 1, body: 1 },
+  young: { s: 0.94, head: 1, body: 1 },
+  grown: { s: 1, head: 1, body: 1 },
+};
+export const petStage = (species, stage) => {
+  const t = species === 'gem' ? GEM_STAGE : PET_STAGE;
+  return t[stage] || t.young;
+};
 
 // The anchors in the final svg coordinates for a stage. The scarf (grown) is
 // not scaled by the head, so its neck point only gets the overall scale.
 export function stageAnchors(species, stage = 'young') {
   const a = PET_ANCHORS[species] || PET_ANCHORS.cat;
-  const { s, head: hk } = PET_STAGE[stage] || PET_STAGE.young;
+  const { s, head: hk } = petStage(species, stage);
   const X = (x) => 32 + (x - 32) * s;
   const Y = (y) => 60 + (y - 60) * s;
   const H = (y) => 41 + (y - 41) * hk; // head scale about the neck point
