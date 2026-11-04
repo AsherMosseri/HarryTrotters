@@ -265,6 +265,8 @@ function Person({ name, w, casino, cfg, onCheck, onAdjust, onBack }) {
 // The owner only: add, take away, or set someone's Jackson coins. It goes in
 // as a grant (bonus or "taken away") with a note, like the Ads page's grants;
 // "set" works out the difference from the server's balance when it can.
+// The most the owner can add or take away at once (the rules allow the same).
+const OWNER_MAX = 1000000000000;
 function AdjustCoins({ name, balance, onCheck, onAdjust }) {
   const [mode, setMode] = useState('add');
   const [amount, setAmount] = useState('');
@@ -272,7 +274,7 @@ function AdjustCoins({ name, balance, onCheck, onAdjust }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
   const n = Math.floor(Number(amount));
-  const ok = Number.isFinite(n) && amount !== '' && (mode === 'set' ? n >= 0 : n > 0) && n <= 100000;
+  const ok = Number.isFinite(n) && amount !== '' && (mode === 'set' ? n >= 0 : n > 0) && n <= OWNER_MAX;
   const go = async () => {
     if (!ok || busy) return;
     setBusy(true);
@@ -286,6 +288,10 @@ function AdjustCoins({ name, balance, onCheck, onAdjust }) {
       const delta = mode === 'add' ? n : mode === 'remove' ? -n : n - now;
       if (!delta) {
         setMsg(`${name.split(' ')[0]} already has ${now}.`);
+        return;
+      }
+      if (Math.abs(delta) > OWNER_MAX) {
+        setMsg(`That’s a change of ${Math.abs(delta).toLocaleString()}: up to ${OWNER_MAX.toLocaleString()} at a time.`);
         return;
       }
       const after = now + delta;

@@ -7,6 +7,7 @@ import { BatteryStrip } from '../Batteries.jsx';
 import { QUEUE_CHECKLIST, STARTER_CHECKLISTS, isQueueChecklist, starterItems } from '../../checklists.js';
 import { parseDay } from '../../milestones.js';
 import { teamDay } from '../../../functions/shared/coins.js';
+import { rolesFromTeam } from '../../driveRoles.js';
 import {
   MATCH_WINDOW,
   QUEUE_LEAD,
@@ -201,6 +202,8 @@ function ScorePad({ matches, now, driveTeam, api }) {
       endgame: n('endgame'),
       result,
       drivers: (driveTeam?.drivers || []).filter(Boolean),
+      // Who drove, operated, coached and was human player (the match log's Drive team).
+      roles: rolesFromTeam(driveTeam || {}),
     });
     setPicked({ id: match.id, until: Date.now() + 5 * 60000 });
     setSaved(`${match.label} saved to the match log.`);

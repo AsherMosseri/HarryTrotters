@@ -134,7 +134,7 @@ const SECTIONS = [
       'Loans: whoever you asked can say yes, say no, or counter with a different amount, interest or length. You can take a counter, say no, or counter back. Every step is in the loan’s History. You get a notification for each answer.',
       'Loans: pay back any amount any time with Pay, or Pay all. You get a reminder 2 days before it’s due. On the due date, whatever is left is taken from your coins, even if that puts you below zero.',
       `Loans: below zero after a due date, you’re locked until you’re back to 0: no betting, no Market, no sending coins, no lending and no new loans. Coins you earn still count and get you there. The lender (${REQUESTS_TO.split(' ')[0]} for the bank) can forgive the loan or give more time.`,
-      'Loans: by default, one bank loan at a time (up to 500 coins) and two from teammates. Nobody lends while paying back a loan of their own, and two people can only have one loan between them at a time.',
+      'Loans: by default, one bank loan at a time (any amount) and two from teammates. Nobody lends while paying back a loan of their own, and two people can only have one loan between them at a time.',
     ],
   ],
   [

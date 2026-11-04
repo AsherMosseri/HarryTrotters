@@ -8,6 +8,7 @@ import Debrief from './shell/Debrief.jsx';
 import { sortMatches } from '../../functions/shared/matches.js';
 import { BatteriesSection } from './Batteries.jsx';
 import { winnerLine } from '../../functions/shared/predict.js';
+import { RUN_ROLES, driversOf, roleCounts, rolesFromTeam, rolesOf } from '../driveRoles.js';
 
 const PERIODS = [
   { key: 'auto', label: 'Auto' },
@@ -153,7 +154,7 @@ function ScoreChart({ runs }) {
   );
 }
 
-function RunDialog({ run, roster, onClose, onSave, onDelete }) {
+function RunDialog({ run, roster, driveTeam, onClose, onSave, onDelete }) {
   useEscape(onClose);
   const isNew = !run.id;
   const [form, setForm] = useState({
@@ -161,7 +162,11 @@ function RunDialog({ run, roster, onClose, onSave, onDelete }) {
     type: run.type || 'practice',
     matchNumber: run.matchNumber || '',
     result: run.result || '',
-    drivers: run.drivers || [],
+    // Who drove, operated, coached and was human player. A new run starts
+    // from the pit screen's drive team; an older run from its drivers list.
+    roles:
+      rolesOf(run) ||
+      (isNew ? rolesFromTeam(driveTeam) : { driver: run.drivers?.[0] || '', operator: run.drivers?.[1] || '', coach: '', human: '' }),
     auto: run.auto ?? '',
     teleop: run.teleop ?? '',
     endgame: run.endgame ?? '',
@@ -179,6 +184,7 @@ function RunDialog({ run, roster, onClose, onSave, onDelete }) {
     onSave(
       {
         ...form,
+        drivers: driversOf(form.roles),
         matchNumber: form.type === 'match' ? form.matchNumber.trim() : '',
         result: form.type === 'match' ? form.result : '',
         auto: num(form.auto),
@@ -247,21 +253,26 @@ function RunDialog({ run, roster, onClose, onSave, onDelete }) {
                 </div>
               </>
             )}
-            <span className="field-label">Drivers</span>
-            <div className="assignee-picker">
-              {roster.map((n) => {
-                const on = form.drivers.includes(n);
-                return (
-                  <button
-                    type="button"
-                    key={n}
-                    className={`person${on ? ' on' : ''}`}
-                    onClick={() => set({ drivers: on ? form.drivers.filter((x) => x !== n) : [...form.drivers, n] })}
+            <span className="field-label">Drive team</span>
+            <div className="run-roles">
+              {RUN_ROLES.map(([key, label]) => (
+                <label key={key} className="run-role">
+                  <span>{label}</span>
+                  <select
+                    className="input"
+                    value={form.roles[key]}
+                    onChange={(e) => set({ roles: { ...form.roles, [key]: e.target.value } })}
+                    aria-label={label}
                   >
-                    <Avatar name={n} size={20} /> {n.split(' ')[0]}
-                  </button>
-                );
-              })}
+                    <option value="">—</option>
+                    {[...new Set([...roster, form.roles[key]].filter(Boolean))].map((n) => (
+                      <option key={n} value={n}>
+                        {n}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ))}
             </div>
             <span className="field-label">Points</span>
             <div className="points-grid">
@@ -340,7 +351,69 @@ function RunDialog({ run, roster, onClose, onSave, onDelete }) {
   );
 }
 
-export default function RunsView({ runs, roster, api, actor, predictions = [], matches = [], batteries = [] }) {
+// A run's drive team in the table: "D Seb · O Jackson · C Asher". Older runs
+// that only listed drivers show those.
+function DriveTeam({ run }) {
+  const roles = rolesOf(run);
+  if (!roles) return (run.drivers || []).map((d) => d.split(' ')[0]).join(', ') || '—';
+  const on = RUN_ROLES.filter(([key]) => roles[key]);
+  if (!on.length) return '—';
+  return (
+    <span className="run-team">
+      {on.map(([key, label, short]) => (
+        <span key={key} className="run-team-one" title={`${label}: ${roles[key]}`}>
+          <b className="run-role-tag">{short}</b> {roles[key].split(' ')[0]}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+// Who did what, across the runs shown: times in each role, and the average
+// total of the runs each person drove.
+function WhoDidWhat({ runs }) {
+  const people = useMemo(() => roleCounts(runs.map((r) => ({ run: r, total: total(r) }))), [runs]);
+  if (!people.length) return null;
+  return (
+    <section className="chart-card who-did-what">
+      <h2>Who did what</h2>
+      <div className="table-wrap">
+        <table className="grid">
+          <thead>
+            <tr>
+              <th>Person</th>
+              {RUN_ROLES.map(([key, label]) => (
+                <th key={key} className="num">
+                  {label}
+                </th>
+              ))}
+              <th className="num" title="Average total of the runs they drove">
+                Avg. driving
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {people.map((p) => (
+              <tr key={p.name}>
+                <td className="nowrap">
+                  <Avatar name={p.name} size={20} /> {p.name}
+                </td>
+                {RUN_ROLES.map(([key]) => (
+                  <td key={key} className={`num${p[key] ? '' : ' muted'}`}>
+                    {p[key] || '—'}
+                  </td>
+                ))}
+                <td className={`num${p.avgDriven == null ? ' muted' : ''}`}>{p.avgDriven ?? '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+export default function RunsView({ runs, roster, api, actor, predictions = [], matches = [], batteries = [], driveTeam = null }) {
   const [filter, setFilter] = useState('');
   // Score guesses, by the run that settled them (shown under its total).
   const guessOf = useMemo(() => new Map(predictions.filter((p) => p.status === 'done' && p.runId).map((p) => [p.runId, p])), [predictions]);
@@ -422,6 +495,7 @@ export default function RunsView({ runs, roster, api, actor, predictions = [], m
                 <ScoreChart runs={shown.slice(-20)} />
                 {shown.length > 20 && <p className="muted tiny">Showing the latest 20 runs.</p>}
               </section>
+              <WhoDidWhat runs={shown} />
             </>
           ) : (
             <p className="empty">No runs of this type yet.</p>
@@ -433,7 +507,7 @@ export default function RunsView({ runs, roster, api, actor, predictions = [], m
                 <tr>
                   <th>Date</th>
                   <th>Run</th>
-                  <th>Drivers</th>
+                  <th>Drive team</th>
                   <th className="num">Auto</th>
                   <th className="num">TeleOp</th>
                   <th className="num">Endgame</th>
@@ -449,7 +523,9 @@ export default function RunsView({ runs, roster, api, actor, predictions = [], m
                       {runLabel(r)}
                       {r.result && <span className={`result result-${r.result}`}>{RESULTS[r.result]}</span>}
                     </td>
-                    <td className="muted small">{(r.drivers || []).map((d) => d.split(' ')[0]).join(', ') || '—'}</td>
+                    <td className="muted small">
+                      <DriveTeam run={r} />
+                    </td>
                     <td className="num">{r.auto}</td>
                     <td className="num">{r.teleop}</td>
                     <td className="num">{r.endgame}</td>
@@ -486,6 +562,7 @@ export default function RunsView({ runs, roster, api, actor, predictions = [], m
         <RunDialog
           run={editing}
           roster={roster}
+          driveTeam={driveTeam}
           onClose={() => setEditing(null)}
           onSave={async (data, issueTask) => {
             const r = editing;

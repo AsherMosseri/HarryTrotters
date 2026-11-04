@@ -180,7 +180,7 @@ function CoinsForm({ ask, api, roster, actor, onClose }) {
           <input className="input" value={reason} maxLength={REASON_MAX} placeholder="for pizza" onChange={(e) => setReason(e.target.value)} />
         </label>
         <p className="muted tiny">
-          Up to {GIFT_MAX} at a time, like /give. It stays open for {EXPIRES / 3600000} hours; you can cancel it.
+          Any amount. It stays open for {EXPIRES / 3600000} hours; you can cancel it.
         </p>
         {error && (
           <p className="form-error" role="alert">

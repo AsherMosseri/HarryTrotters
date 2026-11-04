@@ -1491,7 +1491,11 @@ async function runMove({ conv, msgId, me, move, data, now, house = false, verifi
     } else tx.set(secretRef, secretWith(r.secret, conv, now, [player]));
     tx.update(msgRef, update);
     // still: the game goes on and no coins moved (withBalance skips its reads).
-    return { ok: true, serverNow: now, ...(!r.done && { still: true }) };
+    // The card as written goes back too: on a slow connection the player's
+    // copy of the chat can be seconds behind (a Mines tile tapped again there
+    // was "Pick a closed tile").
+    const card = { game, status, bet, ...(r.done && { payout: update['cmd.payout'], net: update['cmd.net'] }) };
+    return { ok: true, serverNow: now, card, ...(!r.done && { still: true }) };
   });
   const { awards, ...rest } = res || {};
   const cut = await payAwards(awards, msgId, now);
