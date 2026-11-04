@@ -1095,7 +1095,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
   }, [liveKeys, store, loadFail, quiet]);
   useEffect(() => () => chatSubs.current.forEach((stop) => stop()), []);
 
-  // People: pictures, statuses, org info, and who's online (rechecked every 30 s).
+  // People: pictures, statuses, org info, and who's online (rechecked when a dot would change).
   const profiles = useMemo(() => buildProfiles(profileDocs, rename), [profileDocs, rename]);
   const peopleInfo = useMemo(() => buildPeopleInfo(roster, roles, rename), [roster, roles, rename]);
   // The clock moves on only when something shown changes: someone's "typing…"
