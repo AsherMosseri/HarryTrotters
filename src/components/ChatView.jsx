@@ -42,8 +42,9 @@ function dayLabel(ms) {
   return d.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
 }
 
-function TypingLine({ names }) {
-  if (!names.length) return <div className="typing-line" />;
+// children: the "new messages" button while a game is played (see ChatView).
+function TypingLine({ names, children }) {
+  if (!names.length) return <div className="typing-line">{children}</div>;
   const first = names.map((n) => n.split(' ')[0]);
   const who = first.length === 1 ? first[0] : first.length === 2 ? `${first[0]} and ${first[1]}` : 'Several people';
   return (
@@ -54,6 +55,7 @@ function TypingLine({ names }) {
         <i />
       </span>{' '}
       <b>{who}</b> {first.length === 1 ? 'is' : 'are'} typing…
+      {children}
     </div>
   );
 }
@@ -152,6 +154,20 @@ export default function ChatView({
       // buttons make room under the message) before the click lands.
       const inMsg = t.closest('.msg');
       if (inMsg && !t.closest('button, a, .avatar, .avatar-wrap, .msg-name, [role="button"], .spoiler')) return;
+      // On a game card, after its click: the tile or button under the finger
+      // is the one that gets the tap, and the card is held in place
+      // (takeAnchor) while the buttons go away.
+      if (t.closest('.cmd-card')) {
+        let done = false;
+        const clear = () => {
+          if (done) return;
+          done = true;
+          setTimeout(() => setSelected(null), 0);
+        };
+        document.addEventListener('click', clear, { capture: true, once: true });
+        setTimeout(clear, 800);
+        return;
+      }
       setSelected(null);
     };
     document.addEventListener('pointerdown', away, true);
@@ -168,6 +184,9 @@ export default function ChatView({
   const [viewing, setViewing] = useState(null);
   // How many messages came in below while you were scrolled up (0: none; the pill shows the count).
   const [newBelow, setNewBelow] = useState(0);
+  // While a game is played the button sits in the line under the chat, not
+  // over it: one popping up over the card would take the next tap.
+  const [pillDocked, setPillDocked] = useState(false);
   const [side, setSide] = useState(() =>
     !embedded && typeof matchMedia === 'function' && matchMedia('(min-width: 1200px)').matches ? 'members' : null,
   );
@@ -190,11 +209,15 @@ export default function ChatView({
   // still going), for a few seconds after a tap on a card (playing a game), or
   // while the game view is open: then new messages only light up the pill.
   const hold = useRef({ touching: false, until: 0 });
+  // The last card tapped: the control under the finger and its message.
+  const tapped = useRef({ node: null, msg: null });
   const viewOpen = useRef(false);
-  // The message at the top of the list and how far below the top edge it was:
-  // when things above it change size (a game card growing, a photo loading),
-  // the list moves by as much, so what you're looking at stays put. (Done here
-  // rather than with CSS scroll anchoring, which Safari doesn't have.)
+  // What stays put when things change size (a game card growing, a photo
+  // loading, a reaction above): the control you just tapped on a card, else a
+  // game you're playing, else the message at the top of the list. The list
+  // moves by as much as it did. (Done here rather than with CSS scroll
+  // anchoring, which Safari doesn't have, and which would hold the top
+  // message still while a card further down slid under your finger.)
   const anchor = useRef(null);
   // Set before the app scrolls the list itself, so onScroll can tell.
   const selfScroll = useRef(false);
@@ -302,7 +325,25 @@ export default function ChatView({
     el.scrollTo({ top: Math.max(0, top), behavior: smooth ? 'smooth' : 'auto' });
   };
 
-  const holding = () => viewOpen.current || hold.current.touching || performance.now() < hold.current.until;
+  // A game you're playing (data-live on its card, Commands.jsx), on screen:
+  // yours, or one anyone plays that you've tapped. Not in its first moment,
+  // so a game you just started still shows in full as it fills in.
+  const liveCard = () => {
+    const el = list.current;
+    if (!el) return null;
+    const box = el.getBoundingClientRect();
+    const now = performance.now();
+    for (const c of el.querySelectorAll('.cmd-card[data-live]')) {
+      if (c.dataset.live !== 'me' && !tapped.current.msg?.contains(c)) continue;
+      if (now - Number(c.dataset.since || 0) < 600) continue;
+      const r = c.getBoundingClientRect();
+      if (r.bottom > box.top + 24 && r.top < box.bottom - 24) return c;
+    }
+    return null;
+  };
+  // Hands off: while a game is being played on screen nothing follows new
+  // messages (the pill counts them), however long you think between taps.
+  const holding = () => viewOpen.current || hold.current.touching || performance.now() < hold.current.until || !!liveCard();
   const distance = (el) => el.scrollHeight - el.scrollTop - el.clientHeight;
   const setTop = (el, top) => {
     if (Math.abs(el.scrollTop - top) < 1) return;
@@ -314,12 +355,24 @@ export default function ChatView({
     atBottom.current = true;
     setNewBelow(0);
   };
-  // The first message still showing at the top (its bottom below the list's top edge).
+  // Where the anchor (see above) is now.
   const takeAnchor = () => {
     const el = list.current;
     if (!el) return;
-    const nodes = el.querySelectorAll('.msg[id]');
     const top = el.getBoundingClientRect().top;
+    const at = (node) => (node ? { node, off: node.getBoundingClientRect().top - top } : null);
+    const t = tapped.current;
+    if (performance.now() < hold.current.until && t.msg?.isConnected && el.contains(t.msg)) {
+      anchor.current = { ...at(t.node?.isConnected && t.msg.contains(t.node) ? t.node : t.msg), back: at(t.msg) };
+      return;
+    }
+    const game = liveCard();
+    if (game) {
+      anchor.current = at(game);
+      return;
+    }
+    // The first message still showing at the top (its bottom below the list's top edge).
+    const nodes = el.querySelectorAll('.msg[id]');
     let lo = 0;
     let hi = nodes.length - 1;
     let k = -1;
@@ -330,15 +383,18 @@ export default function ChatView({
         hi = mid - 1;
       } else lo = mid + 1;
     }
-    anchor.current = k >= 0 ? { id: nodes[k].id, off: nodes[k].getBoundingClientRect().top - top } : null;
+    anchor.current = k >= 0 ? at(nodes[k]) : null;
   };
   const keepAnchor = () => {
     const el = list.current;
-    const a = anchor.current;
-    const node = a && document.getElementById(a.id);
-    if (!el || !node || !el.contains(node)) return;
-    const moved = node.getBoundingClientRect().top - el.getBoundingClientRect().top - a.off;
+    let a = anchor.current;
+    // The tapped control is gone (the game ended): its message instead.
+    if (a && !(a.node.isConnected && el?.contains(a.node))) a = a.back;
+    if (!el || !a || !a.node.isConnected || !el.contains(a.node)) return takeAnchor();
+    const moved = a.node.getBoundingClientRect().top - el.getBoundingClientRect().top - a.off;
     if (Math.abs(moved) >= 1) setTop(el, el.scrollTop + moved);
+    // Measured again for the next change.
+    takeAnchor();
   };
   // After anything changed size: at the bottom (and free to move), stay there;
   // otherwise keep what you're looking at where it is.
@@ -364,6 +420,7 @@ export default function ChatView({
       const below = distance(el) >= BOTTOM_PX;
       atBottom.current = !below;
       const unread = all.filter((m) => m.at > newSince && m.at <= newUntil && !sentByMe(m, actor)).length;
+      setPillDocked(false);
       setNewBelow(below ? Math.max(1, unread) : 0);
     } else toBottom(el);
     takeAnchor();
@@ -414,7 +471,10 @@ export default function ChatView({
       // won't later either, until you go down (or tap the pill).
       atBottom.current = !holding() && distance(el) < BOTTOM_PX;
       const added = (was >= 0 ? all.slice(was + 1) : [newest]).filter((m) => !sentByMe(m, actor)).length;
-      if (!atBottom.current && added) setNewBelow((n) => n + added);
+      if (!atBottom.current && added) {
+        if (!newBelow) setPillDocked(holding());
+        setNewBelow((n) => n + added);
+      }
     }
     if (pendingJump.current) jumpTo(pendingJump.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -473,7 +533,11 @@ export default function ChatView({
   };
   // A tap on a game card (or any card): hands off for a few seconds.
   const onListPointerDown = (e) => {
-    if (e.target.closest?.('.cmd-card')) hold.current.until = Math.max(hold.current.until, performance.now() + CARD_HOLD);
+    const cardEl = e.target.closest?.('.cmd-card');
+    if (!cardEl) return;
+    hold.current.until = Math.max(hold.current.until, performance.now() + CARD_HOLD);
+    tapped.current = { node: e.target.closest('button, input, textarea, select, a') || cardEl, msg: cardEl.closest('.msg') || cardEl };
+    takeAnchor();
   };
 
   // The game view (GameView.jsx), opened from a card. The list stays exactly
@@ -530,6 +594,18 @@ export default function ChatView({
     const more = await loadOlder();
     if (more.length) requestAnimationFrame(() => jumpTo(id, tries + 1));
   };
+
+  const pill = newBelow > 0 && (
+    <button
+      className={`new-below${pillDocked ? ' docked' : ''}`}
+      onClick={() => {
+        hold.current.until = 0;
+        toBottom(list.current);
+      }}
+    >
+      {newBelow} new message{newBelow === 1 ? '' : 's'} ↓
+    </button>
+  );
 
   const openAt = (key, id) => {
     if (key !== conv.key) {
@@ -924,18 +1000,8 @@ export default function ChatView({
           <BotReplies conv={conv.key} />
           {myNotes.filter((n) => !shownMessages.length || n.at > shownMessages[shownMessages.length - 1].at).map(noteView)}
         </div>
-        {newBelow > 0 && (
-          <button
-            className="new-below"
-            onClick={() => {
-              hold.current.until = 0;
-              toBottom(list.current);
-            }}
-          >
-            {newBelow} new message{newBelow === 1 ? '' : 's'} ↓
-          </button>
-        )}
-        <TypingLine names={typing} />
+        {!pillDocked && pill}
+        <TypingLine names={typing}>{pillDocked && pill}</TypingLine>
         {deleteAsk && (
           <DeleteMessages
             msgs={deleteAsk}
