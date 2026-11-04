@@ -21,8 +21,8 @@ export const MORE_COMMANDS = [
   { name: 'joke', group: 'random', args: '', desc: 'A robotics joke (tap for the punchline)' },
   { name: 'riddle', group: 'random', args: '', desc: 'A riddle; the answer is hidden until tapped' },
   { name: 'fact', group: 'random', args: '', desc: 'A true STEM or FIRST fact' },
-  { name: 'compliment', group: 'random', args: '@person', desc: 'Say something nice about someone' },
-  { name: 'hype', group: 'random', args: '@person', desc: 'Hype someone up before a match' },
+  { name: 'compliment', group: 'random', args: '@person | @group', desc: 'Say something nice about someone' },
+  { name: 'hype', group: 'random', args: '@person | @group', desc: 'Hype someone up before a match' },
   { name: 'cheer', group: 'random', args: '', desc: 'A Harry Trotters team cheer' },
   { name: 'hottake', group: 'random', args: '', desc: 'An FTC hot take: everyone votes agree or disagree' },
   { name: 'vs', group: 'random', args: 'this | that', desc: 'A quick two-way vote' },
@@ -58,20 +58,22 @@ export const MORE_COMMANDS = [
   { name: 'tip', bare: true, group: 'learn', args: 'wiring | code | build…', desc: 'A practical FTC tip' },
   // Team
   { name: 'lab', group: 'team', args: '', desc: 'Who’s at the lab right now, and for how long' },
-  { name: 'hours', bare: true, group: 'team', args: '@person', desc: 'Hours today, this week and this season' },
+  { name: 'hours', bare: true, group: 'team', args: '@person | @group', desc: 'Hours today, this week and this season' },
   { name: 'top', group: 'team', args: '', desc: 'Most lab hours this week' },
-  { name: 'streak', bare: true, group: 'team', args: '@person', desc: 'School-day and weekly lab streaks' },
+  { name: 'streak', bare: true, group: 'team', args: '@person | @group', desc: 'School-day and weekly lab streaks' },
   { name: 'stats', group: 'team', args: '', desc: 'Team hours, tasks and practice runs, this week vs last' },
   { name: 'nextmatch', group: 'team', args: '', desc: 'Our next match at the competition' },
   { name: 'milestone', group: 'team', args: '', desc: 'The next milestones coming up' },
   { name: 'due', bare: true, group: 'team', args: 'me', desc: 'Tasks due in the next 7 days (yours with “me”)' },
-  { name: 'tasks', bare: true, group: 'team', args: '@person', desc: 'Someone’s open tasks' },
+  { name: 'tasks', bare: true, group: 'team', args: '@person | @group', desc: 'Someone’s open tasks' },
   { name: 'unassigned', group: 'team', args: '', desc: 'Open tasks nobody has taken' },
   { name: 'blocked', group: 'team', args: '', desc: 'Tasks that are stuck, and why' },
   { name: 'roster', bare: true, group: 'team', args: 'subteam', desc: 'Who’s on a subteam (or all subteams)' },
 ];
 
 const pick = (list) => list[Math.floor(Math.random() * list.length)];
+// A group lookup card shows this many people, then "and N more".
+export const GROUP_ROWS = 12;
 const shuffle = (list) => {
   const a = [...list];
   for (let i = a.length - 1; i > 0; i--) {
@@ -121,7 +123,9 @@ const RULE_ID = /^([gretiacl])\s*-?\s*(\d{3})$/i;
 // ctx: what commands.js passes (actor, roster, tasks, shifts, milestones,
 // matches, subteamsOf, onShift, runs). card(result, extra) posts a card;
 // note(...) answers only you.
-export async function runMore({ cmd, args }, ctx, { card: post, need }) {
+// group: the people a group in the text reaches (src/groups.js groupTargets),
+// or null; pings(kind): who its card notifies.
+export async function runMore({ cmd, args }, ctx, { card: post, need, group = null, pings = () => ({}) }) {
   // Firestore can't store a list inside a list: rows and groups go in as
   // { c: [...] } and { names: [...] } (MoreCards.jsx reads both shapes).
   const card = (result, extra) =>
@@ -165,6 +169,13 @@ export async function runMore({ cmd, args }, ctx, { card: post, need }) {
       return info('Fact', { lines: [pick(FACTS)] });
     case 'compliment':
     case 'hype': {
+      if (group) {
+        const line = cmd.name === 'hype' ? pick(HYPE) : pick(COMPLIMENTS);
+        return card(
+          { view: 'shout', to: '', group: group.label, people: group.people.slice(0, 60), count: group.people.length, line, name: cmd.name },
+          pings('action'),
+        );
+      }
       const to = args ? namesIn(args, roster)[0] : null;
       if (!to) return need('someone (@name)');
       const line = cmd.name === 'hype' ? pick(HYPE) : pick(COMPLIMENTS);
@@ -220,6 +231,21 @@ export async function runMore({ cmd, args }, ctx, { card: post, need }) {
     case 'pick':
     case 'teams':
     case 'order': {
+      // A group (/pick @Programming, /teams 3 @everyone): its people.
+      if (group) {
+        const pool = group.people;
+        const from = `from ${group.label}`;
+        if (cmd.name === 'pick') {
+          const who = pick(pool);
+          return card({ view: 'people', title: `I pick ${first(who)}`, groups: [[who]], sub: from }, { mentions: who !== me ? [who] : [] });
+        }
+        if (pool.length < 2) return note(`${group.label} needs at least two people for that.`, `Only ${group.short} is in it besides you.`);
+        if (cmd.name === 'order') return card({ view: 'people', title: 'The order', numbered: true, groups: [shuffle(pool)], sub: from });
+        const k = Math.max(2, Math.min(pool.length, +(group.rest.match(/(^|\s)(\d+)(\s|$)/)?.[2] || 2)));
+        const teams = Array.from({ length: k }, () => []);
+        shuffle(pool).forEach((n, i) => teams[i % k].push(n));
+        return card({ view: 'people', title: `${k} teams`, groups: teams, sub: from });
+      }
       const sub = cmd.name === 'pick' && args ? subteamIn(args) : null;
       const named = namesIn(args, roster);
       const here = (ctx.onShift?.() || []).map((p) => p.name);
@@ -511,6 +537,36 @@ export async function runMore({ cmd, args }, ctx, { card: post, need }) {
     }
     case 'hours':
     case 'streak': {
+      // A group: one card, a row each. Hours: most this week first. Streaks: longest first.
+      if (group) {
+        const today = teamMidnight(teamDay(now));
+        const week = teamMidnight(weekStart(teamDay(now)));
+        const list = group.people.map((n) => {
+          const mine = shifts.filter((s) => s.person === n);
+          if (cmd.name === 'streak') {
+            const st = streaksOf(n, mine, now);
+            return { name: n, k: [st.daily, st.weekly], c: [`${st.daily}${st.today ? '' : '*'}`, `${st.weekly}${st.thisWeek ? '' : '*'}`] };
+          }
+          const ms = (from) => mergedMs(mine.filter((s) => s.start >= from), now);
+          const w = ms(week);
+          const all = ms(0);
+          return { name: n, k: [w, all], c: [`${hoursOf(ms(today))} h`, `${hoursOf(w)} h`, `${hoursOf(all)} h`] };
+        });
+        list.sort((a, b) => b.k[0] - a.k[0] || b.k[1] - a.k[1] || a.name.localeCompare(b.name));
+        const streak = cmd.name === 'streak';
+        return card(
+          {
+            view: 'grid',
+            title: streak ? `${group.label} streaks` : `${group.label} hours`,
+            sub: `${list.length} ${list.length === 1 ? 'person' : 'people'} · ${streak ? 'longest first' : 'most this week first'}`,
+            cols: streak ? ['School days', 'Weeks'] : ['Today', 'This week', 'Season'],
+            grid: list.slice(0, GROUP_ROWS).map(({ name, c }) => ({ name, c })),
+            more: Math.max(0, list.length - GROUP_ROWS),
+            ...(streak && { foot: '* today or this week not yet' }),
+          },
+          pings('lookup'),
+        );
+      }
       const who = args ? namesIn(args, roster)[0] : me;
       if (!who) return note(`Who’s “${args}”?`, `Try: /${cmd.name} @name`);
       const mine = shifts.filter((s) => s.person === who);
@@ -642,6 +698,34 @@ export async function runMore({ cmd, args }, ctx, { card: post, need }) {
       });
     }
     case 'tasks': {
+      // A group: one card, a row each, the most late tasks first, then the most open.
+      if (group) {
+        const today = todayISO();
+        const list = group.people.map((n) => {
+          const theirs = open.filter((t) => (t.assignees || []).includes(n));
+          const late = theirs.filter((t) => t.dueDate && t.dueDate < today).length;
+          const next = theirs
+            .map((t) => t.dueDate)
+            .filter((d) => d && d >= today)
+            .sort()[0];
+          const d = next ? daysBetween(today, next) : null;
+          const due = d == null ? '–' : d === 0 ? 'today' : d === 1 ? 'tomorrow' : `in ${d} days`;
+          return { name: n, late, open: theirs.length, c: [String(theirs.length), late ? String(late) : '–', due] };
+        });
+        list.sort((a, b) => b.late - a.late || b.open - a.open || a.name.localeCompare(b.name));
+        const total = list.reduce((t, x) => t + x.open, 0);
+        return card(
+          {
+            view: 'grid',
+            title: `${group.label} tasks`,
+            sub: `${total} open across ${list.length} ${list.length === 1 ? 'person' : 'people'}`,
+            cols: ['Open', 'Late', 'Next due'],
+            grid: list.slice(0, GROUP_ROWS).map(({ name, c }) => ({ name, c })),
+            more: Math.max(0, list.length - GROUP_ROWS),
+          },
+          pings('lookup'),
+        );
+      }
       const who = args ? namesIn(args, roster)[0] : me;
       if (!who) return note(`Who’s “${args}”?`, 'Try: /tasks @name');
       const list = open

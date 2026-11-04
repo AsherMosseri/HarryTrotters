@@ -18,6 +18,7 @@ import { Icon } from '../shell/icons.jsx';
 import { Die } from './Die.jsx';
 import { Bomb, CoinMark, FlipCoin, Gem, PlayingCard, Rocket, RouletteWheel, ensureCasinoDefs } from './casinoArt.jsx';
 import { useMove } from './useMove.js';
+import { GroupFaces } from './MoreCards.jsx';
 
 // The Jackson coins economy and casino cards (the play function rolls; these
 // show it). Live games (blackjack, crash, mines, high-low) have buttons for
@@ -926,6 +927,20 @@ function Economy({ c, by, Name }) {
         </Econ>
       );
     case 'give':
+      // To a group (/give @Programming 10): the amount each, and the total.
+      if (c.group)
+        return (
+          <Econ icon="gift" tone="green" title="Gift">
+            <div className="cmd-big cz-big">
+              <Amt n={c.amount} /> <span className="small muted">each</span>
+            </div>
+            <div>
+              <Name name={by} /> sent <b className="grp-label">{c.group}</b> <b>{c.amount}</b> coin{c.amount === 1 ? '' : 's'} each:{' '}
+              <b className="mono">{c.total}</b> in all
+            </div>
+            <GroupFaces people={c.people} count={c.count} Name={Name} />
+          </Econ>
+        );
       return (
         <Econ icon="gift" tone="green" title="Gift">
           <div className="cmd-big cz-big">

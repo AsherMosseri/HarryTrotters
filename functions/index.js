@@ -13,7 +13,20 @@ import { initializeApp } from 'firebase-admin/app';
 import { FieldPath, FieldValue, getFirestore } from 'firebase-admin/firestore';
 import { getMessaging } from 'firebase-admin/messaging';
 import { fetchPage, firstLink, readPreview } from './preview.js';
-import { AWARD_CAPS, coinSettings, coinsByName, coinTasks, freshWallet, giftEntry, oldBankIds, prizeEntry, teamDay } from './shared/coins.js';
+import {
+  AWARD_CAPS,
+  coinSettings,
+  coinsByName,
+  coinTasks,
+  freshWallet,
+  giftEntry,
+  groupGiftEntries,
+  oldBankIds,
+  prizeEntry,
+  teamDay,
+} from './shared/coins.js';
+import { GROUP_MAX, groupLabel, groupsIn, resolveTargets } from './shared/groups.js';
+import { groupTeam } from './groups.js';
 import * as casino from './shared/casino.js';
 import * as arcade from './shared/arcade.js';
 import { blocked, isOff, serverGroup } from './shared/commandRules.js';
@@ -22,7 +35,7 @@ import * as arcadeBank from './banks/arcade.js';
 import * as fun from './shared/funGames.js';
 import * as mines from './shared/minesweeper.js';
 import { newSeed, secureRandom } from './shared/rng.js';
-import { MANAGER_NAMES, PASSWORD_MIN, ROSTER, cleanName, isManagerName, knownName, memberOk, nameKey, onTeam, sameName } from './shared/team.js';
+import { MANAGER_NAMES, PASSWORD_MIN, ROSTER, SUBTEAMS, cleanName, isManagerName, knownName, memberOk, nameKey, onTeam, sameName } from './shared/team.js';
 import {
   DEFAULT_COMPETITION_DATE,
   TEAM_NUMBER,
@@ -1515,6 +1528,67 @@ async function challengeContext(tx, { me, words, roster, myBank, now, data }) {
   return { peer, hasOpen };
 }
 
+// /give to a group (/give @Programming 10, /give @everyone 1), and any /give
+// that comes with a key (the app sends one with every /give now).
+// - Who it goes to comes from the server's own team (functions/groups.js):
+//   the group's people now, plus anyone named, each checked against the
+//   roster. The app only says which groups and names were typed.
+// - All or nothing: one transaction writes every gift or none, after
+//   checking the whole total against the balance read fresh inside it. The
+//   bank doc is read and touched, so two at once take turns and the second
+//   sees the first (the same as one /give, bets and buys).
+// - The key makes it safe to send twice (a double tap, a retry after a lost
+//   answer): each gift's id is made from the giver, the key and the person, so
+//   it can only be written once, and a second try just says it's done.
+// The overdue-loan lock and Controls (coins off) were checked before this.
+async function giveMany(me, body, data, now) {
+  const key = String(body.key || '');
+  if (!/^[\w-]{8,40}$/.test(key)) throw new HttpsError('invalid-argument', 'Missing key.');
+  const team = await groupTeam(db, data.rename);
+  const g = body.group && typeof body.group === 'object' ? body.group : null;
+  const groups = g ? (Array.isArray(g.groups) ? g.groups : []).map(String) : [];
+  if (groups.some((x) => !SUBTEAMS.includes(x)) || groups.length > SUBTEAMS.length)
+    return note('Which group?', `Groups: @everyone, ${SUBTEAMS.map((x) => `@${x}`).join(', ')}.`);
+  const everyone = !!g?.everyone;
+  // Everyone named by hand, each one checked against the server's roster.
+  const named = (g ? (Array.isArray(g.people) ? g.people : []) : [body.to]).slice(0, GROUP_MAX).map((n) => data.rename(cleanName(String(n || ''))));
+  for (const n of named) {
+    if (n === me && !g) return note('That’s you.', 'Your coins are already yours.');
+    if (n !== me && !team.roster.includes(n)) return note(`Who’s ${n || 'that'}?`, g ? 'They aren’t on the team. Nothing was sent.' : '');
+  }
+  if (g && !groups.length && !everyone) return note('Which group?', 'Try: /give @Programming 10');
+  const people = g ? resolveTargets({ groups, everyone, people: named }, { ...team, me }) : named;
+  const label = g ? groupLabel({ groups, everyone }) : '';
+  if (!people.length) return note(`Nobody in ${label} to give to.`, `${label} has nobody in it besides you.`);
+  const batch = `${nameKey(me)}-${key}`;
+  const refs = people.map((to) => db.doc(`coins/gift-${batch}-${nameKey(to)}`));
+  return db.runTransaction(async (tx) => {
+    // Sent before (a double tap or a retry): say what was sent, write nothing.
+    const before = (await tx.getAll(...refs)).filter((d) => d.exists).map((d) => d.data());
+    const myBank = (await tx.get(bankRef(me))).data() || {};
+    if (before.length) {
+      const sent = before.filter((x) => data.rename(x.from || '') === me);
+      const total = sent.reduce((t, x) => t + x.amount, 0);
+      return { ok: true, repeat: true, people: sent.map((x) => x.to), amount: sent[0]?.amount || 0, total, group: label };
+    }
+    const mine = await freshCoins(me, myBank, data);
+    const made = g
+      ? groupGiftEntries(
+          me,
+          { people, amount: body.amount, note: body.note, batch, group: label },
+          { roster: team.roster, balance: mine.balance, now },
+        )
+      : (() => {
+          const e = giftEntry(me, { to: people[0], amount: body.amount, note: body.note }, { roster: team.roster, balance: mine.balance, now });
+          return e.error ? e : { entries: [e], total: e.amount };
+        })();
+    if (made.error) return note(made.error, made.body);
+    made.entries.forEach((e, i) => tx.set(refs[i], e));
+    tx.set(bankRef(me), { ...myBank, name: me, touched: now });
+    return { ok: true, entry: made.entries[0], people, amount: made.entries[0].amount, total: made.total, group: label };
+  });
+}
+
 export const play = onCall({ maxInstances: 5, invoker: 'public' }, withBalance(async (req) => {
   // The server's clock when the request arrived: it decides when a crash was
   // cashed out (never a time the app sends), before any reads slow it down.
@@ -1549,9 +1623,10 @@ export const play = onCall({ maxInstances: 5, invoker: 'public' }, withBalance(a
       const controls = (await db.doc('settings/controls').get()).data() || {};
       if ((controls.off || []).includes('coins')) return note('🪙 Jackson coins are off right now.');
     }
+    const body = req.data || {};
+    if (action === 'gift' && (body.group || body.key)) return giveMany(me, body, data, now);
     const roster =
       action === 'gift' ? (await db.collection('people').get()).docs.map((d) => data.rename(d.get('name') || '')).filter(Boolean) : [];
-    const body = req.data || {};
     return db.runTransaction(async (tx) => {
       const myBank = (await tx.get(bankRef(me))).data() || {};
       const mine = await freshCoins(me, myBank, data);
@@ -1589,6 +1664,10 @@ export const play = onCall({ maxInstances: 5, invoker: 'public' }, withBalance(a
   // Asher's switches: off, or not allowed in this channel (read fresh, not cached).
   const stop = blocked(game, serverGroup(game), conv, (await db.doc('settings/team').get()).get('commands'));
   if (stop) return { note: stop };
+  // A group (@Programming, @everyone) in a bet, a game or /rob: say so,
+  // never pick one person out of it (shared/groups.js).
+  if (groupsIn(words.join(' ')).any)
+    return note(`/${game} is one person at a time.`, 'Groups like @Programming or @everyone don’t work with it. Name one person.');
   // Asher's Controls (src/controls.js): coins or this channel switched off for everyone but him.
   if (me !== REQUESTS_TO) {
     const controls = (await db.doc('settings/controls').get()).data() || {};

@@ -4884,3 +4884,34 @@ html.kb-open .report-note { min-height: 56px; }
   .adopt-grid > .adopt-tile:nth-child(10) { grid-column: span 2; }
   .adopt-grid > .adopt-tile:nth-child(8) { grid-column: 2 / span 2; }
 }
+
+/* ---------- Groups in commands (/give @Programming 10, /hug @everyone,
+   /hours @CAD): src/groups.js, chat/MoreCards.jsx GroupFaces and Grid. ---------- */
+.grp-label { color: var(--accent); font-weight: 650; }
+.grp-faces { display: flex; align-items: center; gap: 8px; margin-top: 8px; min-width: 0; flex-wrap: wrap; }
+.grp-stack { display: inline-flex; align-items: center; padding-left: 6px; flex: none; }
+.grp-face { display: inline-flex; margin-left: -6px; border-radius: 50%; box-shadow: 0 0 0 2px var(--surface); background: var(--surface); }
+.grp-face.grp-more {
+  width: 26px; height: 26px; align-items: center; justify-content: center; font-size: 10.5px; font-weight: 650;
+  color: var(--muted); background: var(--bg); box-shadow: 0 0 0 2px var(--surface), inset 0 0 0 1px var(--border);
+}
+.grp-names { min-width: 0; line-height: 1.35; }
+.grp-names .cmd-name { font-size: inherit; }
+.grp-target { display: inline-flex; gap: 0; }
+.grp-target > * + * { margin-left: -12px; }
+.grp-shout .grp-faces { margin-top: 6px; }
+.mc-grid-card { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.mc-grid { border-collapse: collapse; width: 100%; font-size: 13px; margin-top: 4px; }
+.mc-grid th, .mc-grid td { padding: 5px 6px; border-top: 1px solid var(--border); text-align: right; white-space: nowrap; }
+.mc-grid thead th { border-top: 0; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; padding-top: 2px; }
+.mc-grid th[scope='row'] { text-align: left; font-weight: 500; padding-left: 0; width: 100%; max-width: 0; overflow: hidden; }
+.mc-grid-who { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.mc-grid-who .cmd-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.mc-grid-dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: #22c55e; }
+.mc-grid .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.mc-grid-more { padding-top: 2px; }
+@media (max-width: 520px) {
+  .mc-grid { font-size: 12.5px; }
+  .mc-grid th, .mc-grid td { padding: 5px 4px; }
+  .mc-grid thead th { font-size: 10px; letter-spacing: 0; white-space: normal; vertical-align: bottom; }
+}

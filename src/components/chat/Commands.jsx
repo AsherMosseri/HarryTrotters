@@ -7,7 +7,7 @@ import { ARCADE_CARDS, ArcadeBody } from './Arcade.jsx';
 import { CardActions } from './CardActions.jsx';
 import { DISPUTABLE } from '../../../functions/shared/disputes.js';
 import { Die } from './Die.jsx';
-import { MoreBody } from './MoreCards.jsx';
+import { GroupFaces, MoreBody } from './MoreCards.jsx';
 import { LabDay } from '../LabLog.jsx';
 import { RecapBody } from '../Life.jsx';
 import { DailyCard } from '../learn/DailyCard.jsx';
@@ -375,6 +375,27 @@ function Body({ c, by, onPerson, fresh }) {
     case 'highfive':
     case 'bonk':
     case 'wave':
+      // A group (/highfive @Programming): one card naming them all.
+      if (c.group)
+        return (
+          <div className={`cmd-action act-${c.name} grp-action`}>
+            <div className="cmd-stage" aria-hidden="true">
+              {(c.name === 'hug' || c.name === 'highfive') && <Avatar name={by} size={52} />}
+              <span className="cmd-target grp-target">
+                {(c.people || []).slice(0, 3).map((n) => (
+                  <Avatar key={n} name={n} size={44} />
+                ))}
+              </span>
+              <span className="cmd-prop">{{ pet: '🫳', hug: '🫂', highfive: '✋', bonk: '🔨', wave: '👋' }[c.name]}</span>
+              {c.name === 'bonk' && <span className="cmd-pow">BONK!</span>}
+            </div>
+            <div>
+              <Name name={by} onPerson={onPerson} />{' '}
+              {c.line.split(c.group).flatMap((part, i) => (i ? [<b key={i} className="grp-label">{c.group}</b>, part] : [part]))}
+            </div>
+            <GroupFaces people={c.people} count={c.count} onPerson={onPerson} />
+          </div>
+        );
       return (
         <div className={`cmd-action act-${c.name}`}>
           <div className="cmd-stage" aria-hidden="true">
