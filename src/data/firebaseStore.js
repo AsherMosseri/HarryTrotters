@@ -59,10 +59,11 @@ const storage = getStorage(app);
 // The offline copy of the team's data (IndexedDB, shared by every tab): the
 // last-known schedule, tasks, checklists and chat stay readable with no
 // internet, and writes made offline wait there and send when it's back.
-// Everything the app is listening to stays in it however big it gets; only
-// past it CACHE_MAX are the oldest of the rest (older chat pages scrolled
-// back to, lists that were closed long ago) cleared out, so it can't grow
-// without end and slow down every start.
+// Everything the app is listening to stays in it however big it gets. Only
+// once it passes CACHE_MAX is the oldest of the rest (older chat pages
+// scrolled back to, lists closed long ago) cleared out, so it can't grow
+// without end. (The team's data is far below that, so in practice nothing
+// is cleared.)
 const CACHE_MAX = 100 * 1024 * 1024;
 const db = initializeFirestore(app, {
   localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager(), cacheSizeBytes: CACHE_MAX }),
