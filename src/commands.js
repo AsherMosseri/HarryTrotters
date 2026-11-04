@@ -23,14 +23,15 @@ export const GROUPS = [
   ['team', 'Team'],
 ];
 
-// name, group, args (shown as a hint), what it does
+// name, group, args (shown as a hint), what it does. bare: works with nothing
+// after it too (/balance is yours), so "/balance" + Return sends it at once.
 export const COMMANDS = [
   { name: 'help', group: 'basics', args: '', desc: 'Every command, and what it does' },
   { name: 'ping', group: 'basics', args: '', desc: 'Is Trotbot awake? (and how fast)' },
-  { name: 'whois', group: 'basics', args: '@person', desc: 'Someone’s hours, tasks, coins, and status' },
-  { name: 'avatar', group: 'basics', args: '@person', desc: 'Their profile picture, big' },
+  { name: 'whois', bare: true, group: 'basics', args: '@person', desc: 'Someone’s hours, tasks, coins, and status' },
+  { name: 'avatar', bare: true, group: 'basics', args: '@person', desc: 'Their profile picture, big' },
   { name: 'countdown', group: 'basics', args: '', desc: 'Days until competition' },
-  { name: 'afk', group: 'basics', args: 'reason', desc: 'Away: Trotbot tells people who @ you' },
+  { name: 'afk', bare: true, group: 'basics', args: 'reason', desc: 'Away: Trotbot tells people who @ you' },
   { name: 'remind', group: 'basics', args: 'when what', desc: 'A reminder later (10m, 2h, tomorrow 7am, at 5pm…)' },
   { name: 'poll', group: 'basics', args: 'question', desc: 'Start a poll' },
 
@@ -44,7 +45,7 @@ export const COMMANDS = [
 
   { name: '8ball', group: 'random', args: 'question', desc: 'Ask the Magic 8-Ball' },
   { name: 'flip', group: 'random', args: '', desc: 'Flip a coin' },
-  { name: 'roll', group: 'random', args: '2d6', desc: 'Roll dice (d20, 3d6+2, 100…)' },
+  { name: 'roll', bare: true, group: 'random', args: '2d6', desc: 'Roll dice (d20, 3d6+2, 100…)' },
   { name: 'choose', group: 'random', args: 'a | b | c', desc: 'Trotbot picks one' },
   { name: 'rate', group: 'random', args: 'thing', desc: 'Trotbot rates it out of 10' },
   { name: 'ship', group: 'random', args: '@person @person', desc: 'How compatible are they?' },
@@ -57,7 +58,7 @@ export const COMMANDS = [
   { name: 'bonk', group: 'actions', args: '@person', desc: 'Cartoon bonk 🔨' },
   { name: 'wave', group: 'actions', args: '@person', desc: 'Say hi' },
 
-  { name: 'balance', group: 'economy', args: '@person', desc: 'How many Jackson coins (yours or theirs)' },
+  { name: 'balance', bare: true, group: 'economy', args: '@person', desc: 'How many Jackson coins (yours or theirs)' },
   { name: 'daily', group: 'economy', args: '', desc: 'Free coins once a day: 5, plus 1 for each day in a row, up to 15 (shares the 20-a-day game limit)', server: true },
   { name: 'work', group: 'economy', args: '', desc: 'Coins for your work, while you’re clocked in (once an hour)', server: true },
   { name: 'beg', group: 'economy', args: '', desc: 'Ask around for coins. No promises.', server: true },
@@ -74,7 +75,7 @@ export const COMMANDS = [
   { name: 'crash', group: 'casino', args: 'bet', desc: 'Cash out before the rocket crashes', server: true },
   { name: 'mines', group: 'casino', args: 'bet bombs', desc: 'Open tiles, dodge the bombs, cash out', server: true },
   { name: 'highlow', group: 'casino', args: 'bet', desc: 'Higher or lower? Keep the streak going', server: true },
-  { name: 'lottery', group: 'casino', args: 'tickets', desc: `Tickets are 5 coins; Friday's draw takes the pot`, server: true },
+  { name: 'lottery', bare: true, group: 'casino', args: 'tickets', desc: `Tickets are 5 coins; Friday's draw takes the pot`, server: true },
 
   { name: 'rps', group: 'arcade', args: '@person bet', desc: 'Rock paper scissors (anyone, or @Trotbot)', server: true },
   { name: 'tictactoe', group: 'arcade', args: '@person bet', desc: 'Tic-tac-toe (anyone, or @Trotbot)', server: true },
@@ -84,15 +85,15 @@ export const COMMANDS = [
   { name: 'hangman', group: 'arcade', args: '', desc: 'Guess the robotics word together', server: true },
   { name: 'typerace', group: 'arcade', args: '', desc: 'Race to type a sentence (no pasting)', server: true },
   { name: 'heist', group: 'arcade', args: 'bet', desc: 'Plan a heist: more crew, better odds', server: true },
-  { name: 'tetris', group: 'arcade', args: '@person | bot | sprint', desc: 'Tetris: alone, race someone live, race Trotbot, or a tournament', server: true },
-  { name: 'minesweep', group: 'arcade', args: '@person | bot | expert', desc: 'Minesweeper: alone, race someone on the same board, Trotbot, or a tournament', server: true },
+  { name: 'tetris', bare: true, group: 'arcade', args: '@person | bot | sprint', desc: 'Tetris: alone, race someone live, race Trotbot, or a tournament', server: true },
+  { name: 'minesweep', bare: true, group: 'arcade', args: '@person | bot | expert', desc: 'Minesweeper: alone, race someone on the same board, Trotbot, or a tournament', server: true },
   { name: 'battleship', group: 'arcade', args: '@person bet', desc: 'Battleship, turn by turn (anyone, or @Trotbot)', server: true },
 
   { name: 'task', group: 'team', args: 'title @person friday !high', desc: 'Make a task' },
   { name: 'mytasks', group: 'team', args: '', desc: 'Your open tasks (check them off right here)' },
   { name: 'overdue', group: 'team', args: '', desc: 'Every task that’s late' },
-  { name: 'shift', group: 'team', args: 'who', desc: 'Clock in or out (/shift who: who’s at the lab)' },
-  { name: 'match', group: 'team', args: 'auto teleop endgame win #7', desc: 'Log a match to the Match Log (or see the record)' },
+  { name: 'shift', bare: true, group: 'team', args: 'who', desc: 'Clock in or out (/shift who: who’s at the lab)' },
+  { name: 'match', bare: true, group: 'team', args: 'auto teleop endgame win #7', desc: 'Log a match to the Match Log (or see the record)' },
   { name: 'standup', group: 'team', args: '', desc: 'Yesterday / today / blockers' },
   // 3.0: fun, text, robotics help and team lookups (moreCommands.js).
   ...MORE_COMMANDS,

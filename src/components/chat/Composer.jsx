@@ -652,7 +652,8 @@ export default function Composer({
                 e.preventDefault();
                 const opt = options[active] || options[0];
                 // "/ping" + Enter: it's complete and needs nothing more, so send it.
-                if (e.key === 'Enter' && opt.type === 'cmd' && opt.c.name === suggest.query.toLowerCase() && !opt.c.args) {
+                // The same for one that works on its own (/balance is yours).
+                if (e.key === 'Enter' && opt.type === 'cmd' && opt.c.name === suggest.query.toLowerCase() && (!opt.c.args || opt.c.bare)) {
                   setSuggest(null);
                   send();
                 } else pick(opt);
