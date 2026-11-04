@@ -1009,17 +1009,41 @@ function Economy({ c, by, Name }) {
 export const CASINO_CARDS = ['slots', 'dice', 'coinflip', 'roulette', 'blackjack', 'crash', 'mines', 'highlow', 'lottery'];
 export const ECONOMY_CARDS = ['daily', 'work', 'beg', 'rob', 'give', 'balance', 'leaderboard'];
 const LIVE = ['blackjack', 'crash', 'mines', 'highlow'];
+// How far along a live game is: over beats playing, then more tiles, cards or guesses.
+const progress = (c) => {
+  const g = c.game || {};
+  return [c.status === 'playing' ? 0 : 1, (g.open?.length || 0) + (g.you?.length || 0) + (g.dealer?.length || 0) + (g.history?.length || 0)];
+};
+const ahead = (a, b) => {
+  const x = progress(a);
+  const y = progress(b);
+  return x[0] > y[0] || (x[0] === y[0] && x[1] > y[1]);
+};
 
 export function CasinoBody({ m, me, Name, onMove, onBuy }) {
-  const c = m.cmd;
+  // The play function's answer brings the card as it wrote it; on a slow
+  // connection the chat's copy can be seconds behind. The newer one shows.
+  const [answered, setAnswered] = useState(null);
+  const c = answered && ahead(answered, m.cmd) ? { ...m.cmd, ...answered } : m.cmd;
   const mine = m.by === me;
+  const live = LIVE.includes(c.name);
   useEffect(ensureCasinoDefs, []);
   // What changes when the server moves the game: a new one means the move is in.
-  const version = LIVE.includes(c.name) ? `${c.status}|${c.bet}|${JSON.stringify(c.game)}` : '';
-  const mv = useMove(onMove, version, {
+  const version = live ? `${c.status}|${c.bet}|${JSON.stringify(c.game)}` : '';
+  const send = (move) =>
+    Promise.resolve(onMove(move)).then((r) => {
+      if (live && r?.card?.game) setAnswered(r.card);
+      // Mines: a tile the server already opened (the card hadn't caught up).
+      // Nothing went wrong: the card shows it in a moment.
+      if (c.name === 'mines' && /^Pick a closed tile/.test(r?.note?.title || '')) return { quiet: true };
+      return r;
+    });
+  const mv = useMove(send, version, {
     // Mines: another tile tapped while one is opening is kept and opened next.
     canQueue: (move) => c.name === 'mines' && /^\d+$/.test(move),
     stillOk: (move) => c.status === 'playing' && !c.game.open?.includes(+move),
+    // A live game's move isn't done until the card shows it (no tap resends it on a stale card).
+    settle: live ? 8000 : 0,
   });
   // A crash just started: wake the play function now, so Cash out doesn't
   // wait for it to start up.
@@ -1027,7 +1051,7 @@ export function CasinoBody({ m, me, Name, onMove, onBuy }) {
     if (c.name === 'crash' && c.status === 'playing' && mine && fresh(m)) mv.peek('warm');
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   if (ECONOMY_CARDS.includes(c.name)) return <Economy c={c} by={m.by} Name={Name} />;
-  const props = { m, c, mine, mv };
+  const props = { m: c === m.cmd ? m : { ...m, cmd: c }, c, mine, mv };
   const body = {
     slots: <Slots {...props} />,
     dice: <Dice {...props} />,

@@ -1634,13 +1634,14 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
       saveMatch: (m, oldId) => store.saveMatch(m, actor, oldId).catch(fail),
       deleteMatch: (m) => store.deleteMatch(m.id).catch(fail),
       // Our score: on the match, and as a run in the match log.
-      logMatchScore: (match, { auto, teleop, endgame, result, drivers }) => {
+      logMatchScore: (match, { auto, teleop, endgame, result, drivers, roles }) => {
         const run = {
           date: teamDay(match.time || Date.now()),
           type: 'match',
           matchNumber: match.label,
           result,
           drivers,
+          ...(roles ? { roles } : {}),
           auto,
           teleop,
           endgame,
@@ -2988,7 +2989,16 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
                     <ScoutView actor={actor} settings={settings} matches={matches} api={api} rename={rename} />
                   </Suspense>
                 ) : view === 'runs' ? (
-                  <RunsView runs={runs} roster={roster} api={api} actor={actor} predictions={predictions} matches={matches} batteries={batteries} />
+                  <RunsView
+                    runs={runs}
+                    roster={roster}
+                    api={api}
+                    actor={actor}
+                    predictions={predictions}
+                    matches={matches}
+                    batteries={batteries}
+                    driveTeam={settings?.driveTeam || null}
+                  />
                 ) : view === 'team' ? (
                   <TeamView
                     roster={roster}
