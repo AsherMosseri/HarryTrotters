@@ -155,36 +155,45 @@ function Slots({ m, c, mine }) {
   useCelebrate(ref, c, spin && mine, 1100);
   return (
     <div ref={ref} className={`casino-slots cz-slots${net > 0 ? ' win' : ''}${three ? ' three' : ''}${spin ? ' fresh' : ''}`}>
-      <div className="cz-machine">
-        <span className="cz-bulbs top" aria-hidden="true">
-          {Array.from({ length: 9 }, (_, i) => (
-            <i key={i} />
-          ))}
-        </span>
-        <div className="cz-glass">
-          <div className="slot-reels">
-            {c.game.reels.map((r, i) => (
-              <div key={i} className={`slot-reel${(three || (net > 0 && c.game.reels.filter((x) => x === r).length > 1)) ? ' hit' : ''}`}>
-                <div className={`slot-strip r${i}${spin ? ' spin' : ''}`}>
-                  {spin &&
-                    REEL_FILL.map((x, j) => (
-                      <span key={j} className="blur">
-                        {x}
-                      </span>
-                    ))}
-                  <span>{r}</span>
-                </div>
-              </div>
+      <div className="cz-table cz-slot-felt">
+        <div className="cz-machine">
+          <span className="cz-marquee" aria-hidden="true">
+            <b>Slots</b>
+          </span>
+          <span className="cz-bulbs top" aria-hidden="true">
+            {Array.from({ length: 9 }, (_, i) => (
+              <i key={i} />
             ))}
+          </span>
+          <div className="cz-glass">
+            <div className="slot-reels">
+              {c.game.reels.map((r, i) => (
+                <div key={i} className={`slot-reel${(three || (net > 0 && c.game.reels.filter((x) => x === r).length > 1)) ? ' hit' : ''}`}>
+                  <div className={`slot-strip r${i}${spin ? ' spin' : ''}`}>
+                    {spin &&
+                      REEL_FILL.map((x, j) => (
+                        <span key={j} className="blur">
+                          {x}
+                        </span>
+                      ))}
+                    <span>{r}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <span className="cz-payline" aria-hidden="true" />
+            <span className="cz-shine" aria-hidden="true" />
           </div>
-          <span className="cz-payline" aria-hidden="true" />
-          <span className="cz-shine" aria-hidden="true" />
+          <span className="cz-bulbs bottom" aria-hidden="true">
+            {Array.from({ length: 9 }, (_, i) => (
+              <i key={i} />
+            ))}
+          </span>
+          <span className={`cz-lever${spin ? ' pull' : ''}`} aria-hidden="true">
+            <i className="cz-lever-stick" />
+            <i className="cz-lever-knob" />
+          </span>
         </div>
-        <span className="cz-bulbs bottom" aria-hidden="true">
-          {Array.from({ length: 9 }, (_, i) => (
-            <i key={i} />
-          ))}
-        </span>
         <BigWin c={c} pop={spin} delay="late" jackpot={three} />
       </div>
       <div className="cz-line">
@@ -243,17 +252,22 @@ function Coinflip({ m, c, mine }) {
   const won = (c.net ?? 0) > 0;
   return (
     <div ref={ref} className="cz-flipcard">
-      <div className={`cz-table cz-flip-stage${won ? ' won' : ''}`}>
-        <FlipCoin side={c.game.side} spin={spin} />
-        <span className={`cz-flip-shadow${spin ? ' spin' : ''}`} aria-hidden="true" />
+      <div className="cz-table cz-flip-table">
+        <div className={`cz-plate${won ? ' won' : ''}`}>
+          <span className="cz-label">Your call</span>
+          <b>{c.game.call}</b>
+        </div>
+        <div className="cz-flip-stage">
+          <FlipCoin side={c.game.side} spin={spin} />
+          <span className={`cz-flip-shadow${spin ? ' spin' : ''}`} aria-hidden="true" />
+        </div>
+        <div className={`cz-plate${won ? ' won' : ''}${spin ? ' cz-reveal late' : ''}`}>
+          <span className="cz-label">Landed</span>
+          <b>{c.game.side}</b>
+        </div>
       </div>
       <div className="cz-flip-text">
-        <div>
-          You called <b>{c.game.call}</b>.{' '}
-          <span className={spin ? 'cz-reveal late' : ''}>
-            {c.game.side === 'edge' ? 'It landed on its EDGE. The house wins.' : `It’s ${c.game.side}.`}
-          </span>
-        </div>
+        {c.game.side === 'edge' && <div className={spin ? 'cz-reveal late' : ''}>It landed on its EDGE. The house wins.</div>}
         <Outcome c={c} reveal={spin ? 'late' : ''} />
       </div>
     </div>
@@ -268,12 +282,17 @@ function Roulette({ m, c, mine }) {
     <div ref={ref} className="casino-roulette">
       <div className="cz-table cz-wheel-felt">
         <RouletteWheel n={c.game.n} spin={spin} />
+        <div className="cz-wheel-info">
+          <span className="cz-label">The ball</span>
+          <span className={`roulette-ball ${c.game.color}${spin ? ' cz-reveal late pop' : ''}`}>
+            <span className="mono">{c.game.n}</span>
+          </span>
+          <span className="cz-label">Your bet</span>
+          <span className="cz-bet-chip">{c.game.spot}</span>
+        </div>
         <BigWin c={c} pop={spin} delay="late" />
       </div>
       <div className="cz-roulette-side">
-        <span className={`roulette-ball ${c.game.color}${spin ? ' cz-reveal late pop' : ''}`}>
-          <span className="mono">{c.game.n}</span>
-        </span>
         <div>
           You bet on <b>{c.game.spot}</b>.
         </div>
@@ -789,6 +808,11 @@ function Lottery({ m, c, me, onBuy }) {
 function Econ({ icon, tone = '', title, art, children }) {
   return (
     <div className={`cz-econ ${tone}`}>
+      {icon && (
+        <span className="cz-econ-mark" aria-hidden="true">
+          <Icon name={icon} size={92} />
+        </span>
+      )}
       {art || (
         <span className="cz-econ-icon" aria-hidden="true">
           <Icon name={icon} size={22} />
@@ -914,7 +938,7 @@ function Economy({ c, by, Name }) {
       );
     case 'balance':
       return (
-        <div className="cmd-whois cz-balance">
+        <div className="cmd-whois cz-balance cz-econ blue">
           <Avatar name={c.to} size={48} />
           <div className="cz-econ-body">
             <Name name={c.to} />
