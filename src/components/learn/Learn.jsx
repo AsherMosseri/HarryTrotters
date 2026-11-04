@@ -4,6 +4,7 @@
 // answer, explains it and pays the coins.
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Icon } from '../shell/icons.jsx';
+import { CoinNum, useCoinFormat } from '../CoinNum.jsx';
 import CountUp from '../CountUp.jsx';
 import { celebrate } from '../../motion.js';
 import { promptDialog } from '../Dialogs.jsx';
@@ -46,7 +47,7 @@ export function CoinsToday({ today, compact }) {
     <span className={`lq-coins${full ? ' full' : ''}${compact ? ' compact' : ''}`} title="Coins from games today">
       <Icon name="coin" size={14} />
       <span className="mono">
-        {today.paid}/{today.cap}
+        <CoinNum n={today.paid} />/<CoinNum n={today.cap} />
       </span>
       {!compact && <span className="lq-coins-bar"><i style={{ transform: `scaleX(${Math.min(1, today.paid / today.cap)})` }} /></span>}
     </span>
@@ -122,7 +123,7 @@ function ActionBar({ q, result, busy, onNext, onSkip, nextRef }) {
           <b>{right ? 'Right' : 'Not quite'}</b>
           {result.coins > 0 && (
             <span className="chip lq-chip-coin">
-              <Icon name="coin" size={13} /> <span className="mono">+{result.coins}</span>
+              <Icon name="coin" size={13} /> <CoinNum n={result.coins} signed className="mono" />
             </span>
           )}
         </span>
@@ -407,6 +408,7 @@ function Reports({ api }) {
 
 // ---------- the Learn page ----------
 export default function LearnView({ api, isManager, onOpenDaily, dailyToday }) {
+  const coins = useCoinFormat();
   const [game, setGame] = useState(null);
   const [progress, setProgress] = useState(null);
   const [totals, setTotals] = useState({});
@@ -453,9 +455,9 @@ export default function LearnView({ api, isManager, onOpenDaily, dailyToday }) {
           <span className="lq-stat-label">Coins from games today</span>
           {today ? (
             <>
-              <b className="mono lq-band-coin-num">
-                {today.paid}
-                <span>/{today.cap}</span>
+              <b className="mono lq-band-coin-num" title={coins.title(today.paid)}>
+                {coins.n(today.paid)}
+                <span>/{coins.n(today.cap)}</span>
               </b>
               <span className="lq-band-bar">
                 <i style={{ transform: `scaleX(${Math.min(1, today.paid / today.cap)})` }} />
