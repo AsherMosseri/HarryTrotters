@@ -9,8 +9,8 @@
 //
 // Everything is checked here, against the card on the message (which only the
 // server writes) and never against numbers the app sends. A report is one per
-// message per person (its id), at most LIMITS.perDay a team day (a counter doc
-// changed in the same transaction), and a refund pays at most what the card
+// message per person (its id), with no daily cap (a counter doc, changed in the
+// same transaction, still counts them per day), and a refund pays at most what the card
 // shows the person lost, once (a key doc and the report's status, in one
 // transaction, so deciding twice at the same moment, on two devices, can't pay twice).
 // The rules never let the app write disputes, refund keys, or refunds.

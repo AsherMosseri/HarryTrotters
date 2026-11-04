@@ -4,6 +4,14 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '3.0.12',
+    date: '2026-11-04',
+    title: 'Report as many casino results as you need',
+    items: [
+      'No more daily limit on casino reports: tap Report on any result that looks wrong, one report per result.',
+    ],
+  },
+  {
     version: '3.0.11',
     date: '2026-11-03',
     title: 'A photo of your real pet',
