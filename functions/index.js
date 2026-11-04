@@ -60,6 +60,7 @@ import { learnFunctions } from './learn.js';
 import { channelFunctions } from './channels.js';
 import { loanFunctions } from './loans.js';
 import { coinRequestFunctions } from './coinRequests.js';
+import { apiFunction } from './api.js';
 
 // Functions run next to the database. The deploy workflow writes location.json
 // from the database's location; nam5 (the US multi-region) pairs with us-central1.
@@ -2451,4 +2452,37 @@ export const { coinRequest, expireCoinRequests } = coinRequestFunctions({
   owner: REQUESTS_TO,
   timeZone: TIME_ZONE,
   loanLock: (name) => loans.lockOf(name),
+});
+
+// The one always-warm callable (functions/api.js): the app sends { fn, data }
+// for the names in functions/shared/api.js and it runs the same handler as
+// the function of that name. Every function above stays deployed as it is
+// (older app versions call them by name); only this one is kept awake.
+export const api = apiFunction({
+  account,
+  play,
+  funGame,
+  submitTournamentScore,
+  quizNext,
+  quizAnswer,
+  quizProgress,
+  quizReport,
+  autoRun,
+  dailyAnswer,
+  loanRequest,
+  loanRespond,
+  loanRepay,
+  loanManage,
+  coinRequest,
+  dispute,
+  disputeDecide,
+  coinCheck,
+  buy,
+  joinTournament,
+  marketManage,
+  pet,
+  petEvent,
+  claimBingo,
+  predict,
+  channelRequest,
 });
