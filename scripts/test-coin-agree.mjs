@@ -5,7 +5,8 @@
 // entries of every kind, loans from the bank and between people, shifts,
 // tasks, group gifts), works out the true balance from how the data was made, then reads
 // the documents the way the app does
-// (Workspace.jsx: subscribeBank, subscribeCoins, tasks, shifts, coinInput)
+// (Workspace.jsx: subscribeBank, subscribeCoins, tasks, shifts, coinInput; and
+// at start only the person's own entries, subscribeMyCoins)
 // and the way the server does (functions/index.js freshCoins: alias queries
 // on the ledger, bank/{nameKey} reads, freshWallet). All three must agree.
 // It also replays the old code (the shapes before the fix) on the minimized
@@ -363,6 +364,16 @@ function appView(w, name, { now = NOW } = {}) {
   return wallet(name, data);
 }
 
+// The app at start: only the ledger entries for this person (subscribeMyCoins:
+// person, from or to is any name they've had), not the whole ledger, which
+// loads only when someone else's coins are shown. Their own balance and
+// history must come out exactly the same.
+function appOwnView(w, name, { now = NOW } = {}) {
+  const names = w.aliasesOf(name).slice(0, 30);
+  const own = w.ledger.filter((x) => ['person', 'from', 'to'].some((f) => names.includes(x[f])));
+  return appView({ ...w, ledger: own }, name, { now });
+}
+
 // The server: freshCoins in functions/index.js, against an in-memory database.
 function serverView(w, name, { cacheAge = 0, now = NOW } = {}) {
   const aliases = w.aliasesOf(name).slice(0, 30);
@@ -425,7 +436,10 @@ for (let seed = 1; seed <= CASES; seed++) {
     const truth = truthBalance(w, name);
     const app = appView(w, name);
     const srv = serverView(w, name);
+    const own = appOwnView(w, name);
     const tag = `seed ${seed * 7919} ${name} [${p.names.join(' > ')}]`;
+    ok(own.balance === app.balance && own.earned === app.earned, `${tag}: own entries ${own.balance} vs whole ledger ${app.balance}`);
+    ok(JSON.stringify(own.history) === JSON.stringify(app.history), `${tag}: own-entries history differs from the whole ledger's`);
     ok(app.balance === srv.balance, `${tag}: app ${app.balance} vs server ${srv.balance}`);
     ok(app.earned === srv.earned, `${tag}: earned app ${app.earned} vs server ${srv.earned}`);
     ok(app.balance === truth.balance, `${tag}: app ${app.balance} vs truth ${truth.balance}`);
