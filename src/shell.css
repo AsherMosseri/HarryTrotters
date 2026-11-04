@@ -4239,3 +4239,6 @@ html.kb-open .report-note { min-height: 56px; }
 
 /* Market, Pets: a photo of your real pet with no pet in the app. */
 .pp-solo { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+
+/* Lab log: the hours beside a name is a small tag, not a full-height chip. */
+.shell .chip.lablog-hours { display: inline-flex; align-items: center; min-height: 0; height: 22px; padding: 0 7px; border-radius: 6px; font-size: 12px; line-height: 1; }
