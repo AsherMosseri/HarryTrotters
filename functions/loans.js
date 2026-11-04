@@ -413,7 +413,12 @@ export function loanFunctions({ db, coinData, freshCoins, bankRef, notify, owner
     const boss = data.rename(owner);
     const open = await db.collection('loans').where('status', 'in', L.OPEN).get();
     const notes = [];
-    for (const d of open.docs) {
+    // Only the ones with something to do get a transaction.
+    const due = (l) =>
+      l.status === 'overdue' ||
+      (l.status === 'pending' && now - (l.updatedAt || l.askedAt || now) >= L.LIMITS.expire) ||
+      (l.status === 'active' && (now >= l.dueAt || (!l.remindedAt && l.dueAt - now <= L.LIMITS.remind)));
+    for (const d of open.docs.filter((x) => due(x.data()))) {
       try {
         notes.push(...(await tickOne(d.id, data, boss, now)));
       } catch (e) {
