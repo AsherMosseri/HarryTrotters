@@ -963,7 +963,19 @@ function commit() {
   } catch {
     /* storage unavailable: keep in memory */
   }
+  // Tests: localStorage 'demo-snap-lag' ("1000-3000", ms) shows changes that
+  // late, like a slow connection's snapshots coming after the play answer.
+  const lag = snapLag();
+  if (lag) return setTimeout(() => listeners.forEach((fn) => fn()), lag);
   for (const fn of listeners) fn();
+}
+function snapLag() {
+  try {
+    const [a, b = a] = (localStorage.getItem('demo-snap-lag') || '').split('-').map(Number);
+    return a > 0 ? a + Math.random() * (b - a) : 0;
+  } catch {
+    return 0;
+  }
 }
 
 function listen(fn) {
@@ -1097,6 +1109,37 @@ function startReminders() {
   reminderTimer = setInterval(tick, 5000);
 }
 if ((state.reminders || []).length) startReminders();
+
+// Tests (scripts/test-no-shift.mjs): other people busy in a demo chat while
+// you play. demo-post { conv, m } adds a message from someone else at the end;
+// demo-edit { conv, id, patch } changes one that's there (a reaction, their
+// game card moving on). localStorage 'demo-lag' (ms) answers game moves like a
+// server a phone's round trip away; 'demo-no-card' leaves the card out of a
+// casino move's answer (like the server before 3.1.1).
+if (typeof window !== 'undefined') {
+  window.addEventListener('demo-post', (e) => {
+    const { conv, m } = e.detail || {};
+    if (!conv || !m?.by) return;
+    const msg = { id: uid(), text: '', mentions: [], taskIds: [], replyTo: null, reactions: {}, at: Date.now(), ...m };
+    state.chat = { ...(state.chat || {}), [conv]: [...((state.chat || {})[conv] || []), msg] };
+    commit();
+  });
+  window.addEventListener('demo-edit', (e) => {
+    const { conv, id, patch } = e.detail || {};
+    const list = (state.chat || {})[conv];
+    if (!list || !patch) return;
+    state.chat = { ...state.chat, [conv]: list.map((x) => (x.id === id ? { ...x, ...patch } : x)) };
+    commit();
+  });
+}
+const demoLag = () => {
+  try {
+    const ms = Number(localStorage.getItem('demo-lag')) || 0;
+    return ms > 0 ? new Promise((r) => setTimeout(r, ms)) : null;
+  } catch {
+    return null;
+  }
+};
 
 // Who counts as on the team in the demo (the starting roster and anyone added).
 const demoNames = () => [...new Set([...ROSTER, ...(state.roles || []).filter((r) => r.name && !r.removed).map((r) => r.name)])];
@@ -1874,6 +1917,7 @@ export const demoStore = {
   // the server (functions/index.js), with the same rules (casino.js).
   // balanceOf(name): the person's coins, from the app's wallet; roster: the team.
   async play(req, actor, { balanceOf, roster = [], subteamsOf = () => [] }, verified = null) {
+    await demoLag();
     const now = Date.now();
     const me = actor.name;
     const { action, game, conv = '', args = [], msgId, move } = req;
@@ -1980,6 +2024,7 @@ export const demoStore = {
         return note(...casino.SHIFT_NOTE);
       if (arcade.MULTI.includes(c.name)) {
         if (move === 'mine') return { ok: true, mine: arcade.myFleet(c.name, secret, me) };
+        if (move === 'sync') return { ok: true, serverNow: now, card: { game: c.game, status: c.status } };
         if (!arcade.isLive(c.status)) return { ok: true };
         const r = arcade.move(c.name, {
           pub: { ...c.game, status: c.status },
@@ -1999,7 +2044,7 @@ export const demoStore = {
         if (arcade.isLive(status)) state.gameSecrets = { ...state.gameSecrets, [msgId]: r.secret };
         else delete state.gameSecrets[msgId];
         state.chat = { ...state.chat, [conv]: list.map((x) => (x.id === msgId ? { ...x, cmd: { ...c, game: g, status } } : x)) };
-        return done({ ok: true, serverNow: now });
+        return done({ ok: true, serverNow: now, card: { game: g, status } });
       }
       if (move !== 'peek' && m.by !== me) return note('That’s not your game.');
       if (c.status !== 'playing') return { ok: true };
@@ -2017,7 +2062,8 @@ export const demoStore = {
         delete state.gameSecrets[msgId];
       } else state.gameSecrets = { ...state.gameSecrets, [msgId]: r.secret };
       state.chat = { ...state.chat, [conv]: list.map((x) => (x.id === msgId ? { ...x, cmd } : x)) };
-      return done({ ok: true, serverNow: now });
+      const card = { game: g, status, bet, ...(r.done && { payout: cmd.payout, net: cmd.net }) };
+      return done({ ok: true, serverNow: now, ...(localStorage.getItem('demo-no-card') ? {} : { card }) });
     }
 
     if (conv.startsWith('dm:') || conv === 'announcements')
@@ -2794,6 +2840,9 @@ export const demoStore = {
   },
   subscribeSince(conv, at, cb) {
     return listen(() => cb([...((state.chat || {})[conv] || [])].filter((m) => m.at >= at).sort((a, b) => a.at - b.at)));
+  },
+  subscribeMessage(conv, id, cb) {
+    return listen(() => cb(((state.chat || {})[conv] || []).find((m) => m.id === id) || null));
   },
   async recentMessages(conv, count) {
     return [...((state.chat || {})[conv] || [])].sort((a, b) => b.at - a.at).slice(0, count);

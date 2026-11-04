@@ -265,6 +265,7 @@ export function ledgerItems(name, ledger = []) {
         amount: x.amount,
         icon: x.amount >= 0 ? '⭐' : '⚠️',
         label: x.note || (x.amount >= 0 ? 'Bonus' : 'Taken away'),
+        ...(x.reverses ? { reverses: String(x.reverses) } : {}),
       });
   }
   for (const b of batches.values()) {
@@ -503,7 +504,12 @@ export function oldBankIds(name, aliases) {
 // Gifts and ad prizes are paid by the server (the play function), which
 // checks them against the real balance and today's limits; demo mode runs the
 // same checks. Each returns the ledger entry to add, or { error }.
-export const GIFT_MAX = 5000;
+// No real limit on an amount (3.1.3): /give, /request, group gifts, teammate
+// loans, the bank and the owner's add / take away / set. One trillion keeps
+// every sum and the loan interest math exact (well under 2^53); the balance
+// checks still apply.
+export const NO_LIMIT = 1000000000000;
+export const GIFT_MAX = NO_LIMIT;
 // The prize wheel's slices, in the order AdGames.jsx draws them, and how
 // likely each one is. The server spins it (prizeEntry); the app only shows
 // where it landed, so it can't pick the +10.
@@ -577,3 +583,8 @@ export function prizeEntry(name, { what, amount, label }, { ledger, gameCap, now
   }
   return { error: 'Unknown prize.' };
 }
+
+// A history line's identity, for the owner's Reverse (CoinsEveryone.jsx): a
+// grant that reverses a line stores this key, so the line shows as reversed
+// and can't be reversed twice by mistake.
+export const historyKey = (x) => `${x.kind || ''}|${x.at || 0}|${x.amount || 0}|${String(x.label || '').slice(0, 120)}`;

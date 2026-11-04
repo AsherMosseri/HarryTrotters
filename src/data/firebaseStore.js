@@ -1177,6 +1177,12 @@ export const firebaseStore = {
     return onSnapshot(query(convCol(conv), where('at', '>=', at), orderBy('at')), (snap) => cb(snap.docs.map(readDoc)), onError);
   },
 
+  // One message, live (a game open in the game view: it keeps up even when
+  // the card has scrolled out of the newest page).
+  subscribeMessage(conv, id, cb, onError) {
+    return onSnapshot(doc(convCol(conv), id), (snap) => cb(snap.exists() ? readDoc(snap) : null), onError);
+  },
+
   // The newest `count` messages, for search.
   async recentMessages(conv, count) {
     const snap = await getDocs(query(convCol(conv), orderBy('at', 'desc'), limit(count)));

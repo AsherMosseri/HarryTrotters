@@ -91,7 +91,7 @@ export const COMMANDS = [
   { name: 'heist', group: 'arcade', args: 'bet', desc: 'Plan a heist: more crew, better odds', server: true },
   { name: 'tetris', bare: true, group: 'arcade', args: '@person | bot | sprint', desc: 'Tetris: alone, race someone live, race Trotbot, or a tournament', server: true },
   { name: 'minesweep', bare: true, group: 'arcade', args: '@person | bot | expert', desc: 'Minesweeper: alone, race someone on the same board, Trotbot, or a tournament', server: true },
-  { name: 'battleship', group: 'arcade', args: '@person bet', desc: 'Battleship, turn by turn (anyone, or @Trotbot)', server: true },
+  { name: 'battleship', group: 'arcade', args: '@person bet hitagain', desc: 'Battleship (anyone, or @Trotbot). Add hitagain: a hit gets another turn', server: true },
 
   { name: 'task', group: 'team', args: 'title @person friday !high', desc: 'Make a task' },
   { name: 'mytasks', group: 'team', args: '', desc: 'Your open tasks (check them off right here)' },
@@ -530,7 +530,7 @@ export async function runCommand({ cmd, args }, ctx) {
       if (to === me) return { note: { title: 'That’s you.', body: 'Your coins are already yours.' } };
       const have = ctx.wallet(me).balance;
       if (amount > have) return { note: { title: `You only have ${have} coins.` } };
-      if (amount > 5000) return { note: { title: 'That’s a lot.', body: 'Up to 5000 at a time.' } };
+      if (amount > GIFT_MAX) return { note: { title: 'That’s a lot.', body: `Up to ${GIFT_MAX.toLocaleString('en-US')} at a time.` } };
       const r = await ctx.gift(to, amount, '', ctx.key);
       if (!r?.ok) return { note: r?.note || { title: 'That didn’t go through.' } };
       return card({ to, amount, line: `sent you ${amount} Jackson coins` }, { mentions: [to] });

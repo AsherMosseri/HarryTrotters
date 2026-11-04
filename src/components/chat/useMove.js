@@ -11,6 +11,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 // tap and is ignored too. A move that fails or gets no answer frees the card
 // and says so.
 //
+// settle (ms): the play function's answer can come before the card shows the
+// move (a slow connection: the card's snapshot is seconds behind). Then the
+// move stays pending, so no tap resends it on the stale card (Mines: "Pick a
+// closed tile"), until the card catches up, or this long at most.
+// An answer of { quiet: true } frees the card and says nothing.
+//
 // onMove(move) → { ok } | { note } (never throws: api.play catches).
 // version: anything that changes when the card's game changes (its snapshot).
 // Returns { send, peek, pending, queued, error }.
@@ -18,7 +24,7 @@ const TIMEOUT = 15000;
 const DOUBLE_TAP = 400;
 export const RETRY = 'That didn’t go through. Tap again.';
 
-export function useMove(onMove, version, { canQueue = () => false, stillOk = () => true } = {}) {
+export function useMove(onMove, version, { canQueue = () => false, stillOk = () => true, settle = 0 } = {}) {
   const [pending, setPending] = useState(null);
   const [queued, setQueued] = useState([]);
   const [error, setError] = useState('');
@@ -53,6 +59,7 @@ export function useMove(onMove, version, { canQueue = () => false, stillOk = () 
       }
       if (move === st.last.move && performance.now() - st.last.at < DOUBLE_TAP) return null;
       const token = ++st.seq;
+      const sentOn = st.version;
       st.pending = move;
       setPending(move);
       setError('');
@@ -71,6 +78,11 @@ export function useMove(onMove, version, { canQueue = () => false, stillOk = () 
         if (refused) {
           st.queued = [];
           setQueued([]);
+        }
+        // It went through, but the card doesn't show it yet: wait for it.
+        if (settle && r?.ok && !refused && !r.quiet && st.version === sentOn && st.pending != null) {
+          setTimeout(() => release(token), settle);
+          return r;
         }
         release(token);
       }

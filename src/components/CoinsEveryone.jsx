@@ -1,7 +1,7 @@
 // Coins screen extras: comparing the app's balance with the server's, and
 // (team management only) everyone's coin history.
 import { useMemo, useState } from 'react';
-import { breakdown, breakdownGaps, historyGroup, wallet as walletOf } from '../coins.js';
+import { breakdown, breakdownGaps, historyGroup, historyKey, wallet as walletOf } from '../coins.js';
 import { Avatar } from './common.jsx';
 import { Icon } from './shell/icons.jsx';
 import { confirmDialog } from './Dialogs.jsx';
@@ -195,6 +195,7 @@ function Person({ name, w, casino, cfg, onCheck, onAdjust, onBack }) {
     });
   }, [w]);
   const shown = chip === 'all' ? all : all.filter((x) => historyGroup(x) === chip);
+  const rev = useReverse(name, w.history, onAdjust);
   const total = shown.reduce((t, x) => t + x.amount, 0);
   return (
     <>
@@ -212,6 +213,7 @@ function Person({ name, w, casino, cfg, onCheck, onAdjust, onBack }) {
         </span>
       </div>
       {onAdjust && <AdjustCoins key={name} name={name} balance={w.balance} onCheck={onCheck} onAdjust={onAdjust} />}
+      {onAdjust && <p className="muted tiny cv-rev-hint">Tap a line to reverse it: a loss is refunded, a gain is taken away.</p>}
       <div className="cv-chips" role="group" aria-label="Show">
         {CHIPS.map(([id, label]) => (
           <button key={id} className={`chip${chip === id ? ' on' : ''}`} aria-pressed={chip === id} onClick={() => setChip(id)}>
@@ -222,12 +224,14 @@ function Person({ name, w, casino, cfg, onCheck, onAdjust, onBack }) {
       {shown.length ? (
         <ul className="coins-history cv-history">
           {shown.map((x, i) => (
-            <li key={`${x.kind}-${x.at}-${i}`}>
+            <li key={`${x.kind}-${x.at}-${i}`} className={`${rev.can(x) ? 'cv-rev' : ''}${rev.isReversed(x) ? ' is-reversed' : ''}`} {...reverseProps(rev, x)}>
               <span className="coins-icon" aria-hidden="true">
                 {x.icon}
               </span>
               <span className="grow">
-                <span className="coins-label">{x.label}</span>
+                <span className="coins-label">
+                  {x.label} <ReversedTag rev={rev} x={x} />
+                </span>
                 <span className="muted tiny">
                   <span className="mono">{when(x.at)}</span>
                   {x.capped ? ` · counted ${cfg.dayCap} h max a day` : ''}
@@ -261,6 +265,8 @@ function Person({ name, w, casino, cfg, onCheck, onAdjust, onBack }) {
 // The owner only: add, take away, or set someone's Jackson coins. It goes in
 // as a grant (bonus or "taken away") with a note, like the Ads page's grants;
 // "set" works out the difference from the server's balance when it can.
+// The most the owner can add or take away at once (the rules allow the same).
+const OWNER_MAX = 1000000000000;
 function AdjustCoins({ name, balance, onCheck, onAdjust }) {
   const [mode, setMode] = useState('add');
   const [amount, setAmount] = useState('');
@@ -268,7 +274,7 @@ function AdjustCoins({ name, balance, onCheck, onAdjust }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
   const n = Math.floor(Number(amount));
-  const ok = Number.isFinite(n) && amount !== '' && (mode === 'set' ? n >= 0 : n > 0) && n <= 100000;
+  const ok = Number.isFinite(n) && amount !== '' && (mode === 'set' ? n >= 0 : n > 0) && n <= OWNER_MAX;
   const go = async () => {
     if (!ok || busy) return;
     setBusy(true);
@@ -282,6 +288,10 @@ function AdjustCoins({ name, balance, onCheck, onAdjust }) {
       const delta = mode === 'add' ? n : mode === 'remove' ? -n : n - now;
       if (!delta) {
         setMsg(`${name.split(' ')[0]} already has ${now}.`);
+        return;
+      }
+      if (Math.abs(delta) > OWNER_MAX) {
+        setMsg(`That’s a change of ${Math.abs(delta).toLocaleString()}: up to ${OWNER_MAX.toLocaleString()} at a time.`);
         return;
       }
       const after = now + delta;
@@ -327,3 +337,46 @@ function AdjustCoins({ name, balance, onCheck, onAdjust }) {
     </div>
   );
 }
+
+// The owner only: tap a history line to reverse it. A loss is refunded, a
+// gain is taken away, as a grant that names the line (historyKey), so the
+// balance and the history still add up, the line shows "Reversed", and it
+// can't be reversed twice. onAdjust is null for everyone else.
+export function useReverse(name, history, onAdjust) {
+  const reversed = useMemo(() => new Set(history.filter((x) => x.reverses).map((x) => x.reverses)), [history]);
+  const [busy, setBusy] = useState('');
+  const can = (x) => !!onAdjust && x.amount !== 0 && !x.reverses && !reversed.has(historyKey(x));
+  const reverse = async (x) => {
+    if (!can(x) || busy) return;
+    const key = historyKey(x);
+    const refund = x.amount < 0;
+    const n = Math.abs(x.amount).toLocaleString();
+    const first = name.split(' ')[0];
+    const ok = await confirmDialog({
+      title: refund ? `Refund ${n} coins to ${first}?` : `Take ${n} coins away from ${first}?`,
+      body: `“${x.label}” (${when(x.at)}). ${first}’s history keeps the line, marked Reversed, with a “Reversed” line for the ${refund ? 'refund' : 'take-away'}.`,
+      okLabel: refund ? 'Refund' : 'Take away',
+      danger: !refund,
+    });
+    if (!ok) return;
+    setBusy(key);
+    await onAdjust({ to: name, amount: -x.amount, note: `Reversed: ${x.label}`.slice(0, 140), reverses: key, at: Date.now() });
+    setBusy('');
+  };
+  return { can, reverse, isReversed: (x) => reversed.has(historyKey(x)), busy: (x) => busy === historyKey(x) };
+}
+
+// What a history row gets when the owner can reverse it: tap (or Enter) to reverse.
+export function reverseProps(rev, x) {
+  if (!rev.can(x)) return {};
+  return {
+    role: 'button',
+    tabIndex: 0,
+    title: x.amount < 0 ? 'Refund this' : 'Take this away',
+    onClick: () => rev.reverse(x),
+    onKeyDown: (e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), rev.reverse(x)),
+  };
+}
+
+export const ReversedTag = ({ rev, x }) =>
+  rev.isReversed(x) ? <span className="cv-reversed">Reversed</span> : rev.busy(x) ? <span className="cv-reversed busy">Reversing…</span> : null;

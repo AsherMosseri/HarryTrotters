@@ -3,7 +3,10 @@ import { Avatar } from '../common.jsx';
 import { BOT, C4_COLS, C4_ROWS, RACES, RPS, TIMES, isLive } from '../../../functions/shared/arcade.js';
 import { AWARD_CAPS } from '../../../functions/shared/coins.js';
 import { serverNow } from '../../serverTime.js';
-import { Battleship, FunShare, RaceCard } from './FunCards.jsx';
+import { FunShare, RaceCard } from './FunCards.jsx';
+import { BattleshipCard, BattleshipView } from './Battleship.jsx';
+import { VIEW_GAMES, noteCard, openGameView, useFreshCmd } from './liveGames.js';
+import { Icon } from '../shell/icons.jsx';
 import { Die } from './Die.jsx';
 import { ActBtn, Amt } from './Casino.jsx';
 import { FlipCoin, ensureCasinoDefs } from './casinoArt.jsx';
@@ -68,6 +71,22 @@ export const Who = ({ name, Name }) =>
 
 // ---------- challenges ----------
 
+// The bet, for everyone to see (players and anyone watching): what each one
+// put in, and what the winner takes. A game with no bet says so.
+export function BetPill({ each, pot, people = 'each' }) {
+  if (!(each > 0))
+    return (
+      <span className="cz-betpill arc-betpill none">
+        <span className="cz-betpill-k">No bet</span>
+      </span>
+    );
+  return (
+    <span className="cz-betpill arc-betpill" title={`${each} Jackson coins ${people}, ${pot} in the pot`}>
+      <span className="cz-betpill-k">Bet</span> <Amt n={each} /> {people} <span className="cz-betpill-k">· pot</span> <Amt n={pot} />
+    </span>
+  );
+}
+
 export function Versus({ g, Name, marks }) {
   return (
     <div className="arc-vs">
@@ -78,7 +97,7 @@ export function Versus({ g, Name, marks }) {
       <span className={g.turn === g.b && isLive(g.status) ? 'turn' : ''}>
         {marks?.[1]} <Who name={g.b} Name={Name} />
       </span>
-      {g.bet > 0 && <span className="chip">{coins(g.bet)} each</span>}
+      <BetPill each={g.bet} pot={2 * g.bet} />
     </div>
   );
 }
@@ -191,7 +210,7 @@ function Challenge({ g, me, act, Name, now, mv }) {
           <span className="cz-vs-badge">vs</span>
           {g.bet > 0 && (
             <span className="cz-chip">
-              <Amt n={g.bet} /> each
+              <Amt n={g.bet} /> each · pot <Amt n={2 * g.bet} />
             </span>
           )}
           {rolled && g.kind === 'coinflip' && <FlipCoin side={g.flip} spin={wasLive} />}
@@ -259,12 +278,17 @@ function Rps({ g, me, act, Name, now }) {
   );
 }
 
-export function TurnBar({ g, me, act, now }) {
+export function TurnBar({ g, me, act, now, onOpen }) {
   if (g.status !== 'playing') return null;
   const player = me === g.a || me === g.b;
   const late = now - g.lastAt > TIMES.turn;
   return (
     <div className="arc-wait">
+      {onOpen && (
+        <button type="button" className="btn small game-open" onClick={onOpen}>
+          <Icon name={player ? 'expand' : 'eye'} size={16} /> {player ? 'Open' : 'Watch'}
+        </button>
+      )}
       <span className="small">
         {g.turn === me ? <b>Your turn</b> : `${g.turn === BOT ? 'Trotbot' : g.turn.split(' ')[0]}’s turn`}
         {!late && <span className="muted"> · {clock(g.lastAt + TIMES.turn - now)}</span>}
@@ -283,10 +307,10 @@ export function TurnBar({ g, me, act, now }) {
   );
 }
 
-function TicTacToe({ g, me, act, Name, now }) {
+function TicTacToe({ g, me, act, Name, now, view, onOpen }) {
   const myTurn = g.status === 'playing' && g.turn === me;
   return (
-    <div className="arc-ttt">
+    <div className={`arc-ttt${view ? ' in-view' : ''}`}>
       <Versus g={g} Name={Name} marks={['❌', '⭕']} />
       <div className="ttt-grid">
         {[...g.board].map((c, i) => (
@@ -302,16 +326,16 @@ function TicTacToe({ g, me, act, Name, now }) {
         ))}
       </div>
       {g.status === 'open' && <Invite g={g} me={me} act={act} game="tictactoe" now={now} />}
-      <TurnBar g={g} me={me} act={act} now={now} />
+      <TurnBar g={g} me={me} act={act} now={now} onOpen={view ? null : onOpen} />
       <Result g={g} Name={Name} />
     </div>
   );
 }
 
-function ConnectFour({ g, me, act, Name, now }) {
+function ConnectFour({ g, me, act, Name, now, view, onOpen }) {
   const myTurn = g.status === 'playing' && g.turn === me;
   return (
-    <div className="arc-c4">
+    <div className={`arc-c4${view ? ' in-view' : ''}`}>
       <Versus g={g} Name={Name} marks={['🔴', '🟡']} />
       <div className="c4-grid" style={{ '--cols': C4_COLS }}>
         {Array.from({ length: C4_COLS }, (_, col) => (
@@ -337,7 +361,7 @@ function ConnectFour({ g, me, act, Name, now }) {
         ))}
       </div>
       {g.status === 'open' && <Invite g={g} me={me} act={act} game="connect4" now={now} />}
-      <TurnBar g={g} me={me} act={act} now={now} />
+      <TurnBar g={g} me={me} act={act} now={now} onOpen={view ? null : onOpen} />
       <Result g={g} Name={Name} />
     </div>
   );
@@ -639,6 +663,9 @@ function Heist({ g, me, act, Name, now }) {
   const each = Math.floor((g.bet * 0.95) / odds);
   return (
     <div className="arc-heist">
+      <div className="arc-betrow">
+        <BetPill each={g.bet} pot={g.bet * n} people="each" />
+      </div>
       <div className="heist-crew">
         {g.crew.map((c) => (
           <span key={c} className="arc-who">
@@ -680,16 +707,39 @@ function Heist({ g, me, act, Name, now }) {
   );
 }
 
-export function ArcadeBody({ m, me, Name, onMove, conv }) {
-  const c = m.cmd;
+// view: shown in the game view (GameView.jsx), big; otherwise it's the card in the chat.
+export function ArcadeBody({ m, me, Name, onMove, conv, view = false, onRun }) {
+  // The newest copy of the game: the chat's, or a move's answer if that's ahead (liveGames.js).
+  const c = useFreshCmd(m.id, m.cmd);
   const g = { ...c.game, status: c.status };
   const live = isLive(c.status);
-  const now = useNow(live);
+  // Board games tick once a second (their clocks show seconds); the fast games need more.
+  const now = useNow(live, VIEW_GAMES.includes(c.name) ? 1000 : 250);
   useEffect(ensureCasinoDefs, []);
+  // Every answer that brings the card back keeps it (a stale chat still shows the move).
+  const send = (move) =>
+    Promise.resolve(onMove(move)).then((r) => {
+      if (r?.card) noteCard(m.id, r.card);
+      return r;
+    });
   // One move at a time, shown at once; the card takes the next tap as soon as
   // its new state arrives (useMove). Timers' quiet asks never block a tap.
-  const mv = useMove(onMove, `${c.status}|${JSON.stringify(c.game)}`);
+  const mv = useMove(send, `${c.status}|${JSON.stringify(c.game)}`);
   const act = (move, quiet) => (quiet ? mv.peek(move) : mv.send(move));
+  // Back from the background (or the connection), the chat's copy of a live
+  // board game can be behind: ask for the card as it is now.
+  const board = VIEW_GAMES.includes(c.name) && live && (view || me === g.a || me === g.b);
+  useEffect(() => {
+    if (!board) return undefined;
+    const sync = () => document.visibilityState === 'visible' && mv.peek('sync');
+    document.addEventListener('visibilitychange', sync);
+    window.addEventListener('online', sync);
+    if (view) sync();
+    return () => {
+      document.removeEventListener('visibilitychange', sync);
+      window.removeEventListener('online', sync);
+    };
+  }, [board, view]); // eslint-disable-line react-hooks/exhaustive-deps
   const error = mv.error;
   // Timers that need the server to move things along.
   const at = {
@@ -705,7 +755,8 @@ export function ArcadeBody({ m, me, Name, onMove, conv }) {
     placing: g.placeBy,
   }[c.status];
   usePeekAt(at, live, act);
-  const props = { g, me, act, Name, now, mv };
+  const onOpen = () => openGameView({ conv, m });
+  const props = { g, me, act, Name, now, mv, view, onOpen, msgId: m.id, conv, m };
   // A Tetris or Minesweeper result someone posted (not a race).
   if (c.share) return <FunShare c={c} by={m.by} Name={Name} />;
   const body = {
@@ -717,7 +768,11 @@ export function ArcadeBody({ m, me, Name, onMove, conv }) {
     hangman: <Hangman {...props} />,
     typerace: <TypeRace {...props} />,
     heist: <Heist {...props} />,
-    battleship: <Battleship {...props} />,
+    battleship: view ? (
+      <BattleshipView {...props} />
+    ) : (
+      <BattleshipCard {...props} onRematch={onRun ? (args) => onRun('battleship', args) : null} />
+    ),
     tetris: <RaceCard {...props} name="tetris" conv={conv} msgId={m.id} />,
     minesweep: <RaceCard {...props} name="minesweep" conv={conv} msgId={m.id} />,
     challenge: <Challenge {...props} />,
@@ -725,7 +780,8 @@ export function ArcadeBody({ m, me, Name, onMove, conv }) {
   return (
     <>
       {body}
-      {error && <div className="casino-error">{error}</div>}
+      {/* The Battleship game view says it in its status line (no line appearing under the board). */}
+      {error && !(view && c.name === 'battleship') && <div className="casino-error">{error}</div>}
     </>
   );
 }
