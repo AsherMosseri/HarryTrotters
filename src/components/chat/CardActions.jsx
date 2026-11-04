@@ -3,11 +3,11 @@ import { MAX_BET } from '../../../functions/shared/challenge.js';
 import { BOT } from '../../../functions/shared/arcade.js';
 import { usePeople } from '../common.jsx';
 import { Icon } from '../shell/icons.jsx';
-import { reportInfo } from '../Disputes.jsx';
+import { REPORTS_TO, reportInfo } from '../Disputes.jsx';
 
 // Two small actions under a finished casino card: dare someone to the same
 // coin flip or dice roll ("Challenge someone", functions/shared/challenge.js),
-// and report the result to team management ("Report", Disputes.jsx). Money
+// and report the result to the owner ("Report", Disputes.jsx). Money
 // is only ever moved by the server.
 
 // Coin flip and dice are the games that can be played head to head.
@@ -32,7 +32,7 @@ export function CardActions({ m, me, onChallenge, onReport }) {
           </button>
         )}
         {info && onReport && (
-          <button className="link-btn small card-report" onClick={onReport} title="Something look wrong? Tell team management">
+          <button className="link-btn small card-report" onClick={onReport} title={`Report this result to ${REPORTS_TO}`}>
             <Icon name="flag" size={15} /> Report
           </button>
         )}

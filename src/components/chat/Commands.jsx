@@ -1,3 +1,4 @@
+import { useRef, useState } from 'react';
 import { Icon } from '../shell/icons.jsx';
 import { Avatar, DisplayName } from '../common.jsx';
 import { COMMANDS, GROUPS } from '../../commands.js';
@@ -12,6 +13,7 @@ import { RecapBody } from '../Life.jsx';
 import { DailyCard } from '../learn/DailyCard.jsx';
 import { priorityById } from '../../config.js';
 import { daysBetween, todayISO } from '../../teamCommands.js';
+import { serverNow } from '../../serverTime.js';
 
 // What slash commands look like in chat (commands.js does the work): the
 // Trotbot card on a command's message, and the notes only you can see.
@@ -196,7 +198,7 @@ function TeamBody({ c, by, onPerson }) {
   }
 }
 
-function Body({ c, by, onPerson }) {
+function Body({ c, by, onPerson, fresh }) {
   switch (c.name) {
     case 'ping':
       return (
@@ -293,7 +295,7 @@ function Body({ c, by, onPerson }) {
           <div className="cmd-dice">
             {c.rolls.map((r, i) =>
               c.sides === 6 ? (
-                <Die key={i} n={r} i={i} />
+                <Die key={i} n={r} i={i} roll={fresh} />
               ) : (
                 <span key={i} className="cmd-die" style={{ '--i': i }}>
                   {r}
@@ -407,7 +409,16 @@ export function CommandCard({ m, onPerson, me, onMove, onBuy, onChallenge, onRep
       : TEAM_CARDS.includes(n)
         ? 'team'
         : '';
-  const PersonName = ({ name }) => <Name name={name} onPerson={onPerson} />;
+  // One component for the card's whole life (a new one each render would
+  // rebuild every name on the card, dropping a tap that lands mid-render).
+  const person = useRef(onPerson);
+  person.current = onPerson;
+  const [PersonName] = useState(() => {
+    const Named = ({ name }) => <Name name={name} onPerson={person.current ? (...a) => person.current?.(...a) : undefined} />;
+    return Named;
+  });
+  // A /roll tumbles only when it was just rolled.
+  const [fresh] = useState(() => serverNow() - m.at < 8000);
   return (
     <div className={`cmd-card cmd-card-${n}${kind ? ` cmd-${kind}` : ''}`}>
       <Trotbot name={n === 'dailyq' ? '' : n} />
@@ -420,7 +431,7 @@ export function CommandCard({ m, onPerson, me, onMove, onBuy, onChallenge, onRep
       ) : m.cmd.view ? (
         <MoreBody c={m.cmd} by={m.by} onPerson={onPerson} />
       ) : (
-        <Body c={m.cmd} by={m.by} onPerson={onPerson} />
+        <Body c={m.cmd} by={m.by} onPerson={onPerson} fresh={fresh} />
       )}
       {DISPUTABLE.includes(n) && <CardActions m={m} me={me} onChallenge={onChallenge} onReport={onReport} />}
     </div>

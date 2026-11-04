@@ -4,6 +4,7 @@
 //
 // 10×10, the classic fleet (carrier 5, battleship 4, cruiser 3, submarine 3,
 // destroyer 2). Ships can touch but not overlap. One shot a turn.
+import { secureRandom } from './rng.js';
 
 export const N = 10;
 export const FLEET = [
@@ -54,7 +55,7 @@ export function fleetText(ships) {
 }
 
 // A random legal fleet.
-export function randomFleet(rng = Math.random) {
+export function randomFleet(rng = secureRandom) {
   for (;;) {
     const used = new Set();
     const ships = [];
@@ -93,7 +94,7 @@ export function fire(shots, ships, i) {
 // yet pull hard toward the cells next to them (target mode); with none, the
 // count alone finds the likeliest cell (hunt mode). sunk: the cells of ships
 // already sunk; left: the lengths still afloat.
-export function botAim(shots, sunkCells, left, rng = Math.random, sloppy = 0.4) {
+export function botAim(shots, sunkCells, left, rng = secureRandom, sloppy = 0.4) {
   const sunk = new Set(sunkCells);
   const open = [];
   for (let i = 0; i < N * N; i++) if (shots[i] === 'x' && !sunk.has(i)) open.push(i);

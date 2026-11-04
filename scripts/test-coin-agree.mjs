@@ -22,10 +22,12 @@ import {
   earnedItems,
   freshWallet,
   ledgerItems,
+  bankItems,
   oldBankIds,
   wallet,
 } from '../functions/shared/coins.js';
-import { bankAfter } from '../functions/shared/casino.js';
+import { bankAfter, closeHold, holdEntry } from '../functions/shared/casino.js';
+import { moneyLine } from '../functions/shared/arcade.js';
 import { nameKey } from '../functions/shared/team.js';
 
 const CASES = Number(process.argv[2]) || 400;
@@ -222,7 +224,8 @@ function makeWorld(seed) {
       let at = START + Math.floor((idx / p.names.length) * (NOW - START)) + int(0, 3) * DAY;
       for (let i = 0; i < m; i++) {
         at += int(1, 3) * HOUR;
-        const kind = pick(['win', 'loss', 'escrow', 'escrow-then-end', 'daily', 'noentry']);
+        const kind = pick(['win', 'loss', 'escrow', 'escrow-then-end', 'daily', 'noentry', 'held', 'held-then-end', 'held-double', 'held-refund', 'held-deleted', 'challenge']);
+        const id = `g${i}-${int(1, 1e9)}`;
         let delta;
         let entry = null;
         if (kind === 'win') (delta = int(1, 80)), (entry = { game: 'slots', icon: '🎰', label: `Slots: won ${delta}` });
@@ -235,6 +238,46 @@ function makeWorld(seed) {
           const pay = chance(0.5) ? 0 : int(1, bet * 3);
           delta = pay;
           entry = { game: 'mines', icon: 'Mines', label: 'Mines', shown: pay - bet };
+        } else if (kind === 'held') {
+          // A live game still going (3.1: the bet shows as held).
+          delta = -int(1, 30);
+          entry = holdEntry('Mines', 'Mines', -delta, id);
+        } else if (kind === 'held-then-end' || kind === 'held-double') {
+          const bet = int(1, 30);
+          b = bankAfter(b, name, -bet, holdEntry('BJ', 'Blackjack', bet, id), {}, at);
+          net -= bet;
+          // Doubling puts the bet in again at the end.
+          const extra = kind === 'held-double' ? bet : 0;
+          const pay = chance(0.5) ? 0 : int(0, (bet + extra) * 3);
+          delta = pay - extra;
+          entry = { game: 'blackjack', icon: 'BJ', label: 'Blackjack', shown: pay - bet - extra, settles: id };
+        } else if (kind === 'held-refund') {
+          // A challenge nobody accepted: the bet comes back.
+          const bet = int(1, 30);
+          b = bankAfter(b, name, -bet, moneyLine({ name, delta: -bet, entry: null }, 'challenge', id), {}, at);
+          net -= bet;
+          delta = bet;
+          entry = moneyLine({ name, delta: bet, entry: null }, 'challenge', id);
+        } else if (kind === 'held-deleted') {
+          // The card was deleted mid-game: the bet stays lost, its line says so.
+          const bet = int(1, 30);
+          b = closeHold(bankAfter(b, name, -bet, holdEntry('Mines', 'Mines', bet, id), {}, at), id);
+          net -= bet;
+          delta = 0;
+        } else if (kind === 'challenge') {
+          // Taken at the start, then won, lost or tied.
+          const bet = int(1, 30);
+          b = bankAfter(b, name, -bet, moneyLine({ name, delta: -bet, entry: null }, 'challenge', id), {}, at);
+          net -= bet;
+          const r = pick(['won', 'lost', 'tie']);
+          const x =
+            r === 'won'
+              ? { name, delta: 2 * bet, entry: { game: 'challenge', icon: 'C', label: 'won', shown: bet } }
+              : r === 'lost'
+                ? { name, delta: 0, entry: { game: 'challenge', icon: 'C', label: 'lost', shown: -bet } }
+                : { name, delta: bet, entry: { game: 'challenge', icon: 'C', label: 'tie', shown: 0 } };
+          delta = x.delta;
+          entry = moneyLine(x, 'challenge', id);
         } else if (kind === 'daily') (delta = int(1, 12)), (entry = { icon: '📅', label: 'Daily' });
         else delta = 0;
         b = bankAfter(b, name, delta, entry, {}, at);
@@ -407,6 +450,55 @@ console.log(`${CASES} random teams checked; ${bankSharedCases} people had a capi
   const a = appView(w, p.current, { now: NOW });
   const s = serverView(w, p.current, { now: NOW + 59000 });
   ok(Math.abs(a.balance - s.balance) <= 1, `running shift: ${a.balance} vs ${s.balance}`);
+}
+
+{
+  // 3.1: the history explains the balance at every moment. Games started,
+  // played and ended in any order (live ones held, then settled; challenges;
+  // refunds; doubles; deleted cards): after every step the casino lines add
+  // up to the bank's net with no "Earlier" line, as long as the lines fit.
+  const rng = rngOf(77);
+  const int = (a, b) => a + Math.floor(rng() * (b - a + 1));
+  const sumOf = (b) => (b.recent || []).reduce((t, x) => t + x.amount, 0);
+  for (let run = 0; run < 300; run++) {
+    let b = {};
+    const live = [];
+    let at = NOW - 30 * DAY;
+    for (let step = 0; step < 24; step++) {
+      at += int(1, 90) * MIN;
+      const r = rng();
+      if (live.length && r < 0.45) {
+        const g = live.splice(int(0, live.length - 1), 1)[0];
+        const how = rng();
+        if (how < 0.15) b = closeHold(b, g.id);
+        else if (g.kind === 'challenge' && how < 0.35) b = bankAfter(b, 'X', g.bet, moneyLine({ name: 'X', delta: g.bet, entry: null }, 'challenge', g.id), {}, at);
+        else {
+          const extra = g.kind === 'blackjack' && how > 0.8 ? g.bet : 0;
+          const pay = rng() < 0.5 ? 0 : int(0, (g.bet + extra) * 4);
+          b = bankAfter(b, 'X', pay - extra, { game: g.kind, icon: 'G', label: 'end', shown: pay - g.bet - extra, settles: g.id }, {}, at);
+        }
+      } else if (r < 0.8) {
+        const g = { id: `c${run}-${step}`, bet: int(1, 200), kind: rng() < 0.5 ? 'challenge' : 'blackjack' };
+        live.push(g);
+        b = bankAfter(b, 'X', -g.bet, g.kind === 'challenge' ? moneyLine({ name: 'X', delta: -g.bet, entry: null }, 'challenge', g.id) : holdEntry('G', 'Blackjack', g.bet, g.id), {}, at);
+      } else {
+        const d = int(1, 40);
+        b = bankAfter(b, 'X', d, { icon: 'W', label: 'Work' }, {}, at);
+      }
+      const items = bankItems('X', { X: b });
+      ok(sumOf(b) === b.net, `run ${run} step ${step}: lines ${sumOf(b)} vs net ${b.net}`);
+      ok(!items.some((x) => /Earlier/.test(x.label)), `run ${run} step ${step}: an "Earlier" line appeared`);
+      ok(live.every((g) => b.recent.some((x) => x.hold === g.id)) && b.recent.filter((x) => x.hold).length === live.length, `run ${run} step ${step}: one held line per live game`);
+    }
+  }
+  // More lines than fit: still adds up (an "Earlier" line takes the rest), and held bets are never dropped.
+  let b = {};
+  b = bankAfter(b, 'X', -50, holdEntry('M', 'Mines', 50, 'keep'), {}, NOW - 99 * DAY);
+  for (let i = 0; i < 200; i++) b = bankAfter(b, 'X', 3, { icon: 'W', label: `Work ${i}` }, {}, NOW - (98 - i / 4) * DAY);
+  const items = bankItems('X', { X: b });
+  ok(items.reduce((t, x) => t + x.amount, 0) === b.net, 'overflow: the history still adds up');
+  ok(b.recent.some((x) => x.hold === 'keep'), 'overflow: the held bet is kept');
+  ok(b.recent.length === 60, `overflow: keeps 60 lines (${b.recent.length})`);
 }
 
 console.log(failures ? `${failures} FAILURES` : 'ALL OK');
