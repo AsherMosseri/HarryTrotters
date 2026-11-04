@@ -94,7 +94,13 @@ export function whatIs(m) {
   if (m.photo) return 'a photo';
   return 'a message';
 }
-export const timeOf = (ms) => new Date(ms).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+// One formatter for every message (making one per call, as toLocaleTimeString
+// does, was the slowest part of drawing the chat). Same text.
+const TIME = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
+export const timeOf = (ms) => {
+  const d = new Date(ms);
+  return Number.isNaN(d.getTime()) ? d.toLocaleTimeString() : TIME.format(d);
+};
 
 // A YouTube link's video id, for the inline player.
 export function youtubeId(url) {
