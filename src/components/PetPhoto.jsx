@@ -79,7 +79,7 @@ export function PetPhotoRow({ pet, onToast }) {
   const remove = async () => {
     const ok = await confirmDialog({
       title: 'Remove the photo?',
-      body: live ? 'It stops showing beside your pet. You can add another one.' : 'It won’t be sent to team management.',
+      body: live ? 'It stops showing. You can add another one.' : 'It won’t be sent to team management.',
       okLabel: 'Remove',
       danger: true,
     });
@@ -101,7 +101,11 @@ export function PetPhotoRow({ pet, onToast }) {
           </button>
         )}
       </div>
-      {live?.caption && !waiting && <p className="muted tiny">Shown beside {pet.name}: {live.caption}</p>}
+      {live?.caption && !waiting && (
+        <p className="muted tiny">
+          {pet ? `Shown beside ${pet.name}` : 'Shown on your profile'}: {live.caption}
+        </p>
+      )}
       {waiting && (
         <p className="pp-badge" role="status">
           <Icon name="clock" size={13} /> Waiting for team management

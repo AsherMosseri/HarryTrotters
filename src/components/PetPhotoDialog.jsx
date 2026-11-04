@@ -188,7 +188,7 @@ export default function PetPhotoDialog({ pet, onClose, onToast }) {
     } else setErr([r?.note?.title, r?.note?.body].filter(Boolean).join(' ') || 'That didn’t go through.');
   };
 
-  const first = (pet.name || 'your pet').split(' ')[0];
+  const first = (pet?.name || 'your pet').split(' ')[0];
   return (
     <Overlay>
       <div className="panel-backdrop center" onClick={() => step !== 'busy' && !sending && close()}>
@@ -345,9 +345,11 @@ export default function PetPhotoDialog({ pet, onClose, onToast }) {
                 </div>
               </div>
               <div className="pp-beside">
-                <span className="pet-stage">
-                  <PetArt species={pet.species} mood="happy" stage="young" size={84} still />
-                </span>
+                {pet && (
+                  <span className="pet-stage">
+                    <PetArt species={pet.species} mood="happy" stage="young" size={84} still />
+                  </span>
+                )}
                 <span className="pp-sticker" style={{ '--pp': '84px', '--ar': Math.min(1.5, Math.max(0.55, sticker.w / sticker.h)) }}>
                   <img src={sticker.url} alt="" width={84} height={84} />
                 </span>
@@ -609,7 +611,7 @@ function ManualCrop({ work, onDone, onBack }) {
         <span>Zoom</span>
         <input type="range" min="1" max="4" step="0.01" value={zoom} onChange={(e) => setZoom(Number(e.target.value))} className="grow" aria-label="Zoom" />
       </label>
-      <p className="muted small">Drag to move the picture inside the frame. It shows as a rounded picture beside your pet.</p>
+      <p className="muted small">Drag to move the picture inside the frame. It shows as a rounded picture.</p>
       <div className="row gap">
         <button className="btn" onClick={onBack}>
           Choose another

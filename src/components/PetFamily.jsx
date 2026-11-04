@@ -77,7 +77,9 @@ export function PetsShelf({ actor, balance, buy, busy, onToast, roster = [] }) {
           </div>
           <AdoptPet />
         </section>
-      ) : (
+      ) : null}
+      {!list.length && <RealPetSection onToast={onToast} />}
+      {!list.length ? null : (
         <section className="mk-sec">
           <div className="sec-head">
             <h2>Your pets</h2>
@@ -578,5 +580,21 @@ export function PetExtras({ name }) {
         </div>
       ))}
     </>
+  );
+}
+
+// No pet in the app yet: a photo of your real pet still works. It shows here
+// and on your profile (and beside your pet once you adopt one).
+function RealPetSection({ onToast }) {
+  return (
+    <section className="mk-sec">
+      <div className="sec-head">
+        <h2>Your real pet</h2>
+      </div>
+      <div className="pp-solo">
+        <OwnSticker size={96} />
+        <PetPhotoRow pet={null} onToast={onToast} />
+      </div>
+    </section>
   );
 }

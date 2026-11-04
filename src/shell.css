@@ -4236,3 +4236,6 @@ html.kb-open .report-note { min-height: 56px; }
 .lq-next { position: relative; }
 .lq-next.is-loading svg { visibility: hidden; }
 .lq-next.is-loading::after { content: ''; position: absolute; right: 14px; top: 50%; width: 14px; height: 14px; margin-top: -7px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.4); border-top-color: #fff; animation: lq-spin 0.7s linear infinite; }
+
+/* Market, Pets: a photo of your real pet with no pet in the app. */
+.pp-solo { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }

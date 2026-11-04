@@ -75,10 +75,6 @@ export function petPhotos({ db, notify, personId, managers, owner }) {
     }
     return { id, request, live };
   }
-  async function hasPet(aliases) {
-    for (const n of aliases) if ((await db.doc(`pets/${personId(n)}`).get()).exists) return true;
-    return false;
-  }
   async function off() {
     const controls = (await db.doc('settings/controls').get()).data() || {};
     return (controls.off || []).includes('photos');
@@ -105,7 +101,6 @@ export function petPhotos({ db, notify, personId, managers, owner }) {
       const info = await inspect(path);
       const r = submitCheck(input, {
         me,
-        hasPet: await hasPet(aliases),
         off: false,
         mine: mine.request,
         file: info ? { ...info, url: 'checked-below', path } : null,
@@ -125,7 +120,7 @@ export function petPhotos({ db, notify, personId, managers, owner }) {
       await db.runTransaction(async (tx) => {
         const ref = db.doc(`petPhotoRequests/${mine.id}`);
         const fresh = (await tx.get(ref)).data() || null;
-        const again = submitCheck(input, { me, hasPet: true, off: false, mine: fresh, file: { ...info, ...kept }, day: teamDay(now), now });
+        const again = submitCheck(input, { me, off: false, mine: fresh, file: { ...info, ...kept }, day: teamDay(now), now });
         if (again.note) refused = again;
         else {
           saved = again;
@@ -181,7 +176,7 @@ export function petPhotos({ db, notify, personId, managers, owner }) {
       const owned = rs.exists ? rs.get('by') : ls.get('by');
       const who = data.rename(owned || '');
       const line = {
-        approved: ['Your pet photo is up', 'It shows beside your pet now.'],
+        approved: ['Your pet photo is up', 'It shows on your profile now.'],
         declined: ['Your pet photo wasn’t approved', r.request.note],
         removed: ['Your pet photo was taken down', r.request.note || 'Ask team management if you’re not sure why.'],
       }[r.told];

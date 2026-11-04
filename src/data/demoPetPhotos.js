@@ -53,7 +53,6 @@ export function demoPetPhotos({ get, commit, uid }) {
         const off = (s.controls?.off || []).includes('photos') && me !== 'Asher Mosseri';
         const r = submitCheck(data, {
           me,
-          hasPet: (s.pets || []).some((p) => p.person === me),
           off,
           mine: request,
           file: data.url && String(data.url).startsWith('data:image/png') ? { url: data.url, path: data.path || 'demo', w: data.w, h: data.h } : null,
@@ -88,7 +87,7 @@ export function demoPetPhotos({ get, commit, uid }) {
         put('petPhotos', r.live, who);
         const owner = (req || showing)?.by;
         const line = {
-          approved: ['Your pet photo is up', 'It shows beside your pet now.'],
+          approved: ['Your pet photo is up', 'It shows on your profile now.'],
           declined: ['Your pet photo wasn’t approved', r.request.note],
           removed: ['Your pet photo was taken down', r.request.note || 'Ask team management if you’re not sure why.'],
         }[r.told];

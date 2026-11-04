@@ -58,9 +58,9 @@ export const pathOk = (path, uid) => typeof path === 'string' && path.startsWith
 //   input: { caption }  (the file itself is checked by the server: path, type, size)
 //   mine: your latest request doc (or null); day: today's team day
 // Returns { note } to refuse, or { request, drop: [paths to delete] }.
-export function submitCheck(input, { me, hasPet, off, mine, file, day, now }) {
+// No pet needed (3.1): without one, the photo shows on your profile and in Market, Pets.
+export function submitCheck(input, { me, off, mine, file, day, now }) {
   if (off) return note('Photos are off right now.');
-  if (!hasPet) return note('Adopt a pet first.', 'The photo goes beside your pet.');
   if (!file || !file.url || !file.path) return note('That photo didn’t upload. Try again.');
   if (!(file.w >= 8 && file.w <= MAX_DIM && file.h >= 8 && file.h <= MAX_DIM)) return note('That picture is the wrong size.', 'Try cutting it out again.');
   const tries = mine?.tries?.day === day ? mine.tries.n || 0 : 0;

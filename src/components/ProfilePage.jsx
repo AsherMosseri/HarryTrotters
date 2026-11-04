@@ -11,6 +11,7 @@ import { hoursOf, mergedMs } from '../../functions/shared/hours.js';
 import { streaksOf } from '../../functions/shared/streaks.js';
 import CountUp from './CountUp.jsx';
 import { PetCard } from './Pet.jsx';
+import { PetSticker, usePetPhoto } from './PetPhoto.jsx';
 import { PetExtras } from './PetFamily.jsx';
 import { useMarket } from '../market.js';
 
@@ -38,6 +39,8 @@ export default function ProfilePage({
   const people = usePeople();
   const market = useMarket();
   const hasPet = !!market?.petOf(name);
+  // A photo of their real pet, even with no pet in the app.
+  const realPet = usePetPhoto(name);
   const phone = useMedia('(max-width: 760px)');
   const [tab, setTab] = useState('about');
   const [note, setNote] = useState(notes[name] || '');
@@ -187,12 +190,19 @@ export default function ProfilePage({
 
               {tab === 'about' && (
                 <div className="pp-body">
-                  {hasPet && (
+                  {hasPet ? (
                     <section className="profile-section">
                       <h3>Pet</h3>
                       <PetCard name={name} />
                       <PetExtras name={name} />
                     </section>
+                  ) : (
+                    realPet && (
+                      <section className="profile-section">
+                        <h3>Pet</h3>
+                        <PetSticker photo={realPet} size={96} />
+                      </section>
+                    )
                   )}
                   {profile.about && (
                     <section className="profile-section">
