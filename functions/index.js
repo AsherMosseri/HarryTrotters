@@ -1274,7 +1274,7 @@ function withBalance(handler) {
     const uid = req.auth?.uid;
     // Nothing to check when no coins moved: a peek, a warm-up, or a move in a
     // game that goes on (its bet was taken at the start).
-    if (!uid || !res || typeof res !== 'object' || ['peek', 'mine', 'warm'].includes(req.data?.move) || req.data?.action === 'warm') return res;
+    if (!uid || !res || typeof res !== 'object' || ['peek', 'mine', 'warm', 'sync'].includes(req.data?.move) || req.data?.action === 'warm') return res;
     if (res.still) {
       const { still, ...rest } = res;
       return rest;
@@ -1395,6 +1395,12 @@ const playersOf = (pub) => [pub.a, pub.b, ...(pub.crew || [])];
 async function runMove({ conv, msgId, me, move, data, now, house = false, verified = null }) {
   const msgRef = db.doc(`channels/${conv}/messages/${msgId}`);
   const secretRef = db.doc(`gameSecrets/${msgId}`);
+  // A board game's card as it is now, for an app whose copy may be behind (it
+  // was in the background): only what's on the card already, no transaction.
+  if (move === 'sync') {
+    const c = (await msgRef.get()).get('cmd');
+    return c && arcade.MULTI.includes(c.name) ? { ok: true, serverNow: now, card: { game: c.game, status: c.status } } : { ok: true, serverNow: now };
+  }
   const res = await db.runTransaction(async (tx) => {
     const [msg, secret] = await Promise.all([tx.get(msgRef), tx.get(secretRef)]);
     const c = msg.get('cmd');
@@ -1435,7 +1441,11 @@ async function runMove({ conv, msgId, me, move, data, now, house = false, verifi
       if (arcade.isLive(status)) tx.set(secretRef, secretWith(r.secret, conv, now, playersOf(r.pub)));
       else tx.delete(secretRef);
       tx.update(msgRef, { 'cmd.game': game, 'cmd.status': status });
-      return { ok: true, serverNow: now, awards: r.awards || [] };
+      // The card as written goes back too, so the player sees the move even
+      // if their copy of the chat is behind. still: no coins of theirs moved
+      // (withBalance skips its reads).
+      const mineMoved = r.money.some((x) => x.name === me) || (r.awards || []).some((x) => x.person === me);
+      return { ok: true, serverNow: now, awards: r.awards || [], card: { game, status }, ...(!mineMoved && { still: true }) };
     }
     const player = data.rename(msg.get('by'));
     if (!house && move !== 'peek' && player !== me) return note('That’s not your game.');

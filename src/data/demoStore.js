@@ -1770,6 +1770,7 @@ export const demoStore = {
       const c = m.cmd;
       if (arcade.MULTI.includes(c.name)) {
         if (move === 'mine') return { ok: true, mine: arcade.myFleet(c.name, secret, me) };
+        if (move === 'sync') return { ok: true, serverNow: now, card: { game: c.game, status: c.status } };
         if (!arcade.isLive(c.status)) return { ok: true };
         const r = arcade.move(c.name, {
           pub: { ...c.game, status: c.status },
@@ -1789,7 +1790,7 @@ export const demoStore = {
         if (arcade.isLive(status)) state.gameSecrets = { ...state.gameSecrets, [msgId]: r.secret };
         else delete state.gameSecrets[msgId];
         state.chat = { ...state.chat, [conv]: list.map((x) => (x.id === msgId ? { ...x, cmd: { ...c, game: g, status } } : x)) };
-        return done({ ok: true, serverNow: now });
+        return done({ ok: true, serverNow: now, card: { game: g, status } });
       }
       if (move !== 'peek' && m.by !== me) return note('That’s not your game.');
       if (c.status !== 'playing') return { ok: true };
