@@ -27,7 +27,8 @@ export const REASONS = {
   errored: 'I lost coins and the game errored',
   other: 'Something else',
 };
-export const LIMITS = { perDay: 10, note: 300, resolution: 200, window: 2 * 3600000 };
+// No daily cap on reports (Asher, 3.1): one per result per person is the limit.
+export const LIMITS = { note: 300, resolution: 200, window: 2 * 3600000 };
 
 // Everyone the card is about (the person who played, or both people in a challenge).
 export function cardPlayers(cmd, by, rename = (n) => n) {

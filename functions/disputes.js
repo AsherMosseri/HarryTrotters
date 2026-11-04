@@ -55,8 +55,8 @@ export function disputeFunctions({ db, coinData, notify, bankRef, owner }) {
       const problem = d.reportProblem(msg, me, data.rename);
       if (problem) return note('Can’t report that.', problem);
       if (old.exists) return note('You already reported this one.', `${ownerFirst} will get to it.`);
+      // Counted per day for the record; there's no daily cap.
       const n = lim.exists ? lim.get('n') || 0 : 0;
-      if (n >= d.LIMITS.perDay) return note(`That’s ${d.LIMITS.perDay} reports today.`, 'Try again tomorrow.');
       const snapshot = d.snapshotOf(msg, me, data.rename);
       tx.set(limitRef, { person: me, day, n: n + 1 });
       tx.set(dref, {

@@ -1952,8 +1952,6 @@ export const demoStore = {
     const list = state.disputes || [];
     if (list.some((x) => x.id === id)) return note('You already reported this one.', `${REQUESTS_TO.split(' ')[0]} will get to it.`);
     const day = teamDay(now);
-    if (list.filter((x) => x.by === me && x.day === day).length >= dispute.LIMITS.perDay)
-      return note(`That’s ${dispute.LIMITS.perDay} reports today.`, 'Try again tomorrow.');
     const snapshot = dispute.snapshotOf(m, me);
     state.disputes = [
       ...list,
