@@ -1768,6 +1768,15 @@ export const demoStore = {
       const secret = (state.gameSecrets || {})[msgId];
       if (!m?.cmd || !secret) return note('That game is gone.');
       const c = m.cmd;
+      // Controls: Casino and games during shifts off: no accepting or joining while clocked in.
+      if (
+        (move === 'accept' || move === 'join') &&
+        casino.shiftLocked(c.name) &&
+        me !== REQUESTS_TO &&
+        (state.controls?.off || []).includes('casinoOnShift') &&
+        (state.shifts || []).some((x) => !x.end && x.person === me)
+      )
+        return note(...casino.SHIFT_NOTE);
       if (arcade.MULTI.includes(c.name)) {
         if (move === 'mine') return { ok: true, mine: arcade.myFleet(c.name, secret, me) };
         if (!arcade.isLive(c.status)) return { ok: true };
@@ -1815,7 +1824,7 @@ export const demoStore = {
     const isCasino = casino.CASINO.includes(game);
     const stop = blocked(game, serverGroup(game), conv, state.settings?.commands);
     if (stop) return { note: stop };
-    // Controls, "Casino during shifts" off: not while you're clocked in (like the server; Asher is exempt).
+    // Controls, "Casino and games during shifts" off: not while you're clocked in (like the server; Asher is exempt).
     if (
       casino.shiftLocked(game) &&
       me !== REQUESTS_TO &&
@@ -2078,6 +2087,8 @@ export const demoStore = {
       const { game, mode } = req;
       if (!fun.GAMES.includes(game) || !fun.MODES[game]?.[mode]) return note('Which game?');
       if ((state.settings?.commands?.off || []).includes(game)) return note(`/${game} is turned off`);
+      if (me !== REQUESTS_TO && (state.controls?.off || []).includes('casinoOnShift') && (state.shifts || []).some((x) => !x.end && x.person === me))
+        return note(...casino.SHIFT_NOTE);
       const s = { person: me, game, mode, startedAt: now, done: false, level: 1, speed: '', race: null, tournament: null };
       if (mode === 'race') {
         const { conv, msgId } = req.race || {};

@@ -12,10 +12,12 @@ export const MINUTE = 60000;
 export const COOLDOWN = { work: 60 * MINUTE, beg: 15 * MINUTE, rob: 3 * 60 * MINUTE };
 export const CASINO = ['slots', 'dice', 'coinflip', 'roulette', 'blackjack', 'crash', 'mines', 'highlow', 'lottery'];
 export const ECONOMY = ['daily', 'work', 'beg', 'rob'];
-// Controls, "Casino during shifts" off (id casinoOnShift): someone clocked in
-// can't start these (or accept a /challenge) until their shift ends.
-export const shiftLocked = (game) => CASINO.includes(game) || game === 'challenge';
-export const SHIFT_NOTE = ['🎰 No casino on shift.', 'The casino opens again when your shift ends.'];
+// Controls, "Casino and games during shifts" off (id casinoOnShift): someone
+// clocked in can't start, accept or join these until their shift ends (games
+// already going can be finished).
+export const SHIFT_GAMES = ['rps', 'tictactoe', 'connect4', 'duel', 'trivia', 'hangman', 'typerace', 'heist', 'battleship', 'tetris', 'minesweep', 'challenge'];
+export const shiftLocked = (game) => CASINO.includes(game) || SHIFT_GAMES.includes(game);
+export const SHIFT_NOTE = ['🎰 No casino or games on shift.', 'They open again when your shift ends.'];
 // Commands only the server may post (the rules refuse them from phones).
 export const SERVER_COMMANDS = [
   ...CASINO,

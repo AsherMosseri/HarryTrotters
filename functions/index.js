@@ -1570,12 +1570,15 @@ export const play = onCall({ maxInstances: 5, invoker: 'public' }, withBalance(a
   if (action === 'move') {
     if (!/^[\w-]{1,40}$/.test(conv) || !/^[\w-]{1,40}$/.test(msgId || '')) throw new HttpsError('invalid-argument', 'Which game?');
     // Accepting a challenge puts coins in: not while coins are off (Controls).
-    if (String(move) === 'accept' && me !== REQUESTS_TO) {
+    // Accepting or joining any game: not on shift when Casino and games during shifts is off.
+    if ((String(move) === 'accept' || String(move) === 'join') && me !== REQUESTS_TO) {
       const card = await db.doc(`channels/${conv}/messages/${msgId}`).get();
-      if (card.get('cmd')?.name === 'challenge') {
+      const name = card.get('cmd')?.name;
+      if (name === 'challenge' || casino.shiftLocked(name)) {
         const controls = (await db.doc('settings/controls').get()).data() || {};
-        if ((controls.off || []).includes('coins')) return note('🪙 Jackson coins are off right now.');
-        if ((controls.off || []).includes('casinoOnShift') && (await workContext(me, data)).onShift) return note(...casino.SHIFT_NOTE);
+        if (name === 'challenge' && String(move) === 'accept' && (controls.off || []).includes('coins')) return note('🪙 Jackson coins are off right now.');
+        if (casino.shiftLocked(name) && (controls.off || []).includes('casinoOnShift') && (await workContext(me, data)).onShift)
+          return note(...casino.SHIFT_NOTE);
       }
     }
     return runMove({ conv, msgId, me, move: String(move), data, now });
@@ -1841,6 +1844,11 @@ export const funGame = onCall({ maxInstances: 5, invoker: 'public' }, async (req
     if (!fun.GAMES.includes(game) || !fun.MODES[game][mode]) throw new HttpsError('invalid-argument', 'Which game?');
     if (isOff(game, (await db.doc('settings/team').get()).get('commands')))
       return note(`/${game} is turned off`, 'It’s off for now. Type / to see what’s on.');
+    // Controls: Casino and games during shifts off (Asher is exempt).
+    if (me !== REQUESTS_TO && ((await db.doc('settings/controls').get()).get('off') || []).includes('casinoOnShift')) {
+      const open = await db.collection('shifts').where('end', '==', null).get();
+      if (open.docs.some((d) => rename(d.get('person') || '') === me)) return note(...casino.SHIFT_NOTE);
+    }
     const s = { person: me, uid, game, mode, startedAt: now, done: false, level: 1, speed: '', race: null, tournament: null };
     if (mode === 'race') {
       const { conv, msgId } = body.race || {};
