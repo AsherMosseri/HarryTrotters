@@ -1183,17 +1183,23 @@ export const firebaseStore = {
     return snap.docs.map(readDoc);
   },
 
+  // A new message's id, made on this device (the app shows the message under
+  // it right away, before the offline copy has it; sendMessage uses it).
+  newMessageId(conv) {
+    return doc(convCol(conv)).id;
+  },
   // Done as soon as the message is in the offline copy, where it already shows
   // (as a pending message), not when the server says so: that can take
   // seconds on venue Wi-Fi, and the box kept the text and said "…" all that
-  // time. A refusal that comes after that goes to onError.
-  async sendMessage(conv, data, actor, photoFiles, { onError } = {}) {
+  // time. A refusal that comes after that goes to onError. id and at: the ones
+  // the app already showed it with (newMessageId).
+  async sendMessage(conv, data, actor, photoFiles, { onError, id, at: shownAt } = {}) {
     const msg = { text: '', mentions: [], taskIds: [], replyTo: null, photo: null, reactions: {}, ...data };
     if (photoFiles)
       msg.photo = { ...(await uploadPhoto(convFolder(conv), photoFiles)), width: photoFiles.width, height: photoFiles.height };
-    const at = Date.now();
+    const at = shownAt || Date.now();
     const batch = fsWriteBatch(db);
-    const ref = doc(convCol(conv));
+    const ref = id ? doc(convCol(conv), id) : doc(convCol(conv));
     batch.set(ref, { ...msg, by: actor.name, byUid: actor.uid, at });
     // DMs keep their latest message on the DM itself, for the list.
     if (isDm(conv)) {

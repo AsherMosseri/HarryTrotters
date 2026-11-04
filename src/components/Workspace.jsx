@@ -532,10 +532,37 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
   const [rawRuns, setRuns] = useState([]);
   const [robot, setRobot] = useState({ versions: [], pins: [], layouts: [] });
   const [rawChat, setChat] = useState({}); // { [channelId]: newest messages }
+  // Messages you just sent, shown the moment you tap Send, until the live
+  // chat has them (same id): { [conv]: [message] }. Firestore shows a sent
+  // message only once it's through its queue, which on an iPad busy loading
+  // could take many seconds.
+  const [sentNow, setSentNow] = useState({});
+  useEffect(
+    () =>
+      setSentNow((prev) => {
+        const next = {};
+        for (const [k, list] of Object.entries(prev)) {
+          const have = new Set((rawChat[k] || []).map((m) => m.id));
+          const left = list.filter((m) => !have.has(m.id));
+          if (left.length) next[k] = left;
+        }
+        return Object.keys(next).length === Object.keys(prev).length && Object.entries(next).every(([k, l]) => l.length === prev[k].length) ? prev : next;
+      }),
+    [rawChat],
+  );
   // Under everyone's current names (a Roster rename shows on old messages at once).
   const chat = useMemo(
-    () => Object.fromEntries(Object.entries(rawChat).map(([k, list]) => [k, list.map((m) => renameMessage(m, rename))])),
-    [rawChat, rename],
+    () =>
+      Object.fromEntries(
+        [...new Set([...Object.keys(rawChat), ...Object.keys(sentNow)])].map((k) => {
+          const list = rawChat[k] || [];
+          const have = new Set(list.map((m) => m.id));
+          const extra = (sentNow[k] || []).filter((m) => !have.has(m.id));
+          const all = extra.length ? [...list, ...extra].sort((a, b) => a.at - b.at) : list;
+          return [k, all.map((m) => renameMessage(m, rename))];
+        }),
+      ),
+    [rawChat, sentNow, rename],
   );
   const [chatChannel, setChatChannel] = useLocalStorage('chat-channel', 'general');
   // Calm chat (off by default, per device): when on, animations in chat wait
@@ -1534,6 +1561,21 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
         botHook.current?.(conv, data?.text);
         store.setPresence(actor, { typing: '', typingAt: 0 }).catch(() => {});
         typingSent.current = 0;
+        // A message without a picture shows at once and the box clears at
+        // once; the save goes on behind it. If it's refused, it comes back
+        // off the screen and the error shows.
+        if (!photoFiles && store.newMessageId) {
+          const id = store.newMessageId(conv);
+          const at = Date.now();
+          const msg = { text: '', mentions: [], taskIds: [], replyTo: null, photo: null, reactions: {}, ...data, id, by: actor.name, byUid: actor.uid, at };
+          setSentNow((p) => ({ ...p, [conv]: [...(p[conv] || []), msg] }));
+          const refused = (e) => {
+            setSentNow((p) => ({ ...p, [conv]: (p[conv] || []).filter((m) => m.id !== id) }));
+            fail(e);
+          };
+          store.sendMessage(conv, data, actor, null, { onError: refused, id, at }).catch(refused);
+          return Promise.resolve();
+        }
         // Done once it's on screen (pending); a refusal after that still says so.
         return store.sendMessage(conv, data, actor, photoFiles, { onError: fail }).catch(fail);
       },
