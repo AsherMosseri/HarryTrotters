@@ -4231,3 +4231,8 @@ html.kb-open .report-note { min-height: 56px; }
   .lq-actions .lq-next { min-height: 46px; padding: 0 22px; }
   .lq-photo img { height: min(260px, 56vw); }
 }
+
+/* Learn: Next shows it's working while the next question loads. */
+.lq-next { position: relative; }
+.lq-next.is-loading svg { visibility: hidden; }
+.lq-next.is-loading::after { content: ''; position: absolute; right: 14px; top: 50%; width: 14px; height: 14px; margin-top: -7px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.4); border-top-color: #fff; animation: lq-spin 0.7s linear infinite; }

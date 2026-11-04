@@ -17,13 +17,22 @@ export function DailyCard({ c, onPerson }) {
   const ctx = useContext(DailyContext);
   const [mine, setMine] = useState(undefined); // undefined: loading, null: not answered
   const [busy, setBusy] = useState(false);
+  // The answer you tapped, lit up at once while the server checks it.
+  const [pending, setPending] = useState(null);
   const [error, setError] = useState('');
   const guard = useTapGuard();
   useEffect(() => (ctx ? ctx.subscribe(c.day, setMine) : undefined), [ctx, c.day]);
   const q = c.q || {};
   const open = c.day === teamDay(Date.now());
+  // Today's question, not answered yet: wake the server's checker (it sleeps
+  // when idle and takes seconds to start) so your tap is answered quickly.
+  const waiting = open && mine === null;
+  useEffect(() => {
+    if (waiting && ctx?.warm) ctx.warm();
+  }, [waiting, ctx]);
   const choose = async (i) => {
     if (!ctx || busy || mine || !guard.ok()) return;
+    setPending(i);
     setBusy(true);
     setError('');
     try {
@@ -37,6 +46,7 @@ export function DailyCard({ c, onPerson }) {
       setError(/already answered/i.test(e.message || '') ? '' : e.message || String(e));
     }
     setBusy(false);
+    setPending(null);
   };
   const done = !!mine;
   const tf = isTrueFalse(q);
@@ -56,9 +66,9 @@ export function DailyCard({ c, onPerson }) {
       {q.lines && <CodeView lines={q.lines} lang={q.lang} readOnly result={done && mine.bugLine != null ? { bugLine: mine.bugLine } : null} />}
       <div className={`lq-choices small${tf ? ' tf' : ''}`}>
         {(q.choices || []).map((ch, i) => {
-          const st = done ? (i === mine.answer ? ' is-right' : i === mine.given ? ' is-wrong' : ' dim') : '';
+          const st = done ? (i === mine.answer ? ' is-right' : i === mine.given ? ' is-wrong' : ' dim') : pending === i ? ' is-picked' : '';
           return (
-            <button key={i} className={`lq-choice${st}`} disabled={done || !open || busy} onClick={() => choose(i)}>
+            <button key={i} className={`lq-choice${st}`} disabled={done || !open || busy} aria-busy={pending === i || undefined} onClick={() => choose(i)}>
               {!tf && <span className="lq-choice-n mono">{String.fromCharCode(65 + i)}</span>}
               <span className="lq-choice-text">{ch}</span>
               {done && i === mine.answer && <Icon name="check" size={16} className="lq-choice-mark" />}

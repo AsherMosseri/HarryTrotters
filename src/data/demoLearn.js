@@ -117,7 +117,8 @@ export function demoLearn(get, commit, listen) {
 
   return {
     ensureDaily,
-    async quizNext({ bank, skip }, actor) {
+    async quizNext({ bank, skip, warm }, actor) {
+      if (warm) return { warm: true };
       await roundTrip();
       if (!NAMES[bank]) fail('Which game?');
       const me = actor.name;
@@ -162,7 +163,8 @@ export function demoLearn(get, commit, listen) {
       commit();
       return { question, progress: progressOf(q) };
     },
-    async quizAnswer({ id, answer }, actor) {
+    async quizAnswer({ id, answer, warm }, actor) {
+      if (warm) return { warm: true };
       await roundTrip();
       const me = actor.name;
       const q = st(me);
@@ -256,7 +258,8 @@ export function demoLearn(get, commit, listen) {
       commit();
       return { ...run, best: q.auto.best, newBest: run.score > prev, coins, progress: progressOf(q), today: today(me) };
     },
-    async dailyAnswer({ day, answer }, actor) {
+    async dailyAnswer({ day, answer, warm }, actor) {
+      if (warm) return { warm: true };
       await roundTrip();
       const s = get();
       const me = actor.name;

@@ -35,7 +35,10 @@ const AUTO_TIER_COINS = 2;
 // Limits so nobody scripts the games: answers and new questions per minute,
 // and an answer can't come back faster than a person could read it.
 const PER_MINUTE = { next: 40, answer: 20, auto: 10 };
-const MIN_ANSWER_MS = 900;
+// An answer sooner than this after the question was made is a bot. Kept short:
+// the time counts from when the server made it, so a quick tap on a
+// true/false question (plus the trip back) must still count.
+const MIN_ANSWER_MS = 400;
 const REPORTS_PER_DAY = 20;
 
 const bad = (msg) => new HttpsError('invalid-argument', msg);
@@ -146,6 +149,8 @@ export function learnFunctions({ db, renamer, personId, timeZone = 'America/New_
 
   // ---------- quizNext({ bank, skip }) ----------
   const quizNext = onCall({ maxInstances: 5, invoker: 'public' }, async (req) => {
+    // The app wakes this up before you need it (it sleeps when idle).
+    if (req.data?.warm === true) return { warm: true };
     const w = await who(req);
     const bank = String(req.data?.bank || '');
     if (!GAMES.includes(bank)) throw bad('Which game?');
@@ -219,6 +224,8 @@ export function learnFunctions({ db, renamer, personId, timeZone = 'America/New_
 
   // ---------- quizAnswer({ id, answer }) ----------
   const quizAnswer = onCall({ maxInstances: 5, invoker: 'public' }, async (req) => {
+    // The app wakes this up before you need it (it sleeps when idle).
+    if (req.data?.warm === true) return { warm: true };
     const w = await who(req);
     const id = String(req.data?.id || '').slice(0, 300);
     const answer = req.data?.answer;
@@ -425,6 +432,8 @@ export function learnFunctions({ db, renamer, personId, timeZone = 'America/New_
 
   // ---------- dailyAnswer({ day, answer }) ----------
   const dailyAnswer = onCall({ maxInstances: 5, invoker: 'public' }, async (req) => {
+    // The app wakes this up before you need it (it sleeps when idle).
+    if (req.data?.warm === true) return { warm: true };
     const w = await who(req);
     const now = Date.now();
     const day = String(req.data?.day || '');

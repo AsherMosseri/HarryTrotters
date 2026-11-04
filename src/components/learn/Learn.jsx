@@ -27,6 +27,7 @@ export const GAMES = [
 const byKey = Object.fromEntries(GAMES.map((g) => [g.key, g]));
 const pct = (c, a) => (a ? Math.round((c / a) * 100) : 0);
 const STREAK_MARKS = [3, 5, 10, 15, 20, 30, 50];
+const TEAM_GAMES = ['who', 'timeline'];
 
 function Stat({ label, children, sub }) {
   return (
@@ -125,7 +126,7 @@ function ActionBar({ q, result, busy, onNext, onSkip, nextRef }) {
             </span>
           )}
         </span>
-        <button className="btn primary lq-next" onClick={onNext} disabled={busy} ref={nextRef}>
+        <button className={`btn primary lq-next${busy ? ' is-loading' : ''}`} onClick={onNext} disabled={busy} aria-busy={busy || undefined} ref={nextRef}>
           Next <Icon name="chevron" size={16} />
         </button>
       </div>
@@ -167,13 +168,25 @@ function Game({ game, api, onBack, onProgress, today, setToday }) {
   // in the middle of the one you're answering.
   const apiRef = useRef(api);
   apiRef.current = api;
+  // The next question, asked for while you read the answer, so Next shows
+  // it at once instead of waiting on the server. (Not for Who did this? and
+  // Robot timeline: those keep one question open so Report still finds it.)
+  const ahead = useRef(null);
+
+  // The server's answer checker sleeps when nobody has used it for a while,
+  // and waking it takes seconds. Wake it now, while you read the question.
+  useEffect(() => {
+    if (game !== 'auto') apiRef.current.quizAnswer({ warm: true }).catch(() => {});
+  }, [game]);
 
   const load = useCallback(
     async (skip = false) => {
       setBusy(true);
       setError('');
       try {
-        const r = await apiRef.current.quizNext({ bank: game, ...(skip ? { skip: true } : {}) });
+        const early = !skip && ahead.current;
+        ahead.current = null;
+        const r = (early && (await early.catch(() => null))) || (await apiRef.current.quizNext({ bank: game, ...(skip ? { skip: true } : {}) }));
         setQ(r.question);
         setEmpty(r.empty || '');
         setResult(null);
@@ -227,6 +240,10 @@ function Game({ game, api, onBack, onProgress, today, setToday }) {
       const r = await apiRef.current.quizAnswer({ id: q.id, answer: given });
       guard.arm(AFTER_GRADE);
       setResult({ ...r, given });
+      if (!TEAM_GAMES.includes(game)) {
+        ahead.current = apiRef.current.quizNext({ bank: game });
+        ahead.current.catch(() => {});
+      }
       if (r.progress) {
         onProgress(r.progress);
         setStreak(r.progress.streak);
@@ -325,7 +342,7 @@ function Game({ game, api, onBack, onProgress, today, setToday }) {
         />
       ) : (
         <div className="lq-stage" key={q?.id || empty}>
-          {error && <p className="lq-error">{error}</p>}
+          {error && !q && <p className="lq-error">{error}</p>}
           {!q && !empty && !error && <div className="lq-loading">Loading a question…</div>}
           {empty && (
             <div className="lq-empty">
@@ -334,6 +351,11 @@ function Game({ game, api, onBack, onProgress, today, setToday }) {
             </div>
           )}
           {board}
+          {error && q && (
+            <p className="lq-error" role="alert">
+              {error}
+            </p>
+          )}
           {q && <ActionBar q={q} result={result} busy={busy} onNext={() => next()} onSkip={() => next(true)} nextRef={nextRef} />}
           {result && <Feedback result={result} q={q} onReport={report} reported={reported} />}
         </div>

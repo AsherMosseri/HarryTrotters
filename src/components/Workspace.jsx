@@ -517,6 +517,9 @@ function Contexts({ people, lab, lottery, controls, market, daily, petReq, child
   );
 }
 
+// When the daily question's checker was last woken (DailyCard).
+let dailyWarmAt = 0;
+
 export default function Workspace({ store, actor, rename, renames, shutdown, onPreview, preview, onExitPreview, onDenied }) {
   const [rawTasks, setRawTasks] = useState(null);
   const [people, setPeople] = useState([]);
@@ -1760,6 +1763,12 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
   const dailyCtx = useMemo(
     () => ({
       answer: (req) => store.dailyAnswer(req, actor),
+      // Wake the daily checker at most every few minutes (it sleeps when idle).
+      warm: () => {
+        if (Date.now() - dailyWarmAt < 4 * 60000) return;
+        dailyWarmAt = Date.now();
+        store.dailyAnswer({ warm: true }, actor).catch(() => {});
+      },
       subscribe: (day, cb) => store.subscribeDailyAnswer(day, actor.name, cb),
     }),
     [store, actor],
