@@ -1299,7 +1299,7 @@ export const { buy, joinTournament, marketManage, pet, payTournaments } = market
 export const { coinCheck } = coinCheckFunctions({ db, coinData, freshCoins, bankRef, cacheAge: () => Date.now() - coinCache.at });
 // Casino reports (functions/disputes.js): a teammate reports a result, team
 // management refunds by hand or dismisses it.
-export const { dispute, disputeDecide } = disputeFunctions({ db, coinData, notify, bankRef });
+export const { dispute, disputeDecide } = disputeFunctions({ db, coinData, notify, bankRef, owner: REQUESTS_TO });
 
 // Team events: the team's lab time fills a meter, tiers give pet gear.
 export const { petEvent, petEventTick } = petEventFunctions({

@@ -14,7 +14,7 @@ import { nameKey } from '../../../functions/shared/team.js';
 import { useMarket } from '../../market.js';
 import { glows } from '../../../functions/shared/market.js';
 import { PetBadge } from '../Pet.jsx';
-import { ReportDialog, reportInfo } from '../Disputes.jsx';
+import { REPORTS_TO, ReportDialog, reportInfo } from '../Disputes.jsx';
 
 export const QUICK_REACTIONS = ['👍', '✅', '😂', '❤️', '🔥', '👀'];
 // Commands that post a poll: the poll is the card (Trotbot's name on top).
@@ -574,7 +574,7 @@ export default function Message({
   const [picker, setPicker] = useState(false);
   const [removing, setRemoving] = useState(false);
   const [editPoll, setEditPoll] = useState(false);
-  // Report a casino result to team management (Disputes.jsx).
+  // Report a casino result to the owner, Asher (Disputes.jsx).
   const [reporting, setReporting] = useState(false);
   const canReport = !!reportInfo(m, actor.name, usePeople()?.rename) && !!api.dispute;
   const actionsRef = useRef(null);
@@ -910,7 +910,7 @@ export default function Message({
             </button>
           )}
           {canReport && (
-            <button onClick={() => setReporting(true)} title="Report this result to team management" aria-label="Report this result">
+            <button onClick={() => setReporting(true)} title={`Report this result to ${REPORTS_TO}`} aria-label="Report this result">
               <Icon name="flag" size={18} /> <span className="act-label">Report</span>
             </button>
           )}

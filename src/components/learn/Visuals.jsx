@@ -276,7 +276,9 @@ export function GearVisual({ q }) {
 // ---------- the hub (G3) ----------
 // The Control Hub or Expansion Hub photo with every port where it really is
 // (the electrical diagram's port positions). Tap a port, then plug in.
-export function HubPuzzle({ q, result, busy, onPick }) {
+// `ok()`: false for a moment after the screen changed (learn/tapGuard.js).
+const always = () => true;
+export function HubPuzzle({ q, result, busy, onPick, ok = always }) {
   const hub = PART_TYPES[q.hub] || PART_TYPES.controlHub;
   const device = PART_TYPES[q.device];
   const [sel, setSel] = useState(null);
@@ -307,7 +309,7 @@ export function HubPuzzle({ q, result, busy, onPick }) {
               key={p.id}
               className={`lq-port${state}`}
               style={{ left: `${(p.x / hub.w) * 100}%`, top: `${(p.y / hub.h) * 100}%` }}
-              onClick={() => !result && setSel(p.id)}
+              onClick={() => !result && ok() && setSel(p.id)}
               aria-label={label(p)}
               aria-pressed={sel === p.id}
               disabled={!!result}
@@ -315,14 +317,13 @@ export function HubPuzzle({ q, result, busy, onPick }) {
           );
         })}
       </div>
-      {!result && (
-        <div className="lq-plug">
-          <span className={port ? '' : 'muted'}>{port ? label(port) : 'Tap a port on the hub.'}</span>
-          <button className="btn primary" disabled={!port || busy} onClick={() => onPick(sel)}>
-            Plug in here
-          </button>
-        </div>
-      )}
+      {/* Stays after you answer (only disabled), so nothing below moves up under your finger. */}
+      <div className="lq-plug">
+        <span className={port ? '' : 'muted'}>{port ? label(port) : 'Tap a port on the hub.'}</span>
+        <button className="btn primary" disabled={!port || busy || !!result} onClick={() => onPick(sel)}>
+          Plug in here
+        </button>
+      </div>
     </div>
   );
 }
@@ -629,11 +630,12 @@ export const PersonChoice = ({ name }) => (
 );
 
 // ---------- robot timeline (G9) ----------
-export function Timeline({ q, result, busy, onSubmit }) {
+export function Timeline({ q, result, busy, onSubmit, ok = always }) {
   const [order, setOrder] = useState(() => q.items.map((i) => i.id));
   const byId = Object.fromEntries(q.items.map((i) => [i.id, i]));
   const shown = result ? result.order : order;
   const move = (i, d) => {
+    if (!ok()) return;
     const j = i + d;
     if (j < 0 || j >= order.length) return;
     const next = [...order];
@@ -656,25 +658,22 @@ export function Timeline({ q, result, busy, onSubmit }) {
                 <b>{it.label}</b>
                 {result && <span className="mono small muted">{result.dates?.[id]}</span>}
               </span>
-              {!result && (
-                <span className="lq-tl-moves">
-                  <button className="icon-btn" onClick={() => move(i, -1)} disabled={i === 0} aria-label="Earlier">
-                    <Icon name="chevronUp" size={18} />
-                  </button>
-                  <button className="icon-btn" onClick={() => move(i, 1)} disabled={i === order.length - 1} aria-label="Later">
-                    <Icon name="chevronDown" size={18} />
-                  </button>
-                </span>
-              )}
+              {/* Hidden, not removed, once checked: the rows keep their height. */}
+              <span className="lq-tl-moves" style={result ? { visibility: 'hidden' } : undefined}>
+                <button className="icon-btn" onClick={() => move(i, -1)} disabled={i === 0 || !!result} aria-label="Earlier">
+                  <Icon name="chevronUp" size={18} />
+                </button>
+                <button className="icon-btn" onClick={() => move(i, 1)} disabled={i === order.length - 1 || !!result} aria-label="Later">
+                  <Icon name="chevronDown" size={18} />
+                </button>
+              </span>
             </li>
           );
         })}
       </ol>
-      {!result && (
-        <button className="btn primary lq-wide" disabled={busy} onClick={() => onSubmit(order)}>
-          Check the order
-        </button>
-      )}
+      <button className="btn primary lq-wide" disabled={busy || !!result} onClick={() => onSubmit(order)}>
+        Check the order
+      </button>
     </div>
   );
 }

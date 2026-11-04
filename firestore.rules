@@ -299,11 +299,11 @@ service cloud.firestore {
     match /lottery/{id} {
       allow read: if isMember();
     }
-    // Casino reports (functions/disputes.js): the person who made one and team
-    // management read them; reports, their daily counters, and refund keys are
-    // written by the server only.
+    // Casino reports (functions/disputes.js): the person who made one and the
+    // owner (Asher, who handles them; not other team managers) read them;
+    // reports, their daily counters, and refund keys are written by the server only.
     match /disputes/{id} {
-      allow read: if isMember() && (isManager() || isMe(resource.data.by));
+      allow read: if isMember() && (isOwner() || isMe(resource.data.by));
       allow write: if false;
     }
     match /disputeDays/{id} {

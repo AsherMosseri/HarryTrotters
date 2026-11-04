@@ -28,7 +28,7 @@ import { asksOn } from '../../functions/shared/checkin.js';
 import * as market from '../../functions/shared/market.js';
 import { PERK_IDEAS } from '../../functions/shared/market.js';
 import { giftAccept, giftEnd, giftOffer, petEdit, petsIn } from '../../functions/shared/pets.js';
-import { MANAGER_NAMES, ROSTER, cleanName, sameName } from '../../functions/shared/team.js';
+import { ROSTER, cleanName, sameName } from '../../functions/shared/team.js';
 import * as chan from '../../functions/shared/channels.js';
 import { checkPicks, myPicks, personOptionId, usesVoteButton } from '../../functions/shared/polls.js';
 import { demoLife } from './demoLife.js';
@@ -1107,12 +1107,14 @@ export const demoStore = {
   async getMember() {
     // ?demo=member previews the app as a regular teammate; ?demo=signin shows
     // the sign-in screen (Asher "has" a password there, everyone else makes one);
-    // ?demo=pending, a new name waiting for team management to let it in.
+    // ?demo=pending, a new name waiting for team management to let it in;
+    // ?demo=manager, Sebastian: team management, but not the owner.
     const as = new URLSearchParams(location.search).get('demo');
     if (as === 'signin' && !sessionStorage.getItem('demo-signed-in')) return null;
     // Removed from the team (the preview's stand-in for the server deleting this device's sign-in).
     if (localStorage.getItem('demo-removed') === '1') return null;
     if (as === 'pending') return { name: 'Riley Chen', admin: false, via: 'password', pending: true };
+    if (as === 'manager') return { name: 'Sebastian Tolbert', admin: true, via: 'password' };
     // ?demo=newapp: an old Home Screen app still signed in with the team code
     // (Cooper, no password yet); ?demo=newapp-pw: Asher, who has one;
     // ?demo=newapp-offline: the server can't be reached.
@@ -1931,9 +1933,11 @@ export const demoStore = {
     return listen(() => cb({ ...(state.bank || {}) }));
   },
   // Casino reports, checked the way functions/disputes.js checks them
-  // (shared/disputes.js). Team management sees every report, others their own.
+  // (shared/disputes.js). The owner (Asher) sees every report, everyone else
+  // (Sebastian too, ?demo=manager) their own.
   subscribeDisputes(actor, cb) {
-    return listen(() => cb((state.disputes || []).filter((x) => actor.admin || x.by === actor.name).sort((a, b) => b.at - a.at)));
+    const owner = actor.admin && actor.name === REQUESTS_TO;
+    return listen(() => cb((state.disputes || []).filter((x) => owner || x.by === actor.name).sort((a, b) => b.at - a.at)));
   },
   async dispute(req, actor) {
     const now = Date.now();
@@ -1946,7 +1950,7 @@ export const demoStore = {
     if (problem) return note('Can’t report that.', problem);
     const id = dispute.reportId(msgId, me);
     const list = state.disputes || [];
-    if (list.some((x) => x.id === id)) return note('You already reported this one.', 'Team management will get to it.');
+    if (list.some((x) => x.id === id)) return note('You already reported this one.', `${REQUESTS_TO.split(' ')[0]} will get to it.`);
     const day = teamDay(now);
     if (list.filter((x) => x.by === me && x.day === day).length >= dispute.LIMITS.perDay)
       return note(`That’s ${dispute.LIMITS.perDay} reports today.`, 'Try again tomorrow.');
@@ -1957,7 +1961,7 @@ export const demoStore = {
     ];
     const first = me.split(' ')[0];
     state.inbox = [
-      ...MANAGER_NAMES.filter((n) => n !== me).map((to) => ({
+      ...[REQUESTS_TO].filter((n) => n !== me).map((to) => ({
         id: uid(),
         type: 'dispute',
         title: `${first} reported a ${dispute.GAME_LABEL[snapshot.game]} result`,
@@ -1975,7 +1979,7 @@ export const demoStore = {
   async disputeDecide(req, actor) {
     const now = Date.now();
     const note = (title, body = '') => ({ note: { title, body } });
-    if (!actor.admin) return note('Team management only.');
+    if (!actor.admin || actor.name !== REQUESTS_TO) return note(`Only ${REQUESTS_TO.split(' ')[0]} can do that.`);
     const { id, decision } = req;
     const resolution = String(req.note || '').trim().slice(0, dispute.LIMITS.resolution);
     const x = (state.disputes || []).find((y) => y.id === id);
@@ -2006,8 +2010,8 @@ export const demoStore = {
         ...(refund && { icon: '↩️' }),
         title: refund ? `${refund} coins refunded` : 'Your report was looked at',
         body: refund
-          ? `Team management refunded your ${dispute.GAME_LABEL[x.cmd] || 'casino'} result.${resolution ? ` ${resolution}` : ''}`
-          : `Team management kept the result as it was.${resolution ? ` ${resolution}` : ''}`,
+          ? `${REQUESTS_TO.split(' ')[0]} refunded your ${dispute.GAME_LABEL[x.cmd] || 'casino'} result.${resolution ? ` ${resolution}` : ''}`
+          : `${REQUESTS_TO.split(' ')[0]} kept the result as it was.${resolution ? ` ${resolution}` : ''}`,
         open: 'disputes:',
         at: now,
         read: false,

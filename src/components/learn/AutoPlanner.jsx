@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '../shell/icons.jsx';
 import { AUTO, simulate } from '../../../functions/shared/autoPath.js';
 import { animOn, celebrate } from '../../motion.js';
+import { AFTER_GRADE, AFTER_NEW } from './tapGuard.js';
 
 const F = AUTO.field;
 const rect = (r) => ({ x: r.x0, y: r.y0, width: r.x1 - r.x0, height: r.y1 - r.y0 });
@@ -66,7 +67,9 @@ function Field({ children, svgRef, onDown, onMove, onUp }) {
 
 const fmt = (t) => `0:${String(Math.max(0, Math.ceil(30 - t))).padStart(2, '0')}`;
 
-export default function AutoPlanner({ api, onResult }) {
+// `guard` (learn/tapGuard.js): ignores taps for a moment after the result
+// shows, so a double tap on Run it can't throw the run away.
+export default function AutoPlanner({ api, onResult, guard }) {
   const [start, setStart] = useState(null);
   const [path, setPath] = useState([]); // [[x, y]...] in inches, first is the start
   const [strokes, setStrokes] = useState([]); // path lengths after each drag, for undo
@@ -130,16 +133,20 @@ export default function AutoPlanner({ api, onResult }) {
     setStrokes([]);
   };
   const reset = () => {
+    if (guard && !guard.ok()) return;
     setRun(null);
     setReplayAt(null);
     if (start) setPath([path[0]]);
     setStrokes([]);
   };
   const score = async () => {
+    if (busy || (guard && !guard.ok())) return;
+    guard?.arm(AFTER_NEW);
     setBusy(true);
     setError('');
     try {
       const r = await api.autoRun({ path });
+      guard?.arm(AFTER_GRADE);
       setRun(r);
       onResult?.(r);
       if (r.newBest && r.score > 0) celebrate({ el: svgRef.current, count: 22 });
@@ -271,7 +278,8 @@ export default function AutoPlanner({ api, onResult }) {
         {error && <p className="lq-error">{error}</p>}
         <div className="lq-auto-tools">
           {run ? (
-            <button className="btn primary" onClick={reset}>
+            // On the left, away from where Run it was.
+            <button className="btn primary lq-again" onClick={reset}>
               Draw another
             </button>
           ) : (
