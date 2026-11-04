@@ -452,6 +452,10 @@ const PATHS = {
   // Game controls (Tetris, Minesweeper, Battleship).
   rotateCw: <path d="M15.5 10a5.5 5.5 0 1 1-1.6-3.9M14.5 2.8v3.6h-3.6" />,
   rotateCcw: <path d="M4.5 10a5.5 5.5 0 1 0 1.6-3.9M5.5 2.8v3.6h3.6" />,
+  // A game's big view (four corners out).
+  expand: <path d="M3.5 8V3.5H8M12 3.5h4.5V8M16.5 12v4.5H12M8 16.5H3.5V12" />,
+  // Battleship: a boat.
+  ship: <path d="M3 12.5h14l-2.2 3.5H5.2zM6 12.5V9h8v3.5M8.5 9V5.5h3V9M10 3v2.5" />,
   left: <path d="M12.5 4.5 7 10l5.5 5.5" />,
   right: <path d="M7.5 4.5 13 10l-5.5 5.5" />,
   down: <path d="M4.5 7.5 10 13l5.5-5.5" />,

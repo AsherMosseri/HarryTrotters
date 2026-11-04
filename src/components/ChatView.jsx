@@ -1,5 +1,5 @@
 import { renameMessage, sentByMe } from '../people.js';
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { SUBTEAMS, SUBTEAM_COLORS } from '../config.js';
 import { useControls } from '../controls.js';
 import { Avatar, Nameplate, Overlay, PlusIcon, usePeople } from './common.jsx';
@@ -13,9 +13,16 @@ import { useDraftKeys } from '../drafts.js';
 import { ChannelDialog, ChannelIcon, MembersPanel, NewDmDialog, NotifyMenu, PinnedBar, PinsPanel, SearchPanel, slugChannel } from './chat/Panels.jsx';
 import { Icon } from './shell/icons.jsx';
 import { BotReplies, ChatAd, chatAdSpots, useAds } from './Ads.jsx';
+import GameView from './chat/GameView.jsx';
+import { onOpenGameView } from './chat/gameView.js';
+import { MULTI, isLive } from '../../functions/shared/arcade.js';
 
 const GROUP_MINUTES = 5;
 const PAGE = 60;
+// Within this many px of the bottom counts as at the bottom (new messages follow).
+const BOTTOM_PX = 32;
+// After a tap on a card, how long the list keeps still (ms).
+const CARD_HOLD = 4000;
 const NONE = [];
 
 // Messages by id, newest copy winning, oldest first.
@@ -159,7 +166,8 @@ export default function ChatView({
   const [older, setOlder] = useState({ key: current.key, msgs: [], done: false });
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [viewing, setViewing] = useState(null);
-  const [newBelow, setNewBelow] = useState(false);
+  // How many messages came in below while you were scrolled up (0: none; the pill shows the count).
+  const [newBelow, setNewBelow] = useState(0);
   const [side, setSide] = useState(() =>
     !embedded && typeof matchMedia === 'function' && matchMedia('(min-width: 1200px)').matches ? 'members' : null,
   );
@@ -178,6 +186,18 @@ export default function ChatView({
   const [pinAt, setPinAt] = useState(0);
   const list = useRef(null);
   const atBottom = useRef(true);
+  // No automatic scrolling while a finger is on the list (or its fling is
+  // still going), for a few seconds after a tap on a card (playing a game), or
+  // while the game view is open: then new messages only light up the pill.
+  const hold = useRef({ touching: false, until: 0 });
+  const viewOpen = useRef(false);
+  // The message at the top of the list and how far below the top edge it was:
+  // when things above it change size (a game card growing, a photo loading),
+  // the list moves by as much, so what you're looking at stays put. (Done here
+  // rather than with CSS scroll anchoring, which Safari doesn't have.)
+  const anchor = useRef(null);
+  // Set before the app scrolls the list itself, so onScroll can tell.
+  const selfScroll = useRef(false);
   const lastCount = useRef(0);
   const lastNewest = useRef(null);
   const pendingJump = useRef(null);
@@ -196,15 +216,19 @@ export default function ChatView({
   }
   // The live window holds the newest PAGE messages, so as new ones come in the
   // oldest slide out of it. With older pages loaded, those are kept with the
-  // pages, or they'd fall into a gap between the pages and the window.
+  // pages, or they'd fall into a gap between the pages and the window. They're
+  // kept too while you're scrolled up (what you're reading doesn't vanish), and
+  // a game still being played always is (in a busy #arcade, a long Battleship
+  // game used to drop out of the chat mid-game).
   const live = messages[conv.key] || NONE;
   const [seenLive, setSeenLive] = useState({ key: conv.key, msgs: live });
   if (seenLive.key !== conv.key || seenLive.msgs !== live) {
     setSeenLive({ key: conv.key, msgs: live });
-    if (seenLive.key === conv.key && older.key === conv.key && older.msgs.length && live.length >= PAGE) {
+    if (seenLive.key === conv.key && older.key === conv.key && live.length >= PAGE) {
       const ids = new Set(live.map((m) => m.id));
       const slid = seenLive.msgs.filter((m) => !ids.has(m.id) && m.at < live[0].at);
-      if (slid.length) setOlder((o) => (o.key === conv.key ? { ...o, msgs: mergeMessages(o.msgs, slid) } : o));
+      const keep = older.msgs.length || !atBottom.current || slid.some((m) => MULTI.includes(m.cmd?.name) && isLive(m.cmd.status));
+      if (slid.length && keep) setOlder((o) => (o.key === conv.key ? { ...o, msgs: mergeMessages(o.msgs, slid) } : o));
     }
   }
   // Older pages are fetched once, so they also get a live copy from the oldest
@@ -278,6 +302,54 @@ export default function ChatView({
     el.scrollTo({ top: Math.max(0, top), behavior: smooth ? 'smooth' : 'auto' });
   };
 
+  const holding = () => viewOpen.current || hold.current.touching || performance.now() < hold.current.until;
+  const distance = (el) => el.scrollHeight - el.scrollTop - el.clientHeight;
+  const setTop = (el, top) => {
+    if (Math.abs(el.scrollTop - top) < 1) return;
+    selfScroll.current = true;
+    el.scrollTop = top;
+  };
+  const toBottom = (el) => {
+    setTop(el, el.scrollHeight - el.clientHeight);
+    atBottom.current = true;
+    setNewBelow(0);
+  };
+  // The first message still showing at the top (its bottom below the list's top edge).
+  const takeAnchor = () => {
+    const el = list.current;
+    if (!el) return;
+    const nodes = el.querySelectorAll('.msg[id]');
+    const top = el.getBoundingClientRect().top;
+    let lo = 0;
+    let hi = nodes.length - 1;
+    let k = -1;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      if (nodes[mid].getBoundingClientRect().bottom > top) {
+        k = mid;
+        hi = mid - 1;
+      } else lo = mid + 1;
+    }
+    anchor.current = k >= 0 ? { id: nodes[k].id, off: nodes[k].getBoundingClientRect().top - top } : null;
+  };
+  const keepAnchor = () => {
+    const el = list.current;
+    const a = anchor.current;
+    const node = a && document.getElementById(a.id);
+    if (!el || !node || !el.contains(node)) return;
+    const moved = node.getBoundingClientRect().top - el.getBoundingClientRect().top - a.off;
+    if (Math.abs(moved) >= 1) setTop(el, el.scrollTop + moved);
+  };
+  // After anything changed size: at the bottom (and free to move), stay there;
+  // otherwise keep what you're looking at where it is.
+  const settle = () => {
+    const el = list.current;
+    if (!el) return;
+    if (atBottom.current && !holding()) return toBottom(el);
+    keepAnchor();
+    atBottom.current = distance(el) < BOTTOM_PX;
+  };
+
   // Opening a conversation: unread messages start at the red "New" line near
   // the top, so you read down from where you left off (like Discord).
   // Nothing new: the newest message, at the bottom.
@@ -286,21 +358,23 @@ export default function ChatView({
     if (!el) return;
     const sep = el.querySelector('.new-sep');
     if (sep) {
+      selfScroll.current = true;
       scrollListTo(sep, 56);
-      const below = el.scrollHeight - el.scrollTop - el.clientHeight > 120;
+      const below = distance(el) >= BOTTOM_PX;
       atBottom.current = !below;
-      setNewBelow(below);
-    } else {
-      el.scrollTop = el.scrollHeight;
-      atBottom.current = true;
-    }
+      const unread = all.filter((m) => m.at > newSince && m.at <= newUntil && !sentByMe(m, actor)).length;
+      setNewBelow(below ? Math.max(1, unread) : 0);
+    } else toBottom(el);
+    takeAnchor();
   };
 
   useLayoutEffect(() => {
     setSelected(null);
     setPicks(null);
-    setNewBelow(false);
+    setNewBelow(0);
     setNotifyOpen(false);
+    setGameView(null);
+    viewOpen.current = false;
     lastCount.current = all.length;
     lastNewest.current = all[all.length - 1]?.id ?? null;
     if (all.length) showStart();
@@ -309,53 +383,116 @@ export default function ChatView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conv.key]);
 
-  // Follow new messages if already at the bottom (or if they're mine). "New"
-  // means a different newest message: the live window is capped at PAGE, so
-  // the count stays the same once a channel is busy.
+  // Follow new messages only when you're at the bottom and not busy with
+  // something (or when they're yours). Scrolled up, nothing moves: the pill
+  // counts them. "New" means a different newest message: the live window is
+  // capped at PAGE, so the count stays the same once a channel is busy.
   useLayoutEffect(() => {
     const el = list.current;
     if (!el) return;
     const newest = all[all.length - 1];
     const firstLoad = lastCount.current === 0 && all.length > 0;
     const newestChanged = !!newest && newest.id !== lastNewest.current;
+    const was = all.findIndex((m) => m.id === lastNewest.current);
     lastCount.current = all.length;
     lastNewest.current = newest?.id ?? null;
     // Messages arriving for a conversation that just opened empty.
     if (firstLoad) showStart();
-    else if (!newestChanged) {
-      // Same messages, changed (an edit, a reaction, a link preview): stay at the bottom.
-      if (atBottom.current) el.scrollTop = el.scrollHeight;
-    } else if (atBottom.current || sentByMe(newest, actor)) {
-      el.scrollTop = el.scrollHeight;
-      atBottom.current = true;
-      setNewBelow(false);
-    } else setNewBelow(true);
+    // Same messages, changed (an edit, a reaction, a game's move): stay put.
+    else if (!newestChanged) settle();
+    else if (sentByMe(newest, actor) && !viewOpen.current) toBottom(el);
+    else if (atBottom.current && !holding()) toBottom(el);
+    else {
+      keepAnchor();
+      atBottom.current = distance(el) < BOTTOM_PX;
+      const added = (was >= 0 ? all.slice(was + 1) : [newest]).filter((m) => !sentByMe(m, actor)).length;
+      if (!atBottom.current && added) setNewBelow((n) => n + added);
+    }
     if (pendingJump.current) jumpTo(pendingJump.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [all, actor]);
 
-  // At the bottom, stay there when things grow later: photos, GIFs, and videos
-  // finishing loading, or the list getting shorter (a reply bar, the keyboard).
+  // Things changing size later: photos, GIFs, and videos finishing loading, a
+  // game card growing, the list getting shorter (a reply bar, the keyboard).
+  // At the bottom, stay there; scrolled up, what you're looking at stays put.
+  const sizes = useRef(null);
   useEffect(() => {
     const el = list.current;
-    if (!el) return;
-    const stick = () => atBottom.current && (el.scrollTop = el.scrollHeight);
-    el.addEventListener('load', stick, true);
-    el.addEventListener('loadedmetadata', stick, true);
-    const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(stick) : null;
+    if (!el) return undefined;
+    const fit = () => settle();
+    el.addEventListener('load', fit, true);
+    el.addEventListener('loadedmetadata', fit, true);
+    const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(fit) : null;
     ro?.observe(el);
+    sizes.current = ro;
+    // A finger on the list: hands off until it lifts (and its fling stops).
+    const down = () => (hold.current.touching = true);
+    const up = () => {
+      if (!hold.current.touching) return;
+      hold.current.touching = false;
+      hold.current.until = Math.max(hold.current.until, performance.now() + 350);
+    };
+    el.addEventListener('touchstart', down, { passive: true });
+    window.addEventListener('touchend', up, { passive: true });
+    window.addEventListener('touchcancel', up, { passive: true });
     return () => {
-      el.removeEventListener('load', stick, true);
-      el.removeEventListener('loadedmetadata', stick, true);
+      el.removeEventListener('load', fit, true);
+      el.removeEventListener('loadedmetadata', fit, true);
+      el.removeEventListener('touchstart', down);
+      window.removeEventListener('touchend', up);
+      window.removeEventListener('touchcancel', up);
       ro?.disconnect();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  // Every message on screen is watched for size changes (observing one again is a no-op).
+  useLayoutEffect(() => {
+    const ro = sizes.current;
+    if (!ro || !list.current) return;
+    for (const node of list.current.children) ro.observe(node);
+  });
 
   const onScroll = () => {
     const el = list.current;
-    atBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
-    if (atBottom.current) setNewBelow(false);
+    const mine = selfScroll.current;
+    selfScroll.current = false;
+    atBottom.current = distance(el) < BOTTOM_PX;
+    if (atBottom.current) setNewBelow(0);
+    takeAnchor();
+    // A fling goes on after the finger lifts: wait for it to stop.
+    if (!mine && !hold.current.touching) hold.current.until = Math.max(hold.current.until, performance.now() + 150);
   };
+  // A tap on a game card (or any card): hands off for a few seconds.
+  const onListPointerDown = (e) => {
+    if (e.target.closest?.('.cmd-card')) hold.current.until = Math.max(hold.current.until, performance.now() + CARD_HOLD);
+  };
+
+  // The game view (GameView.jsx), opened from a card. The list stays exactly
+  // where it was underneath, and is back there when it closes.
+  const [gameView, setGameView] = useState(null);
+  useEffect(
+    () =>
+      onOpenGameView((o) => {
+        if (o.conv !== conv.key) return;
+        takeAnchor();
+        viewOpen.current = true;
+        setGameView(o);
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [conv.key],
+  );
+  const closeGameView = useCallback(() => {
+    setGameView(null);
+    requestAnimationFrame(() => {
+      viewOpen.current = false;
+      const el = list.current;
+      if (!el) return;
+      keepAnchor();
+      atBottom.current = distance(el) < BOTTOM_PX;
+      if (atBottom.current) setNewBelow(0);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const loadOlder = async () => {
     if (!all.length) return [];
@@ -367,7 +504,7 @@ export default function ChatView({
     // A short page was the last one: the button goes away.
     setOlder((o) => (o.key === key ? { key, msgs: mergeMessages(more, o.msgs), done: more.length < PAGE } : o));
     setLoadingOlder(false);
-    requestAnimationFrame(() => (el.scrollTop = el.scrollHeight - before));
+    requestAnimationFrame(() => setTop(el, el.scrollHeight - before));
     return more;
   };
 
@@ -676,7 +813,7 @@ export default function ChatView({
             onAll={() => setSide('pins')}
           />
         )}
-        <div className="msg-list" ref={list} onScroll={onScroll}>
+        <div className="msg-list" ref={list} onScroll={onScroll} onPointerDown={onListPointerDown}>
           {/* Pretend ads, every N messages (Asher's Ads page). */}
           {live.length >= PAGE && !older.done && (
             <button className="btn ghost load-older" onClick={loadOlder} disabled={loadingOlder}>
@@ -779,15 +916,15 @@ export default function ChatView({
           <BotReplies conv={conv.key} />
           {myNotes.filter((n) => !shownMessages.length || n.at > shownMessages[shownMessages.length - 1].at).map(noteView)}
         </div>
-        {newBelow && (
+        {newBelow > 0 && (
           <button
             className="new-below"
             onClick={() => {
-              list.current.scrollTop = list.current.scrollHeight;
-              setNewBelow(false);
+              hold.current.until = 0;
+              toBottom(list.current);
             }}
           >
-            New messages ↓
+            {newBelow} new message{newBelow === 1 ? '' : 's'} ↓
           </button>
         )}
         <TypingLine names={typing} />
@@ -867,6 +1004,7 @@ export default function ChatView({
         )}
       </section>
 
+      {gameView && <GameView conv={gameView.conv} m={gameView.m} api={api} actor={actor} onClose={closeGameView} />}
       {side === 'members' && <MembersPanel names={memberNames} onPerson={onPerson} onClose={() => setSide(null)} />}
       {side === 'pins' && feat('pins') && (
         <PinsPanel conv={conv} api={api} ctx={ctx} canUnpin={canPost || isManager} onJump={(id) => openAt(conv.key, id)} onClose={() => setSide(null)} />

@@ -87,7 +87,7 @@ export const COMMANDS = [
   { name: 'heist', group: 'arcade', args: 'bet', desc: 'Plan a heist: more crew, better odds', server: true },
   { name: 'tetris', bare: true, group: 'arcade', args: '@person | bot | sprint', desc: 'Tetris: alone, race someone live, race Trotbot, or a tournament', server: true },
   { name: 'minesweep', bare: true, group: 'arcade', args: '@person | bot | expert', desc: 'Minesweeper: alone, race someone on the same board, Trotbot, or a tournament', server: true },
-  { name: 'battleship', group: 'arcade', args: '@person bet', desc: 'Battleship, turn by turn (anyone, or @Trotbot)', server: true },
+  { name: 'battleship', group: 'arcade', args: '@person bet hitagain', desc: 'Battleship (anyone, or @Trotbot). Add hitagain: a hit gets another turn', server: true },
 
   { name: 'task', group: 'team', args: 'title @person friday !high', desc: 'Make a task' },
   { name: 'mytasks', group: 'team', args: '', desc: 'Your open tasks (check them off right here)' },

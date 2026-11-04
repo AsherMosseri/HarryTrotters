@@ -2576,6 +2576,9 @@ export const demoStore = {
   subscribeSince(conv, at, cb) {
     return listen(() => cb([...((state.chat || {})[conv] || [])].filter((m) => m.at >= at).sort((a, b) => a.at - b.at)));
   },
+  subscribeMessage(conv, id, cb) {
+    return listen(() => cb(((state.chat || {})[conv] || []).find((m) => m.id === id) || null));
+  },
   async recentMessages(conv, count) {
     return [...((state.chat || {})[conv] || [])].sort((a, b) => b.at - a.at).slice(0, count);
   },
