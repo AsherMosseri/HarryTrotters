@@ -265,6 +265,7 @@ export function ledgerItems(name, ledger = []) {
         amount: x.amount,
         icon: x.amount >= 0 ? '⭐' : '⚠️',
         label: x.note || (x.amount >= 0 ? 'Bonus' : 'Taken away'),
+        ...(x.reverses ? { reverses: String(x.reverses) } : {}),
       });
   }
   for (const b of batches.values()) {
@@ -577,3 +578,8 @@ export function prizeEntry(name, { what, amount, label }, { ledger, gameCap, now
   }
   return { error: 'Unknown prize.' };
 }
+
+// A history line's identity, for the owner's Reverse (CoinsEveryone.jsx): a
+// grant that reverses a line stores this key, so the line shows as reversed
+// and can't be reversed twice by mistake.
+export const historyKey = (x) => `${x.kind || ''}|${x.at || 0}|${x.amount || 0}|${String(x.label || '').slice(0, 120)}`;

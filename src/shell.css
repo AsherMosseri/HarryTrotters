@@ -5173,3 +5173,12 @@ button.bs-cell:focus-visible { outline: 2px solid var(--accent); outline-offset:
 .arc-betpill.none { background: transparent; }
 .arc-betrow { display: flex; justify-content: flex-end; }
 .gv-body .arc-vs .arc-betpill { height: 28px; font-size: 14px; }
+
+/* The owner's Reverse: history lines are tappable, and a reversed one says so. */
+.coins-history li.cv-rev { cursor: pointer; border-radius: 8px; }
+@media (hover: hover) and (pointer: fine) { .coins-history li.cv-rev:hover { background: var(--surface-2); } }
+.coins-history li.cv-rev:active { background: var(--surface-2); }
+.coins-history li.is-reversed b { text-decoration: line-through; opacity: 0.6; }
+.cv-reversed { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px; font-size: 11px; font-weight: 650; vertical-align: 1px; color: var(--muted); background: var(--surface-2); border: 1px solid var(--border); }
+.cv-reversed.busy { font-style: italic; }
+.cv-rev-hint { margin: 4px 0 2px; }

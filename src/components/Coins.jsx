@@ -4,7 +4,7 @@ import { mondayOf } from '../milestones.js';
 import { relTime, useEscape } from '../util.js';
 import { Avatar, CloseIcon, Overlay } from './common.jsx';
 import { Icon } from './shell/icons.jsx';
-import { CompareWithServer, EveryoneCoins, StaleBanner } from './CoinsEveryone.jsx';
+import { CompareWithServer, EveryoneCoins, ReversedTag, StaleBanner, reverseProps, useReverse } from './CoinsEveryone.jsx';
 import { MyReports } from './Disputes.jsx';
 import { LoansPanel } from './Loans.jsx';
 
@@ -28,6 +28,8 @@ const whenAt = (at) => new Date(at).toLocaleString(undefined, { month: 'short', 
 export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onMarket, onClose, isManager = false, onCheck, stale, onRefresh, disputes = [], initialTab = 'wallet', onAdjust, loans = null, loanFocus = null, onToast }) {
   useEscape(onClose);
   const [tab, setTab] = useState(initialTab);
+  // The owner can reverse a line of their own history (CoinsEveryone.jsx useReverse).
+  const rev = useReverse(actor.name, wallet.history, onAdjust);
   // Opened again from a notification while it's already open.
   useEffect(() => setTab(initialTab), [initialTab]);
   const [range, setRange] = useState('week');
@@ -117,16 +119,25 @@ export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onMarket
           <StaleBanner stale={stale} onRefresh={onRefresh} />
           <div className="coins-body">
             {tab === 'everyone' && isManager && onCheck && <EveryoneCoins roster={roster} data={data} cfg={cfg} onCheck={onCheck} onAdjust={onAdjust} />}
+            {tab === 'wallet' && onAdjust && wallet.history.length > 0 && (
+              <p className="muted tiny cv-rev-hint">Tap a line to reverse it: a loss is refunded, a gain is taken away.</p>
+            )}
             {tab === 'wallet' &&
               (wallet.history.length ? (
                 <ul className="coins-history">
                   {wallet.history.map((x, i) => (
-                    <li key={`${x.kind}-${x.at}-${i}`} className={x.held ? 'held' : undefined}>
+                    <li
+                      key={`${x.kind}-${x.at}-${i}`}
+                      className={`${x.held ? 'held' : ''}${rev.can(x) ? ' cv-rev' : ''}${rev.isReversed(x) ? ' is-reversed' : ''}`}
+                      {...reverseProps(rev, x)}
+                    >
                       <span className="coins-icon" aria-hidden="true">
                         {x.icon}
                       </span>
                       <span className="grow">
-                        <span className="coins-label">{x.label}</span>
+                        <span className="coins-label">
+                          {x.label} <ReversedTag rev={rev} x={x} />
+                        </span>
                         <span className="muted tiny">
                           {relTime(x.at)} · <span className="mono">{whenAt(x.at)}</span>
                           {x.capped ? ` · counted ${cfg.dayCap} h max a day` : ''}
