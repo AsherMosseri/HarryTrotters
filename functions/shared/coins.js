@@ -16,6 +16,7 @@ import { mergedMs } from './hours.js';
 import { nameKey } from './team.js';
 import { BOT, GROUP_MAX } from './groups.js';
 import { secureRandom } from './rng.js';
+import { coinsText } from './coinText.js';
 
 // The team day 3.0's earning rules start (4 an hour in 15-minute steps, cut
 // at midnight, at most tasksPerDay paid tasks a day). Earlier days pay as
@@ -531,8 +532,8 @@ export function giftEntry(from, { to, amount, note }, { roster, balance, now = D
   if (!roster.includes(to)) return { error: 'Who’s that?' };
   if (to === from) return { error: 'That’s you.', body: 'Your coins are already yours.' };
   if (!Number.isInteger(n) || n < 1) return { error: 'Send at least 1 coin.' };
-  if (n > GIFT_MAX) return { error: 'That’s a lot.', body: `Up to ${GIFT_MAX} at a time.` };
-  if (n > balance) return { error: `You only have ${balance} coins.` };
+  if (n > GIFT_MAX) return { error: 'That’s a lot.', body: `Up to ${coinsText(GIFT_MAX)} at a time.` };
+  if (n > balance) return { error: `You only have ${coinsText(balance)} coins.` };
   return { type: 'gift', from, to, amount: n, note: text(note, 140).trim(), at: now };
 }
 
@@ -555,8 +556,8 @@ export function groupGiftEntries(from, { people = [], amount, note, batch, group
   const total = entries.reduce((t, e) => t + e.amount, 0);
   if (total > balance)
     return {
-      error: `That’s ${total} coins (${entries[0].amount} each for ${entries.length} ${entries.length === 1 ? 'person' : 'people'}).`,
-      body: `You have ${balance}. Nothing was sent.`,
+      error: `That’s ${coinsText(total)} coins (${coinsText(entries[0].amount)} each for ${entries.length} ${entries.length === 1 ? 'person' : 'people'}).`,
+      body: `You have ${coinsText(balance)}. Nothing was sent.`,
     };
   return { entries, total };
 }

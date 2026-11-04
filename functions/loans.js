@@ -30,6 +30,7 @@ import { logger } from 'firebase-functions';
 import * as L from './shared/loans.js';
 import { cleanName, memberOk } from './shared/team.js';
 import { teamDay } from './shared/coins.js';
+import { coinsText } from './shared/coinText.js';
 
 const OPEN_FN = { maxInstances: 5, invoker: 'public' };
 // The time everything here goes by (tests move it to a due date).
@@ -135,7 +136,7 @@ export function loanFunctions({ db, coinData, freshCoins, bankRef, notify, owner
       {
         to: bank ? boss : lender,
         type: 'loan',
-        title: bank ? `${first(me)} asked the bank for ${t.terms.amount} coins` : `${first(me)} asked you for a loan`,
+        title: bank ? `${first(me)} asked the bank for ${coinsText(t.terms.amount)} coins` : `${first(me)} asked you for a loan`,
         body: L.termsText(t.terms),
         open: `loans:${res.id}`,
         by: me,
@@ -254,8 +255,8 @@ export function loanFunctions({ db, coinData, freshCoins, bankRef, notify, owner
         {
           to: res.loan.lender,
           type: 'loan',
-          title: res.left ? `${first(me)} paid back ${res.paid}` : `${first(me)} paid off their loan`,
-          body: res.left ? `${res.left} left.` : `${res.paid} coins, all done.`,
+          title: res.left ? `${first(me)} paid back ${coinsText(res.paid)}` : `${first(me)} paid off their loan`,
+          body: res.left ? `${coinsText(res.left)} left.` : `${coinsText(res.paid)} coins, all done.`,
           open: `loans:${id}`,
           by: me,
         },
@@ -292,7 +293,7 @@ export function loanFunctions({ db, coinData, freshCoins, bankRef, notify, owner
         // lender's own coins (the bank just makes it).
         if (lender) {
           const have = await balanceOf(lender, data, lenderBank.data() || {});
-          if (have < r.give) return note(`That gives ${r.give} back to ${first(borrower)}. You only have ${Math.max(0, have)}.`);
+          if (have < r.give) return note(`That gives ${coinsText(r.give)} back to ${first(borrower)}. You only have ${coinsText(Math.max(0, have))}.`);
           touch(tx, lender, lenderBank, now);
         }
         tx.set(coinsRef(L.entryId(id, action, loan.moves || 0)), L.loanEntry({ ...loan, borrower, lender }, action, r.give, now));
@@ -311,7 +312,7 @@ export function loanFunctions({ db, coinData, freshCoins, bankRef, notify, owner
         body:
           action === 'forgive'
             ? res.give
-              ? `${res.give} coins back. You’re unlocked.`
+              ? `${coinsText(res.give)} coins back. You’re unlocked.`
               : 'You don’t owe the rest.'
             : `Now due ${new Date(res.loan.dueAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone })}.`,
         open: `loans:${id}`,
@@ -373,7 +374,7 @@ export function loanFunctions({ db, coinData, freshCoins, bankRef, notify, owner
             to: lender,
             type: 'loan',
             title: `${first(borrower)}’s loan was due`,
-            body: `${c.take} coins came back to you.`,
+            body: `${coinsText(c.take)} coins came back to you.`,
             open: `loans:${id}`,
           });
         return;
@@ -384,7 +385,7 @@ export function loanFunctions({ db, coinData, freshCoins, bankRef, notify, owner
           to: borrower,
           type: 'loan',
           title: `Your loan is due in ${Math.max(1, Math.round((loan.dueAt - now) / L.DAY))} day${Math.round((loan.dueAt - now) / L.DAY) > 1 ? 's' : ''}`,
-          body: `${L.leftOf(loan, now)} left to pay ${L.lenderName(loan)}. Whatever is left is taken on the due date.`,
+          body: `${coinsText(L.leftOf(loan, now))} left to pay ${L.lenderName(loan)}. Whatever is left is taken on the due date.`,
           open: `loans:${id}`,
         });
         return;

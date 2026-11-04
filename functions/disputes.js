@@ -20,6 +20,7 @@ import { logger } from 'firebase-functions';
 import * as d from './shared/disputes.js';
 import { memberOk, nameKey } from './shared/team.js';
 import { teamDay } from './shared/coins.js';
+import { coinsText } from './shared/coinText.js';
 
 const OPEN = { maxInstances: 5, invoker: 'public' };
 
@@ -116,7 +117,7 @@ export function disputeFunctions({ db, coinData, notify, bankRef, owner }) {
       const x = snap.data();
       if (!x) return note('That report is gone.');
       if (x.status !== 'open')
-        return note('Already handled.', x.status === 'refunded' ? `Refunded ${x.refund} coins.` : 'It was dismissed.');
+        return note('Already handled.', x.status === 'refunded' ? `Refunded ${coinsText(x.refund)} coins.` : 'It was dismissed.');
       const now = Date.now();
       const who = data.rename(x.by);
       if (decision === 'dismiss') {
@@ -153,7 +154,7 @@ export function disputeFunctions({ db, coinData, notify, bankRef, owner }) {
         to: out.x.by,
         type: 'dispute',
         ...(out.status === 'refunded' && { icon: '↩️' }),
-        title: out.status === 'refunded' ? `${out.refund} coins refunded` : 'Your report was looked at',
+        title: out.status === 'refunded' ? `${coinsText(out.refund)} coins refunded` : 'Your report was looked at',
         body:
           out.status === 'refunded'
             ? `${ownerFirst} refunded your ${d.GAME_LABEL[out.x.cmd] || 'casino'} result.${resolution ? ` ${resolution}` : ''}`

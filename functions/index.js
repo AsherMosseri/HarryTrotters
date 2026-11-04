@@ -60,6 +60,7 @@ import { learnFunctions } from './learn.js';
 import { channelFunctions } from './channels.js';
 import { loanFunctions } from './loans.js';
 import { coinRequestFunctions } from './coinRequests.js';
+import { coinsText } from './shared/coinText.js';
 
 // Functions run next to the database. The deploy workflow writes location.json
 // from the database's location; nam5 (the US multi-region) pairs with us-central1.
@@ -1722,7 +1723,7 @@ export const play = onCall({ maxInstances: 5, invoker: 'public' }, withBalance(a
       const n = words[0] ? casino.parseBet(words[0], Math.floor(balance / casino.TICKET)) : 0;
       if (words[0] && (!n || n < 1)) return note('How many tickets?', `Tickets are ${casino.TICKET} coins. Try: /lottery 3`);
       const cost = (n || 0) * casino.TICKET;
-      if (cost > balance) return note(`That’s ${cost} coins. You have ${balance}.`);
+      if (cost > balance) return note(`That’s ${coinsText(cost)} coins. You have ${coinsText(balance)}.`);
       const tickets = { ...(lot.tickets || {}) };
       if (n) tickets[me] = (tickets[me] || 0) + n;
       const pot = (lot.pot || 0) + cost;
@@ -1754,8 +1755,8 @@ export const play = onCall({ maxInstances: 5, invoker: 'public' }, withBalance(a
 
     if (isCasino) {
       const bet = casino.parseBet(words[0], balance);
-      if (!bet || bet < 1) return note(`/${game} needs a bet`, `Try: /${game} 20 (or all, half, 25%). You have ${balance} coins.`);
-      if (bet > balance) return note(`You only have ${balance} coins.`, 'Try /daily, /work, or /beg.');
+      if (!bet || bet < 1) return note(`/${game} needs a bet`, `Try: /${game} 20 (or all, half, 25%). You have ${coinsText(balance)} coins.`);
+      if (bet > balance) return note(`You only have ${coinsText(balance)} coins.`, 'Try /daily, /work, or /beg.');
       const r = casino.startGame(game, bet, words.slice(1), secureRandom, now);
       if (r.error) return note(r.error);
       const { status = 'done', ...game2 } = r.pub;
@@ -1822,7 +1823,7 @@ export const play = onCall({ maxInstances: 5, invoker: 'public' }, withBalance(a
         {
           ...r.card,
           to: them,
-          line: r.card.ok ? `robbed you and got away with ${r.amount} coins` : `tried to rob you and paid you a ${r.amount} coin fine`,
+          line: r.card.ok ? `robbed you and got away with ${coinsText(r.amount)} coins` : `tried to rob you and paid you a ${coinsText(r.amount)} coin fine`,
         },
         [them],
       );
@@ -2243,12 +2244,12 @@ export const drawLottery = onSchedule({ schedule: '0 18 * * 5', timeZone: TIME_Z
     const last = { winner, pot: lot.pot, tickets: theirs, of: total, people: entries.length, at: now };
     tx.set(lotteryRef, { pot: 0, tickets: {}, drawAt: nextFriday(now + 60000), round: (lot.round || 1) + 1, last });
     tx.set(db.collection('channels/arcade/messages').doc(), {
-      text: `🎟️ ${winner} won the lottery: ${lot.pot} coins!`,
+      text: `🎟️ ${winner} won the lottery: ${coinsText(lot.pot)} coins!`,
       by: 'Trotbot',
       byUid: 'trotbot',
       bot: true,
       at: now,
-      cmd: { name: 'lottery', draw: last, line: `won the lottery: ${lot.pot} coins` },
+      cmd: { name: 'lottery', draw: last, line: `won the lottery: ${coinsText(lot.pot)} coins` },
       mentions: [winner],
       taskIds: [],
       replyTo: null,

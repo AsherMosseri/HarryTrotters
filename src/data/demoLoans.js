@@ -7,6 +7,7 @@
 import * as L from '../../functions/shared/loans.js';
 import { teamDay } from '../../functions/shared/coins.js';
 import { REQUESTS_TO } from '../config.js';
+import { coinsText } from '../../functions/shared/coinText.js';
 
 export function demoLoans({ get, commit, uid }) {
   const S = () => get();
@@ -60,7 +61,7 @@ export function demoLoans({ get, commit, uid }) {
     S().loans = [loan, ...all()];
     tell(
       bank ? REQUESTS_TO : lender,
-      bank ? `${first(me)} asked the bank for ${t.terms.amount} coins` : `${first(me)} asked you for a loan`,
+      bank ? `${first(me)} asked the bank for ${coinsText(t.terms.amount)} coins` : `${first(me)} asked you for a loan`,
       L.termsText(t.terms),
       loan.id,
     );
@@ -128,8 +129,8 @@ export function demoLoans({ get, commit, uid }) {
     if (!loan.bank)
       tell(
         loan.lender,
-        done ? `${first(actor.name)} paid off their loan` : `${first(actor.name)} paid back ${r.amount}`,
-        done ? `${r.amount} coins, all done.` : `${r.left} left.`,
+        done ? `${first(actor.name)} paid off their loan` : `${first(actor.name)} paid back ${coinsText(r.amount)}`,
+        done ? `${coinsText(r.amount)} coins, all done.` : `${coinsText(r.left)} left.`,
         loan.id,
       );
     commit();
@@ -152,7 +153,7 @@ export function demoLoans({ get, commit, uid }) {
     let patch = r.patch;
     if (r.give > 0) {
       if (!loan.bank && balanceOf(loan.lender) < r.give)
-        return note(`That gives ${r.give} back to ${first(loan.borrower)}. You only have ${Math.max(0, balanceOf(loan.lender))}.`);
+        return note(`That gives ${coinsText(r.give)} back to ${first(loan.borrower)}. You only have ${coinsText(Math.max(0, balanceOf(loan.lender)))}.`);
       pay(loan, req.action, r.give, now);
       patch = { ...patch, moves: (loan.moves || 0) + 1 };
     }
@@ -164,7 +165,7 @@ export function demoLoans({ get, commit, uid }) {
       req.action === 'forgive' ? `${who} forgave your loan` : `${who} gave you more time on your loan`,
       req.action === 'forgive'
         ? r.give
-          ? `${r.give} coins back. You’re unlocked.`
+          ? `${coinsText(r.give)} coins back. You’re unlocked.`
           : 'You don’t owe the rest.'
         : `Now due ${new Date(next.dueAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}.`,
       loan.id,
@@ -207,7 +208,7 @@ export function demoLoans({ get, commit, uid }) {
         changed = true;
       } else if (loan.status === 'active' && !loan.remindedAt && loan.dueAt - now <= L.LIMITS.remind) {
         save({ ...loan, remindedAt: now });
-        tell(loan.borrower, 'Your loan is due in 2 days', `${L.leftOf(loan, now)} left to pay ${L.lenderName(loan)}.`, loan.id);
+        tell(loan.borrower, 'Your loan is due in 2 days', `${coinsText(L.leftOf(loan, now))} left to pay ${L.lenderName(loan)}.`, loan.id);
         changed = true;
       } else if (loan.status === 'overdue' && balanceOf(loan.borrower) >= 0) {
         save({ ...loan, status: 'repaid', closedAt: now, history: L.withLine(loan.history, { act: 'settled', by: 'bank', at: now }) });

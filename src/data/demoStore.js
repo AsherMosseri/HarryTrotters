@@ -40,6 +40,7 @@ import { demoPetPhotos } from './demoPetPhotos.js';
 import { demoLoans } from './demoLoans.js';
 import { PHOTO_ACTIONS } from '../../functions/shared/petphotos.js';
 import { earnedIds } from '../../functions/shared/events.js';
+import { coinsText } from '../../functions/shared/coinText.js';
 
 const KEY = 'ftc32313-demo-v13';
 const listeners = new Set();
@@ -2063,7 +2064,7 @@ export const demoStore = {
       const n = words[0] ? casino.parseBet(words[0], Math.floor(balance / casino.TICKET)) : 0;
       if (words[0] && (!n || n < 1)) return note('How many tickets?', `Tickets are ${casino.TICKET} coins. Try: /lottery 3`);
       const cost = (n || 0) * casino.TICKET;
-      if (cost > balance) return note(`That’s ${cost} coins. You have ${balance}.`);
+      if (cost > balance) return note(`That’s ${coinsText(cost)} coins. You have ${coinsText(balance)}.`);
       const tickets = { ...(lot.tickets || {}) };
       if (n) tickets[me] = (tickets[me] || 0) + n;
       const pot = (lot.pot || 0) + cost;
@@ -2082,8 +2083,8 @@ export const demoStore = {
     }
     if (isCasino) {
       const bet = casino.parseBet(words[0], balance);
-      if (!bet || bet < 1) return note(`/${game} needs a bet`, `Try: /${game} 20 (or all, half, 25%). You have ${balance} coins.`);
-      if (bet > balance) return note(`You only have ${balance} coins.`, 'Try /daily, /work, or /beg.');
+      if (!bet || bet < 1) return note(`/${game} needs a bet`, `Try: /${game} 20 (or all, half, 25%). You have ${coinsText(balance)} coins.`);
+      if (bet > balance) return note(`You only have ${coinsText(balance)} coins.`, 'Try /daily, /work, or /beg.');
       const r = casino.startGame(game, bet, words.slice(1), secureRandom, now);
       if (r.error) return note(r.error);
       const { status = 'done', ...g } = r.pub;
@@ -2133,7 +2134,7 @@ export const demoStore = {
         {
           ...r.card,
           to: them,
-          line: r.card.ok ? `robbed you and got away with ${r.amount} coins` : `tried to rob you and paid you a ${r.amount} coin fine`,
+          line: r.card.ok ? `robbed you and got away with ${coinsText(r.amount)} coins` : `tried to rob you and paid you a ${coinsText(r.amount)} coin fine`,
         },
         [them],
       );
@@ -2219,7 +2220,7 @@ export const demoStore = {
     const resolution = String(req.note || '').trim().slice(0, dispute.LIMITS.resolution);
     const x = (state.disputes || []).find((y) => y.id === id);
     if (!x) return note('That report is gone.');
-    if (x.status !== 'open') return note('Already handled.', x.status === 'refunded' ? `Refunded ${x.refund} coins.` : 'It was dismissed.');
+    if (x.status !== 'open') return note('Already handled.', x.status === 'refunded' ? `Refunded ${coinsText(x.refund)} coins.` : 'It was dismissed.');
     if (decision !== 'refund' && decision !== 'dismiss') return note('Refund or dismiss?');
     let refund = 0;
     if (decision === 'refund') {
@@ -2243,7 +2244,7 @@ export const demoStore = {
         id: uid(),
         type: 'dispute',
         ...(refund && { icon: '↩️' }),
-        title: refund ? `${refund} coins refunded` : 'Your report was looked at',
+        title: refund ? `${coinsText(refund)} coins refunded` : 'Your report was looked at',
         body: refund
           ? `${REQUESTS_TO.split(' ')[0]} refunded your ${dispute.GAME_LABEL[x.cmd] || 'casino'} result.${resolution ? ` ${resolution}` : ''}`
           : `${REQUESTS_TO.split(' ')[0]} kept the result as it was.${resolution ? ` ${resolution}` : ''}`,
@@ -2515,7 +2516,7 @@ export const demoStore = {
     state.lottery = { pot: 0, tickets: {}, drawAt: nextFridayLocal(now + 60000), round: (lot.round || 1) + 1, last };
     const m = {
       id: uid(),
-      text: `🎟️ ${winner} won the lottery: ${lot.pot} coins!`,
+      text: `🎟️ ${winner} won the lottery: ${coinsText(lot.pot)} coins!`,
       by: 'Trotbot',
       byUid: 'trotbot',
       bot: true,
