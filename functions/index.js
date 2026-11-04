@@ -2440,7 +2440,8 @@ export const { quizNext, quizAnswer, quizProgress, quizReport, autoRun, dailyAns
 export const { channelRequest, channelRenames } = channelFunctions({ db, renamer, notify, owner: REQUESTS_TO });
 
 // Coin requests (/request @person amount, functions/coinRequests.js): the
-// person asked pays with one tap, through the same checks as a gift.
+// person asked pays with one tap, through the same checks as a gift (and its
+// overdue-loan lock). Groups (/request @Programming 5) too.
 export const { coinRequest, expireCoinRequests } = coinRequestFunctions({
   db,
   coinData,
@@ -2449,4 +2450,5 @@ export const { coinRequest, expireCoinRequests } = coinRequestFunctions({
   notify,
   owner: REQUESTS_TO,
   timeZone: TIME_ZONE,
+  loanLock: (name) => loans.lockOf(name),
 });

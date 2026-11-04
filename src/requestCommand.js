@@ -6,9 +6,14 @@
 //   /request style [what]     the style request form (Edit profile), filled in
 //   /request @person 25 why   ask a teammate for Jackson coins (the server
 //                             posts the card; functions/coinRequests.js)
+//   /request @Programming 5 why   the same of each person in a group (or
+//                             @everyone): one card, a request per person
 // commands.js runs it; the forms are components/RequestForms.jsx.
 
 import { parseAsk } from '../functions/shared/coinRequests.js';
+import { GIFT_MAX } from '../functions/shared/coins.js';
+import { SUBTEAMS } from '../functions/shared/team.js';
+import { groupTargets } from './groups.js';
 
 export const ASK_KEYWORDS = [
   ['channel', 'Ask for a new channel'],
@@ -60,6 +65,10 @@ export async function coins(text, ctx) {
   const usage = 'Try: /request @Cooper 25 for pizza';
   const note = (title, body = '') => ({ note: { title, body } });
   if (ctx.isOn && !ctx.isOn('coins')) return note('🪙 Jackson coins are off right now.');
+  // A group (@Programming, @everyone): src/groups.js reads it, or says why not.
+  const t = groupTargets('request', text, ctx);
+  if (t?.note) return { note: t.note };
+  if (t) return groupCoins(t, ctx);
   const p = parseAsk(text, ctx.roster || []);
   if (!p.them) return note('Ask who?', usage);
   if (p.ambiguous) return note('Which one?', `${p.ambiguous.join(', ')}. Use their full name, like /request @${p.ambiguous[0]} ${p.amount || 10}`);
@@ -70,9 +79,36 @@ export async function coins(text, ctx) {
   return r?.note ? { note: r.note } : { done: true };
 }
 
+// The same of each person in a group: the amount comes first after the
+// group, then the reason ("/request @Programming 5 for pizza"). Only the
+// groups and the people named go to the server (t.ask), never the list of
+// people: it works out who's in them, skips anyone already waiting on one
+// from you, and posts the card. The key makes a double send one request.
+async function groupCoins(t, ctx) {
+  const note = (title, body = '') => ({ note: { title, body } });
+  const usage = `Try: /request ${t.label} 5 for pizza`;
+  // The first word that looks like a number (a full name's last word, like
+  // "Mlezcko" in "@Cooper Mlezcko", can come before it).
+  const words = t.rest.split(/\s+/).filter(Boolean);
+  const at = words.findIndex((x) => /^[-+]?\.?\d/.test(x));
+  if (at < 0) return note('How many coins each?', usage);
+  const w = words[at].replace('🪙', '');
+  if (!/^\d+$/.test(w) || Number(w) < 1) return note('Ask for a whole number of coins each, at least 1.', usage);
+  const amount = Number(w);
+  if (amount > GIFT_MAX) return note('That’s a lot.', `Up to ${GIFT_MAX} each, the same as /give.`);
+  const reason = words.slice(at + 1).join(' ');
+  const r = await ctx.coinRequest({ action: 'create', group: t.ask, amount, reason, key: ctx.key });
+  if (r?.note) return { note: r.note };
+  if (!r?.ok) return note('That didn’t go through.');
+  // Who was left out (already waiting on one from you, or can't see the channel).
+  return r.reply?.body ? { note: r.reply } : { done: true };
+}
+
 // What the message box suggests after "/request ": the words that open a
-// form, then people (to ask for coins). q: what's typed so far ("pe", "@co").
-export function askOptions(q, { roster = [], me, isOn = () => true }) {
+// form, then groups and people (to ask for coins). q: what's typed so far
+// ("pe", "@co"). groupCount(subteam): how many people a subteam asks (not
+// you); leave it out where groups don't work (a DM).
+export function askOptions(q, { roster = [], me, isOn = () => true, groupCount = null }) {
   const lower = q.toLowerCase().replace(/^@/, '');
   const at = q.startsWith('@');
   const words = at
@@ -89,5 +125,22 @@ export function askOptions(q, { roster = [], me, isOn = () => true }) {
         .filter((n) => n !== me && (n.toLowerCase().startsWith(lower) || n.toLowerCase().split(' ').some((w) => w.startsWith(lower))))
         .map((n) => ({ type: 'person', key: `p-${n}`, insert: `@${n}`, name: n }))
     : [];
-  return [...words, ...people].slice(0, 8);
+  // Groups once there's an @ or a letter to go on (/request @prog → @Programming).
+  const groups =
+    groupCount && isOn('coins') && (at || lower)
+      ? [
+          ...('everyone'.startsWith(lower) ? [{ type: 'everyone', key: 'everyone', insert: '@everyone', cmd: true }] : []),
+          ...(lower
+            ? SUBTEAMS.filter((s) => s.toLowerCase().startsWith(lower) || s.toLowerCase().split(' ').some((x) => x.startsWith(lower))).map((s) => ({
+                type: 'role',
+                key: `r-${s}`,
+                insert: `@${s}`,
+                name: s,
+                count: groupCount(s),
+                cmd: true,
+              }))
+            : []),
+        ]
+      : [];
+  return [...words, ...groups, ...people].slice(0, 8);
 }

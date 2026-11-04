@@ -149,7 +149,13 @@ export default function Composer({
     if (suggest.kind === '/')
       return matchCommands(q, api.team().commandCfg).map((c) => ({ type: 'cmd', key: c.name, insert: `/${c.name}`, c }));
     // After "/request ": channel, pet, style, and people (to ask for coins).
-    if (suggest.kind === 'ask') return askOptions(q, { roster: isDm && members ? members : roster, me: actor.name, isOn: feat });
+    if (suggest.kind === 'ask')
+      return askOptions(q, {
+        roster: isDm && members ? members : roster,
+        me: actor.name,
+        isOn: feat,
+        groupCount: isDm ? null : (s) => subteamMembers(s).filter((n) => n !== actor.name).length,
+      });
     if (suggest.kind === '@') {
       // After a command: groups where it takes them (/give @Programming 10,
       // and @everyone for anyone there), only people where it doesn't.

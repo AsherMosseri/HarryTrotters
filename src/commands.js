@@ -37,7 +37,7 @@ export const COMMANDS = [
   { name: 'afk', bare: true, group: 'basics', args: 'reason', desc: 'Away: Trotbot tells people who @ you' },
   { name: 'remind', group: 'basics', args: 'when what', desc: 'A reminder later (10m, 2h, tomorrow 7am, at 5pm…)' },
   { name: 'poll', group: 'basics', args: 'question', desc: 'Start a poll' },
-  { name: 'request', bare: true, group: 'basics', args: 'idea | channel | pet | style | @person amount', desc: 'Ask for a feature, a channel, a pet, a style, or coins from someone' },
+  { name: 'request', bare: true, group: 'basics', args: 'idea | channel | pet | style | @person or @group amount', desc: 'Ask for a feature, a channel, a pet, a style, or coins from someone (or each person in a group)' },
 
   { name: 'me', group: 'text', args: 'action', desc: 'Say what you’re doing: /me waves shows “Asher waves”' },
   { name: 'shrug', group: 'text', args: 'message', desc: 'Adds ¯\\_(ツ)_/¯' },
@@ -456,7 +456,9 @@ export async function runCommand({ cmd, args }, ctx) {
   // A group (@Programming, @everyone) where the command takes people:
   // src/groups.js works out who, or says why not (a command that's one
   // person at a time, a DM, nobody in it). null: no group, as before.
-  const group = /@/.test(cmd.args) || cmd.name === 'pick' ? groupTargets(cmd.name, args, ctx) : null;
+  // /request reads its own (src/requestCommand.js): only a coin request takes
+  // a group, and an idea that mentions @Programming is just an idea.
+  const group = (/@/.test(cmd.args) && cmd.name !== 'request') || cmd.name === 'pick' ? groupTargets(cmd.name, args, ctx) : null;
   if (group?.note) return { note: group.note };
   const pings = (kind) => groupNotify(group, kind, ctx);
   // Tetris and Minesweeper alone or against Trotbot open the game screen;

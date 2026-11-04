@@ -4,11 +4,12 @@
 // people and the org chart's saved subteams) and the starting org chart.
 // The app's list of people is never used for anything with coins.
 //
-// For /request (coin requests to a group), the server side is:
+// /give (index.js giveMany) and /request (coinRequests.js createGroup) use it:
 //   const team = await groupTeam(db, rename);
 //   const g = groupsIn(text);                 // or { groups, everyone } the app sent
 //   const people = resolveTargets({ ...g, people: named }, { ...team, me });
-// then one request per person; refuse if people is empty or longer than GROUP_MAX.
+// then one gift or request per person; refuse if people is empty or longer
+// than GROUP_MAX.
 
 import { teamFrom } from './shared/groups.js';
 

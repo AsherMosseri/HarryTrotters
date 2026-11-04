@@ -21,7 +21,7 @@ import * as dispute from '../../functions/shared/disputes.js';
 import { blocked, isOff, serverGroup } from '../../functions/shared/commandRules.js';
 import * as coinAsk from '../../functions/shared/coinRequests.js';
 import { AWARD_CAPS, breakdown, giftEntry, groupGiftEntries, prizeEntry, teamDay, teamMidnight } from '../../functions/shared/coins.js';
-import { BOT, groupLabel, resolveTargets } from '../../functions/shared/groups.js';
+import { BOT, GROUP_MAX, groupLabel, resolveTargets } from '../../functions/shared/groups.js';
 import * as fun from '../../functions/shared/funGames.js';
 import * as mines from '../../functions/shared/minesweeper.js';
 const MINE_LEVELS = mines.LEVELS;
@@ -1634,11 +1634,12 @@ export const demoStore = {
   // Coin requests (/request @person amount), run the way the coinRequest
   // function runs them (functions/coinRequests.js), with the same checks
   // (shared/coinRequests.js). Paying adds the same gift /give adds.
-  async coinRequest(req, actor, { balanceOf, roster = [] }) {
+  async coinRequest(req, actor, { balanceOf, roster = [], subteamsOf = () => [] }) {
     const now = Date.now();
     const me = actor.name;
     const note = (title, body = '') => ({ note: { title, body } });
     const asks = state.coinRequests || (state.coinRequests = {});
+    const groups = state.coinRequestGroups || (state.coinRequestGroups = {});
     const ctl = state.controls || {};
     const cfg = state.settings?.commands;
     const coinsOff = me !== REQUESTS_TO && (ctl.off || []).includes('coins');
@@ -1648,18 +1649,92 @@ export const demoStore = {
       state.inbox = [{ id: uid(), type: 'coinRequest', title, body, open: `chat:${conv}`, at: now, read: false, to }, ...(state.inbox || [])];
     };
     const msgs = (conv) => (state.chat || {})[conv] || [];
-    if (action === 'create') {
-      const conv = String(req.conv || '');
-      if (!conv || conv === 'announcements') return note('Not here.', 'Ask in a channel or a DM.');
+    const setCard = (conv, id, fn) => {
+      state.chat = { ...state.chat, [conv]: msgs(conv).map((x) => (x.id === id ? { ...x, cmd: fn(x.cmd) } : x)) };
+    };
+    // My requests still waiting: one-person ones, and groups (each counts once).
+    const openOf = (who) => [
+      ...Object.values(asks).filter((r) => r.from === who && !r.group && r.status === 'open' && r.expiresAt > now),
+      ...Object.values(groups)
+        .filter((g) => g.from === who && g.expiresAt > now)
+        .map((g) => ({ id: g.id, people: g.rows.filter((x) => asks[x.id]?.status === 'open').map((x) => x.to), expiresAt: g.expiresAt }))
+        .filter((g) => g.people.length),
+    ];
+    const madeToday = (who) =>
+      Object.values(asks).filter((r) => r.from === who && !r.group && teamDay(r.at) === teamDay(now)).length +
+      Object.values(groups).filter((g) => g.from === who && teamDay(g.at) === teamDay(now)).length;
+    // The switches /give has, where a request is made.
+    const switchedOff = (conv) => {
       if (coinsOff) return note('🪙 Jackson coins are off right now.');
       if (me !== REQUESTS_TO && (ctl.channelsOff || []).includes(conv)) return note('Not here.', 'This channel is off right now.');
       if (isOff('give', cfg)) return note('/give is turned off', 'Sending coins is off for now, so coin requests are too.');
       const stop = blocked('request', 'basics', conv, cfg) || blocked('give', 'economy', conv, cfg);
-      if (stop) return { note: stop };
-      const open = Object.values(asks).filter((r) => r.from === me && r.status === 'open' && r.expiresAt > now);
-      const sentToday = Object.values(asks).filter((r) => r.from === me && teamDay(r.at) === teamDay(now)).length;
+      return stop ? { note: stop } : null;
+    };
+    if (action === 'create' && req.group != null) {
+      // A group: the same steps as the server's createGroup.
+      const conv = String(req.conv || '');
+      if (!conv || conv === 'announcements') return note('Not here.', 'Ask in a channel.');
+      if (conv.startsWith('dm:')) return note('Groups work in channels.', 'In a DM, ask people one by one.');
+      const off = switchedOff(conv);
+      if (off) return off;
+      const g = req.group && typeof req.group === 'object' ? req.group : {};
+      const gs = (Array.isArray(g.groups) ? g.groups : []).map(String);
+      if (gs.some((x) => !SUBTEAMS.includes(x))) return note('Which group?', `Groups: @everyone, ${SUBTEAMS.map((x) => `@${x}`).join(', ')}.`);
+      const everyone = g.everyone === true;
+      if (!gs.length && !everyone) return note('Which group?', 'Try: /request @Programming 5 for pizza');
+      const team = roster.filter((n) => n !== BOT);
+      const named = (Array.isArray(g.people) ? g.people : []).map(String);
+      for (const n of named) if (n !== me && !team.includes(n)) return note(`Who’s ${n}?`, 'They aren’t on the team. Nobody was asked.');
+      const label = groupLabel({ groups: gs, everyone });
+      const people = resolveTargets({ groups: gs, everyone, people: named }, { roster: team, subteamsOf, me });
+      if (!people.length) return note(`Nobody in ${label} to ask.`, `${label} has nobody in it besides you.`);
+      if (people.length > GROUP_MAX) return note(`That’s ${people.length} people.`, `Up to ${GROUP_MAX} at a time.`);
+      const id = `g-${req.key || uid()}-${personId(me)}`;
+      const was = groups[id];
+      if (was) return { ok: true, id, repeat: true, asked: was.rows.length, skipped: was.skipped, reply: coinAsk.groupReply({ asked: was.rows.map((x) => x.to), skipped: was.skipped, amount: was.amount }) };
+      const open = openOf(me);
+      const { ask, skipped } = coinAsk.skipAsked(people, open, now);
+      if (!ask.length) return note(`You already asked ${skipped.length === 1 ? first(skipped[0]) : `everyone in ${label}`}.`, 'Wait for their answers, or cancel those first.');
+      const r = coinAsk.startGroupAsk({ me, people: ask, label, amount: req.amount, reason: req.reason, open, sentToday: madeToday(me), now });
+      if (r.error) return note(r.error, r.body);
+      const pub = r.pub;
+      const rows = ask.map((to, i) => ({ id: `${id}-${i}`, to, row: `r${i}` }));
+      groups[id] = { id, from: me, conv, amount: pub.amount, reason: pub.reason, label, everyone, quiet: everyone && !actor.admin, at: now, expiresAt: pub.expiresAt, rows, skipped };
+      for (const x of rows) asks[x.id] = { from: me, to: x.to, amount: pub.amount, reason: pub.reason, at: now, expiresAt: pub.expiresAt, status: 'open', id: x.id, conv, group: id, row: x.row };
+      const m = {
+        id,
+        text: `/request ${label} ${pub.amount}${pub.reason ? ` ${pub.reason}` : ''}`,
+        by: me,
+        byUid: actor.uid,
+        at: now,
+        cmd: {
+          name: 'request',
+          kind: 'coins',
+          group: { label, count: rows.length },
+          ask: { from: me, amount: pub.amount, reason: pub.reason, at: now, expiresAt: pub.expiresAt, label },
+          rows: Object.fromEntries(rows.map((x) => [x.row, { to: x.to, status: 'open' }])),
+          status: 'open',
+          line: coinAsk.groupAskLine(pub),
+        },
+        mentions: [],
+        taskIds: [],
+        replyTo: req.replyTo || null,
+        reactions: {},
+      };
+      state.chat = { ...(state.chat || {}), [conv]: [...msgs(conv), m] };
+      for (const x of rows) tell(x.to, `${first(me)} asks you for ${coinAsk.coinText(pub.amount)}`, `${label}${pub.reason ? `: ${pub.reason}` : '. Tap to pay or decline.'}`, conv);
+      commit();
+      return { ok: true, id, group: label, asked: rows.length, skipped, reply: coinAsk.groupReply({ asked: ask, skipped, amount: pub.amount }) };
+    }
+    if (action === 'create') {
+      const conv = String(req.conv || '');
+      if (!conv || conv === 'announcements') return note('Not here.', 'Ask in a channel or a DM.');
+      const off = switchedOff(conv);
+      if (off) return off;
+      const open = openOf(me);
       const to = String(req.to || '');
-      const r = coinAsk.startAsk({ me, to, amount: req.amount, reason: req.reason, roster, active: roster.includes(to), open, sentToday, now });
+      const r = coinAsk.startAsk({ me, to, amount: req.amount, reason: req.reason, roster, active: roster.includes(to), open, sentToday: madeToday(me), now });
       if (r.error) return note(r.error, r.body);
       const dm = conv.startsWith('dm:') ? (state.dms || []).find((d) => `dm:${d.id}` === conv) : null;
       if (dm && !dm.people.includes(to)) return note(`${first(to)} isn’t in this conversation.`, 'Ask in a channel they can see, or in a DM with them.');
@@ -1685,28 +1760,50 @@ export const demoStore = {
       return { ok: true, id };
     }
     if (!coinAsk.MOVES.includes(action)) return note('Unknown action.');
-    const pub = asks[req.id];
-    if (!pub) return note('That request is gone.');
     if (action === 'pay') {
       if (coinsOff) return note('🪙 Jackson coins are off right now.');
       if (isOff('give', cfg)) return note('/give is turned off', 'Sending coins is off for now, so coin requests are too.');
       if (isOff('request', cfg)) return note('/request is turned off', 'It’s off for now.');
     }
-    const balance = action === 'pay' && me === pub.to ? balanceOf(me) : 0;
-    const r = coinAsk.askMove({ pub, me, move: action, balance, roster, now });
-    if (!r.write) return r.error ? note(r.error, r.body) : { ok: true, status: pub.status, ...(r.already && { already: r.already }) };
-    const { status, decidedAt, paidAt } = r.pub;
-    asks[req.id] = { ...pub, status, decidedAt, ...(paidAt && { paidAt }) };
-    if (r.entry && !(state.coins || []).some((x) => x.id === `req-${req.id}`))
-      state.coins = [...(state.coins || []), { ...r.entry, id: `req-${req.id}`, request: req.id }];
-    state.chat = {
-      ...state.chat,
-      [pub.conv]: msgs(pub.conv).map((x) => (x.id === req.id ? { ...x, cmd: { ...x.cmd, status, decidedAt, ...(paidAt && { paidAt }) } } : x)),
+    // One request (a person's own, or one row of a group), as the server's move().
+    const moveOne = (id, mv) => {
+      const pub = asks[id];
+      if (!pub) return note('That request is gone.');
+      const balance = mv === 'pay' && me === pub.to ? balanceOf(me) : 0;
+      const r = coinAsk.askMove({ pub, me, move: mv, balance, roster, now });
+      if (!r.write) return r.error ? note(r.error, r.body) : { ok: true, status: pub.status, ...(r.already && { already: r.already }) };
+      const { status, decidedAt, paidAt } = r.pub;
+      asks[id] = { ...pub, status, decidedAt, ...(paidAt && { paidAt }) };
+      if (r.entry && !(state.coins || []).some((x) => x.id === `req-${id}`))
+        state.coins = [...(state.coins || []), { ...r.entry, id: `req-${id}`, request: id }];
+      if (pub.group)
+        setCard(pub.conv, pub.group, (c) => {
+          const rows = { ...c.rows, [pub.row]: { ...c.rows[pub.row], status, at: decidedAt, ...(paidAt && { paidAt }) } };
+          return { ...c, rows, status: Object.values(rows).some((x) => x.status === 'open') ? 'open' : 'closed' };
+        });
+      else setCard(pub.conv, id, (c) => ({ ...c, status, decidedAt, ...(paidAt && { paidAt }) }));
+      if (status === 'paid') tell(pub.from, `${first(pub.to)} paid your request: ${coinAsk.coinText(pub.amount)}`, pub.reason || 'The coins are in your balance.', pub.conv);
+      if (status === 'declined') tell(pub.from, `${first(pub.to)} declined your request for ${coinAsk.coinText(pub.amount)}`, pub.reason || '', pub.conv);
+      return { ok: true, status, ...(r.error && { note: { title: r.error, body: '' } }) };
     };
-    if (status === 'paid') tell(pub.from, `${first(pub.to)} paid your request: ${coinAsk.coinText(pub.amount)}`, pub.reason || 'The coins are in your balance.', pub.conv);
-    if (status === 'declined') tell(pub.from, `${first(pub.to)} declined your request for ${coinAsk.coinText(pub.amount)}`, pub.reason || '', pub.conv);
+    let out;
+    if (String(req.id || '').startsWith('g-')) {
+      // A tap on a group card: your own row, or (Cancel, time's up) every open row.
+      const g = groups[req.id];
+      if (!g) return note('That request is gone.');
+      if (action === 'pay' || action === 'decline') {
+        const mine = g.rows.find((x) => x.to === me);
+        if (!mine) return me === g.from ? note('Waiting for their answers.') : note('This request isn’t for you.', `${first(g.from)} asked ${g.label}.`);
+        out = moveOne(mine.id, action);
+      } else if (action === 'cancel' && me !== g.from) return note(`Only ${first(g.from)} can cancel this.`);
+      else if (action === 'peek' && now < g.expiresAt) return { ok: true, status: 'open' };
+      else {
+        const done = g.rows.filter((x) => asks[x.id]?.status === 'open').map((x) => moveOne(x.id, action));
+        out = { ok: true, status: action === 'cancel' ? 'cancelled' : 'expired', closed: done.filter((x) => x.ok && !x.already).length };
+      }
+    } else out = moveOne(req.id, action);
     commit();
-    return { ok: true, status, ...(r.error && { note: { title: r.error, body: '' } }) };
+    return out;
   },
   subscribeAdSubmissions(cb) {
     return listen(() => cb([...(state.adSubmissions || [])]));

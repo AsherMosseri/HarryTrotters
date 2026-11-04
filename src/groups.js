@@ -10,7 +10,8 @@
 //   only notifies @everyone when team management sends it (see groupNotify).
 // - Not in DMs (chat has no @Subteam there either).
 //
-// Wiring /request (coin requests) into this, after merging:
+// /request (coin requests) uses it like this (src/requestCommand.js
+// groupCoins; the server side is functions/coinRequests.js createGroup):
 //   const t = groupTargets('request', words, ctx);   // ctx as in runCommand
 //   if (t?.note) return { note: t.note };
 //   if (t) → ask the server with { group: t.ask, amount, key }, where the

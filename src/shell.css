@@ -4964,3 +4964,31 @@ html.kb-open .report-note { min-height: 56px; }
   .mc-grid th, .mc-grid td { padding: 5px 4px; }
   .mc-grid thead th { font-size: 10px; letter-spacing: 0; white-space: normal; vertical-align: bottom; }
 }
+
+/* ---------- Group coin requests (/request @Programming 5 for pizza):
+   chat/AskCard.jsx GroupCoins. One card, a chip per person. ---------- */
+.ask-group-tally { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.ask-group-bar { flex: 1 1 auto; min-width: 60px; max-width: 220px; height: 6px; border-radius: 3px; background: var(--accent-soft); overflow: hidden; }
+.ask-group-bar > span { display: block; height: 100%; border-radius: inherit; background: var(--st-done); transition: width 0.3s; }
+.ask-group-tally .small { flex: none; white-space: nowrap; }
+.ask-chips { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.ask-chip {
+  display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px 2px 2px; border-radius: 999px;
+  border: 1px solid var(--border); background: var(--surface); font-size: 12.5px; line-height: 1.2; max-width: 100%;
+}
+.ask-chip-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.ask-chip-icon { flex: none; font-weight: 700; font-size: 11px; color: var(--muted); }
+.ask-chip.s-paid { border-color: color-mix(in srgb, var(--st-done) 55%, var(--border)); background: color-mix(in srgb, var(--st-done) 12%, var(--surface)); }
+.ask-chip.s-paid .ask-chip-icon { color: var(--st-done); }
+.ask-chip.s-open { border-style: dashed; }
+.ask-chip.s-declined .ask-chip-icon { color: var(--danger); }
+.ask-chip.s-declined .ask-chip-name, .ask-chip.s-cancelled .ask-chip-name, .ask-chip.s-expired .ask-chip-name { color: var(--muted); }
+.ask-chip.s-cancelled, .ask-chip.s-expired { opacity: 0.6; }
+.ask-chips .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.ask-chip.me { box-shadow: 0 0 0 1.5px var(--accent); font-weight: 600; }
+.ask-chip-more { padding: 4px 2px; }
+.ask-group.s-closed .ask-amount { color: var(--muted); }
+@media (max-width: 760px) {
+  .ask-chip { font-size: 13px; padding: 3px 9px 3px 3px; }
+  .ask-group-bar { max-width: none; }
+}
