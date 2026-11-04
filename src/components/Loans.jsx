@@ -409,7 +409,7 @@ function AskForm({ loans, actor, roster, mode, setMode, onDone, prefill }) {
       )}
       {bank ? (
         <p className="muted small">
-          {first(REQUESTS_TO)} answers for the bank: yes, no, or a different offer. Up to {exactCoins(cfg.bankMax)} coins, {cfg.bankOpen} bank loan
+          {first(REQUESTS_TO)} answers for the bank: yes, no, or a different offer. Any amount, {cfg.bankOpen} bank loan
           {cfg.bankOpen === 1 ? '' : 's'} at a time.
         </p>
       ) : (
@@ -805,7 +805,6 @@ export function LoanSettings({ cfg, call }) {
           label="Loans on"
         />
       </div>
-      {num('Most from the bank', 'bankMax', 'Coins in one bank loan.', L.PEER_MAX)}
       {num('Bank loans at a time', 'bankOpen', 'Per person, waiting ones included. 0 stops the bank.', 5)}
       {num('Loans from teammates at a time', 'peerOpen', 'Per person, as the borrower.', 5)}
       <div className="cmd-admin-row loan-set-row">

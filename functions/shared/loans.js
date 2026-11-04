@@ -37,8 +37,9 @@ export const RATE_MAX = 50;
 export const STYLES = ['flat', 'weekly'];
 // A teammate's standard rate. The bank's is in the loan settings.
 export const PEER_STANDARD = { style: 'flat', rate: 10 };
-// The most a teammate can lend at once (the same as GIFT_MAX in shared/coins.js).
-export const PEER_MAX = 5000;
+// The most anyone (a teammate or the bank) can lend at once: no real limit
+// since 3.1.3 (the same as GIFT_MAX / NO_LIMIT in shared/coins.js).
+export const PEER_MAX = 1000000000000;
 export const LIMITS = {
   note: 200,
   // Lines kept in a loan's thread, and counters before someone has to say yes or no.
@@ -53,7 +54,7 @@ export const LIMITS = {
 };
 // Asher's loan settings (settings/loans; Controls, Loans). Bank loans only,
 // except `on`, which stops new loan requests of every kind.
-export const LOAN_DEFAULTS = { on: true, bankMax: 500, bankOpen: 1, peerOpen: 2, bankStyle: 'flat', bankRate: 10, terms: [1, 2, 4] };
+export const LOAN_DEFAULTS = { on: true, bankMax: PEER_MAX, bankOpen: 1, peerOpen: 2, bankStyle: 'flat', bankRate: 10, terms: [1, 2, 4] };
 // Still going (they count toward the limits). LIVE: coins have moved.
 export const OPEN = ['pending', 'active', 'overdue'];
 export const LIVE = ['active', 'overdue'];
@@ -73,7 +74,8 @@ export function loanSettings(raw) {
   const terms = TERMS.filter((t) => (Array.isArray(r.terms) ? r.terms.map(Number) : LOAN_DEFAULTS.terms).includes(t));
   return {
     on: r.on !== false,
-    bankMax: clamp(r.bankMax, 1, PEER_MAX, LOAN_DEFAULTS.bankMax),
+    // No limit on a bank loan since 3.1.3, whatever an older setting says.
+    bankMax: PEER_MAX,
     bankOpen: clamp(r.bankOpen, 0, 5, LOAN_DEFAULTS.bankOpen),
     peerOpen: clamp(r.peerOpen, 0, 5, LOAN_DEFAULTS.peerOpen),
     bankStyle: STYLES.includes(r.bankStyle) ? r.bankStyle : LOAN_DEFAULTS.bankStyle,
