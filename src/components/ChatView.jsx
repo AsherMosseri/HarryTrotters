@@ -401,7 +401,12 @@ export default function ChatView({
     if (firstLoad) showStart();
     // Same messages, changed (an edit, a reaction, a game's move): stay put.
     else if (!newestChanged) settle();
-    else if (sentByMe(newest, actor) && !viewOpen.current) toBottom(el);
+    else if (sentByMe(newest, actor) && !viewOpen.current) {
+      // You sent something: you're done with the card you were playing, and
+      // the new one (a game you just started) shows in full as it fills in.
+      hold.current.until = 0;
+      toBottom(el);
+    }
     else if (atBottom.current && !holding()) toBottom(el);
     else {
       keepAnchor();
