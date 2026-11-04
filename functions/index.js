@@ -1684,6 +1684,10 @@ export const play = onCall({ maxInstances: 5, invoker: 'public' }, withBalance(a
   // never pick one person out of it (shared/groups.js).
   if (groupsIn(words.join(' ')).any)
     return note(`/${game} is one person at a time.`, 'Groups like @Programming or @everyone don’t work with it. Name one person.');
+  // Bets are read with shared/amount.js (2k, 1.5k, 1,000); one that isn't a
+  // whole number of coins says the nearest one instead of rounding it.
+  const whole = casino.wholeCoinsNote(words);
+  if (whole) return note(...whole);
   // Asher's Controls (src/controls.js): coins or this channel switched off for everyone but him.
   if (me !== REQUESTS_TO) {
     const controls = (await db.doc('settings/controls').get()).data() || {};
@@ -1755,7 +1759,7 @@ export const play = onCall({ maxInstances: 5, invoker: 'public' }, withBalance(a
 
     if (isCasino) {
       const bet = casino.parseBet(words[0], balance);
-      if (!bet || bet < 1) return note(`/${game} needs a bet`, `Try: /${game} 20 (or all, half, 25%). You have ${balance} coins.`);
+      if (!bet || bet < 1) return note(`/${game} needs a bet`, `Try: /${game} 20 (or 1k, all, half, 25%). You have ${balance} coins.`);
       if (bet > balance) return note(`You only have ${balance} coins.`, 'Try /daily, /work, or /beg.');
       const r = casino.startGame(game, bet, words.slice(1), secureRandom, now);
       if (r.error) return note(r.error);

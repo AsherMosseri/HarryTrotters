@@ -6,6 +6,7 @@ import { Avatar } from './common.jsx';
 import { confirmDialog } from './Dialogs.jsx';
 import { Switch } from './Ads.jsx';
 import { Icon } from './shell/icons.jsx';
+import { onLoanForm, peekLoanForm, takeLoanForm } from '../loanCommand.js';
 
 // Loans (3.1), a tab in the coins screen. Ask the bank (Asher answers; the
 // coins are made up, not his) or a teammate (their own coins) for coins, with
@@ -91,9 +92,35 @@ export function loanLines(loans, open) {
   return out;
 }
 
+// /loan (src/loanCommand.js): what it asked to fill in, taken once: the form
+// to open ({ mode, who, amount, rate, style, term, note }) or { pay }.
+export function useLoanPrefill() {
+  const [prefill, setPrefill] = useState(peekLoanForm);
+  useEffect(() => {
+    takeLoanForm();
+    return onLoanForm((p) => (takeLoanForm(), setPrefill(p)));
+  }, []);
+  return prefill;
+}
+
 export function LoansPanel({ loans, actor, roster, focus, onToast }) {
   const { cfg, owner, borrowing, lending, lock, now } = loans;
   const [ask, setAsk] = useState(null); // 'bank' | 'person' | null
+  // Filled in by /loan until the form closes; the person still taps Send request.
+  const prefill = useLoanPrefill();
+  const [fill, setFill] = useState(null);
+  useEffect(() => {
+    if (prefill?.mode && !lock && (cfg.on || owner) && !(owner && prefill.mode === 'bank')) {
+      setFill(prefill);
+      setAsk(prefill.mode);
+    }
+    if (prefill?.pay && !prefill.focus) document.getElementById('loans-mine')?.scrollIntoView?.({ block: 'start' });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefill]);
+  const setMode = (m) => {
+    setAsk(m);
+    if (!m) setFill(null);
+  };
   const [showPast, setShowPast] = useState(false);
   const [bankTab, setBankTab] = useState('waiting');
   const open = (l) => L.OPEN.includes(l.status);
@@ -172,12 +199,14 @@ export function LoansPanel({ loans, actor, roster, focus, onToast }) {
           <p className="muted small">Loans are off right now.</p>
         ) : ask ? (
           <AskForm
+            key={fill?.n || 0}
+            prefill={fill}
             loans={loans}
             actor={actor}
             roster={roster}
             mode={ask}
-            setMode={setAsk}
-            onDone={(text) => (setAsk(null), onToast?.(text))}
+            setMode={setMode}
+            onDone={(text) => (setMode(null), onToast?.(text))}
           />
         ) : (
           <div className="loan-ask-btns">
@@ -193,7 +222,7 @@ export function LoansPanel({ loans, actor, roster, focus, onToast }) {
         )}
       </section>
 
-      <section className="loan-sec">
+      <section className="loan-sec" id="loans-mine">
         <h3 className="loan-head">My loans</h3>
         {mine.length ? mine.map(card) : <p className="muted small">Nothing borrowed right now.</p>}
       </section>
@@ -321,11 +350,18 @@ function Preview({ value, bank, cfg, you = true }) {
   );
 }
 
-function AskForm({ loans, actor, roster, mode, setMode, onDone }) {
+function AskForm({ loans, actor, roster, mode, setMode, onDone, prefill }) {
   const { cfg, owner, call } = loans;
-  const [who, setWho] = useState('');
-  const [value, setValue] = useState({ amount: '', style: 'standard', rate: 10, term: cfg.terms.includes(2) ? 2 : cfg.terms[0] });
-  const [text, setText] = useState('');
+  // From /loan: what it read; anything it didn't stays as the default.
+  const p = prefill || {};
+  const [who, setWho] = useState(p.who || '');
+  const [value, setValue] = useState(() => ({
+    amount: p.amount ?? '',
+    style: p.style || (p.rate !== undefined ? L.standardOf(mode === 'bank', cfg).style : 'standard'),
+    rate: p.rate ?? 10,
+    term: p.term && (mode === 'bank' ? cfg.terms : L.TERMS).includes(p.term) ? p.term : cfg.terms.includes(2) ? 2 : cfg.terms[0],
+  }));
+  const [text, setText] = useState(p.note || '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const bank = mode === 'bank';

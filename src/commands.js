@@ -13,6 +13,8 @@ import { GROUP_ROWS, MORE_COMMANDS, runMore } from './moreCommands.js';
 import { runRequest } from './requestCommand.js';
 import { groupNotify, groupTargets } from './groups.js';
 import { GIFT_MAX } from '../functions/shared/coins.js';
+import { amountTip, looksLikeAmount, parseAmount } from '../functions/shared/amount.js';
+import { loanOff, runLoan } from './loanCommand.js';
 
 export const GROUPS = [
   ['basics', 'Basics'],
@@ -66,7 +68,8 @@ export const COMMANDS = [
   { name: 'daily', group: 'economy', args: '', desc: 'Free coins once a day: 5, plus 1 for each day in a row, up to 15 (shares the 20-a-day game limit)', server: true },
   { name: 'work', group: 'economy', args: '', desc: 'Coins for your work, while you’re clocked in (once an hour)', server: true },
   { name: 'beg', group: 'economy', args: '', desc: 'Ask around for coins. No promises.', server: true },
-  { name: 'give', group: 'economy', args: '@person | @group amount', desc: 'Send someone coins (to a group: that much to each person)' },
+  { name: 'give', group: 'economy', args: '@person | @group amount', desc: 'Send someone coins, like 20 or 2k (to a group: that much to each person)' },
+  { name: 'loan', bare: true, group: 'economy', args: 'bank | @person amount 10% 2w why | pay', desc: 'Borrow coins: opens the loan form, filled in, for you to check and send' },
   { name: 'rob', group: 'economy', args: '@person', desc: '35% chance to steal some. Or pay a fine.', server: true },
   { name: 'leaderboard', group: 'economy', args: '', desc: 'Who has the most coins' },
 
@@ -134,14 +137,15 @@ export function matchCommands(typed, cfg) {
 }
 
 const pick = (list) => list[Math.floor(Math.random() * list.length)];
-// Anything left after the game words ("bot", "hard", "expert"…) is a person to race.
+// Anything left after the game words ("bot", "hard", "expert"…) and amounts
+// ("20", "2k") is a person to race.
 const GAME_WORDS = /^(bot|trotbot|easy|medium|hard|beginner|intermediate|expert|marathon|sprint|ultra|\d+)$/i;
 const namesSomeone = (args) =>
   !/\btournament\s+\S/i.test(args) &&
   args
     .replace(/@/g, '')
     .split(/\s+/)
-    .some((w) => w && !GAME_WORDS.test(w));
+    .some((w) => w && !GAME_WORDS.test(w) && !looksLikeAmount(w));
 const between = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
 // The same answer every time for the same thing (so /rate pizza is consistent).
 const hash = (s) => [...String(s).toLowerCase()].reduce((h, c) => (h * 31 + c.codePointAt(0)) >>> 0, 7);
@@ -436,13 +440,15 @@ export function parseRemind(text, now = Date.now()) {
 // countdown(), whois(name), ping(), setAfk(reason), addReminder(at, text) },
 // and for groups (src/groups.js): subteamsOf(name), isDm, isManager,
 // mentionsOn, everyoneOn, giftGroup(ask, amount, key), key (the same for a
-// second send of the same text, so a /give can't pay twice).
+// second send of the same text, so a /give can't pay twice); for /loan,
+// loans (Loans.jsx useLoans: cfg, owner, lock, borrowing).
 // Returns one of:
 //   { post: { text, cmd?, poll?, votes?, mentions? } }   a message everyone sees
 //   { note: { title, body?, lines? } }                  only you see it
 //   { poll: 'question' }                                 opens the poll maker
 //   { standup: true }                                    opens the standup form
 //   { ask: { form, text } }                              /request: opens a request form
+//   { loan: { open | pay | mode, who, amount… } }        /loan: opens Loans, filled in
 export async function runCommand({ cmd, args }, ctx) {
   const me = ctx.actor.name;
   const first = (n) => n.split(' ')[0];
@@ -450,8 +456,18 @@ export async function runCommand({ cmd, args }, ctx) {
     post: { text: `/${cmd.name}${args ? ` ${args}` : ''}`, cmd: { ...result, name: cmd.name }, ...extra },
   });
   const need = (what) => ({ note: { title: `/${cmd.name} needs ${what}`, body: `Try: /${cmd.name} ${cmd.args}` } });
-  // Turned off, or not in this channel (Asher's Commands page).
-  const stop = blocked(cmd.name, cmd.group, ctx.conv, ctx.commandCfg);
+  // /loan with coins or loans switched off (Controls) says so, before the
+  // Commands page check (which counts it as off then too, to hide it).
+  // /loan pay still opens My loans while loans are off.
+  if (cmd.name === 'loan') {
+    const off = loanOff(args, ctx);
+    if (off) return { note: off };
+  }
+  // Turned off, or not in this channel (Asher's Commands page). loansOff:
+  // /loan is only off because loans are (controls.js commandCfgFor).
+  const cfg = ctx.commandCfg;
+  const loanPay = cmd.name === 'loan' && cfg?.loansOff;
+  const stop = blocked(cmd.name, cmd.group, ctx.conv, loanPay ? { ...cfg, off: cfg.off.filter((n) => n !== 'loan') } : cfg);
   if (stop) return { note: stop };
   // A group (@Programming, @everyone) where the command takes people:
   // src/groups.js works out who, or says why not (a command that's one
@@ -482,10 +498,13 @@ export async function runCommand({ cmd, args }, ctx) {
     case 'leaderboard':
       return card({ top: ctx.richest() });
     case 'give': {
-      // The amount is the last word, a whole number ("/give @Cooper 20").
+      // The amount is the last word, a whole number ("/give @Cooper 20",
+      // "2k", "1,000"; functions/shared/amount.js, the same as the server).
       const last = args.trim().split(/\s+/).pop() || '';
-      const amount = /^\d+$/.test(last) ? +last : 0;
+      const amount = parseAmount(last) || 0;
       const who = args.trim().slice(0, -last.length).trim();
+      const tip = amountTip(last);
+      if (tip) return { note: { title: 'That’s not a whole number of coins.', body: tip } };
       // A group: each person gets the amount, all or nothing, on the server,
       // which works out who's in the group itself (functions/index.js giveMany).
       if (group) {
@@ -643,6 +662,9 @@ export async function runCommand({ cmd, args }, ctx) {
       return { poll: args };
     case 'request':
       return runRequest(args, ctx, { card });
+    case 'loan':
+      // Opens the loan form, filled in; it never asks by itself (loanCommand.js).
+      return runLoan(args, ctx);
 
     case 'me':
       if (!args) return need('an action');

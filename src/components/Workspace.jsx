@@ -103,6 +103,7 @@ import { hasLabel, newBattery, putOnRobot, statusPatch } from '../batteries.js';
 import { streaksOf } from '../../functions/shared/streaks.js';
 import { confirmDialog } from './Dialogs.jsx';
 import { LoanSettings, loanLines, useLoans } from './Loans.jsx';
+import { openLoanForm } from '../loanCommand.js';
 import { RequestForms } from './RequestForms.jsx';
 
 // Versions were renumbered once (2.0 became 1.9, 2.1 became 2.0, and so
@@ -2157,7 +2158,10 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
     roster,
     lottery,
     team: {
-      commandCfg: commandCfgFor(settings.commands || {}, controls),
+      commandCfg: commandCfgFor(settings.commands || {}, controls, { loansOn: loans.cfg.on || loans.owner }),
+      // /loan (loanCommand.js): the loans it checks, and the coins screen on Loans, filled in.
+      loans,
+      openLoan: (p) => (openLoanForm(p), openLoans(p.focus)),
       tasks: tasks || [],
       runs: () => runs,
       createRun: (data) => api.createRun(data),

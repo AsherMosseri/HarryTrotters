@@ -6,6 +6,7 @@
 // chat message, payout is everything paid back (0 = lost the bet, bet = push).
 import { secureRandom } from './rng.js';
 import { keepRecent } from './coins.js';
+import { amountTip, parseAmount } from './amount.js';
 
 export const TICKET = 5; // lottery ticket price
 export const MINUTE = 60000;
@@ -39,7 +40,8 @@ export const SERVER_COMMANDS = [
 const rint = (rng, a, b) => a + Math.floor(rng() * (b - a + 1));
 const pickOf = (rng, list) => list[Math.floor(rng() * list.length)];
 
-// "50", "all", "half", "25%" → a whole number of coins (null if it isn't one).
+// "50", "2k", "1.5k", "1,000", "all", "half", "25%" → a whole number of coins
+// (null if it isn't one). Numbers are read by amount.js, the same as the app.
 export function parseBet(word, balance) {
   const w = String(word || '')
     .trim()
@@ -49,7 +51,15 @@ export function parseBet(word, balance) {
   if (w === 'half') return Math.floor(balance / 2);
   const pct = /^(\d+(?:\.\d+)?)%$/.exec(w);
   if (pct) return Math.floor((balance * Math.min(100, +pct[1])) / 100);
-  return /^\d+$/.test(w) ? +w : null;
+  return parseAmount(w);
+}
+
+// A bet that isn't a whole number of coins ("/slots 1.2345k"): the note that
+// says so, with the nearest whole amount (never rounded for them). null when
+// every word is fine. The server and demo mode check this first.
+export function wholeCoinsNote(words) {
+  const tip = (words || []).map(amountTip).find(Boolean);
+  return tip ? ['That’s not a whole number of coins.', tip] : null;
 }
 
 // ---------- one-shot games ----------

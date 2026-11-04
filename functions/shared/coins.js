@@ -16,6 +16,7 @@ import { mergedMs } from './hours.js';
 import { nameKey } from './team.js';
 import { BOT, GROUP_MAX } from './groups.js';
 import { secureRandom } from './rng.js';
+import { parseAmount } from './amount.js';
 
 // The team day 3.0's earning rules start (4 an hour in 15-minute steps, cut
 // at midnight, at most tasksPerDay paid tasks a day). Earlier days pay as
@@ -526,8 +527,9 @@ export function spinWheel(rng = secureRandom) {
 export const GAME_PRIZE_MAX = 20;
 const text = (v, n) => String(v || '').slice(0, n);
 
+// amount: a number, or the text of one ("2k", "1,000"; amount.js).
 export function giftEntry(from, { to, amount, note }, { roster, balance, now = Date.now() }) {
-  const n = Number(amount);
+  const n = typeof amount === 'string' ? (parseAmount(amount) ?? NaN) : Number(amount);
   if (!roster.includes(to)) return { error: 'Who’s that?' };
   if (to === from) return { error: 'That’s you.', body: 'Your coins are already yours.' };
   if (!Number.isInteger(n) || n < 1) return { error: 'Send at least 1 coin.' };
