@@ -7,6 +7,7 @@ import { Icon } from './shell/icons.jsx';
 import { CompareWithServer, EveryoneCoins, ReversedTag, StaleBanner, reverseProps, useReverse } from './CoinsEveryone.jsx';
 import { MyReports } from './Disputes.jsx';
 import { LoansPanel } from './Loans.jsx';
+import { CoinNum, useCoinFormat } from './CoinNum.jsx';
 
 // A Jackson coin: a little gold coin with a J.
 export const Coin = ({ size = 16 }) => (
@@ -14,10 +15,11 @@ export const Coin = ({ size = 16 }) => (
     J
   </span>
 );
+// The number follows Appearance → Coin numbers (coinFormat.js).
 export const Coins = ({ n, size }) => (
   <span className="jcoins">
     <Coin size={size} />
-    {Number(n || 0).toLocaleString()}
+    <CoinNum n={n} />
   </span>
 );
 
