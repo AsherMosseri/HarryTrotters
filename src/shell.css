@@ -5010,7 +5010,7 @@ button.bs-cell:focus-visible { outline: 2px solid var(--accent); outline-offset:
 @container gv (min-aspect-ratio: 6/5) {
   .bs-view.player:not(.done) {
     display: grid; grid-template-columns: minmax(0, var(--bs-t)) minmax(220px, 1fr); grid-template-rows: auto auto auto 1fr auto;
-    gap: 10px 22px; --bs-t: min(62cqw, calc(100cqh - 70px), 640px);
+    gap: 10px 22px; --bs-t: min(62cqw, calc(100cqh - 112px), 640px);
   }
   .bs-view.player:not(.done) > .bs-view-top { grid-column: 1 / -1; }
   .bs-view.player:not(.done) > .bs-news { grid-column: 2; grid-row: 2; }

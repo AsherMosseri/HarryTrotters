@@ -6,7 +6,7 @@ import { Icon } from '../shell/icons.jsx';
 import { ArcadeBody } from './Arcade.jsx';
 import { ModeChip } from './Battleship.jsx';
 
-// The game view: a live two-player game, big, over the chat (gameView.js has
+// The game view: a live two-player game, big, over the chat (liveGames.js has
 // the opener). The players play here; anyone else watches, live and read-only,
 // seeing only what's on the card (in Battleship: shots, hits and sunk ships,
 // never a fleet before the end). The chat keeps going underneath and stays

@@ -4,7 +4,7 @@ import * as bs from '../../../functions/shared/battleship.js';
 import { Icon } from '../shell/icons.jsx';
 import { confirmDialog } from '../Dialogs.jsx';
 import { Invite, Result, Versus } from './Arcade.jsx';
-import { openGameView } from './gameView.js';
+import { openGameView } from './liveGames.js';
 
 // Battleship. In the chat, a summary card (who's playing, the rules, what just
 // happened, both boards' shots) with a big Play or Watch button; the game

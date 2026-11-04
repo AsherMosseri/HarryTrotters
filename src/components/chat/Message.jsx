@@ -656,6 +656,10 @@ export default function Message({
       }}
       onClick={(e) => {
         if (e.target.closest('a,button,input,.emoji-picker,.spoiler:not(.shown)')) return;
+        // A game being played: a tap that just misses a square or a button
+        // isn't a tap on the message (its buttons would open under the board).
+        // The card's top line still opens them.
+        if (e.target.closest('.cmd-arcade') && !e.target.closest('.cmd-head')) return;
         onSelect(selected ? null : m.id);
       }}
     >

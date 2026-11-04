@@ -14,7 +14,7 @@ import { ChannelDialog, ChannelIcon, MembersPanel, NewDmDialog, NotifyMenu, Pinn
 import { Icon } from './shell/icons.jsx';
 import { BotReplies, ChatAd, chatAdSpots, useAds } from './Ads.jsx';
 import GameView from './chat/GameView.jsx';
-import { onOpenGameView } from './chat/gameView.js';
+import { onOpenGameView } from './chat/liveGames.js';
 import { MULTI, isLive } from '../../functions/shared/arcade.js';
 
 const GROUP_MINUTES = 5;
@@ -347,7 +347,8 @@ export default function ChatView({
     if (!el) return;
     if (atBottom.current && !holding()) return toBottom(el);
     keepAnchor();
-    atBottom.current = distance(el) < BOTTOM_PX;
+    // Only you going down (or the pill) makes it follow again.
+    if (distance(el) >= BOTTOM_PX) atBottom.current = false;
   };
 
   // Opening a conversation: unread messages start at the red "New" line near
@@ -404,7 +405,9 @@ export default function ChatView({
     else if (atBottom.current && !holding()) toBottom(el);
     else {
       keepAnchor();
-      atBottom.current = distance(el) < BOTTOM_PX;
+      // Held still (a finger, a card, the game view): it didn't follow, so it
+      // won't later either, until you go down (or tap the pill).
+      atBottom.current = !holding() && distance(el) < BOTTOM_PX;
       const added = (was >= 0 ? all.slice(was + 1) : [newest]).filter((m) => !sentByMe(m, actor)).length;
       if (!atBottom.current && added) setNewBelow((n) => n + added);
     }
@@ -456,11 +459,12 @@ export default function ChatView({
     const el = list.current;
     const mine = selfScroll.current;
     selfScroll.current = false;
+    takeAnchor();
+    if (mine) return;
     atBottom.current = distance(el) < BOTTOM_PX;
     if (atBottom.current) setNewBelow(0);
-    takeAnchor();
     // A fling goes on after the finger lifts: wait for it to stop.
-    if (!mine && !hold.current.touching) hold.current.until = Math.max(hold.current.until, performance.now() + 150);
+    if (!hold.current.touching) hold.current.until = Math.max(hold.current.until, performance.now() + 150);
   };
   // A tap on a game card (or any card): hands off for a few seconds.
   const onListPointerDown = (e) => {
@@ -488,8 +492,7 @@ export default function ChatView({
       const el = list.current;
       if (!el) return;
       keepAnchor();
-      atBottom.current = distance(el) < BOTTOM_PX;
-      if (atBottom.current) setNewBelow(0);
+      if (distance(el) >= BOTTOM_PX) atBottom.current = false;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

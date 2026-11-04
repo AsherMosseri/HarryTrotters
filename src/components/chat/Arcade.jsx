@@ -5,7 +5,7 @@ import { AWARD_CAPS } from '../../../functions/shared/coins.js';
 import { serverNow } from '../../serverTime.js';
 import { FunShare, RaceCard } from './FunCards.jsx';
 import { BattleshipCard, BattleshipView } from './Battleship.jsx';
-import { VIEW_GAMES, noteCard, openGameView, useFreshCmd } from './gameView.js';
+import { VIEW_GAMES, noteCard, openGameView, useFreshCmd } from './liveGames.js';
 import { Icon } from '../shell/icons.jsx';
 import { Die } from './Die.jsx';
 import { ActBtn, Amt } from './Casino.jsx';
@@ -690,7 +690,7 @@ function Heist({ g, me, act, Name, now }) {
 
 // view: shown in the game view (GameView.jsx), big; otherwise it's the card in the chat.
 export function ArcadeBody({ m, me, Name, onMove, conv, view = false, onRun }) {
-  // The newest copy of the game: the chat's, or a move's answer if that's ahead (gameView.js).
+  // The newest copy of the game: the chat's, or a move's answer if that's ahead (liveGames.js).
   const c = useFreshCmd(m.id, m.cmd);
   const g = { ...c.game, status: c.status };
   const live = isLive(c.status);
