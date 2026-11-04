@@ -25,7 +25,7 @@ const WHO = (n) => n.split(' ')[0];
 // The exact day and time of a history line (casino lines come in quick runs).
 const whenAt = (at) => new Date(at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
-export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onMarket, onClose, isManager = false, onCheck, stale, onRefresh, disputes = [], initialTab = 'wallet', onAdjust, loans = null, loanFocus = null, onToast }) {
+export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onMarket, onClose, isManager = false, onCheck, stale, onRefresh, disputes = [], initialTab = 'wallet', onAdjust, loans = null, loanFocus = null, onToast, everyone = true }) {
   useEscape(onClose);
   const [tab, setTab] = useState(initialTab);
   // Opened again from a notification while it's already open.
@@ -116,7 +116,11 @@ export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onMarket
           </div>
           <StaleBanner stale={stale} onRefresh={onRefresh} />
           <div className="coins-body">
-            {tab === 'everyone' && isManager && onCheck && <EveryoneCoins roster={roster} data={data} cfg={cfg} onCheck={onCheck} onAdjust={onAdjust} />}
+            {/* everyone: everyone's coins have loaded (only yours load until this screen opens). */}
+            {tab === 'everyone' &&
+              isManager &&
+              onCheck &&
+              (everyone ? <EveryoneCoins roster={roster} data={data} cfg={cfg} onCheck={onCheck} onAdjust={onAdjust} /> : <p className="empty">Loading…</p>)}
             {tab === 'wallet' &&
               (wallet.history.length ? (
                 <ul className="coins-history">
@@ -261,16 +265,20 @@ export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onMarket
                     ))}
                   </div>
                 )}
-                <ol className="coins-board">
-                  {board.map((r, i) => (
-                    <li key={r.name} className={r.name === actor.name ? 'me' : ''}>
-                      <span className={`coins-rank${i < 3 ? ` top top-${i + 1}` : ''}`}>{i + 1}</span>
-                      <Avatar name={r.name} size={28} />
-                      <span className="grow">{r.name}</span>
-                      <Coins n={r.coins} />
-                    </li>
-                  ))}
-                </ol>
+                {everyone ? (
+                  <ol className="coins-board">
+                    {board.map((r, i) => (
+                      <li key={r.name} className={r.name === actor.name ? 'me' : ''}>
+                        <span className={`coins-rank${i < 3 ? ` top top-${i + 1}` : ''}`}>{i + 1}</span>
+                        <Avatar name={r.name} size={28} />
+                        <span className="grow">{r.name}</span>
+                        <Coins n={r.coins} />
+                      </li>
+                    ))}
+                  </ol>
+                ) : (
+                  <p className="empty">Loading…</p>
+                )}
                 <p className="muted tiny">
                   {kind === 'coins'
                     ? 'Everyone’s balance right now: everything earned, won, given, and spent.'

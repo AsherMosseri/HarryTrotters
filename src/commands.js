@@ -433,7 +433,8 @@ export function parseRemind(text, now = Date.now()) {
 // ---------- running one ----------
 
 // What happens when you send "/name args". ctx: { actor, roster, competitionDate,
-// countdown(), whois(name), ping(), setAfk(reason), addReminder(at, text) },
+// countdown(), whois(name), ping(), setAfk(reason), addReminder(at, text),
+// everyoneCoins() (resolves once everyone's coins are loaded, before showing them) },
 // and for groups (src/groups.js): subteamsOf(name), isDm, isManager,
 // mentionsOn, everyoneOn, giftGroup(ask, amount, key), key (the same for a
 // second send of the same text, so a /give can't pay twice).
@@ -473,6 +474,8 @@ export async function runCommand({ cmd, args }, ctx) {
     case 'balance': {
       const who = args ? findPerson(args, ctx.roster) : me;
       if (!who) return { note: { title: `Who’s “${args}”?`, body: 'Try: /balance @name' } };
+      // Someone else's coins: the app loads everyone's first.
+      if (who !== me) await ctx.everyoneCoins?.();
       const w = ctx.wallet(who);
       return card(
         { to: who, balance: w.balance, earned: w.earned, casino: w.casino, played: w.stats.played || 0, best: w.stats.best || 0 },
@@ -480,6 +483,7 @@ export async function runCommand({ cmd, args }, ctx) {
       );
     }
     case 'leaderboard':
+      await ctx.everyoneCoins?.();
       return card({ top: ctx.richest() });
     case 'give': {
       // The amount is the last word, a whole number ("/give @Cooper 20").
@@ -592,6 +596,8 @@ export async function runCommand({ cmd, args }, ctx) {
     }
     case 'whois':
     case 'avatar': {
+      // /whois shows coins: the app loads everyone's first.
+      if (cmd.name === 'whois') await ctx.everyoneCoins?.();
       // /whois @Programming: a row each, A to Z.
       if (group) {
         const list = [...group.people].sort((a, b) => a.localeCompare(b));

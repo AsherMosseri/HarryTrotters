@@ -38,7 +38,7 @@ import RunsView from './RunsView.jsx';
 import ChatView from './ChatView.jsx';
 import Sidebar from './shell/Sidebar.jsx';
 import ConnectionPill from './shell/ConnectionPill.jsx';
-import { noteFor } from '../connection.js';
+import { isOnline, noteFor } from '../connection.js';
 import Today from './shell/Today.jsx';
 import { Icon } from './shell/icons.jsx';
 // The 3D viewer pulls in three.js, so it loads only when the Robot tab opens.
@@ -1060,42 +1060,57 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
   const shownConv = view === 'chat' ? currentConv : view === 'parts' ? partsConv : null;
 
   // Live chat for every channel and my DMs (for unread counts), plus a team DM
-  // being viewed.
+  // being viewed. The conversation on screen and #announcements (its required
+  // polls and banner) get their whole last page; every other one only what's
+  // newer than you've read (the same unread counts and previews), so a start
+  // doesn't download every conversation's last page. Entries: "key" for a
+  // whole page, "key>since" for just the unread.
   const liveKeys = useMemo(() => {
     const keys = [...convs.channels, ...convs.dms].map((c) => c.key);
     if (view === 'chat' && currentConv && !keys.includes(currentConv.key)) keys.push(currentConv.key);
-    return keys.join('|');
-  }, [convs, view, currentConv]);
+    const whole = (key) => !store.subscribeUnread || key === shownConv?.key || key === 'announcements';
+    return keys
+      .map((key) => (whole(key) ? key : chatRead?.[key] != null ? `${key}>${chatRead[key]}` : ''))
+      .filter(Boolean)
+      .join('|');
+  }, [convs, view, currentConv, shownConv, chatRead, store]);
   const chatSubs = useRef(new Map());
   useEffect(() => {
     const want = new Set(liveKeys.split('|').filter(Boolean));
-    for (const [key, stop] of chatSubs.current)
-      if (!want.has(key)) {
+    for (const [sub, stop] of chatSubs.current)
+      if (!want.has(sub)) {
         stop();
-        chatSubs.current.delete(key);
+        chatSubs.current.delete(sub);
       }
-    for (const key of want)
-      if (!chatSubs.current.has(key))
-        chatSubs.current.set(
-          key,
-          store.subscribeChannel(
-            key,
-            CHAT_PAGE,
-            (msgs) => setChat((all) => ({ ...all, [key]: msgs })),
-            key.startsWith('dm:') ? quiet('dm') : loadFail('chat'),
-          ),
-        );
+    for (const sub of want) {
+      if (chatSubs.current.has(sub)) continue;
+      const [key, since] = sub.split('>');
+      const got = (msgs) => setChat((all) => ({ ...all, [key]: msgs }));
+      const onError = key.startsWith('dm:') ? quiet('dm') : loadFail('chat');
+      chatSubs.current.set(
+        sub,
+        since === undefined ? store.subscribeChannel(key, CHAT_PAGE, got, onError) : store.subscribeUnread(key, Number(since), CHAT_PAGE, got, onError),
+      );
+    }
   }, [liveKeys, store, loadFail, quiet]);
   useEffect(() => () => chatSubs.current.forEach((stop) => stop()), []);
 
   // People: pictures, statuses, org info, and who's online (rechecked every 30 s).
   const profiles = useMemo(() => buildProfiles(profileDocs, rename), [profileDocs, rename]);
   const peopleInfo = useMemo(() => buildPeopleInfo(roster, roles, rename), [roster, roles, rename]);
+  // The clock moves on only when something shown changes: someone's "typing…"
+  // or online dot running out, or a new minute (coins count a running shift by
+  // the minute). Ticking every 2 seconds redrew the whole app, chat and all,
+  // even with nothing new, which an iPad feels.
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), view === 'chat' || view === 'parts' ? 2000 : 30000);
-    return () => clearInterval(t);
-  }, [view]);
+    const t = Date.now();
+    let next = Math.floor(t / 60000) * 60000 + 60000;
+    for (const p of presence)
+      for (const end of [(p.typingAt || 0) + TYPING_MS, (p.at || 0) + ONLINE_MS]) if (end > t && end < next) next = end;
+    const timer = setTimeout(() => setNow(Date.now()), Math.max(250, next - t + 50));
+    return () => clearTimeout(timer);
+  }, [presence, now]);
   const online = useMemo(() => {
     const out = new Set();
     for (const p of presence) if (p.name && (p.at || 0) > now - ONLINE_MS) out.add(rename(p.name));
@@ -1500,6 +1515,8 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
       setRaceLive: (race, data) => store.setRaceLive(race, data, actor).catch(() => {}),
       subscribeRaceLive: (race, cb) => store.subscribeRaceLive(race, cb),
       wallet: (name) => cmdData.current.wallet(name),
+      // Before someone else's coins: loads the whole ledger (once a visit).
+      everyoneCoins: () => cmdData.current.everyoneCoins?.(),
       richest: () => cmdData.current.richest(),
       lottery: () => cmdData.current.lottery,
       // Gifts and ad prizes go through the play function, which checks the balance and today's limits.
@@ -1516,7 +1533,8 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
         botHook.current?.(conv, data?.text);
         store.setPresence(actor, { typing: '', typingAt: 0 }).catch(() => {});
         typingSent.current = 0;
-        return store.sendMessage(conv, data, actor, photoFiles).catch(fail);
+        // Done once it's on screen (pending); a refusal after that still says so.
+        return store.sendMessage(conv, data, actor, photoFiles, { onError: fail }).catch(fail);
       },
       // "Typing…": at most one write every 3 seconds.
       typing: (conv) => {
@@ -2071,14 +2089,6 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
   const [ledger, setLedger] = useState([]);
   // coinReload: start the coins and bank listeners over (Coins screen: refresh).
   const [coinReload, setCoinReload] = useState(0);
-  useEffect(
-    () =>
-      store.subscribeCoins((list) => {
-        setLedger(list);
-        seenCoins('ledger');
-      }),
-    [store, seenCoins, coinReload],
-  );
   // Coins the server just paid you for a streak milestone, a bingo line or
   // the closest guess: a toast, and a burst for streaks and big wins. The
   // newest one seen is kept on this device so a reload doesn't repeat it.
@@ -2107,6 +2117,59 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
     if (big) celebrate();
   }, [ledger, rename, actor.name]);
   const [coinsOpen, setCoinsOpen] = useState(false);
+  // The ledger only loads whole (every entry anyone has, thousands by now, on
+  // every start) once someone else's coins are needed: the Coins screen (its
+  // boards, loans, team management's Everyone), casino reports, the Ads page,
+  // or /balance @someone, /leaderboard and /whois (api.everyoneCoins). Until
+  // then it's just the entries your own balance is counted from, which is the
+  // same balance. Once loaded it stays for the visit.
+  // ledgerAll: the ledger on hand is the whole one, from the server.
+  const [everyoneCoins, setEveryoneCoins] = useState(false);
+  const needEveryone = coinsOpen || adsPage || (disputesOpen && ownsReports);
+  useEffect(() => {
+    if (needEveryone) setEveryoneCoins(true);
+  }, [needEveryone]);
+  const wholeLedger = everyoneCoins || needEveryone || !store.subscribeMyCoins;
+  const [ledgerAll, setLedgerAll] = useState(false);
+  // Every name you've had (old entries keep the name they were saved with).
+  const myNames = useMemo(
+    () => [actor.name, ...Object.keys({ ...RENAMED, ...renames }).filter((k) => k !== actor.name && rename(k) === actor.name)].join('\n'),
+    [actor.name, renames, rename],
+  );
+  useEffect(() => {
+    if (wholeLedger)
+      return store.subscribeCoins((list, meta) => {
+        setLedger(list);
+        // A first answer from this device's saved copy can be only part of
+        // the ledger (what was saved from your own entries); online, wait for
+        // the server's.
+        if (!meta?.cached || !isOnline()) setLedgerAll(true);
+        seenCoins('ledger');
+      });
+    setLedgerAll(false);
+    return store.subscribeMyCoins(myNames.split('\n'), (list) => {
+      setLedger(list);
+      seenCoins('ledger');
+    });
+  }, [store, seenCoins, coinReload, wholeLedger, myNames]);
+  // /balance @someone, /leaderboard, /whois: resolves once everyone's coins
+  // are here (or after a while, offline).
+  const everyoneWaits = useRef([]);
+  useEffect(() => {
+    if (!ledgerAll) return;
+    everyoneWaits.current.forEach((done) => done());
+    everyoneWaits.current = [];
+  }, [ledgerAll]);
+  const ledgerAllRef = useRef(ledgerAll);
+  ledgerAllRef.current = ledgerAll;
+  const loadEveryoneCoins = useCallback(() => {
+    if (ledgerAllRef.current) return Promise.resolve();
+    setEveryoneCoins(true);
+    return new Promise((done) => {
+      everyoneWaits.current.push(done);
+      setTimeout(done, 10000);
+    });
+  }, []);
   const coinCfg = useMemo(() => coinSettings(settings.coins), [settings.coins]);
   // Casino and economy winnings/losses (bank) and the Friday lottery; the
   // play function writes them.
@@ -2155,6 +2218,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
   cmdData.current = {
     roster,
     lottery,
+    everyoneCoins: loadEveryoneCoins,
     team: {
       commandCfg: commandCfgFor(settings.commands || {}, controls),
       tasks: tasks || [],
@@ -3409,7 +3473,8 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
           {coinsOpen && (
             <CoinsDialog
               disputes={myDisputes}
-              loans={controls.isOn('coins') ? loans : null}
+              loans={controls.isOn('coins') ? { ...loans, everyone: ledgerAll } : null}
+              everyone={ledgerAll}
               loanFocus={loanFocus}
               onToast={(text) => setToast({ text })}
               initialTab={coinsTab}
