@@ -435,7 +435,7 @@ export function BattleshipView({ g, me, act, Name, now, mv, msgId }) {
           </div>
           <div className="bs-yours-wrap">
             <Board {...yours} label="Your fleet" className="yours" />
-            <Fleet sunk={g.sunk?.[me]} />
+            <Fleet sunk={g.sunk?.[me]} short={done} />
           </div>
         </div>
       ) : g.shots ? (

@@ -5089,9 +5089,11 @@ button.bs-cell:focus-visible { outline: 2px solid var(--accent); outline-offset:
 .bs-yours-wrap > .bs-fleet { padding-top: 22px; flex-direction: column; gap: 4px; }
 .bs-board.target .bs-label { font-size: 14px; }
 .bs-view.watching .bs-view-boards { grid-template-columns: repeat(2, minmax(0, var(--bs-w))); --bs-w: min(calc((100cqw - 18px) / 2), calc(100cqh - 190px), 460px); }
-.bs-view.done .bs-view-boards { grid-template-columns: repeat(2, minmax(0, var(--bs-w))); --bs-w: min(calc((100cqw - 18px) / 2), calc(100cqh - 200px), 460px); }
-.bs-view.done .bs-yours-wrap { display: flex; }
+.bs-view.done .bs-view-boards, .bs-view.player.done .bs-view-boards { grid-template-columns: repeat(2, minmax(0, var(--bs-w))); --bs-w: min(calc((100cqw - 18px) / 2), calc(100cqh - 200px), 460px); }
+.bs-view.done .bs-yours-wrap { display: flex; flex-direction: column; }
+.bs-view.done .bs-view-boards .bs-board { width: 100%; }
 .bs-view.done .bs-yours-wrap > .bs-fleet { padding-top: 0; flex-direction: row; }
+.bs-view.done .bs-fleet.short { flex-wrap: wrap; row-gap: 2px; }
 .bs-view-boards.one { grid-template-columns: minmax(0, min(100cqw, calc(100cqh - 200px), 420px)); }
 .bs-view-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-height: 40px; margin-top: auto; flex: none; }
 .bs-view .arc-result { font-size: 16px; }
