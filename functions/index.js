@@ -1758,7 +1758,7 @@ export const play = onCall({ maxInstances: 5, invoker: 'public' }, withBalance(a
 
     if (isCasino) {
       const bet = casino.parseBet(words[0], balance);
-      if (!bet || bet < 1) return note(`/${game} needs a bet`, `Try: /${game} 20 (or all, half, 25%). You have ${balance} coins.`);
+      if (!bet || bet < 1) return note(`/${game} needs a bet`, `Try: /${game} 20 (or 1k, all, half, 25%). You have ${balance} coins.`);
       if (bet > balance) return note(`You only have ${balance} coins.`, 'Try /daily, /work, or /beg.');
       const r = casino.startGame(game, bet, words.slice(1), secureRandom, now);
       if (r.error) return note(r.error);

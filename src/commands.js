@@ -13,7 +13,7 @@ import { GROUP_ROWS, MORE_COMMANDS, runMore } from './moreCommands.js';
 import { runRequest } from './requestCommand.js';
 import { groupNotify, groupTargets } from './groups.js';
 import { GIFT_MAX } from '../functions/shared/coins.js';
-import { amountTip, parseAmount } from '../functions/shared/amount.js';
+import { amountTip, looksLikeAmount, parseAmount } from '../functions/shared/amount.js';
 import { loanOff, runLoan } from './loanCommand.js';
 
 export const GROUPS = [
@@ -137,14 +137,15 @@ export function matchCommands(typed, cfg) {
 }
 
 const pick = (list) => list[Math.floor(Math.random() * list.length)];
-// Anything left after the game words ("bot", "hard", "expert"…) is a person to race.
+// Anything left after the game words ("bot", "hard", "expert"…) and amounts
+// ("20", "2k") is a person to race.
 const GAME_WORDS = /^(bot|trotbot|easy|medium|hard|beginner|intermediate|expert|marathon|sprint|ultra|\d+)$/i;
 const namesSomeone = (args) =>
   !/\btournament\s+\S/i.test(args) &&
   args
     .replace(/@/g, '')
     .split(/\s+/)
-    .some((w) => w && !GAME_WORDS.test(w));
+    .some((w) => w && !GAME_WORDS.test(w) && !looksLikeAmount(w));
 const between = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
 // The same answer every time for the same thing (so /rate pizza is consistent).
 const hash = (s) => [...String(s).toLowerCase()].reduce((h, c) => (h * 31 + c.codePointAt(0)) >>> 0, 7);
