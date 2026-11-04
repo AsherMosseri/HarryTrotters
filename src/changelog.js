@@ -4,6 +4,34 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '3.1.3',
+    date: '2026-11-04',
+    title: 'No more coin limits',
+    items: [
+      'No limit on how many coins you can /give, /request, lend or borrow from the bank at once. You still can’t give, lend or pay more than you have, and bank loans still need Asher’s yes.',
+    ],
+  },
+  {
+    version: '3.1.2',
+    date: '2026-11-04',
+    title: 'Mines fixed: taps land where you aim',
+    items: [
+      'Fixed: while you play a casino game, other people’s messages and games no longer move the chat, so your card stays put under your finger. New messages show a “new messages” button instead.',
+      'Fixed: “Pick a closed tile” on a tile that looked closed. The card now shows each tile you open right away, so it can’t be sent twice.',
+      'Tapping just beside a tile no longer opens the message’s buttons and scrolls the chat.',
+    ],
+  },
+  {
+    version: '3.1.1',
+    date: '2026-11-04',
+    title: 'Who drove, operated and coached',
+    items: [
+      'Every practice run and match now records its drive team: Driver, Operator, Coach and Human player. Log a run fills them in from the pit screen’s drive team, and you can change them for each run.',
+      'Match log shows the drive team on every run, and a new Who did what table counts how many runs each person drove, operated, coached or was human player, with the average score of the runs they drove.',
+      'Scores saved from the pit screen during a competition record the drive team too.',
+    ],
+  },
+  {
     version: '3.1',
     date: '2026-11-04',
     title: 'A new casino, loans and /request',

@@ -522,7 +522,7 @@ export async function runCommand({ cmd, args }, ctx) {
       if (to === me) return { note: { title: 'That’s you.', body: 'Your coins are already yours.' } };
       const have = ctx.wallet(me).balance;
       if (amount > have) return { note: { title: `You only have ${have} coins.` } };
-      if (amount > 5000) return { note: { title: 'That’s a lot.', body: 'Up to 5000 at a time.' } };
+      if (amount > GIFT_MAX) return { note: { title: 'That’s a lot.', body: `Up to ${GIFT_MAX.toLocaleString('en-US')} at a time.` } };
       const r = await ctx.gift(to, amount, '', ctx.key);
       if (!r?.ok) return { note: r?.note || { title: 'That didn’t go through.' } };
       return card({ to, amount, line: `sent you ${amount} Jackson coins` }, { mentions: [to] });
