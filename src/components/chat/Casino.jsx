@@ -541,7 +541,7 @@ function Mines({ c, mine, mv }) {
             const open = g.open.includes(i);
             const bomb = g.spots?.includes(i);
             const pend = mv.pending === String(i);
-            const kept = mv.queued === String(i);
+            const kept = mv.queued.includes(String(i));
             const pop = open ? appeared(`o${i}`) : bomb && appeared(`b${i}`);
             return (
               <button

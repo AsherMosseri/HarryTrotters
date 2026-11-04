@@ -6,7 +6,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 // takes the next tap as soon as the move shows up on it: the server writes the
 // card, so its new state arriving means the move is done, even while the
 // play function is still finishing its answer. A tap during a pending move is
-// either kept for right after it (canQueue, e.g. another mines tile) or
+// either kept to send right after it, in order (canQueue: other mines tiles), or
 // ignored; the same move again within a moment of the last one is a double
 // tap and is ignored too. A move that fails or gets no answer frees the card
 // and says so.
@@ -20,9 +20,9 @@ export const RETRY = 'That didn’t go through. Tap again.';
 
 export function useMove(onMove, version, { canQueue = () => false, stillOk = () => true } = {}) {
   const [pending, setPending] = useState(null);
-  const [queued, setQueued] = useState(null);
+  const [queued, setQueued] = useState([]);
   const [error, setError] = useState('');
-  const s = useRef({ pending: null, queued: null, seq: 0, last: { move: null, at: 0 }, version });
+  const s = useRef({ pending: null, queued: [], seq: 0, last: { move: null, at: 0 }, version });
   // The latest props, for callbacks made once.
   const live = useRef({ onMove, canQueue, stillOk });
   live.current = { onMove, canQueue, stillOk };
@@ -33,20 +33,21 @@ export function useMove(onMove, version, { canQueue = () => false, stillOk = () 
     st.last = { move: st.pending, at: performance.now() };
     st.pending = null;
     setPending(null);
-    const next = st.queued;
-    st.queued = null;
-    setQueued(null);
-    // A tap kept for after: send it if it still makes sense on the new card.
-    if (next != null && live.current.stillOk(next)) queueMicrotask(() => sendRef.current(next));
+    // Taps kept for after: the next one that still makes sense on the new card goes now.
+    const rest = st.queued.filter((x) => live.current.stillOk(x));
+    const next = rest.shift();
+    st.queued = rest;
+    setQueued(rest);
+    if (next != null) queueMicrotask(() => sendRef.current(next));
   }, []);
 
   const send = useCallback(
     async (move) => {
       const st = s.current;
       if (st.pending != null) {
-        if (move !== st.pending && st.queued == null && live.current.canQueue(move)) {
-          st.queued = move;
-          setQueued(move);
+        if (move !== st.pending && !st.queued.includes(move) && st.queued.length < 8 && live.current.canQueue(move)) {
+          st.queued = [...st.queued, move];
+          setQueued(st.queued);
         }
         return null;
       }
@@ -68,8 +69,8 @@ export function useMove(onMove, version, { canQueue = () => false, stillOk = () 
         else if (r?.timedOut || r?.failed) setError(RETRY);
         // A refused move may leave the kept tap pointless.
         if (refused) {
-          st.queued = null;
-          setQueued(null);
+          st.queued = [];
+          setQueued([]);
         }
         release(token);
       }
