@@ -312,6 +312,15 @@ service cloud.firestore {
     match /refundKeys/{id} {
       allow read, write: if false;
     }
+    // Coin requests (/request @person amount; functions/coinRequests.js): the
+    // request (who, how much, its status) and each person's waiting list are
+    // written by the coinRequest function only. The card in chat is a copy.
+    match /coinRequests/{id} {
+      allow read, write: if false;
+    }
+    match /coinRequestsOpen/{id} {
+      allow read, write: if false;
+    }
     // Decks, mine spots, and crash points: the server only.
     match /gameSecrets/{id} {
       allow read, write: if false;
@@ -539,10 +548,17 @@ service cloud.firestore {
     // Casino, economy, and arcade game cards only come from the server (the
     // play function), so nobody can post a fake jackpot or a fake win.
     function serverCommand(m) {
-      return 'cmd' in m && m.cmd is map && m.cmd.get('name', '') in
+      return 'cmd' in m && m.cmd is map && (m.cmd.get('name', '') in
         ['slots', 'dice', 'coinflip', 'roulette', 'blackjack', 'crash', 'mines', 'highlow', 'lottery', 'daily', 'work', 'beg', 'rob',
          'rps', 'tictactoe', 'connect4', 'duel', 'challenge', 'trivia', 'hangman', 'typerace', 'heist', 'labday', 'recap',
-         'battleship', 'tetris', 'minesweep'];
+         'battleship', 'tetris', 'minesweep']
+        || (m.cmd.get('name', '') == 'request' && m.cmd.get('kind', '') != 'idea'));
+    }
+    // A coin request card's state (open, paid, declined…) is the server's,
+    // team management included: nobody changes its cmd.
+    function coinCard(c) { return c is map && c.get('name', '') == 'request' && c.get('kind', '') != 'idea'; }
+    function keepsCoinCard() {
+      return (!coinCard(resource.data.get('cmd', null)) && !coinCard(request.resource.data.get('cmd', null))) || keepsCmd();
     }
     // ...or change one afterwards (team management can still edit/delete).
     function keepsCmd() {
@@ -592,7 +608,8 @@ service cloud.firestore {
       allow read: if isMember() && canReadIn(channelId);
       allow create: if isMember() && validMessage() && (channelId != 'announcements' || isManager()) && !channelOff(channelId) && canPostIn(channelId);
       allow update: if isMember() && !channelOff(channelId) && changeAllowed()
-        && (isManager() || (canPostIn(channelId) && (isAuthor() || sharedChange()) && keepsCmd()));
+        && (isManager() || (canPostIn(channelId) && (isAuthor() || sharedChange()) && keepsCmd()))
+        && keepsCoinCard();
       allow delete: if isManager();
     }
 
@@ -620,7 +637,8 @@ service cloud.firestore {
         allow read: if isMember() && (isManager() || inPeople(dmPeople()));
         allow create: if isMember() && !featureOff('dms') && validMessage() && inPeople(dmPeople());
         allow update: if isMember() && !featureOff('dms') && changeAllowed() && (isManager() || (inPeople(dmPeople())
-          && (isAuthor() || sharedChange()) && keepsCmd()));
+          && (isAuthor() || sharedChange()) && keepsCmd()))
+          && keepsCoinCard();
         allow delete: if isManager();
       }
     }

@@ -245,6 +245,23 @@ function makeWorld(seed) {
     });
     truth[p.current].bankNet = net;
   }
+  // Gifts between teammates: /give, and paid coin requests (/request @person,
+  // functions/coinRequests.js), which are the same gift with the request's id
+  // on it and the reason as the note. Each is one entry both people count:
+  // the server finds it by `from` for one and `to` for the other.
+  for (let i = people.length > 1 ? int(0, people.length * 2) : 0; i > 0; i--) {
+    const a = pick(people);
+    const b = pick(people.filter((q) => q !== a));
+    const at = t0();
+    const amount = int(1, 60);
+    const asked = chance(0.5);
+    const note = asked ? pick(['for pizza', '', 'robot parts']) : '';
+    const extra = asked ? { request: `r${i}` } : {};
+    ledger.push({ type: 'gift', from: nameAt(a, at), to: nameAt(b, at), amount, note, at, ...extra });
+    const as = { type: 'gift', from: a.current, to: b.current, amount, note, at };
+    truth[a.current].ledger.push(as);
+    truth[b.current].ledger.push(as);
+  }
   return { rand, people, renames, rename, aliasesOf, cfg, shifts, tasks, truthTasks, ledger, bank, truth };
 }
 
