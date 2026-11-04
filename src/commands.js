@@ -10,6 +10,7 @@ import { overdueTasks, parseMatch, parseTask, seasonRecord, todayISO } from './t
 import { blocked, isOff } from '../functions/shared/commandRules.js';
 import { gameArgs } from './components/games/launch.js';
 import { MORE_COMMANDS, runMore } from './moreCommands.js';
+import { runRequest } from './requestCommand.js';
 
 export const GROUPS = [
   ['basics', 'Basics'],
@@ -34,6 +35,7 @@ export const COMMANDS = [
   { name: 'afk', bare: true, group: 'basics', args: 'reason', desc: 'Away: Trotbot tells people who @ you' },
   { name: 'remind', group: 'basics', args: 'when what', desc: 'A reminder later (10m, 2h, tomorrow 7am, at 5pm…)' },
   { name: 'poll', group: 'basics', args: 'question', desc: 'Start a poll' },
+  { name: 'request', bare: true, group: 'basics', args: 'idea | channel | pet | style | @person amount', desc: 'Ask for a feature, a channel, a pet, a style, or coins from someone' },
 
   { name: 'me', group: 'text', args: 'action', desc: 'Say what you’re doing: /me waves shows “Asher waves”' },
   { name: 'shrug', group: 'text', args: 'message', desc: 'Adds ¯\\_(ツ)_/¯' },
@@ -435,6 +437,7 @@ export function parseRemind(text, now = Date.now()) {
 //   { note: { title, body?, lines? } }                  only you see it
 //   { poll: 'question' }                                 opens the poll maker
 //   { standup: true }                                    opens the standup form
+//   { ask: { form, text } }                              /request: opens a request form
 export async function runCommand({ cmd, args }, ctx) {
   const me = ctx.actor.name;
   const first = (n) => n.split(' ')[0];
@@ -579,6 +582,8 @@ export async function runCommand({ cmd, args }, ctx) {
     }
     case 'poll':
       return { poll: args };
+    case 'request':
+      return runRequest(args, ctx, { card });
 
     case 'me':
       if (!args) return need('an action');

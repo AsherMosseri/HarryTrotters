@@ -61,8 +61,9 @@ export function RequestPetLink() {
   );
 }
 
-function RequestPetDialog({ ctx, onClose }) {
-  const [animal, setAnimal] = useState('');
+// Also opened by /request pet [animal] (RequestForms.jsx), with the animal filled in.
+export function RequestPetDialog({ ctx, onClose, initial = '' }) {
+  const [animal, setAnimal] = useState(initial.slice(0, 40));
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState('');

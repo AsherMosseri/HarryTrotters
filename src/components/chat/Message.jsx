@@ -731,6 +731,7 @@ export default function Message({
                 onMove={(move) => api.play({ action: 'move', conv, msgId: m.id, move })}
                 onBuy={(n) => api.play({ action: 'run', game: 'lottery', args: [String(n)], conv })}
                 onChallenge={(args) => api.play({ action: 'run', game: 'challenge', args, conv })}
+                onAsk={(action) => api.coinRequest({ action, conv, id: m.id })}
                 onReport={canReport ? () => setReporting(true) : null}
               />
             )}

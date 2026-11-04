@@ -21,8 +21,8 @@ const TABS = [
 const tabOf = (r) => TABS.find(([, , has]) => has(r))?.[0] || 'open';
 
 // The idea box: type it, tap Send. onSend resolves false if it didn't save.
-export function RequestBox({ onSend, autoFocus }) {
-  const [text, setText] = useState('');
+export function RequestBox({ onSend, autoFocus, initial = '' }) {
+  const [text, setText] = useState(initial);
   const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
   const send = async () => {

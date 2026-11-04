@@ -160,9 +160,10 @@ function MyRequests({ requests, onCancel }) {
 }
 
 // Anyone: ask for a channel. onSend resolves { error } or {}.
-export function RequestChannelDialog({ roster, actor, channels, requests, onSend, onCancel, onClose }) {
+// initialName: from /request channel <name> (RequestForms.jsx).
+export function RequestChannelDialog({ roster, actor, channels, requests, onSend, onCancel, onClose, initialName = '' }) {
   useEscape(onClose);
-  const [name, setName] = useState('');
+  const [name, setName] = useState(() => cleanChannelName(initialName).slice(0, NAME_MAX));
   const [purpose, setPurpose] = useState('');
   const [kind, setKind] = useState('public');
   const [invitees, setInvitees] = useState([]);
