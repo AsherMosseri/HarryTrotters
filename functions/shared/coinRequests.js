@@ -11,6 +11,7 @@
 
 import { GIFT_MAX, giftEntry } from './coins.js';
 import { GROUP_MAX, namesShort } from './groups.js';
+import { coinsText } from './coinText.js';
 
 export const EXPIRES = 24 * 3600000; // a request is open for a day
 export const MAX_OPEN = 3; // requests one person can have waiting at once
@@ -19,7 +20,8 @@ export const REASON_MAX = 140; // the same as a gift's note
 export const MOVES = ['pay', 'decline', 'cancel', 'peek'];
 export const BOT = 'Trotbot';
 const first = (n) => String(n || '').split(' ')[0];
-export const coinText = (n) => `${n} 🪙`;
+// With commas (1,234 🪙): requests always show the exact amount.
+export const coinText = (n) => `${coinsText(n)} 🪙`;
 
 // What the card and notifications say: "asks Cooper for 25 🪙: for pizza".
 export const askLine = (p) => `asks ${first(p.to)} for ${coinText(p.amount)}${p.reason ? `: ${p.reason}` : ''}`;

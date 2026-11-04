@@ -109,4 +109,4 @@ if (typeof window !== 'undefined')
 
 // For text built outside React components (toasts, card lines): the number
 // in this device's style right now.
-export const coinText = (n) => formatCoins(n, current);
+export const coinStyled = (n) => formatCoins(n, current);

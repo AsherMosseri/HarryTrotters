@@ -20,7 +20,7 @@ import { Bomb, CoinMark, FlipCoin, Gem, PlayingCard, Rocket, RouletteWheel, ensu
 import { useMove } from './useMove.js';
 import { GroupFaces } from './MoreCards.jsx';
 import { CoinNum, useCoinFormat } from '../CoinNum.jsx';
-import { coinText, exactCoins } from '../../coinFormat.js';
+import { coinStyled, exactCoins } from '../../coinFormat.js';
 
 // The Jackson coins economy and casino cards (the play function rolls; these
 // show it). Live games (blackjack, crash, mines, high-low) have buttons for
@@ -436,7 +436,7 @@ function Crash({ c, mine, mv }) {
     if (refs.rocket.current) refs.rocket.current.style.transform = at(g.end);
     if (refs.mult.current) refs.mult.current.textContent = `${mult.toFixed(2)}×`;
     // In this device's coin style (read each frame, so a change shows at once).
-    if (refs.cash.current) refs.cash.current.textContent = coinText(Math.floor(c.bet * mult));
+    if (refs.cash.current) refs.cash.current.textContent = coinStyled(Math.floor(c.bet * mult));
   };
   // Finished: the curve up to where it ended.
   const endAt = playing ? 1 : c.game.at || 1;
