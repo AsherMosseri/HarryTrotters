@@ -15,6 +15,7 @@ import { relTime } from '../../util.js';
 import { alertDialog } from '../Dialogs.jsx';
 import { openGame } from '../games/launch.js';
 import { askOptions } from '../../requestCommand.js';
+import { loanOptions } from '../../loanCommand.js';
 import { groupKind } from '../../groups.js';
 
 // A /give's key: the same when the same text is sent again (a double tap, or a
@@ -156,6 +157,8 @@ export default function Composer({
         isOn: feat,
         groupCount: isDm ? null : (s) => subteamMembers(s).filter((n) => n !== actor.name).length,
       });
+    if (suggest.kind === 'loan')
+      return loanOptions(q, { roster: isDm && members ? members : roster, me: actor.name, owner: !!api.team().loans?.owner });
     if (suggest.kind === '@') {
       // After a command: groups where it takes them (/give @Programming 10,
       // and @everyone for anyone there), only people where it doesn't.
@@ -216,6 +219,13 @@ export default function Composer({
     const ask = !editing && /^\/request\s+(@?[^\s@]{0,30})$/i.exec(before);
     if (ask) {
       setSuggest({ kind: 'ask', query: ask[1], start: caret - ask[1].length, end: caret });
+      setActive(0);
+      return;
+    }
+    // After "/loan ": bank, pay, and people (loanCommand.js).
+    const loan = !editing && /^\/loan\s+(@?[^\s@]{0,30})$/i.exec(before);
+    if (loan) {
+      setSuggest({ kind: 'loan', query: loan[1], start: caret - loan[1].length, end: caret });
       setActive(0);
       return;
     }
@@ -368,6 +378,10 @@ export default function Composer({
         // /request with a form to fill in (RequestForms.jsx, opened by Workspace).
         reset();
         api.openAsk({ ...result.ask, conv });
+      } else if (result.loan) {
+        // /loan: the coins screen on Loans, the form filled in (loanCommand.js).
+        reset();
+        team.openLoan(result.loan);
       } else if (result.standup) {
         setText('');
         setSuggest(null);
@@ -507,7 +521,7 @@ export default function Composer({
         />
       )}
       {suggest && options.length > 0 && (
-        <ul className={`suggest${suggest.kind === '/' || suggest.kind === 'ask' ? ' suggest-cmds' : ''}`}>
+        <ul className={`suggest${suggest.kind === '/' || suggest.kind === 'ask' || suggest.kind === 'loan' ? ' suggest-cmds' : ''}`}>
           {options.map((o, i) => (
             <li key={o.key}>
               <button className={i === active ? 'active' : ''} onMouseDown={(e) => e.preventDefault()} onClick={() => pick(o)}>
@@ -719,8 +733,10 @@ export default function Composer({
                 setActive((a) => (a + (e.key === 'ArrowDown' ? 1 : options.length - 1)) % options.length);
                 return;
               }
-              if (e.key === 'Enter' && suggest.kind === 'ask' && !suggest.query) {
-                // "/request " + Return: nothing picked yet, so it's the picker.
+              const typedWord = suggest.kind === 'loan' && options.some((o) => o.type === 'askword' && o.word === suggest.query.toLowerCase());
+              if (e.key === 'Enter' && (((suggest.kind === 'ask' || suggest.kind === 'loan') && !suggest.query) || typedWord)) {
+                // "/request " + Return: nothing picked yet, so it's the picker
+                // ("/loan " opens Loans; "/loan pay" is already a whole word).
                 e.preventDefault();
                 setSuggest(null);
                 send();

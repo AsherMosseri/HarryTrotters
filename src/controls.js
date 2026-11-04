@@ -99,11 +99,15 @@ export const offCount = (d = {}) =>
 // Commands that belong to a switched-off feature count as off too (the
 // Commands page's own switches stay as they are). Same rule as the play function.
 export const COIN_GROUPS = ['economy', 'casino', 'arcade'];
-export function commandCfgFor(cfg = {}, controls) {
+// loansOn: Controls, Loans is on (or it's the owner); off hides /loan, and
+// loansOff says that's the only reason, so /loan pay still runs (commands.js).
+export function commandCfgFor(cfg = {}, controls, { loansOn = true } = {}) {
   const extra = COMMANDS.filter(
     (c) => (c.name === 'poll' && !controls.isOn('polls')) || (COIN_GROUPS.includes(c.group) && !controls.isOn('coins')),
   ).map((c) => c.name);
-  return extra.length ? { ...cfg, off: [...new Set([...(cfg.off || []), ...extra])] } : cfg;
+  const out = extra.length ? { ...cfg, off: [...new Set([...(cfg.off || []), ...extra])] } : cfg;
+  if (loansOn || (out.off || []).includes('loan')) return out;
+  return { ...out, off: [...(out.off || []), 'loan'], loansOff: true };
 }
 
 // A profile as everyone else sees it: switched-off looks taken out. Only for
