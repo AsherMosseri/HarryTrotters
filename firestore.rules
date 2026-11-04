@@ -330,6 +330,11 @@ service cloud.firestore {
     match /coinRequestsOpen/{id} {
       allow read, write: if false;
     }
+    // A request to a group (/request @Programming 5): who was asked and who
+    // hasn't answered. The coinRequest function only, like the requests.
+    match /coinRequestGroups/{id} {
+      allow read, write: if false;
+    }
     // Decks, mine spots, and crash points: the server only.
     match /gameSecrets/{id} {
       allow read, write: if false;

@@ -21,7 +21,7 @@ export const BOT = 'Trotbot';
 //   action  one card naming the whole group (/hug @Programming)
 //   lookup  one card with a row per person (/hours @Programming)
 //   pool    picks from the group's people (/pick, /teams, /order)
-//   request one coin request per person (/request; another branch wires it in)
+//   request one coin request per person, under one card (/request)
 // Every other command that takes a person refuses a group.
 export const GROUP_COMMANDS = {
   give: 'gift',

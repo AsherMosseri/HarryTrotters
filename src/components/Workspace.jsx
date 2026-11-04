@@ -1596,7 +1596,14 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
         ),
       // /request @person amount (functions/coinRequests.js): ask, pay, decline, cancel.
       coinRequest: (req) =>
-        Promise.resolve(store.coinRequest(req, actor, { balanceOf: (n) => cmdData.current.wallet(n).balance, roster: cmdData.current.roster }))
+        Promise.resolve(
+          store.coinRequest(req, actor, {
+            balanceOf: (n) => cmdData.current.wallet(n).balance,
+            roster: cmdData.current.roster,
+            // Demo only: who's in a subteam (the server reads its own).
+            subteamsOf: (n) => cmdData.current.team?.subteamsOf?.(n) || [],
+          }),
+        )
           .then((r) => (coinSync.current?.noteServer(r?.balance), r))
           .catch((e) => ({ note: noteFor(e, 'That didn’t go through') })),
       openAsk: (ask) => setAskForm(ask),

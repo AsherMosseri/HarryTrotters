@@ -10,6 +10,7 @@
 // cancelled and expired requests move nothing.
 
 import { GIFT_MAX, giftEntry } from './coins.js';
+import { GROUP_MAX, namesShort } from './groups.js';
 
 export const EXPIRES = 24 * 3600000; // a request is open for a day
 export const MAX_OPEN = 3; // requests one person can have waiting at once
@@ -75,8 +76,10 @@ export function startAsk({ me, to, amount, reason = '', roster = [], active = fa
     return { error: 'Ask for a whole number of coins, at least 1.', body: usage };
   if (amount > GIFT_MAX) return { error: 'That’s a lot.', body: `Up to ${GIFT_MAX} at a time, the same as /give.` };
   if (!active) return { error: `${first(to)} isn’t on the team.` };
+  // open: one-person requests ({ to }) and group requests ({ people: the
+  // ones still waiting on }), each counting as one toward MAX_OPEN.
   const waiting = open.filter((r) => (r.expiresAt || 0) > now);
-  if (waiting.some((r) => r.to === to))
+  if (waiting.some((r) => r.to === to || (r.people || []).includes(to)))
     return { error: `You already asked ${first(to)}.`, body: 'Cancel that one first, or wait for an answer.' };
   if (waiting.length >= MAX_OPEN)
     return { error: `You have ${MAX_OPEN} requests waiting.`, body: 'Cancel one, or wait for answers.' };
@@ -112,4 +115,64 @@ export function askMove({ pub, me, move, balance = 0, roster = [], now = Date.no
   const entry = giftEntry(me, { to: pub.from, amount: pub.amount, note: pub.reason }, { roster, balance, now });
   if (entry.error) return { error: entry.error, ...(entry.body && { body: entry.body }) };
   return { ...end('paid', { paidAt: now }), entry };
+}
+
+// ---------- group requests (/request @Programming 5 for pizza) ----------
+// One request per person, each paid or declined on its own (the same askMove
+// as above, for that person's own row), under one card. The group as a whole
+// counts as ONE request toward MAX_OPEN and DAY_LIMIT. The server works out
+// who's in the group (functions/groups.js); the app only says which groups
+// and people were typed.
+
+// "asks @Programming for 5 🪙 each: for pizza".
+export const groupAskLine = (p) => `asks ${p.label} for ${coinText(p.amount)} each${p.reason ? `: ${p.reason}` : ''}`;
+
+// Who to ask: the group's people, minus the ones I already have a request
+// waiting with (open: as in startAsk). Returns { ask, skipped }.
+export function skipAsked(people, open = [], now = Date.now()) {
+  const waiting = open.filter((r) => (r.expiresAt || 0) > now);
+  const asked = new Set(waiting.flatMap((r) => (r.people ? r.people : [r.to])));
+  return { ask: people.filter((n) => !asked.has(n)), skipped: people.filter((n) => asked.has(n)) };
+}
+
+// A new group request. people: who it asks (the server's list, already
+// without me, Trotbot, anyone off the team, and anyone skipped); label:
+// "@Programming"; open, sentToday: as in startAsk.
+// Returns { error, body? } or { pub }.
+export function startGroupAsk({ me, people = [], label = '', amount, reason = '', open = [], sentToday = 0, now = Date.now() }) {
+  const usage = `Try: /request ${label || '@Programming'} 5 for pizza`;
+  if (typeof amount !== 'number' || !Number.isInteger(amount) || amount < 1)
+    return { error: 'Ask for a whole number of coins each, at least 1.', body: usage };
+  if (amount > GIFT_MAX) return { error: 'That’s a lot.', body: `Up to ${GIFT_MAX} each, the same as /give.` };
+  if (people.some((n) => n === me || !n)) return { error: 'That’s you.', body: 'Your coins are already yours.' };
+  if (!people.length) return { error: `Nobody in ${label || 'that group'} to ask.` };
+  if (people.length > GROUP_MAX) return { error: `That’s ${people.length} people.`, body: `Up to ${GROUP_MAX} at a time.` };
+  const waiting = open.filter((r) => (r.expiresAt || 0) > now);
+  if (waiting.length >= MAX_OPEN) return { error: `You have ${MAX_OPEN} requests waiting.`, body: 'A group counts as one. Cancel one, or wait for answers.' };
+  if (sentToday >= DAY_LIMIT) return { error: `That’s ${DAY_LIMIT} requests today.`, body: 'Try again tomorrow.' };
+  return {
+    pub: { from: me, amount, reason: cleanReason(reason), label, people: [...people], at: now, expiresAt: now + EXPIRES, status: 'open' },
+  };
+}
+
+// What the asker is told after a group request: "Asked 4 people for 5 🪙
+// each." and who was left out ("Mia already has one from you").
+export function groupReply({ asked = [], skipped = [], unseen = [], amount = 0 }) {
+  const n = asked.length;
+  const title = `Asked ${n} ${n === 1 ? 'person' : 'people'} for ${coinText(amount)}${n === 1 ? '' : ' each'}.`;
+  const has = (list) => (list.length === 1 ? 'has' : 'have');
+  const body = [
+    skipped.length ? `${namesShort(skipped)} already ${has(skipped)} one from you.` : '',
+    unseen.length ? `${namesShort(unseen)} can’t see this channel, so ${unseen.length === 1 ? 'wasn’t' : 'weren’t'} asked.` : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+  return { title, body };
+}
+
+// A group card's rows ({ r0: { to, status, paidAt? }, … }) counted up.
+export function groupTally(rows = {}) {
+  const list = Object.values(rows || {});
+  const n = (s) => list.filter((r) => r.status === s).length;
+  return { total: list.length, paid: n('paid'), declined: n('declined'), open: n('open'), cancelled: n('cancelled'), expired: n('expired') };
 }
