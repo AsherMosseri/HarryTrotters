@@ -46,6 +46,7 @@ import { lifeFunctions } from './life.js';
 import { learnFunctions } from './learn.js';
 import { channelFunctions } from './channels.js';
 import { loanFunctions } from './loans.js';
+import { coinRequestFunctions } from './coinRequests.js';
 
 // Functions run next to the database. The deploy workflow writes location.json
 // from the database's location; nam5 (the US multi-region) pairs with us-central1.
@@ -2358,3 +2359,15 @@ export const { quizNext, quizAnswer, quizProgress, quizReport, autoRun, dailyAns
 
 // Channel requests (functions/channels.js): anyone asks, team management approves.
 export const { channelRequest, channelRenames } = channelFunctions({ db, renamer, notify, owner: REQUESTS_TO });
+
+// Coin requests (/request @person amount, functions/coinRequests.js): the
+// person asked pays with one tap, through the same checks as a gift.
+export const { coinRequest, expireCoinRequests } = coinRequestFunctions({
+  db,
+  coinData,
+  freshCoins,
+  bankRef,
+  notify,
+  owner: REQUESTS_TO,
+  timeZone: TIME_ZONE,
+});

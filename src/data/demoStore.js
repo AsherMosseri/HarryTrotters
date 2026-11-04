@@ -18,7 +18,8 @@ import { dayOf, logFields, taskArea } from '../labLog.js';
 import * as arcade from '../../functions/shared/arcade.js';
 import * as challenge from '../../functions/shared/challenge.js';
 import * as dispute from '../../functions/shared/disputes.js';
-import { blocked, serverGroup } from '../../functions/shared/commandRules.js';
+import { blocked, isOff, serverGroup } from '../../functions/shared/commandRules.js';
+import * as coinAsk from '../../functions/shared/coinRequests.js';
 import { AWARD_CAPS, breakdown, giftEntry, prizeEntry, teamDay, teamMidnight } from '../../functions/shared/coins.js';
 import * as fun from '../../functions/shared/funGames.js';
 import * as mines from '../../functions/shared/minesweeper.js';
@@ -1629,6 +1630,83 @@ export const demoStore = {
     }
     return note('Unknown action.');
   },
+  // Coin requests (/request @person amount), run the way the coinRequest
+  // function runs them (functions/coinRequests.js), with the same checks
+  // (shared/coinRequests.js). Paying adds the same gift /give adds.
+  async coinRequest(req, actor, { balanceOf, roster = [] }) {
+    const now = Date.now();
+    const me = actor.name;
+    const note = (title, body = '') => ({ note: { title, body } });
+    const asks = state.coinRequests || (state.coinRequests = {});
+    const ctl = state.controls || {};
+    const cfg = state.settings?.commands;
+    const coinsOff = me !== REQUESTS_TO && (ctl.off || []).includes('coins');
+    const action = String(req.action || '');
+    const first = (n) => (n || '').split(' ')[0];
+    const tell = (to, title, body, conv) => {
+      state.inbox = [{ id: uid(), type: 'coinRequest', title, body, open: `chat:${conv}`, at: now, read: false, to }, ...(state.inbox || [])];
+    };
+    const msgs = (conv) => (state.chat || {})[conv] || [];
+    if (action === 'create') {
+      const conv = String(req.conv || '');
+      if (!conv || conv === 'announcements') return note('Not here.', 'Ask in a channel or a DM.');
+      if (coinsOff) return note('🪙 Jackson coins are off right now.');
+      if (me !== REQUESTS_TO && (ctl.channelsOff || []).includes(conv)) return note('Not here.', 'This channel is off right now.');
+      if (isOff('give', cfg)) return note('/give is turned off', 'Sending coins is off for now, so coin requests are too.');
+      const stop = blocked('request', 'basics', conv, cfg) || blocked('give', 'economy', conv, cfg);
+      if (stop) return { note: stop };
+      const open = Object.values(asks).filter((r) => r.from === me && r.status === 'open' && r.expiresAt > now);
+      const sentToday = Object.values(asks).filter((r) => r.from === me && teamDay(r.at) === teamDay(now)).length;
+      const to = String(req.to || '');
+      const r = coinAsk.startAsk({ me, to, amount: req.amount, reason: req.reason, roster, active: roster.includes(to), open, sentToday, now });
+      if (r.error) return note(r.error, r.body);
+      const dm = conv.startsWith('dm:') ? (state.dms || []).find((d) => `dm:${d.id}` === conv) : null;
+      if (dm && !dm.people.includes(to)) return note(`${first(to)} isn’t in this conversation.`, 'Ask in a channel they can see, or in a DM with them.');
+      const id = uid();
+      const pub = r.pub;
+      asks[id] = { ...pub, id, conv };
+      const m = {
+        id,
+        text: `/request @${to} ${pub.amount}${pub.reason ? ` ${pub.reason}` : ''}`,
+        by: me,
+        byUid: actor.uid,
+        at: now,
+        cmd: { name: 'request', kind: 'coins', ask: { from: me, to, amount: pub.amount, reason: pub.reason, at: now, expiresAt: pub.expiresAt }, status: 'open', line: coinAsk.askLine(pub) },
+        mentions: [],
+        taskIds: [],
+        replyTo: req.replyTo || null,
+        reactions: {},
+      };
+      state.chat = { ...(state.chat || {}), [conv]: [...msgs(conv), m] };
+      if (dm) state.dms = state.dms.map((d) => (d === dm ? { ...d, lastAt: now, lastBy: me, lastText: `${first(me)} ${m.cmd.line}` } : d));
+      else tell(to, `${first(me)} asks you for ${coinAsk.coinText(pub.amount)}`, pub.reason || 'Tap to pay or decline.', conv);
+      commit();
+      return { ok: true, id };
+    }
+    if (!coinAsk.MOVES.includes(action)) return note('Unknown action.');
+    const pub = asks[req.id];
+    if (!pub) return note('That request is gone.');
+    if (action === 'pay') {
+      if (coinsOff) return note('🪙 Jackson coins are off right now.');
+      if (isOff('give', cfg)) return note('/give is turned off', 'Sending coins is off for now, so coin requests are too.');
+      if (isOff('request', cfg)) return note('/request is turned off', 'It’s off for now.');
+    }
+    const balance = action === 'pay' && me === pub.to ? balanceOf(me) : 0;
+    const r = coinAsk.askMove({ pub, me, move: action, balance, roster, now });
+    if (!r.write) return r.error ? note(r.error, r.body) : { ok: true, status: pub.status, ...(r.already && { already: r.already }) };
+    const { status, decidedAt, paidAt } = r.pub;
+    asks[req.id] = { ...pub, status, decidedAt, ...(paidAt && { paidAt }) };
+    if (r.entry && !(state.coins || []).some((x) => x.id === `req-${req.id}`))
+      state.coins = [...(state.coins || []), { ...r.entry, id: `req-${req.id}`, request: req.id }];
+    state.chat = {
+      ...state.chat,
+      [pub.conv]: msgs(pub.conv).map((x) => (x.id === req.id ? { ...x, cmd: { ...x.cmd, status, decidedAt, ...(paidAt && { paidAt }) } } : x)),
+    };
+    if (status === 'paid') tell(pub.from, `${first(pub.to)} paid your request: ${coinAsk.coinText(pub.amount)}`, pub.reason || 'The coins are in your balance.', pub.conv);
+    if (status === 'declined') tell(pub.from, `${first(pub.to)} declined your request for ${coinAsk.coinText(pub.amount)}`, pub.reason || '', pub.conv);
+    commit();
+    return { ok: true, status, ...(r.error && { note: { title: r.error, body: '' } }) };
+  },
   subscribeAdSubmissions(cb) {
     return listen(() => cb([...(state.adSubmissions || [])]));
   },
@@ -3158,6 +3236,8 @@ export const demoStore = {
         ...(state.inbox || []),
       ];
     commit();
+    // The new id, like the real store (/request's card links to it).
+    return r.id;
   },
   async updateRequest(id, patch, actor) {
     state.requests = (state.requests || []).map((r) =>

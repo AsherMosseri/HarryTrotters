@@ -14,6 +14,7 @@ import { whatIs } from './Message.jsx';
 import { relTime } from '../../util.js';
 import { alertDialog } from '../Dialogs.jsx';
 import { openGame } from '../games/launch.js';
+import { askOptions } from '../../requestCommand.js';
 
 // The formatting bar: [label, title, what it does].
 const FORMATS = [
@@ -137,6 +138,8 @@ export default function Composer({
     const q = suggest.query.toLowerCase();
     if (suggest.kind === '/')
       return matchCommands(q, api.team().commandCfg).map((c) => ({ type: 'cmd', key: c.name, insert: `/${c.name}`, c }));
+    // After "/request ": channel, pet, style, and people (to ask for coins).
+    if (suggest.kind === 'ask') return askOptions(q, { roster: isDm && members ? members : roster, me: actor.name, isOn: feat });
     if (suggest.kind === '@') {
       if (!feat('mentions')) return [];
       const out = [];
@@ -176,6 +179,12 @@ export default function Composer({
     const slash = !editing && /^\/([a-z0-9]{0,20})$/i.exec(before);
     if (slash) {
       setSuggest({ kind: '/', query: slash[1], start: 0, end: caret });
+      setActive(0);
+      return;
+    }
+    const ask = !editing && /^\/request\s+(@?[^\s@]{0,30})$/i.exec(before);
+    if (ask) {
+      setSuggest({ kind: 'ask', query: ask[1], start: caret - ask[1].length, end: caret });
       setActive(0);
       return;
     }
@@ -294,6 +303,10 @@ export default function Composer({
         wallet: api.wallet,
         richest: api.richest,
         gift: api.gift,
+        // /request (requestCommand.js): Controls switches, a feature request, coins.
+        isOn: feat,
+        addIdea: api.addIdea,
+        coinRequest: (req) => api.coinRequest({ ...req, conv, replyTo: replyInfo() }),
       });
       if (result.post) {
         await api.sendMessage(conv, { mentions: [], taskIds: [], replyTo: replyInfo(), roles: [], everyone: false, ...result.post });
@@ -306,6 +319,10 @@ export default function Composer({
       } else if (result.game) {
         reset();
         openGame(result.game);
+      } else if (result.ask) {
+        // /request with a form to fill in (RequestForms.jsx, opened by Workspace).
+        reset();
+        api.openAsk({ ...result.ask, conv });
       } else if (result.standup) {
         setText('');
         setSuggest(null);
@@ -444,11 +461,17 @@ export default function Composer({
         />
       )}
       {suggest && options.length > 0 && (
-        <ul className={`suggest${suggest.kind === '/' ? ' suggest-cmds' : ''}`}>
+        <ul className={`suggest${suggest.kind === '/' || suggest.kind === 'ask' ? ' suggest-cmds' : ''}`}>
           {options.map((o, i) => (
             <li key={o.key}>
               <button className={i === active ? 'active' : ''} onMouseDown={(e) => e.preventDefault()} onClick={() => pick(o)}>
                 {o.type === 'cmd' && <CommandOption c={o.c} />}
+                {o.type === 'askword' && (
+                  <>
+                    <code className="cmd-opt-name">{o.word}</code>
+                    <span className="muted small cmd-opt-desc">{o.desc}</span>
+                  </>
+                )}
                 {o.type === 'person' && (
                   <>
                     <Avatar name={o.name} size={22} showOnline /> {o.name}
@@ -646,6 +669,13 @@ export default function Composer({
               if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
                 e.preventDefault();
                 setActive((a) => (a + (e.key === 'ArrowDown' ? 1 : options.length - 1)) % options.length);
+                return;
+              }
+              if (e.key === 'Enter' && suggest.kind === 'ask' && !suggest.query) {
+                // "/request " + Return: nothing picked yet, so it's the picker.
+                e.preventDefault();
+                setSuggest(null);
+                send();
                 return;
               }
               if (e.key === 'Enter' || e.key === 'Tab') {

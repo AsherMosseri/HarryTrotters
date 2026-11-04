@@ -8,6 +8,7 @@ import { CardActions } from './CardActions.jsx';
 import { DISPUTABLE } from '../../../functions/shared/disputes.js';
 import { Die } from './Die.jsx';
 import { MoreBody } from './MoreCards.jsx';
+import { AskBody } from './AskCard.jsx';
 import { LabDay } from '../LabLog.jsx';
 import { RecapBody } from '../Life.jsx';
 import { DailyCard } from '../learn/DailyCard.jsx';
@@ -400,7 +401,7 @@ function Body({ c, by, onPerson, fresh }) {
   }
 }
 
-export function CommandCard({ m, onPerson, me, onMove, onBuy, onChallenge, onReport, conv }) {
+export function CommandCard({ m, onPerson, me, onMove, onBuy, onChallenge, onReport, onAsk, conv }) {
   const n = m.cmd.name;
   const kind = ARCADE_CARDS.includes(n)
     ? 'arcade'
@@ -422,7 +423,9 @@ export function CommandCard({ m, onPerson, me, onMove, onBuy, onChallenge, onRep
   return (
     <div className={`cmd-card cmd-card-${n}${kind ? ` cmd-${kind}` : ''}`}>
       <Trotbot name={n === 'dailyq' ? '' : n} />
-      {kind === 'arcade' ? (
+      {n === 'request' ? (
+        <AskBody m={m} me={me} Name={PersonName} onAsk={onAsk} />
+      ) : kind === 'arcade' ? (
         <ArcadeBody m={m} me={me} onMove={onMove} Name={PersonName} conv={conv} />
       ) : kind === 'money' ? (
         <CasinoBody m={m} me={me} onMove={onMove} onBuy={onBuy} Name={PersonName} />
