@@ -266,7 +266,7 @@ function Person({ name, w, casino, cfg, onCheck, onAdjust, onBack }) {
 // as a grant (bonus or "taken away") with a note, like the Ads page's grants;
 // "set" works out the difference from the server's balance when it can.
 // The most the owner can add or take away at once (the rules allow the same).
-const OWNER_MAX = 100000000;
+const OWNER_MAX = 1000000000000;
 function AdjustCoins({ name, balance, onCheck, onAdjust }) {
   const [mode, setMode] = useState('add');
   const [amount, setAmount] = useState('');

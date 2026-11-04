@@ -4,6 +4,14 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '3.1.3',
+    date: '2026-11-04',
+    title: 'No more coin limits',
+    items: [
+      'No limit on how many coins you can /give, /request, lend or borrow from the bank at once. You still can’t give, lend or pay more than you have, and bank loans still need Asher’s yes.',
+    ],
+  },
+  {
     version: '3.1.2',
     date: '2026-11-04',
     title: 'Mines fixed: taps land where you aim',
