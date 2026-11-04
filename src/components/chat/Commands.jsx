@@ -15,11 +15,8 @@ import { DailyCard } from '../learn/DailyCard.jsx';
 import { priorityById } from '../../config.js';
 import { daysBetween, todayISO } from '../../teamCommands.js';
 import { serverNow } from '../../serverTime.js';
-<<<<<<< HEAD
 import { CoinNum } from '../CoinNum.jsx';
-=======
 import { isLive } from '../../../functions/shared/arcade.js';
->>>>>>> redesign
 
 // What slash commands look like in chat (commands.js does the work): the
 // Trotbot card on a command's message, and the notes only you can see.
