@@ -4030,7 +4030,8 @@ html.kb-bar .chat-side-body { padding-bottom: calc(8px + var(--kb-bar, 0px)); }
   position: sticky; top: 0; z-index: 26; flex: none; height: 0; display: flex; justify-content: flex-end;
   padding-right: max(16px, env(safe-area-inset-right)); pointer-events: none;
 }
-.coin-slot .coin-pill { pointer-events: auto; margin-top: max(10px, env(safe-area-inset-top)); }
+/* Clear of the status bar on an iPad home-screen app (the page runs up under it), not touching its edge. */
+.coin-slot .coin-pill { pointer-events: auto; margin-top: max(10px, calc(env(safe-area-inset-top) + 8px)); }
 .phone-top .coin-pill { height: 32px; padding: 0 9px 0 6px; gap: 5px; font-size: 12.5px; }
 /* Crowded bar (on a shift, or a small phone): the page title steps down so it isn't cut off. */
 .phone-top:has(.shift-pill) .phone-title { font-size: 22px; }
