@@ -88,7 +88,7 @@ function FixButton({ c, row, multi, me, onFix }) {
       title: refund ? `Refund ${n} coins to ${who === 'you' ? 'yourself' : who}?` : `Take back ${n} coins from ${who}?`,
       body: (
         <>
-          <b>{row.name}</b> {refund ? 'lost' : 'won'} <b className="mono">{n}</b> at {game}.{' '}
+          <b>{row.name}</b> {refund ? 'lost' : 'won'} <b>{n}</b> at {game}.{' '}
           {refund ? `${n} coins go back to them` : `${n} coins come off their balance`}, once, as “{line}” in their coin history
           {row.name === me ? '' : ', and they’re told'}. The card will say “{refund ? 'Refunded' : 'Taken back'} by {first(me)}”.
           {!refund && ' If they’ve spent it, their balance can go below zero.'}
