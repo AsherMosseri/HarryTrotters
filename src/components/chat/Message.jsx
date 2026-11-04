@@ -656,6 +656,10 @@ export default function Message({
       }}
       onClick={(e) => {
         if (e.target.closest('a,button,input,.emoji-picker,.spoiler:not(.shown)')) return;
+        // A game being played: a tap that just misses a square or a button
+        // isn't a tap on the message (its buttons would open under the board).
+        // The card's top line still opens them.
+        if (e.target.closest('.cmd-arcade') && !e.target.closest('.cmd-head')) return;
         onSelect(selected ? null : m.id);
       }}
     >
@@ -731,6 +735,7 @@ export default function Message({
                 onMove={(move) => api.play({ action: 'move', conv, msgId: m.id, move })}
                 onBuy={(n) => api.play({ action: 'run', game: 'lottery', args: [String(n)], conv })}
                 onChallenge={(args) => api.play({ action: 'run', game: 'challenge', args, conv })}
+                onRun={(game, args) => api.play({ action: 'run', game, args, conv })}
                 onAsk={(action) => api.coinRequest({ action, conv, id: m.id })}
                 onReport={canReport ? () => setReporting(true) : null}
               />

@@ -1619,6 +1619,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
       removeReaction: (channel, id, emoji) => store.removeReaction(channel, id, emoji).catch(fail),
       removeSuperReaction: (channel, id, emoji) => store.removeSuperReaction(channel, id, emoji).catch(fail),
       subscribeSince: (channel, at, cb) => store.subscribeSince(channel, at, cb, quiet('chat')),
+      subscribeMessage: (channel, id, cb) => store.subscribeMessage(channel, id, cb, quiet('chat')),
       loadOlderMessages: (channel, beforeAt) =>
         store.loadOlderMessages(channel, beforeAt, CHAT_PAGE).catch((e) => {
           fail(e);

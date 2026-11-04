@@ -422,7 +422,7 @@ function Body({ c, by, onPerson, fresh }) {
   }
 }
 
-export function CommandCard({ m, onPerson, me, onMove, onBuy, onChallenge, onReport, onAsk, conv }) {
+export function CommandCard({ m, onPerson, me, onMove, onBuy, onChallenge, onReport, onAsk, onRun, conv }) {
   const n = m.cmd.name;
   const kind = ARCADE_CARDS.includes(n)
     ? 'arcade'
@@ -447,7 +447,7 @@ export function CommandCard({ m, onPerson, me, onMove, onBuy, onChallenge, onRep
       {n === 'request' ? (
         <AskBody m={m} me={me} Name={PersonName} onAsk={onAsk} />
       ) : kind === 'arcade' ? (
-        <ArcadeBody m={m} me={me} onMove={onMove} Name={PersonName} conv={conv} />
+        <ArcadeBody m={m} me={me} onMove={onMove} Name={PersonName} conv={conv} onRun={onRun} />
       ) : kind === 'money' ? (
         <CasinoBody m={m} me={me} onMove={onMove} onBuy={onBuy} Name={PersonName} />
       ) : kind === 'team' ? (

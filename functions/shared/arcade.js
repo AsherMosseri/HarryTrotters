@@ -100,6 +100,31 @@ export function parseChallenge(words, roster) {
   return { them, betWord };
 }
 
+// Battleship's two rule sets, picked by whoever challenges (and fixed for the
+// game): classic, one shot each in turn; or hit again, where a hit (or a
+// sink) keeps your turn and a miss passes it.
+export const BS_MODES = {
+  classic: { label: 'Classic', rules: 'One shot each, turn by turn' },
+  hitagain: { label: 'Hit again', rules: 'A hit keeps your turn; a miss passes it' },
+};
+// The rule words in a challenge ("hitagain", "hit-again", "hit again",
+// "classic"), and the words left for the person and the bet.
+export function battleshipMode(words) {
+  const low = words.map((w) => String(w).toLowerCase());
+  const rest = [];
+  let mode = 'classic';
+  for (let k = 0; k < words.length; k++) {
+    const w = low[k].replace(/[^a-z]/g, '');
+    if (w === 'hitagain' || w === 'again' || w === 'extra') mode = 'hitagain';
+    else if (w === 'hit' && low[k + 1]?.replace(/[^a-z]/g, '') === 'again') {
+      mode = 'hitagain';
+      k++;
+    } else if (w === 'classic') mode = 'classic';
+    else rest.push(words[k]);
+  }
+  return { mode, rest };
+}
+
 // ---------- money ----------
 
 const entry = (game, label, shown) => ({ game, icon: ICON[game], label: `${LABEL[game]}: ${label}`, shown });
@@ -292,7 +317,9 @@ export function start(
   if (CHALLENGES.includes(game)) {
     // A Minesweeper race's board size: "/minesweep @Cooper expert 10".
     const level = game === 'minesweep' ? words.map((w) => w.toLowerCase()).find((w) => LEVELS[w]) || 'beginner' : '';
-    const rest = level ? words.filter((w) => w.toLowerCase() !== level) : words;
+    // Battleship's rules, picked by the challenger: "/battleship @Cooper 10 hitagain".
+    const bsRules = game === 'battleship' ? battleshipMode(words) : null;
+    const rest = level ? words.filter((w) => w.toLowerCase() !== level) : bsRules ? bsRules.rest : words;
     const { them, betWord } = parseChallenge(rest, roster);
     if (!them) return { error: `Challenge who? Try: /${game} @name 20${RACES.includes(game) ? '' : ' (or @Trotbot)'}` };
     if (them === me) return { error: 'You can’t challenge yourself.' };
@@ -311,7 +338,8 @@ export function start(
     if (game === 'connect4') Object.assign(p, { board: '.'.repeat(C4_COLS * C4_ROWS), turn: me });
     if (game === 'duel' && bot) startDuel(p, secret, now, rng);
     if (game === 'battleship') {
-      p.placed = [];
+      // Fixed from here on: no move changes it.
+      Object.assign(p, { placed: [], mode: bsRules.mode, n: 0 });
       if (bot) startPlacing(p, secret, now, rng);
     }
     if (RACES.includes(game)) Object.assign(p, { results: {}, ...(level && { level }) });
@@ -654,10 +682,15 @@ export function move(game, { pub, secret = {}, me, move: mv, balance = 0, now = 
 
 // ---------- Battleship ----------
 
-// pub: placed [names], turn, shots { name: what's been fired at name's board },
-// sunk { name: [{ k, cells }] }, last { by, i, hit, sunk }. The fleets stay
-// in the secret (as fleet text, battleship.fleetText) until the game ends,
-// then they go on the card as pub.fleets.
+// pub: placed [names], mode (BS_MODES: 'classic' or 'hitagain', set when the
+// challenge is made), turn, shots { name: what's been fired at name's board },
+// sunk { name: [{ k, cells }] }, last { by, i, hit, sunk } (the latest shot),
+// log (the latest shots in order, so the card can say "Trotbot fired 3 times:
+// hit, hit, miss"), and n, which goes up with every change (so the app can
+// tell which of two copies of the card is newer). The fleets stay in the
+// secret (as fleet text, battleship.fleetText) until the game ends, then they
+// go on the card as pub.fleets.
+const LOG_MAX = 30;
 const sunkCells = (p, name) => (p.sunk?.[name] || []).flatMap((x) => x.cells);
 const afloat = (p, name) => {
   const gone = new Set((p.sunk?.[name] || []).map((x) => x.k));
@@ -665,8 +698,10 @@ const afloat = (p, name) => {
 };
 function battleshipMove(p, s, { me, m, now, rng, end, player, nothing }) {
   const other = me === p.a ? p.b : p.a;
+  const bump = () => (p.n = (p.n || 0) + 1);
   const finish = (winner, how) => {
     if (s.ships) p.fleets = s.ships;
+    bump();
     const res = end(winner, how);
     const loser = winner === p.a ? p.b : p.a;
     res.awards =
@@ -675,12 +710,17 @@ function battleshipMove(p, s, { me, m, now, rng, end, player, nothing }) {
         : [];
     return res;
   };
-  const out = () => ({ write: true, pub: p, secret: s, money: [], awards: [] });
+  const out = () => {
+    bump();
+    return { write: true, pub: p, secret: s, money: [], awards: [] };
+  };
   if (p.status === 'placing') {
     if (m === 'peek') {
       if (now < p.placeBy) return nothing;
       const placed = (p.placed || []).filter((n) => n === p.a || n === p.b);
-      return placed.length === 1 ? finish(placed[0], 'timeout') : end('', 'noplace');
+      if (placed.length === 1) return finish(placed[0], 'timeout');
+      bump();
+      return end('', 'noplace');
     }
     if (!player) return { error: 'You’re not playing this one.' };
     if (m === 'resign') return finish(other, 'resigned');
@@ -697,13 +737,16 @@ function battleshipMove(p, s, { me, m, now, rng, end, player, nothing }) {
         turn: p.a,
         shots: { [p.a]: bs.emptyShots(), [p.b]: bs.emptyShots() },
         sunk: { [p.a]: [], [p.b]: [] },
+        log: [],
       });
     return out();
   }
-  // Left for good: whoever's turn it was loses.
+  // Left for good: whoever's turn it was loses (with hit again, that's
+  // whoever was still shooting).
   if (m === 'peek') return now - p.lastAt >= TIMES.abandoned ? finish(p.turn === p.a ? p.b : p.a, 'timeout') : nothing;
   if (!player) return { error: 'You’re not playing this one.' };
   if (m === 'resign') return finish(other, 'resigned');
+  // The turn clock starts again with every shot, extra turns too.
   if (m === 'claim') {
     if (p.turn === me) return { error: 'It’s your turn.' };
     if (now - p.lastAt < TIMES.turn) return { error: `${p.turn} has ${Math.ceil((p.lastAt + TIMES.turn - now) / 1000)} more seconds.` };
@@ -716,21 +759,29 @@ function battleshipMove(p, s, { me, m, now, rng, end, player, nothing }) {
     p.shots = { ...p.shots, [at]: r.shots };
     if (r.sunk >= 0) p.sunk = { ...p.sunk, [at]: [...(p.sunk[at] || []), { k: r.sunk, cells: fleet[r.sunk] }] };
     p.last = { by, i, hit: r.hit, sunk: r.sunk >= 0 ? bs.FLEET[r.sunk][0] : '' };
+    p.log = [...(p.log || []), p.last].slice(-LOG_MAX);
     return r.all;
   };
   if (!/^(fire:)?\d+$/.test(m)) return { error: 'Pick a square to fire at.' };
   const i = +m.replace(/^fire:/, '');
   if (!(i >= 0 && i < bs.N * bs.N)) return { error: 'Pick a square to fire at.' };
   if (p.shots[other][i] !== '.') return { error: 'You already fired there.' };
+  const again = p.mode === 'hitagain';
   p.lastAt = now;
   p.mine = null;
   if (shoot(me, other, i)) return finish(me, 'sunk');
+  // Hit again: a hit or a sink keeps the turn.
+  if (again && p.last.hit) return out();
   p.turn = other;
   if (other === BOT) {
-    // Trotbot answers right away; the card shows both shots.
+    // Trotbot answers right away (the card shows every shot): once, or with
+    // hit again, until it misses.
     p.mine = p.last;
-    const at = bs.botAim(p.shots[me], sunkCells(p, me), afloat(p, me), rng);
-    if (shoot(BOT, me, at)) return finish(BOT, 'sunk');
+    for (;;) {
+      const at = bs.botAim(p.shots[me], sunkCells(p, me), afloat(p, me), rng);
+      if (shoot(BOT, me, at)) return finish(BOT, 'sunk');
+      if (!again || !p.last.hit) break;
+    }
     p.turn = me;
   }
   return out();

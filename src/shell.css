@@ -2863,37 +2863,6 @@ button.pm-row:hover { background: color-mix(in srgb, var(--text) 4%, transparent
 .fun-share-icon { width: 40px; height: 40px; flex: none; border-radius: 10px; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); }
 .fun-share-line { font-size: 15px; }
 
-/* Battleship */
-.bs-boards { display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-start; }
-.bs-board { display: flex; flex-direction: column; gap: 4px; width: min(300px, 100%); }
-.bs-board.small { width: min(190px, 100%); }
-.bs-label { font-weight: 700; }
-.bs-grid {
-  display: grid; grid-template-columns: repeat(10, 1fr); gap: 2px; padding: 2px; border-radius: 8px;
-  background: color-mix(in srgb, var(--bs-water) 60%, var(--border)); touch-action: none; user-select: none; -webkit-user-select: none;
-}
-.bs-cell { aspect-ratio: 1; border: 0; padding: 0; border-radius: 3px; background: var(--bs-water); display: grid; place-items: center; min-width: 0; }
-.bs-cell:not(:disabled) { cursor: crosshair; }
-.bs-cell:not(:disabled):hover { background: color-mix(in srgb, var(--accent) 30%, var(--bs-water)); }
-.bs-cell.ship { background: var(--bs-ship); }
-.bs-cell.pick { background: color-mix(in srgb, var(--accent) 70%, var(--bs-ship)); }
-.bs-cell.bad { background: #dc2626; }
-.bs-cell.hit { background: #f59e0b; }
-.bs-cell.sunk { background: #b91c1c; }
-.bs-cell.last { outline: 2px solid var(--text); outline-offset: -2px; }
-.bs-x {
-  width: 55%; height: 55%;
-  background: linear-gradient(45deg, transparent 42%, #fff 42%, #fff 58%, transparent 58%), linear-gradient(-45deg, transparent 42%, #fff 42%, #fff 58%, transparent 58%);
-}
-.bs-o { width: 28%; height: 28%; border-radius: 50%; background: color-mix(in srgb, var(--text) 45%, transparent); }
-:root[data-anim~='move'] .bs-cell.last.hit .bs-x { animation: bs-hit 0.5s ease both; }
-@keyframes bs-hit { from { transform: scale(0.2); opacity: 0; } 60% { transform: scale(1.25); opacity: 1; } to { transform: scale(1); opacity: 1; } }
-.bs-status { display: flex; flex-direction: column; gap: 2px; }
-.bs-shot.hit { color: #b45309; font-weight: 700; }
-.bs-fleet { display: flex; gap: 8px; flex-wrap: wrap; }
-.bs-fleet .gone { text-decoration: line-through; color: var(--muted); }
-.bs-place { display: flex; flex-direction: column; gap: 8px; }
-.bs-place .bs-board { width: min(320px, 100%); }
 .tet-stats b { white-space: nowrap; }
 .tet-stop { margin-top: auto; }
 .tet.touch .tet-stop { display: none; }
@@ -5004,3 +4973,203 @@ html.kb-open .report-note { min-height: 56px; }
   .ask-chip { font-size: 13px; padding: 3px 9px 3px 3px; }
   .ask-group-bar { max-width: none; }
 }
+
+/* ==========================================================================
+   3.1 Battleship (Classic or Hit again) and the game view
+   (chat/Battleship.jsx, chat/GameView.jsx). The board never moves under a
+   finger: everything above it has a fixed height. Hover colors only where
+   there's a mouse. Motion follows the Animations switches (transform and
+   opacity only, fixed keyframe values).
+   ========================================================================== */
+/* The chat keeps its own place (ChatView anchors by hand: Safari has no CSS
+   scroll anchoring), so the browser's own is off to not do it twice. */
+.msg-list { overflow-anchor: none; }
+
+/* Boards */
+.bs-board { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.bs-label { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bs-grid {
+  display: grid; grid-template-columns: repeat(10, 1fr); gap: 2px; padding: 2px; border-radius: 8px; aspect-ratio: 1;
+  background: color-mix(in srgb, var(--bs-water) 55%, var(--border)); user-select: none; -webkit-user-select: none;
+  -webkit-touch-callout: none; touch-action: manipulation;
+}
+/* Placing: drags move ships, not the page. */
+.bs-grid[data-board='place'] { touch-action: none; }
+.bs-cell {
+  display: grid; place-items: center; min-width: 0; min-height: 0; aspect-ratio: 1; border: 0; padding: 0; margin: 0;
+  border-radius: 3px; background: var(--bs-water); color: inherit; font: inherit; cursor: default;
+  -webkit-tap-highlight-color: transparent;
+}
+button.bs-cell:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; position: relative; z-index: 1; }
+.bs-grid.live > .bs-cell:not(.off) { cursor: crosshair; }
+.bs-grid[data-board='place'] > .bs-cell { cursor: pointer; }
+.bs-cell.ship { background: var(--bs-ship); }
+.bs-cell.hit { background: #f59e0b; }
+.bs-cell.sunk { background: #b91c1c; }
+.bs-cell.last { box-shadow: inset 0 0 0 2px var(--text); }
+.bs-cell.pick { background: color-mix(in srgb, var(--accent) 75%, var(--bs-ship)); }
+.bs-cell.ghost { background: color-mix(in srgb, #16a34a 45%, var(--bs-water)); box-shadow: inset 0 0 0 2px #16a34a; }
+.bs-cell.bad { background: color-mix(in srgb, #dc2626 70%, var(--bs-water)); box-shadow: inset 0 0 0 2px #dc2626; }
+.bs-cell.pending { background: color-mix(in srgb, var(--accent) 45%, var(--bs-water)); box-shadow: inset 0 0 0 3px var(--accent); }
+.bs-grid.busy { cursor: progress; }
+.bs-board.waiting > .bs-grid > .bs-cell:not(.hit):not(.miss):not(.ship) { background: color-mix(in srgb, var(--bs-water) 80%, var(--surface-2)); }
+@media (hover: hover) {
+  .bs-board:not(.waiting) > .bs-grid.live:not(.busy) > .bs-cell:not(.off):not(.ship):not(.pick):not(.bad):hover {
+    background: color-mix(in srgb, var(--accent) 28%, var(--bs-water));
+  }
+}
+.bs-x {
+  width: 58%; height: 58%;
+  background: linear-gradient(45deg, transparent 41%, #fff 41%, #fff 59%, transparent 59%), linear-gradient(-45deg, transparent 41%, #fff 41%, #fff 59%, transparent 59%);
+}
+.bs-o { width: 30%; height: 30%; border-radius: 50%; background: color-mix(in srgb, var(--text) 45%, transparent); }
+:root[data-anim~='move'] .bs-cell.last.hit .bs-x { animation: bs-hit 0.45s ease both; }
+:root[data-anim~='move'] .bs-cell.last.miss .bs-o { animation: bs-splash 0.4s ease both; }
+:root[data-anim~='taps'] .bs-cell.pending::after {
+  content: ''; width: 46%; height: 46%; border-radius: 50%; border: 2px solid var(--accent); animation: bs-aim 0.9s ease-in-out infinite;
+}
+@keyframes bs-hit { from { transform: scale(0.2); opacity: 0; } 60% { transform: scale(1.25); opacity: 1; } to { transform: scale(1); opacity: 1; } }
+@keyframes bs-splash { from { transform: scale(2.2); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@keyframes bs-aim { 0%, 100% { transform: scale(0.7); opacity: 0.5; } 50% { transform: scale(1.1); opacity: 1; } }
+/* Ships left: pips, crossed out when sunk. */
+.bs-fleet { display: flex; gap: 4px 10px; flex-wrap: wrap; }
+.bs-fleet > span { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.bs-fleet > .gone { color: var(--muted); text-decoration: line-through; }
+.bs-pips { display: inline-flex; gap: 1.5px; }
+.bs-pips i { width: 5px; height: 7px; border-radius: 1.5px; background: var(--bs-ship); }
+.bs-fleet > .gone .bs-pips i { background: #b91c1c; opacity: 0.6; }
+.bs-fleet.short { flex-wrap: nowrap; gap: 8px; align-items: center; }
+.bs-fleet.short > .gone { text-decoration: none; }
+.bs-fleet.short .bs-pips i { width: 7px; height: 9px; }
+/* The rules, on the card and in the view. */
+.bs-mode {
+  display: inline-flex; align-items: center; min-height: 22px; padding: 0 9px; border-radius: 999px; font-size: 12px; font-weight: 700;
+  background: var(--surface-2); color: var(--muted); white-space: nowrap;
+}
+.bs-mode.hitagain { background: color-mix(in srgb, #f59e0b 20%, var(--surface)); color: #92400e; }
+:root[data-theme='dark'] .bs-mode.hitagain { color: #fcd34d; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme='light']) .bs-mode.hitagain { color: #fcd34d; } }
+/* What just happened: a bold line and a smaller one, always the same height. */
+.bs-news { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.bs-news > b { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bs-news > span { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.35; }
+.bs-news.fixed { height: calc(15px * 1.35 + 2px + 2 * 13px * 1.35 + 4px); flex: none; }
+.bs-news.go > b { color: var(--accent); }
+.bs-news.hit > b { color: #b45309; }
+:root[data-theme='dark'] .bs-news.hit > b { color: #fbbf24; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme='light']) .bs-news.hit > b { color: #fbbf24; } }
+.bs-news.firing > b { color: var(--accent); }
+.bs-bad-text { color: var(--danger); font-weight: 600; }
+
+/* The card in the chat: a summary, both boards' shots, and a big button. */
+.bs-card { display: flex; flex-direction: column; gap: 8px; }
+.bs-card-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.bs-minis { display: grid; grid-template-columns: repeat(2, minmax(0, 150px)); gap: 12px; }
+.bs-board.mini .bs-grid { gap: 1px; padding: 1px; border-radius: 6px; }
+.bs-board.mini .bs-cell { border-radius: 1.5px; }
+.bs-board.mini .bs-cell.last { box-shadow: inset 0 0 0 1.5px var(--text); }
+.bs-board.mini .bs-label { font-size: 12px; }
+.bs-card-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.bs-card-actions .game-open { flex: 1 1 220px; max-width: 320px; gap: 8px; }
+.bs-rematch { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; padding-top: 8px; border-top: 1px dashed var(--border); }
+.bs-modes.segmented { flex-wrap: nowrap; gap: 4px; }
+.bs-modes .plain-seg { min-height: 36px; }
+.arc-wait .game-open { gap: 6px; }
+
+/* The game view */
+.panel-backdrop.center.gv-backdrop { align-items: center; padding: 16px; z-index: 45; }
+.panel-backdrop.center > .dialog.game-sheet {
+  width: min(760px, 100%); height: min(calc(var(--vvh, 100dvh) - 32px), 1120px); max-height: none;
+  overflow: hidden; padding: 0 16px 12px; gap: 8px; outline: none;
+}
+.game-sheet .gv-head { flex: none; }
+.gv-title { display: inline-flex; align-items: center; gap: 8px; min-width: 0; font-size: 16px; white-space: nowrap; }
+.gv-watching {
+  display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 700;
+  background: var(--accent-soft); color: var(--accent);
+}
+.gv-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; container: gv / size; padding-top: 4px; }
+.gv-body > .arc-ttt, .gv-body > .arc-c4 { align-items: center; gap: 14px; }
+.gv-body .in-view .ttt-grid { grid-template-columns: repeat(3, min(28cqw, calc((100cqh - 190px) / 3), 136px)); gap: 8px; }
+.gv-body .in-view .ttt-cell { width: auto; height: auto; aspect-ratio: 1; font-size: clamp(30px, 8cqw, 62px); }
+.gv-body .in-view .c4-grid { grid-template-columns: repeat(var(--cols), min(calc((100cqw - 40px) / 7), calc((100cqh - 230px) / 6), 74px)); gap: 5px; padding: 8px; }
+.gv-body .in-view .c4-col { gap: 5px; }
+.gv-body .in-view .c4-cell { width: 100%; height: auto; aspect-ratio: 1; }
+.gv-body .in-view .arc-vs { font-size: 16px; }
+@media (min-width: 900px) and (min-aspect-ratio: 5/4) {
+  .panel-backdrop.center > .dialog.game-sheet { width: min(1100px, 100%); }
+}
+@media (max-width: 760px) {
+  .panel-backdrop.center.gv-backdrop { padding: 0; align-items: stretch; }
+  .panel-backdrop.center > .dialog.game-sheet {
+    width: 100%; height: var(--vvh, 100dvh); border-radius: 0; box-shadow: none; padding: 0 12px max(10px, env(safe-area-inset-bottom));
+  }
+  .game-sheet .gv-head { margin: 0 -12px; padding-top: max(10px, env(safe-area-inset-top)); }
+}
+
+/* Battleship in the view. Sizes come from the room the view has (gv-body is
+   a size container), so the board you fire at is as big as fits. */
+.bs-view { display: flex; flex-direction: column; gap: 10px; min-height: 100%; }
+.bs-view-top { display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; flex: none; }
+.bs-view-top .arc-vs { font-size: 15px; }
+.bs-view-boards { display: grid; gap: 12px 18px; justify-content: center; align-content: start; }
+.bs-view.player .bs-view-boards { grid-template-columns: minmax(0, var(--bs-t)); --bs-t: min(100cqw, calc(100cqh - 420px), 560px); }
+.bs-target-wrap, .bs-yours-wrap, .bs-watch-wrap { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.bs-yours-wrap { display: grid; grid-template-columns: var(--bs-y) minmax(0, 1fr); gap: 4px 12px; align-items: start; --bs-y: min(38cqw, 190px); }
+.bs-yours-wrap > .bs-board { grid-row: 1 / span 2; }
+.bs-yours-wrap > .bs-fleet { padding-top: 22px; flex-direction: column; gap: 4px; }
+.bs-board.target .bs-label { font-size: 14px; }
+.bs-view.watching .bs-view-boards { grid-template-columns: repeat(2, minmax(0, var(--bs-w))); --bs-w: min(calc((100cqw - 18px) / 2), calc(100cqh - 190px), 460px); }
+.bs-view.done .bs-view-boards, .bs-view.player.done .bs-view-boards { grid-template-columns: repeat(2, minmax(0, var(--bs-w))); --bs-w: min(calc((100cqw - 18px) / 2), calc(100cqh - 200px), 460px); }
+.bs-view.done .bs-yours-wrap { display: flex; flex-direction: column; }
+.bs-view.done .bs-view-boards .bs-board { width: 100%; }
+.bs-view.done .bs-yours-wrap > .bs-fleet { padding-top: 0; flex-direction: row; }
+.bs-view.done .bs-fleet.short { flex-wrap: wrap; row-gap: 2px; }
+.bs-view-boards.one { grid-template-columns: minmax(0, min(100cqw, calc(100cqh - 200px), 420px)); }
+.bs-view-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-height: 40px; margin-top: auto; flex: none; }
+.bs-view .arc-result { font-size: 16px; }
+/* Wide view (iPad sideways, a computer): the board you fire at on the left, the rest beside it. */
+@container gv (min-aspect-ratio: 6/5) {
+  .bs-view.player:not(.done) {
+    display: grid; grid-template-columns: minmax(0, var(--bs-t)) minmax(220px, 1fr); grid-template-rows: auto auto auto 1fr auto;
+    gap: 10px 22px; --bs-t: min(62cqw, calc(100cqh - 112px), 640px);
+  }
+  .bs-view.player:not(.done) > .bs-view-top { grid-column: 1 / -1; }
+  .bs-view.player:not(.done) > .bs-news { grid-column: 2; grid-row: 2; }
+  .bs-view.player:not(.done) > .bs-view-boards { display: contents; }
+  .bs-view.player:not(.done) .bs-target-wrap { grid-column: 1; grid-row: 2 / span 4; }
+  .bs-view.player:not(.done) .bs-yours-wrap { grid-column: 2; grid-row: 3; align-self: start; --bs-y: min(18cqw, 210px); }
+  .bs-view.player:not(.done) > .bs-view-actions { grid-column: 2; grid-row: 5; }
+  .bs-view.watching .bs-view-boards, .bs-view.done .bs-view-boards { --bs-w: min(calc((100cqw - 18px) / 2), calc(100cqh - 150px), 520px); }
+}
+/* Placing */
+.bs-place { display: flex; flex-direction: column; gap: 10px; min-height: 100%; }
+.bs-board.placing { width: min(100cqw, calc(100cqh - 300px), 480px); align-self: center; }
+.bs-dock { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+.bs-dock-ship {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 10px; border-radius: 10px;
+  border: 1px solid var(--border); background: var(--surface); color: inherit; font: inherit; font-size: 13px; font-weight: 600;
+}
+.bs-dock-ship.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); background: var(--accent-soft); }
+.bs-dock-ship.on .bs-pips i { background: var(--accent); }
+.bs-place-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.bs-place-actions .grow { flex: 1; }
+.bs-place-actions .btn.primary { min-width: 120px; justify-content: center; }
+@container gv (min-aspect-ratio: 6/5) {
+  .bs-place {
+    display: grid; grid-template-columns: minmax(0, var(--bs-p)) minmax(220px, 1fr); grid-template-rows: auto auto auto 1fr auto;
+    gap: 10px 22px; --bs-p: min(60cqw, calc(100cqh - 60px), 600px);
+  }
+  .bs-place > .bs-board.placing { grid-column: 1; grid-row: 1 / span 5; width: auto; align-self: start; }
+  .bs-place > .bs-news { grid-column: 2; grid-row: 1; }
+  .bs-place > .bs-dock { grid-column: 2; grid-row: 2; justify-content: flex-start; }
+  .bs-place > .bs-place-actions { grid-column: 2; grid-row: 3; }
+  .bs-place > .bs-view-actions { grid-column: 2; grid-row: 5; }
+}
+/* The bet on every arcade game (the casino's BET pill): what each put in and the pot. */
+.arc-vs .arc-betpill { margin-left: auto; }
+.arc-betpill { white-space: nowrap; flex: none; }
+.arc-betpill .coin-amt, .arc-betpill .mono { font-weight: 700; }
+.arc-betpill.none { background: transparent; }
+.arc-betrow { display: flex; justify-content: flex-end; }
+.gv-body .arc-vs .arc-betpill { height: 28px; font-size: 14px; }
