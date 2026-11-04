@@ -4,6 +4,16 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '3.1.1',
+    date: '2026-11-04',
+    title: 'Who drove, operated and coached',
+    items: [
+      'Every practice run and match now records its drive team: Driver, Operator, Coach and Human player. Log a run fills them in from the pit screen’s drive team, and you can change them for each run.',
+      'Match log shows the drive team on every run, and a new Who did what table counts how many runs each person drove, operated, coached or was human player, with the average score of the runs they drove.',
+      'Scores saved from the pit screen during a competition record the drive team too.',
+    ],
+  },
+  {
     version: '3.1',
     date: '2026-11-04',
     title: 'A new casino, loans and /request',
