@@ -1815,6 +1815,14 @@ export const demoStore = {
     const isCasino = casino.CASINO.includes(game);
     const stop = blocked(game, serverGroup(game), conv, state.settings?.commands);
     if (stop) return { note: stop };
+    // Controls, "Casino during shifts" off: not while you're clocked in (like the server; Asher is exempt).
+    if (
+      casino.shiftLocked(game) &&
+      me !== REQUESTS_TO &&
+      (state.controls?.off || []).includes('casinoOnShift') &&
+      (state.shifts || []).some((x) => !x.end && x.person === me)
+    )
+      return note(...casino.SHIFT_NOTE);
     const balance = balanceOf(me);
     const mine = bank(me);
     if (arcade.MULTI.includes(game)) {

@@ -1575,6 +1575,7 @@ export const play = onCall({ maxInstances: 5, invoker: 'public' }, withBalance(a
       if (card.get('cmd')?.name === 'challenge') {
         const controls = (await db.doc('settings/controls').get()).data() || {};
         if ((controls.off || []).includes('coins')) return note('🪙 Jackson coins are off right now.');
+        if ((controls.off || []).includes('casinoOnShift') && (await workContext(me, data)).onShift) return note(...casino.SHIFT_NOTE);
       }
     }
     return runMove({ conv, msgId, me, move: String(move), data, now });
@@ -1594,6 +1595,8 @@ export const play = onCall({ maxInstances: 5, invoker: 'public' }, withBalance(a
     const controls = (await db.doc('settings/controls').get()).data() || {};
     if ((controls.channelsOff || []).includes(conv)) return note('Not here.', 'This channel is off right now.');
     if ((controls.off || []).includes('coins')) return note('🪙 Jackson coins are off right now.');
+    if (casino.shiftLocked(game) && (controls.off || []).includes('casinoOnShift') && (await workContext(me, data)).onShift)
+      return note(...casino.SHIFT_NOTE);
   }
   const roster = isArcade ? (await db.collection('people').get()).docs.map((d) => data.rename(d.get('name') || '')).filter(Boolean) : [];
   const msgRef = db.collection(`channels/${conv}/messages`).doc();
