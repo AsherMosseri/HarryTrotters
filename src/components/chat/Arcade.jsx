@@ -71,6 +71,22 @@ export const Who = ({ name, Name }) =>
 
 // ---------- challenges ----------
 
+// The bet, for everyone to see (players and anyone watching): what each one
+// put in, and what the winner takes. A game with no bet says so.
+export function BetPill({ each, pot, people = 'each' }) {
+  if (!(each > 0))
+    return (
+      <span className="cz-betpill arc-betpill none">
+        <span className="cz-betpill-k">No bet</span>
+      </span>
+    );
+  return (
+    <span className="cz-betpill arc-betpill" title={`${each} Jackson coins ${people}, ${pot} in the pot`}>
+      <span className="cz-betpill-k">Bet</span> <Amt n={each} /> {people} <span className="cz-betpill-k">· pot</span> <Amt n={pot} />
+    </span>
+  );
+}
+
 export function Versus({ g, Name, marks }) {
   return (
     <div className="arc-vs">
@@ -81,7 +97,7 @@ export function Versus({ g, Name, marks }) {
       <span className={g.turn === g.b && isLive(g.status) ? 'turn' : ''}>
         {marks?.[1]} <Who name={g.b} Name={Name} />
       </span>
-      {g.bet > 0 && <span className="chip">{coins(g.bet)} each</span>}
+      <BetPill each={g.bet} pot={2 * g.bet} />
     </div>
   );
 }
@@ -194,7 +210,7 @@ function Challenge({ g, me, act, Name, now, mv }) {
           <span className="cz-vs-badge">vs</span>
           {g.bet > 0 && (
             <span className="cz-chip">
-              <Amt n={g.bet} /> each
+              <Amt n={g.bet} /> each · pot <Amt n={2 * g.bet} />
             </span>
           )}
           {rolled && g.kind === 'coinflip' && <FlipCoin side={g.flip} spin={wasLive} />}
@@ -647,6 +663,9 @@ function Heist({ g, me, act, Name, now }) {
   const each = Math.floor((g.bet * 0.95) / odds);
   return (
     <div className="arc-heist">
+      <div className="arc-betrow">
+        <BetPill each={g.bet} pot={g.bet * n} people="each" />
+      </div>
       <div className="heist-crew">
         {g.crew.map((c) => (
           <span key={c} className="arc-who">

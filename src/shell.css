@@ -5082,7 +5082,7 @@ button.bs-cell:focus-visible { outline: 2px solid var(--accent); outline-offset:
 .bs-view-top { display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; flex: none; }
 .bs-view-top .arc-vs { font-size: 15px; }
 .bs-view-boards { display: grid; gap: 12px 18px; justify-content: center; align-content: start; }
-.bs-view.player .bs-view-boards { grid-template-columns: minmax(0, var(--bs-t)); --bs-t: min(100cqw, calc(100cqh - 330px), 560px); }
+.bs-view.player .bs-view-boards { grid-template-columns: minmax(0, var(--bs-t)); --bs-t: min(100cqw, calc(100cqh - 420px), 560px); }
 .bs-target-wrap, .bs-yours-wrap, .bs-watch-wrap { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .bs-yours-wrap { display: grid; grid-template-columns: var(--bs-y) minmax(0, 1fr); gap: 4px 12px; align-items: start; --bs-y: min(38cqw, 190px); }
 .bs-yours-wrap > .bs-board { grid-row: 1 / span 2; }
@@ -5133,3 +5133,10 @@ button.bs-cell:focus-visible { outline: 2px solid var(--accent); outline-offset:
   .bs-place > .bs-place-actions { grid-column: 2; grid-row: 3; }
   .bs-place > .bs-view-actions { grid-column: 2; grid-row: 5; }
 }
+/* The bet on every arcade game (the casino's BET pill): what each put in and the pot. */
+.arc-vs .arc-betpill { margin-left: auto; }
+.arc-betpill { white-space: nowrap; flex: none; }
+.arc-betpill .coin-amt, .arc-betpill .mono { font-weight: 700; }
+.arc-betpill.none { background: transparent; }
+.arc-betrow { display: flex; justify-content: flex-end; }
+.gv-body .arc-vs .arc-betpill { height: 28px; font-size: 14px; }
