@@ -5182,3 +5182,25 @@ button.bs-cell:focus-visible { outline: 2px solid var(--accent); outline-offset:
 .cv-reversed { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px; font-size: 11px; font-weight: 650; vertical-align: 1px; color: var(--muted); background: var(--surface-2); border: 1px solid var(--border); }
 .cv-reversed.busy { font-style: italic; }
 .cv-rev-hint { margin: 4px 0 2px; }
+
+/* ---------- 3.1.1: the owner's Refund / Take back on a game card ---------- */
+/* Everyone sees the tag the server puts on the card; only the owner gets the buttons. */
+.card-fixed { display: flex; flex-wrap: wrap; gap: 6px; }
+.card-fixed-tag {
+  display: inline-flex; align-items: center; gap: 5px; min-height: 24px; padding: 2px 9px; border-radius: 999px;
+  font-size: 12px; font-weight: 650; line-height: 1.2; color: var(--muted); background: var(--surface-2, var(--accent-soft));
+  border: 1px solid var(--border);
+}
+.card-fixed-tag.refund { color: #15803d; border-color: color-mix(in srgb, #15803d 35%, var(--border)); background: color-mix(in srgb, #15803d 8%, var(--surface)); }
+.card-fixed-tag.takeback { color: #b42318; border-color: color-mix(in srgb, #b42318 35%, var(--border)); background: color-mix(in srgb, #b42318 7%, var(--surface)); }
+.card-actions .card-fix { font-weight: 650; }
+.card-actions .card-fix.refund { color: #15803d; }
+.card-actions .card-fix.takeback { color: #b42318; }
+.card-actions .card-fix:disabled { opacity: 0.6; }
+.card-fix-error { flex-basis: 100%; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .card-fixed-tag.refund, :root:not([data-theme='light']) .card-actions .card-fix.refund { color: #4ade80; }
+  :root:not([data-theme='light']) .card-fixed-tag.takeback, :root:not([data-theme='light']) .card-actions .card-fix.takeback { color: #f87171; }
+}
+:root[data-theme='dark'] .card-fixed-tag.refund, :root[data-theme='dark'] .card-actions .card-fix.refund { color: #4ade80; }
+:root[data-theme='dark'] .card-fixed-tag.takeback, :root[data-theme='dark'] .card-actions .card-fix.takeback { color: #f87171; }

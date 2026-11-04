@@ -1384,6 +1384,11 @@ export const firebaseStore = {
   async disputeDecide(req) {
     return (await callable('disputeDecide')(req)).data;
   },
+  // The owner's Refund / Take back on a game card in chat: { conv, msgId,
+  // person, mode: 'refund' | 'takeback' }. The amount is the card's.
+  async ownerRefund(req) {
+    return (await callable('ownerRefund')(req)).data;
+  },
   // Coin requests (/request @person amount; functions/coinRequests.js):
   // create, pay, decline, cancel, peek. Returns { ok } or { note }.
   async coinRequest(req) {
