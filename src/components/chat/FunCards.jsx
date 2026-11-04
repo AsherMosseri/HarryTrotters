@@ -35,7 +35,7 @@ export function FunShare({ c, by, Name }) {
       </div>
       {c.bot && (
         <div className={`arc-result ${c.won ? 'win' : 'lose'}`}>
-          {c.won ? 'Beat' : 'Lost to'} Trotbot ({c.speed || 'medium'}): <span className="mono">{c.bot.line}</span>
+          {c.won ? 'Beat' : 'Lost to'} Trotbot ({fun.botLabel(c)}): <span className="mono">{c.bot.line}</span>
         </div>
       )}
       <div className="fun-row">

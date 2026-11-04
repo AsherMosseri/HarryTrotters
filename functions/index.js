@@ -1976,13 +1976,15 @@ export const funGame = onCall({ maxInstances: 5, invoker: 'public' }, async (req
       s.seed = newSeed();
       if (game === 'tetris') s.level = Math.max(1, Math.min(15, Math.floor(Number(body.level)) || 1));
       else s.level = mines.LEVELS[body.level] ? body.level : 'beginner';
-      if (mode === 'bot') s.speed = fun.SPEEDS.includes(body.speed) ? body.speed : 'medium';
+      // Trotbot's level (checked against fun.BOT_LEVELS) is set here, once:
+      // 'finish' plays and pays the session's level, never the app's word.
+      if (mode === 'bot') Object.assign(s, fun.botPick(body));
     }
     const ref = db.collection('funGames').doc();
     await ref.set(s);
     // A server-run game's seed stays here (see 'sweep').
     const server = fun.serverRun(s);
-    return { ok: true, id: ref.id, seed: server ? null : s.seed, server, mode, level: s.level, speed: s.speed, attempt: s.attempt || 0, serverNow: now };
+    return { ok: true, id: ref.id, seed: server ? null : s.seed, server, mode, level: s.level, speed: s.speed, botLevel: s.botLevel || '', attempt: s.attempt || 0, serverNow: now };
   }
 
   // A Minesweeper tournament game (fun.serverRun): the phone sends its taps

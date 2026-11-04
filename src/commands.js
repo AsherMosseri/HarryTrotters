@@ -89,8 +89,8 @@ export const COMMANDS = [
   { name: 'hangman', group: 'arcade', args: '', desc: 'Guess the robotics word together', server: true },
   { name: 'typerace', group: 'arcade', args: '', desc: 'Race to type a sentence (no pasting)', server: true },
   { name: 'heist', group: 'arcade', args: 'bet', desc: 'Plan a heist: more crew, better odds', server: true },
-  { name: 'tetris', bare: true, group: 'arcade', args: '@person | bot | sprint', desc: 'Tetris: alone, race someone live, race Trotbot, or a tournament', server: true },
-  { name: 'minesweep', bare: true, group: 'arcade', args: '@person | bot | expert', desc: 'Minesweeper: alone, race someone on the same board, Trotbot, or a tournament', server: true },
+  { name: 'tetris', bare: true, group: 'arcade', args: '@person | bot [beginner…insane] | sprint', desc: 'Tetris: alone, race someone live, race Trotbot (5 levels), or a tournament', server: true },
+  { name: 'minesweep', bare: true, group: 'arcade', args: '@person | bot [beginner…insane] | expert', desc: 'Minesweeper: alone, race someone on the same board, Trotbot (5 levels), or a tournament', server: true },
   { name: 'battleship', group: 'arcade', args: '@person bet hitagain', desc: 'Battleship (anyone, or @Trotbot). Add hitagain: a hit gets another turn', server: true },
 
   { name: 'task', group: 'team', args: 'title @person friday !high', desc: 'Make a task' },
