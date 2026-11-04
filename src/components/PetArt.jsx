@@ -1071,7 +1071,10 @@ const Scarf = ({ detail }) => (
   </g>
 );
 
-export function PetArt({ species = 'cat', mood = 'ok', stage = 'young', size = 64, still = false, className = '', title }) {
+// neck: what the pet wears at the neck (PetGear's Neck, in this art's own
+// coordinates). It's drawn under the head, so a long nose, a beak or a wattle
+// stays in front of it.
+export function PetArt({ species = 'cat', mood = 'ok', stage = 'young', size = 64, still = false, className = '', title, neck = null }) {
   const id = 'p' + useId().replace(/[^a-zA-Z0-9]/g, '');
   const c = LOOK[species] || LOOK.cat;
   const detail = size >= 40;
@@ -1108,8 +1111,10 @@ export function PetArt({ species = 'cat', mood = 'ok', stage = 'young', size = 6
           {/* a soft shadow where the head sits on the body */}
           {!part.over && <ellipse cx="32" cy="41.6" rx="12" ry="3.4" fill={c.dark} opacity="0.22" />}
           {!part.over && scarf}
+          {!part.over && neck}
           <g transform={headT}>{part.head}</g>
           {part.over && scarf}
+          {part.over && neck}
         </g>
       </g>
     </svg>

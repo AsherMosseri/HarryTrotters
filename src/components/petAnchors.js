@@ -5,6 +5,8 @@
 // line's y and the distance between the two eyes (centered on x 32); neck: the
 // middle of the scarf band, and how wide it is. up (optional): how far hats and
 // the halo sit higher than the head's top, for pets with something on top (a comb).
+// under (optional): neck gear is drawn under the head instead of over the whole
+// pet, for pets with something hanging over the neck (a long nose, a wattle).
 export const PET_ANCHORS = {
   cat: { head: { x: 32, y: 28.6, r: 16 }, eyes: { x: 32, y: 28.6, gap: 15.2 }, neck: { x: 32, y: 44.5, w: 26 } },
   dog: { head: { x: 32, y: 28.6, r: 15.8 }, eyes: { x: 32, y: 27.2, gap: 15.2 }, neck: { x: 32, y: 44.5, w: 26 } },
@@ -13,14 +15,16 @@ export const PET_ANCHORS = {
   owl: { head: { x: 32, y: 28.2, r: 16.5 }, eyes: { x: 32, y: 29.2, gap: 14 }, neck: { x: 32, y: 44.5, w: 26 } },
   frog: { head: { x: 32, y: 30.4, r: 16 }, eyes: { x: 32, y: 20.8, gap: 19.2 }, neck: { x: 32, y: 44.5, w: 26 } },
   panda: { head: { x: 32, y: 28.6, r: 16.2 }, eyes: { x: 32, y: 28.6, gap: 15.2 }, neck: { x: 32, y: 44.5, w: 26 } },
-  monkey: { head: { x: 32, y: 27.6, r: 15.3 }, eyes: { x: 32, y: 27.8, gap: 14 }, neck: { x: 32, y: 44.5, w: 26 } },
+  // The long nose hangs down over the neck: a bandana goes under it.
+  monkey: { head: { x: 32, y: 27.6, r: 15.3 }, eyes: { x: 32, y: 27.8, gap: 14 }, neck: { x: 32, y: 44.5, w: 26 }, under: true },
   redpanda: { head: { x: 32, y: 28.6, r: 16 }, eyes: { x: 32, y: 28.4, gap: 15.2 }, neck: { x: 32, y: 44.5, w: 26 } },
   // Spines crown the head to about y 12.6, so hats ride 2 up (see `up` below).
   hedgehog: { head: { x: 32, y: 29, r: 16 }, eyes: { x: 32, y: 29.4, gap: 15.6 }, neck: { x: 32, y: 44.5, w: 26 }, up: 2 },
   // The comb rises to y 7 above the head, so hats and the halo ride 5 up and cover it.
-  chicken: { head: { x: 32, y: 29, r: 16 }, eyes: { x: 32, y: 28.2, gap: 14.8 }, neck: { x: 32, y: 44.5, w: 26 }, up: 5 },
+  chicken: { head: { x: 32, y: 29, r: 16 }, eyes: { x: 32, y: 28.2, gap: 14.8 }, neck: { x: 32, y: 44.5, w: 26 }, up: 5, under: true },
   // The head sits high on a long neck: the blue ball; the casque rises to y 5.6 above it, the wattle hangs to y 43.
-  cassowary: { head: { x: 32, y: 22.6, r: 12.4 }, eyes: { x: 32, y: 22.8, gap: 12 }, neck: { x: 32, y: 41, w: 17 } },
+  // Neck gear sits at the base of the neck, below the wattle (it hangs to y 43).
+  cassowary: { head: { x: 32, y: 22.6, r: 12.4 }, eyes: { x: 32, y: 22.8, gap: 12 }, neck: { x: 32, y: 47.4, w: 20 } },
   // A pear-cut gem on its side, point to the right: the face sits on the table,
   // a little left of center (the round end); the top of the stone is the head's top.
   // The neck is low (a bib under the mouth), since the stone is all one piece.

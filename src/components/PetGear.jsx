@@ -1,6 +1,6 @@
 import { PetArt } from './PetArt.jsx';
 import { cleanGear } from '../../functions/shared/pets.js';
-import { stageAnchors } from './petAnchors.js';
+import { PET_ANCHORS, petStage, stageAnchors } from './petAnchors.js';
 
 // Gear for pets (unlocked by level, see functions/shared/pets.js): small flat
 // SVGs drawn over the pet art in the same 64x64 box, so any pet can wear any
@@ -191,7 +191,7 @@ export function GearOverlay({ species, gear, stage = 'young', mood = 'ok', size 
         <g>
           {/* Keeps the bobbing in step with the pet underneath. */}
           <rect x="15" y="5" width="34" height="54" fill="none" />
-          {g.neck && <Neck id={g.neck} neck={a.neck} />}
+          {g.neck && !(PET_ANCHORS[species] || PET_ANCHORS.cat).under && <Neck id={g.neck} neck={a.neck} />}
           {/* The chicken pecks: its head gear moves with the head (same translate-only keyframe). */}
           <g className={species === 'chicken' ? 'pet-peck' : undefined}>
             {g.face && <Face id={g.face} eyes={a.eyes} />}
@@ -208,10 +208,22 @@ export function GearOverlay({ species, gear, stage = 'young', mood = 'ok', size 
 // A pet with what it wears. Takes PetArt's props plus `gear`.
 export function PetWithGear({ gear, size = 64, ...art }) {
   const g = cleanGear(gear);
-  const worn = g.head || g.face || g.neck || g.extra;
+  const anchor = PET_ANCHORS[art.species] || PET_ANCHORS.cat;
+  // A pet with something hanging over its neck (anchor.under: the monkey's
+  // nose, the chicken's wattle): neck gear goes inside its own drawing, under
+  // the head, at the same spot and size the overlay would put it (the
+  // overlay's numbers divided back by the stage scale the art is drawn at).
+  const under = !!(g.neck && anchor.under);
+  const worn = g.head || g.face || g.extra || (g.neck && !under);
+  let neck = null;
+  if (under) {
+    const n = anchor.neck;
+    const { s } = petStage(art.species, art.stage);
+    neck = <Neck id={g.neck} neck={{ x: n.x, y: n.y - 3 / s, w: Math.min(12, n.w * s * 0.45) / s }} />;
+  }
   return (
     <span className="pet-geared" style={{ width: size, height: size }}>
-      <PetArt {...art} size={size} className={`${art.className || ''}${g.palette ? ` pet-tint-${g.palette}` : ''}`} />
+      <PetArt {...art} neck={neck} size={size} className={`${art.className || ''}${g.palette ? ` pet-tint-${g.palette}` : ''}`} />
       {worn && <GearOverlay species={art.species} stage={art.stage} mood={art.mood} size={size} still={art.still} gear={g} />}
     </span>
   );
