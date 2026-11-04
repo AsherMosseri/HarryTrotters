@@ -1922,7 +1922,7 @@ export const demoStore = {
     // card: the game and its card's id, so a held bet and its result share a history line.
     const payOut = (money, card) => {
       for (const x of money)
-        setBank(x.name, casino.bankAfter(bank(x.name), x.name, x.delta, arcade.moneyLine(x, card.game, card.id), x.extra || {}, now));
+        setBank(x.name, casino.bankAfter(bank(x.name), x.name, x.delta, arcade.moneyLine(x, card.game, card.id, conv), x.extra || {}, now));
     };
 
     // A group gift (/give @Programming 10): the same rules as the server's
@@ -2013,7 +2013,7 @@ export const demoStore = {
       const cmd = { ...c, game: g, status, bet };
       if (r.done) {
         const net = r.payout - bet;
-        setBank(m.by, casino.bankAfter(bank(m.by), m.by, r.payout - (r.extraBet || 0), { ...result(net, c.name), shown: net, settles: msgId }, {}, now));
+        setBank(m.by, casino.bankAfter(bank(m.by), m.by, r.payout - (r.extraBet || 0), { ...result(net, c.name), shown: net, settles: msgId, card: `${conv}/${msgId}` }, {}, now));
         Object.assign(cmd, { payout: r.payout, net });
         delete state.gameSecrets[msgId];
       } else state.gameSecrets = { ...state.gameSecrets, [msgId]: r.secret };
@@ -2089,8 +2089,8 @@ export const demoStore = {
       const { status = 'done', ...g } = r.pub;
       if (r.done) {
         const net = r.payout - bet;
-        setBank(me, casino.bankAfter(mine, me, net, result(net, game), {}, now));
-        post({ game: g, status, bet, payout: r.payout, net });
+        const m = post({ game: g, status, bet, payout: r.payout, net });
+        setBank(me, casino.bankAfter(mine, me, net, { ...result(net, game), card: `${conv}/${m.id}` }, {}, now));
       } else {
         const m = post({ game: g, status, bet });
         setBank(me, casino.bankAfter(mine, me, -bet, casino.holdEntry(ICON[game], LABEL[game], bet, m.id), {}, now));
