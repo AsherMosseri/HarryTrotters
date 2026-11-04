@@ -4672,6 +4672,9 @@ html.kb-open .report-note { min-height: 56px; }
   color: #14284b; background: linear-gradient(180deg, #fff, #dfe5ee); border: 2.5px dashed #c62828; box-shadow: 0 0 0 2px #fff, 0 3px 6px rgb(0 0 0 / 45%);
 }
 .cz-wheel-felt > .cz-bigwin { bottom: -14px; }
+/* High-low keeps its streak chip on the bottom rail: the banner goes on the top one. */
+.casino-hl .cz-table > .cz-bigwin { top: -12px; bottom: auto; }
+.casino-hl .cz-table:has(> .cz-bigwin) { margin: 12px 0 0; }
 
 /* Economy cards: a panel tinted by what happened, with its icon as a big faint mark. */
 .cz-econ {
