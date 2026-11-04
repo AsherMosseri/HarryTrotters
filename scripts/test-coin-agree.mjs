@@ -3,7 +3,7 @@
 //
 // It builds randomized teams (renames, old spellings, bank docs, ledger
 // entries of every kind, loans from the bank and between people, shifts,
-// tasks), works out the true balance from how the data was made, then reads
+// tasks, group gifts), works out the true balance from how the data was made, then reads
 // the documents the way the app does
 // (Workspace.jsx: subscribeBank, subscribeCoins, tasks, shifts, coinInput)
 // and the way the server does (functions/index.js freshCoins: alias queries
@@ -22,6 +22,7 @@ import {
   coinTasks,
   earnedItems,
   freshWallet,
+  groupGiftEntries,
   ledgerItems,
   bankItems,
   oldBankIds,
@@ -127,7 +128,7 @@ function makeWorld(seed) {
   const tasks = [];
   const ledger = [];
   const truth = Object.fromEntries(
-    people.map((p) => [p.current, { shifts: [], tasks: [], ledger: [], bankNet: 0 }]),
+    people.map((p) => [p.current, { shifts: [], tasks: [], ledger: [], bankNet: 0, giftNet: 0, batches: 0 }]),
   );
   for (const p of people) {
     const t = truth[p.current];
@@ -222,6 +223,26 @@ function makeWorld(seed) {
       if (peer) truth[peer.current].ledger.push(entry);
     }
   }
+  // Group gifts (/give @Programming 10, shared/coins.js groupGiftEntries):
+  // one entry per person sharing a batch id, under the names they had then.
+  // The giver's history shows them as one line. Truth is plain arithmetic.
+  for (const p of people) {
+    if (!chance(0.45) || people.length < 2) continue;
+    for (let i = int(1, 2); i > 0; i--) {
+      const at = t0();
+      const to = people.filter((q) => q !== p && chance(0.7));
+      if (!to.length) continue;
+      const each = int(1, 25);
+      const made = groupGiftEntries(p.current, { people: to.map((q) => q.current), amount: each, batch: `b${seed}-${p.current}-${i}`, group: '@Programming' }, { roster: people.map((q) => q.current), balance: Infinity, now: at });
+      for (const e of made.entries) {
+        const q = to.find((x) => x.current === e.to);
+        ledger.push({ ...e, from: nameAt(p, at), to: nameAt(q, at) });
+        truth[q.current].giftNet += each;
+      }
+      truth[p.current].giftNet -= each * to.length;
+      truth[p.current].batches += 1;
+    }
+  }
   // Truth for tasks: the same rows with current names.
   const truthTasks = tasks.map((t) => ({
     ...t,
@@ -305,6 +326,23 @@ function makeWorld(seed) {
     });
     truth[p.current].bankNet = net;
   }
+  // Gifts between teammates: /give, and paid coin requests (/request @person,
+  // functions/coinRequests.js), which are the same gift with the request's id
+  // on it and the reason as the note. Each is one entry both people count:
+  // the server finds it by `from` for one and `to` for the other.
+  for (let i = people.length > 1 ? int(0, people.length * 2) : 0; i > 0; i--) {
+    const a = pick(people);
+    const b = pick(people.filter((q) => q !== a));
+    const at = t0();
+    const amount = int(1, 60);
+    const asked = chance(0.5);
+    const note = asked ? pick(['for pizza', '', 'robot parts']) : '';
+    const extra = asked ? { request: `r${i}` } : {};
+    ledger.push({ type: 'gift', from: nameAt(a, at), to: nameAt(b, at), amount, note, at, ...extra });
+    const as = { type: 'gift', from: a.current, to: b.current, amount, note, at };
+    truth[a.current].ledger.push(as);
+    truth[b.current].ledger.push(as);
+  }
   return { rand, people, renames, rename, aliasesOf, cfg, shifts, tasks, truthTasks, ledger, bank, truth };
 }
 
@@ -373,11 +411,12 @@ function truthBalance(w, name) {
   const t = w.truth[name];
   const earned = earnedItems(name, { tasks: w.truthTasks, shifts: t.shifts, cfg: w.cfg, now: Math.floor(NOW / MIN) * MIN }).reduce((s, x) => s + x.amount, 0);
   const led = ledgerItems(name, t.ledger).reduce((s, x) => s + x.amount, 0);
-  return { earned, balance: earned + led + t.bankNet };
+  return { earned, balance: earned + led + t.bankNet + (t.giftNet || 0) };
 }
 
 // ---------- run ----------
 let bankSharedCases = 0;
+let groupGiftCases = 0;
 let gapCases = 0;
 for (let seed = 1; seed <= CASES; seed++) {
   const w = makeWorld(seed * 7919);
@@ -394,6 +433,11 @@ for (let seed = 1; seed <= CASES; seed++) {
     ok(app.earned === truth.earned, `${tag}: earned ${app.earned} vs truth ${truth.earned}`);
     // The history adds up to the balance (what the Coins screen lists).
     ok(app.history.reduce((s, x) => s + x.amount, 0) === app.balance, `${tag}: history does not add up`);
+    ok(srv.history.reduce((s, x) => s + x.amount, 0) === srv.balance, `${tag}: server history does not add up`);
+    // Each group gift is one line for the giver ("Gave 10 each to @Programming (3 people)").
+    const groupLines = app.history.filter((x) => x.kind === 'gift-out' && /each to @Programming/.test(x.label)).length;
+    ok(groupLines === w.truth[name].batches, `${tag}: ${groupLines} group-gift lines, expected ${w.truth[name].batches}`);
+    if (w.truth[name].batches) groupGiftCases++;
     if (p.names.some((s) => s !== name && nameKey(s) === nameKey(name))) {
       bankSharedCases++;
       const oldSrv = oldServerBalance(w, name);
@@ -401,6 +445,7 @@ for (let seed = 1; seed <= CASES; seed++) {
     }
   }
 }
+console.log(`${groupGiftCases} people gave to a group (one history line each, adding up)`);
 console.log(`${CASES} random teams checked; ${bankSharedCases} people had a capitals-only rename (same bank doc), the old server code was off for ${gapCases} of them`);
 
 // ---------- the minimized failing case ----------

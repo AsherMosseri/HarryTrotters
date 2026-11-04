@@ -180,6 +180,82 @@ function Tasks({ c }) {
   );
 }
 
+// A group on a card (/hug @Programming, /give @everyone 5): a row of faces
+// and who's in it ("Cooper, Mia, Sam and 3 more"). Tap a name for their card.
+export function GroupFaces({ people = [], count, onPerson, Name: Named, max = 6 }) {
+  const total = count ?? people.length;
+  const shown = people.slice(0, max);
+  const named = people.slice(0, 4);
+  const more = total - named.length;
+  return (
+    <div className="grp-faces">
+      <span className="grp-stack" aria-hidden="true">
+        {shown.map((n) => (
+          <span key={n} className="grp-face">
+            <Avatar name={n} size={26} />
+          </span>
+        ))}
+        {total > shown.length && <span className="grp-face grp-more mono">+{total - shown.length}</span>}
+      </span>
+      <span className="small grp-names">
+        {named.map((n, i) => (
+          <span key={n}>
+            {i > 0 && (i === named.length - 1 && !more ? ' and ' : ', ')}
+            {Named ? <Named name={n} /> : <Name name={n} onPerson={onPerson} />}
+          </span>
+        ))}
+        {more > 0 && <span className="muted"> and {more} more</span>}
+      </span>
+    </div>
+  );
+}
+
+// A group lookup (/hours @Programming, /tasks @everyone…): a row per person.
+function Grid({ c, onPerson }) {
+  return (
+    <div className="mc-grid-card">
+      <div className="mc-title">
+        <b>{c.title}</b>
+      </div>
+      {c.sub && <div className="muted small">{c.sub}</div>}
+      <table className="mc-grid">
+        <thead>
+          <tr>
+            <th scope="col">
+              <span className="sr-only">Name</span>
+            </th>
+            {c.cols.map((h) => (
+              <th key={h} scope="col">
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {c.grid.map((r) => (
+            <tr key={r.name}>
+              <th scope="row">
+                <span className="mc-grid-who">
+                  <Avatar name={r.name} size={22} />
+                  <Name name={r.name} onPerson={onPerson} />
+                  {r.dot && <span className="mc-grid-dot" title={c.dotLabel} aria-label={c.dotLabel} />}
+                </span>
+              </th>
+              {r.c.map((v, k) => (
+                <td key={k} className="mono">
+                  {v}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {c.more > 0 && <div className="muted small mc-grid-more">and {c.more} more</div>}
+      {c.foot && <div className="muted tiny">{c.foot}</div>}
+    </div>
+  );
+}
+
 function Rule({ c }) {
   const [all, setAll] = useState(false);
   const shown = all ? c.text : c.text.slice(0, 3);
@@ -222,7 +298,27 @@ export function MoreBody({ c, by, onPerson }) {
       return <Rule c={c} />;
     case 'cheer':
       return <div className="mc-cheer">{c.line}</div>;
+    case 'grid':
+      return <Grid c={c} onPerson={onPerson} />;
     case 'shout':
+      if (c.group)
+        return (
+          <div className="mc-shout grp-shout">
+            <div className="grow">
+              {c.name === 'hype' ? (
+                <>
+                  <b className="grp-label">{c.group}</b> {c.line}
+                </>
+              ) : (
+                <>
+                  <b className="grp-label">{c.group}</b>, {c.line}
+                  <div className="muted tiny">from {first(by)}</div>
+                </>
+              )}
+              <GroupFaces people={c.people} count={c.count} onPerson={onPerson} />
+            </div>
+          </div>
+        );
       return (
         <div className="mc-shout">
           <Avatar name={c.to} size={40} />

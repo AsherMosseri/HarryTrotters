@@ -103,6 +103,7 @@ import { hasLabel, newBattery, putOnRobot, statusPatch } from '../batteries.js';
 import { streaksOf } from '../../functions/shared/streaks.js';
 import { confirmDialog } from './Dialogs.jsx';
 import { LoanSettings, loanLines, useLoans } from './Loans.jsx';
+import { RequestForms } from './RequestForms.jsx';
 
 // Versions were renumbered once (2.0 became 1.9, 2.1 became 2.0, and so
 // on). Move this device's "last seen" version along so What's new doesn't
@@ -841,6 +842,8 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
   // Feature requests (💡). showRequests is true, or the id of one to point at.
   const [requests, setRequests] = useState([]);
   const [showRequests, setShowRequests] = useState(null);
+  // /request's forms (RequestForms.jsx): { form, text, conv }, or null.
+  const [askForm, setAskForm] = useState(null);
   useEffect(() => store.subscribeRequests(setRequests, quiet('requests')), [store, quiet]);
   const newRequests = actor.name === REQUESTS_TO ? requests.filter((r) => r.status === 'new').length : 0;
   // Pages and data the app downloads only when first needed (the 3D robot
@@ -1473,7 +1476,11 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
       play: (req) => {
         const sent = Date.now();
         return store
-          .play(req, actor, { balanceOf: (n) => cmdData.current.wallet(n).balance, roster: cmdData.current.roster })
+          .play(req, actor, {
+            balanceOf: (n) => cmdData.current.wallet(n).balance,
+            roster: cmdData.current.roster,
+            subteamsOf: (n) => cmdData.current.team?.subteamsOf?.(n) || [],
+          })
           .then((r) => (setServerSkew(r?.serverNow, sent), coinSync.current?.noteServer(r?.balance), r))
           .catch((e) => ({ note: noteFor(e, 'Trotbot couldn’t do that') }));
       },
@@ -1496,7 +1503,10 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
       richest: () => cmdData.current.richest(),
       lottery: () => cmdData.current.lottery,
       // Gifts and ad prizes go through the play function, which checks the balance and today's limits.
-      gift: (to, amount, note) => api.play({ action: 'gift', to, amount, note: note || '' }),
+      // key: the same for a second send of the same /give, so it can't pay twice.
+      gift: (to, amount, note, key) => api.play({ action: 'gift', to, amount, note: note || '', ...(key && { key }) }),
+      // A /give to a group (src/groups.js): the server works out who's in it.
+      giftGroup: (group, amount, key) => api.play({ action: 'gift', group, amount, note: '', key }),
       whois: (name) => cmdData.current.whois(name),
       // For the team commands (/task, /shift, /match…).
       team: () => cmdData.current.team,
@@ -1575,6 +1585,21 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
             return false;
           },
         ),
+      // /request <idea>: the same request, answering its id (for the chat card), or false.
+      addIdea: (text) =>
+        store.addRequest(text, actor).then(
+          (id) => id || true,
+          (e) => {
+            fail(e);
+            return false;
+          },
+        ),
+      // /request @person amount (functions/coinRequests.js): ask, pay, decline, cancel.
+      coinRequest: (req) =>
+        Promise.resolve(store.coinRequest(req, actor, { balanceOf: (n) => cmdData.current.wallet(n).balance, roster: cmdData.current.roster }))
+          .then((r) => (coinSync.current?.noteServer(r?.balance), r))
+          .catch((e) => ({ note: noteFor(e, 'That didn’t go through') })),
+      openAsk: (ask) => setAskForm(ask),
       updateRequest: (id, patch) => store.updateRequest(id, patch, actor).catch(fail),
       saveNote: (about, text) => store.saveNote(actor.name, about, text).catch(fail),
       voteRequest: (id, vote) => store.voteRequest(id, actor.name, vote).catch(fail),
@@ -2328,6 +2353,9 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
       on: controls.isOn('requests'),
       add: (text) => api.addRequest(text),
       vote: (id) => api.voteRequest(id, 'up'),
+      // /request idea cards in chat: 👍 and Open in Feature requests.
+      voteAs: (id, v) => api.voteRequest(id, v),
+      openList: (id) => setShowRequests(id || true),
     }),
     [requests, actor.name, controls, api],
   );
@@ -3075,6 +3103,18 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
                         description: `Feature request from ${r.by}:\n${r.text}`,
                       });
                     }}
+                  />
+                )}
+                {askForm && (
+                  <RequestForms
+                    ask={askForm}
+                    setAsk={setAskForm}
+                    actor={actor}
+                    roster={roster}
+                    api={api}
+                    channels={convs.channels}
+                    channelRequests={channelRequests}
+                    isOn={controls.isOn}
                   />
                 )}
                 {chanDlg === 'request' && requestsOn && (

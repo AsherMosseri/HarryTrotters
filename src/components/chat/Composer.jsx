@@ -14,6 +14,13 @@ import { whatIs } from './Message.jsx';
 import { relTime } from '../../util.js';
 import { alertDialog } from '../Dialogs.jsx';
 import { openGame } from '../games/launch.js';
+import { askOptions } from '../../requestCommand.js';
+import { groupKind } from '../../groups.js';
+
+// A /give's key: the same when the same text is sent again (a double tap, or a
+// retry after it didn't answer), so the server pays it once; new after it goes
+// through or the text changes.
+const newKey = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
 
 // The formatting bar: [label, title, what it does].
 const FORMATS = [
@@ -131,23 +138,44 @@ export default function Composer({
   }, [panel]);
 
   const subteamMembers = (s) => roster.filter((n) => people?.infoOf(n)?.subteams?.includes(s));
+  // Sending right now (set at once, before React redraws, so a fast double tap
+  // can't run a command twice), and the key for the command being sent.
+  const busy = useRef(false);
+  const cmdKey = useRef({ text: '', key: newKey() });
 
   const options = useMemo(() => {
     if (!suggest) return [];
     const q = suggest.query.toLowerCase();
     if (suggest.kind === '/')
       return matchCommands(q, api.team().commandCfg).map((c) => ({ type: 'cmd', key: c.name, insert: `/${c.name}`, c }));
+    // After "/request ": channel, pet, style, and people (to ask for coins).
+    if (suggest.kind === 'ask') return askOptions(q, { roster: isDm && members ? members : roster, me: actor.name, isOn: feat });
     if (suggest.kind === '@') {
-      if (!feat('mentions')) return [];
+      // After a command: groups where it takes them (/give @Programming 10,
+      // and @everyone for anyone there), only people where it doesn't.
+      const cmd = !editing && text.startsWith('/') ? parseCommand(text.split(/\s/)[0])?.cmd : null;
+      const groupsOk = cmd ? !!groupKind(cmd.name) && !isDm : null;
+      if (!feat('mentions') && !groupsOk) return [];
       const out = [];
-      if (!isDm && isManager && feat('everyone') && 'everyone'.startsWith(q))
-        out.push({ type: 'everyone', key: 'everyone', insert: '@everyone' });
+      if (groupsOk ? 'everyone'.startsWith(q) : cmd === null && !isDm && isManager && feat('everyone') && 'everyone'.startsWith(q))
+        out.push({ type: 'everyone', key: 'everyone', insert: '@everyone', cmd: !!groupsOk });
       const matches = (n) =>
         n
           .toLowerCase()
           .split(' ')
           .some((w) => w.startsWith(q)) || n.toLowerCase().startsWith(q);
-      const roles = isDm ? [] : SUBTEAMS.filter(matches).map((s) => ({ type: 'role', key: `r-${s}`, insert: `@${s}`, name: s }));
+      const roles =
+        isDm || groupsOk === false
+          ? []
+          : SUBTEAMS.filter(matches).map((s) => ({
+              type: 'role',
+              key: `r-${s}`,
+              insert: `@${s}`,
+              name: s,
+              // After a command, the people it reaches (not you).
+              count: subteamMembers(s).filter((n) => n !== actor.name).length,
+              cmd: !!groupsOk,
+            }));
       // Not yourself; in a DM, only the people in it.
       const names = (isDm && members ? members : roster).filter((n) => n !== actor.name && matches(n));
       const ppl = names.map((n) => ({ type: 'person', key: `p-${n}`, insert: `@${n}`, name: n }));
@@ -164,7 +192,7 @@ export default function Composer({
     const std = searchEmoji(q, 8).map((e) => ({ type: 'emoji', key: e.char, insert: e.char, char: e.char, code: e.code }));
     return [...team, ...std].slice(0, 8);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [suggest, roster, members, tasks, teamEmoji, isManager, isDm, emojiReady]);
+  }, [suggest, roster, members, tasks, teamEmoji, isManager, isDm, emojiReady, text.split(/\s/)[0]]);
 
   const onChange = (e) => {
     const value = e.target.value;
@@ -176,6 +204,12 @@ export default function Composer({
     const slash = !editing && /^\/([a-z0-9]{0,20})$/i.exec(before);
     if (slash) {
       setSuggest({ kind: '/', query: slash[1], start: 0, end: caret });
+      setActive(0);
+      return;
+    }
+    const ask = !editing && /^\/request\s+(@?[^\s@]{0,30})$/i.exec(before);
+    if (ask) {
+      setSuggest({ kind: 'ask', query: ask[1], start: caret - ask[1].length, end: caret });
       setActive(0);
       return;
     }
@@ -273,8 +307,11 @@ export default function Composer({
   };
 
   // Trotbot's side of a command (see commands.js).
-  const runSlash = async (parsed) => {
+  const runSlash = async (parsed, body) => {
+    if (busy.current) return;
+    busy.current = true;
     setSending(true);
+    if (cmdKey.current.text !== body) cmdKey.current = { text: body, key: newKey() };
     try {
       const team = api.team();
       const result = await runCommand(parsed, {
@@ -294,9 +331,24 @@ export default function Composer({
         wallet: api.wallet,
         richest: api.richest,
         gift: api.gift,
+        // /request (requestCommand.js): Controls switches, a feature request, coins.
+        isOn: feat,
+        addIdea: api.addIdea,
+        coinRequest: (req) => api.coinRequest({ ...req, conv, replyTo: replyInfo() }),
+        // Groups (src/groups.js): who's in a subteam, and who may ping whom.
+        giftGroup: api.giftGroup,
+        isDm,
+        isManager,
+        mentionsOn: feat('mentions'),
+        everyoneOn: feat('everyone'),
+        key: cmdKey.current.key,
       });
+      if (result.post || result.done) cmdKey.current = { text: '', key: newKey() };
       if (result.post) {
-        await api.sendMessage(conv, { mentions: [], taskIds: [], replyTo: replyInfo(), roles: [], everyone: false, ...result.post });
+        const post = { mentions: [], taskIds: [], replyTo: replyInfo(), roles: [], everyone: false, ...result.post };
+        // Mentions switched off (Controls): the card still goes, without pings.
+        if (!feat('mentions')) Object.assign(post, { mentions: [], roles: [], everyone: false });
+        await api.sendMessage(conv, post);
         reset();
       } else if (result.note) {
         onNote(result.note);
@@ -306,6 +358,10 @@ export default function Composer({
       } else if (result.game) {
         reset();
         openGame(result.game);
+      } else if (result.ask) {
+        // /request with a form to fill in (RequestForms.jsx, opened by Workspace).
+        reset();
+        api.openAsk({ ...result.ask, conv });
       } else if (result.standup) {
         setText('');
         setSuggest(null);
@@ -317,6 +373,7 @@ export default function Composer({
         setPanel('poll');
       }
     } finally {
+      busy.current = false;
       setSending(false);
     }
   };
@@ -325,7 +382,7 @@ export default function Composer({
     const body = text.trim();
     if ((!body && !photo) || sending) return;
     const parsed = !editing && !photo && parseCommand(body);
-    if (parsed) return runSlash(parsed);
+    if (parsed) return runSlash(parsed, body);
     // @Subteam pings that subteam; @everyone (team management only) pings everyone.
     const everyone = !isDm && isManager && feat('everyone') && /@everyone(?![\w])/.test(body);
     const roles = isDm || !feat('mentions') ? [] : SUBTEAMS.filter((s) => body.includes(`@${s}`));
@@ -444,11 +501,17 @@ export default function Composer({
         />
       )}
       {suggest && options.length > 0 && (
-        <ul className={`suggest${suggest.kind === '/' ? ' suggest-cmds' : ''}`}>
+        <ul className={`suggest${suggest.kind === '/' || suggest.kind === 'ask' ? ' suggest-cmds' : ''}`}>
           {options.map((o, i) => (
             <li key={o.key}>
               <button className={i === active ? 'active' : ''} onMouseDown={(e) => e.preventDefault()} onClick={() => pick(o)}>
                 {o.type === 'cmd' && <CommandOption c={o.c} />}
+                {o.type === 'askword' && (
+                  <>
+                    <code className="cmd-opt-name">{o.word}</code>
+                    <span className="muted small cmd-opt-desc">{o.desc}</span>
+                  </>
+                )}
                 {o.type === 'person' && (
                   <>
                     <Avatar name={o.name} size={22} showOnline /> {o.name}
@@ -456,7 +519,8 @@ export default function Composer({
                 )}
                 {o.type === 'everyone' && (
                   <>
-                    <span className="suggest-icon">@</span> @everyone <span className="muted small">notifies the whole team</span>
+                    <span className="suggest-icon">@</span> @everyone{' '}
+                    <span className="muted small">{o.cmd ? 'everyone on the team' : 'notifies the whole team'}</span>
                   </>
                 )}
                 {o.type === 'role' && (
@@ -466,7 +530,8 @@ export default function Composer({
                     </span>{' '}
                     @{o.name}{' '}
                     <span className="muted small">
-                      {subteamMembers(o.name).length} {subteamMembers(o.name).length === 1 ? 'person' : 'people'}
+                      {o.cmd ? o.count : subteamMembers(o.name).length}{' '}
+                      {(o.cmd ? o.count : subteamMembers(o.name).length) === 1 ? 'person' : 'people'}
                     </span>
                   </>
                 )}
@@ -646,6 +711,13 @@ export default function Composer({
               if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
                 e.preventDefault();
                 setActive((a) => (a + (e.key === 'ArrowDown' ? 1 : options.length - 1)) % options.length);
+                return;
+              }
+              if (e.key === 'Enter' && suggest.kind === 'ask' && !suggest.query) {
+                // "/request " + Return: nothing picked yet, so it's the picker.
+                e.preventDefault();
+                setSuggest(null);
+                send();
                 return;
               }
               if (e.key === 'Enter' || e.key === 'Tab') {

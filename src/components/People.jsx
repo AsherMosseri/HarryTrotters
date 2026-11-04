@@ -529,8 +529,10 @@ export const STYLE_KINDS = [
   ['border', 'Border'],
   ['style', 'Something else'],
 ];
-function StyleRequest({ kind, setKind, onSend }) {
-  const [text, setText] = useState('');
+// /request style opens this same form in a small window (RequestForms.jsx),
+// with what was typed after it filled in.
+export function StyleRequest({ kind, setKind, onSend, initialText = '', autoFocus = false, id = 'style-request' }) {
+  const [text, setText] = useState(initialText);
   const [sent, setSent] = useState(false);
   const send = async () => {
     const label = STYLE_KINDS.find(([k]) => k === kind)?.[1] || 'Style';
@@ -540,7 +542,7 @@ function StyleRequest({ kind, setKind, onSend }) {
     }
   };
   return (
-    <div className="style-request" id="style-request">
+    <div className="style-request" id={id}>
       <h3 className="field-label">Want something new?</h3>
       <p className="muted tiny">Ask for a font, effect, decoration, or anything else. It goes straight to Asher.</p>
       <div className="row gap wrap">
@@ -558,6 +560,7 @@ function StyleRequest({ kind, setKind, onSend }) {
           onChange={(e) => (setText(e.target.value), setSent(false))}
           placeholder="Describe it, like “a lightning name effect”"
           aria-label="Your idea"
+          autoFocus={autoFocus}
           onKeyDown={(e) => e.key === 'Enter' && text.trim() && send()}
         />
         <button className="btn primary" disabled={!text.trim()} onClick={send}>

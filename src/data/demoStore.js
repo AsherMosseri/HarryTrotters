@@ -18,8 +18,10 @@ import { dayOf, logFields, taskArea } from '../labLog.js';
 import * as arcade from '../../functions/shared/arcade.js';
 import * as challenge from '../../functions/shared/challenge.js';
 import * as dispute from '../../functions/shared/disputes.js';
-import { blocked, serverGroup } from '../../functions/shared/commandRules.js';
-import { AWARD_CAPS, breakdown, giftEntry, prizeEntry, teamDay, teamMidnight } from '../../functions/shared/coins.js';
+import { blocked, isOff, serverGroup } from '../../functions/shared/commandRules.js';
+import * as coinAsk from '../../functions/shared/coinRequests.js';
+import { AWARD_CAPS, breakdown, giftEntry, groupGiftEntries, prizeEntry, teamDay, teamMidnight } from '../../functions/shared/coins.js';
+import { BOT, groupLabel, resolveTargets } from '../../functions/shared/groups.js';
 import * as fun from '../../functions/shared/funGames.js';
 import * as mines from '../../functions/shared/minesweeper.js';
 const MINE_LEVELS = mines.LEVELS;
@@ -28,7 +30,7 @@ import { asksOn } from '../../functions/shared/checkin.js';
 import * as market from '../../functions/shared/market.js';
 import { PERK_IDEAS } from '../../functions/shared/market.js';
 import { giftAccept, giftEnd, giftOffer, petEdit, petsIn } from '../../functions/shared/pets.js';
-import { ROSTER, cleanName, sameName } from '../../functions/shared/team.js';
+import { ROSTER, SUBTEAMS, cleanName, sameName } from '../../functions/shared/team.js';
 import * as chan from '../../functions/shared/channels.js';
 import { checkPicks, myPicks, personOptionId, usesVoteButton } from '../../functions/shared/polls.js';
 import { demoLife } from './demoLife.js';
@@ -1629,6 +1631,83 @@ export const demoStore = {
     }
     return note('Unknown action.');
   },
+  // Coin requests (/request @person amount), run the way the coinRequest
+  // function runs them (functions/coinRequests.js), with the same checks
+  // (shared/coinRequests.js). Paying adds the same gift /give adds.
+  async coinRequest(req, actor, { balanceOf, roster = [] }) {
+    const now = Date.now();
+    const me = actor.name;
+    const note = (title, body = '') => ({ note: { title, body } });
+    const asks = state.coinRequests || (state.coinRequests = {});
+    const ctl = state.controls || {};
+    const cfg = state.settings?.commands;
+    const coinsOff = me !== REQUESTS_TO && (ctl.off || []).includes('coins');
+    const action = String(req.action || '');
+    const first = (n) => (n || '').split(' ')[0];
+    const tell = (to, title, body, conv) => {
+      state.inbox = [{ id: uid(), type: 'coinRequest', title, body, open: `chat:${conv}`, at: now, read: false, to }, ...(state.inbox || [])];
+    };
+    const msgs = (conv) => (state.chat || {})[conv] || [];
+    if (action === 'create') {
+      const conv = String(req.conv || '');
+      if (!conv || conv === 'announcements') return note('Not here.', 'Ask in a channel or a DM.');
+      if (coinsOff) return note('🪙 Jackson coins are off right now.');
+      if (me !== REQUESTS_TO && (ctl.channelsOff || []).includes(conv)) return note('Not here.', 'This channel is off right now.');
+      if (isOff('give', cfg)) return note('/give is turned off', 'Sending coins is off for now, so coin requests are too.');
+      const stop = blocked('request', 'basics', conv, cfg) || blocked('give', 'economy', conv, cfg);
+      if (stop) return { note: stop };
+      const open = Object.values(asks).filter((r) => r.from === me && r.status === 'open' && r.expiresAt > now);
+      const sentToday = Object.values(asks).filter((r) => r.from === me && teamDay(r.at) === teamDay(now)).length;
+      const to = String(req.to || '');
+      const r = coinAsk.startAsk({ me, to, amount: req.amount, reason: req.reason, roster, active: roster.includes(to), open, sentToday, now });
+      if (r.error) return note(r.error, r.body);
+      const dm = conv.startsWith('dm:') ? (state.dms || []).find((d) => `dm:${d.id}` === conv) : null;
+      if (dm && !dm.people.includes(to)) return note(`${first(to)} isn’t in this conversation.`, 'Ask in a channel they can see, or in a DM with them.');
+      const id = uid();
+      const pub = r.pub;
+      asks[id] = { ...pub, id, conv };
+      const m = {
+        id,
+        text: `/request @${to} ${pub.amount}${pub.reason ? ` ${pub.reason}` : ''}`,
+        by: me,
+        byUid: actor.uid,
+        at: now,
+        cmd: { name: 'request', kind: 'coins', ask: { from: me, to, amount: pub.amount, reason: pub.reason, at: now, expiresAt: pub.expiresAt }, status: 'open', line: coinAsk.askLine(pub) },
+        mentions: [],
+        taskIds: [],
+        replyTo: req.replyTo || null,
+        reactions: {},
+      };
+      state.chat = { ...(state.chat || {}), [conv]: [...msgs(conv), m] };
+      if (dm) state.dms = state.dms.map((d) => (d === dm ? { ...d, lastAt: now, lastBy: me, lastText: `${first(me)} ${m.cmd.line}` } : d));
+      else tell(to, `${first(me)} asks you for ${coinAsk.coinText(pub.amount)}`, pub.reason || 'Tap to pay or decline.', conv);
+      commit();
+      return { ok: true, id };
+    }
+    if (!coinAsk.MOVES.includes(action)) return note('Unknown action.');
+    const pub = asks[req.id];
+    if (!pub) return note('That request is gone.');
+    if (action === 'pay') {
+      if (coinsOff) return note('🪙 Jackson coins are off right now.');
+      if (isOff('give', cfg)) return note('/give is turned off', 'Sending coins is off for now, so coin requests are too.');
+      if (isOff('request', cfg)) return note('/request is turned off', 'It’s off for now.');
+    }
+    const balance = action === 'pay' && me === pub.to ? balanceOf(me) : 0;
+    const r = coinAsk.askMove({ pub, me, move: action, balance, roster, now });
+    if (!r.write) return r.error ? note(r.error, r.body) : { ok: true, status: pub.status, ...(r.already && { already: r.already }) };
+    const { status, decidedAt, paidAt } = r.pub;
+    asks[req.id] = { ...pub, status, decidedAt, ...(paidAt && { paidAt }) };
+    if (r.entry && !(state.coins || []).some((x) => x.id === `req-${req.id}`))
+      state.coins = [...(state.coins || []), { ...r.entry, id: `req-${req.id}`, request: req.id }];
+    state.chat = {
+      ...state.chat,
+      [pub.conv]: msgs(pub.conv).map((x) => (x.id === req.id ? { ...x, cmd: { ...x.cmd, status, decidedAt, ...(paidAt && { paidAt }) } } : x)),
+    };
+    if (status === 'paid') tell(pub.from, `${first(pub.to)} paid your request: ${coinAsk.coinText(pub.amount)}`, pub.reason || 'The coins are in your balance.', pub.conv);
+    if (status === 'declined') tell(pub.from, `${first(pub.to)} declined your request for ${coinAsk.coinText(pub.amount)}`, pub.reason || '', pub.conv);
+    commit();
+    return { ok: true, status, ...(r.error && { note: { title: r.error, body: '' } }) };
+  },
   subscribeAdSubmissions(cb) {
     return listen(() => cb([...(state.adSubmissions || [])]));
   },
@@ -1697,7 +1776,7 @@ export const demoStore = {
   // The casino and economy, run here the way the play function runs them on
   // the server (functions/index.js), with the same rules (casino.js).
   // balanceOf(name): the person's coins, from the app's wallet; roster: the team.
-  async play(req, actor, { balanceOf, roster = [] }, verified = null) {
+  async play(req, actor, { balanceOf, roster = [], subteamsOf = () => [] }, verified = null) {
     const now = Date.now();
     const me = actor.name;
     const { action, game, conv = '', args = [], msgId, move } = req;
@@ -1749,6 +1828,31 @@ export const demoStore = {
         setBank(x.name, casino.bankAfter(bank(x.name), x.name, x.delta, arcade.moneyLine(x, card.game, card.id), x.extra || {}, now));
     };
 
+    // A group gift (/give @Programming 10): the same rules as the server's
+    // giveMany, against the demo team. A second send with the same key is
+    // already done.
+    if (action === 'gift' && req.group) {
+      const g = req.group;
+      const groups = (g.groups || []).filter((x) => SUBTEAMS.includes(x));
+      const team = roster.filter((n) => n !== BOT);
+      for (const n of g.people || [])
+        if (n !== me && !team.includes(n)) return note(`Who’s ${n}?`, 'They aren’t on the team. Nothing was sent.');
+      const people = resolveTargets({ groups, everyone: !!g.everyone, people: g.people || [] }, { roster: team, subteamsOf, me });
+      const label = groupLabel({ groups, everyone: !!g.everyone });
+      if (!people.length) return note(`Nobody in ${label} to give to.`, `${label} has nobody in it besides you.`);
+      const batch = `${personId(me)}-${req.key}`;
+      const before = (state.coins || []).filter((x) => x.type === 'gift' && x.batch === batch);
+      const total = before.reduce((t, x) => t + x.amount, 0);
+      if (before.length) return { ok: true, repeat: true, people: before.map((x) => x.to), amount: before[0].amount, total, group: label };
+      const made = groupGiftEntries(
+        me,
+        { people, amount: req.amount, note: req.note, batch, group: label },
+        { roster: team, balance: balanceOf(me), now },
+      );
+      if (made.error) return note(made.error, made.body);
+      for (const e of made.entries) await demoStore.addCoinTx(e);
+      return { ok: true, people, amount: made.entries[0].amount, total: made.total, group: label };
+    }
     // Gifts and ad prizes, checked the way the server checks them.
     if (action === 'gift' || action === 'prize') {
       const entry =
@@ -1768,6 +1872,15 @@ export const demoStore = {
       const secret = (state.gameSecrets || {})[msgId];
       if (!m?.cmd || !secret) return note('That game is gone.');
       const c = m.cmd;
+      // Controls: Casino and games during shifts off: no accepting or joining while clocked in.
+      if (
+        (move === 'accept' || move === 'join') &&
+        casino.shiftLocked(c.name) &&
+        me !== REQUESTS_TO &&
+        (state.controls?.off || []).includes('casinoOnShift') &&
+        (state.shifts || []).some((x) => !x.end && x.person === me)
+      )
+        return note(...casino.SHIFT_NOTE);
       if (arcade.MULTI.includes(c.name)) {
         if (move === 'mine') return { ok: true, mine: arcade.myFleet(c.name, secret, me) };
         if (move === 'sync') return { ok: true, serverNow: now, card: { game: c.game, status: c.status } };
@@ -1816,6 +1929,14 @@ export const demoStore = {
     const isCasino = casino.CASINO.includes(game);
     const stop = blocked(game, serverGroup(game), conv, state.settings?.commands);
     if (stop) return { note: stop };
+    // Controls, "Casino and games during shifts" off: not while you're clocked in (like the server; Asher is exempt).
+    if (
+      casino.shiftLocked(game) &&
+      me !== REQUESTS_TO &&
+      (state.controls?.off || []).includes('casinoOnShift') &&
+      (state.shifts || []).some((x) => !x.end && x.person === me)
+    )
+      return note(...casino.SHIFT_NOTE);
     const balance = balanceOf(me);
     const mine = bank(me);
     if (arcade.MULTI.includes(game)) {
@@ -2071,6 +2192,8 @@ export const demoStore = {
       const { game, mode } = req;
       if (!fun.GAMES.includes(game) || !fun.MODES[game]?.[mode]) return note('Which game?');
       if ((state.settings?.commands?.off || []).includes(game)) return note(`/${game} is turned off`);
+      if (me !== REQUESTS_TO && (state.controls?.off || []).includes('casinoOnShift') && (state.shifts || []).some((x) => !x.end && x.person === me))
+        return note(...casino.SHIFT_NOTE);
       const s = { person: me, game, mode, startedAt: now, done: false, level: 1, speed: '', race: null, tournament: null };
       if (mode === 'race') {
         const { conv, msgId } = req.race || {};
@@ -3143,6 +3266,8 @@ export const demoStore = {
         ...(state.inbox || []),
       ];
     commit();
+    // The new id, like the real store (/request's card links to it).
+    return r.id;
   },
   async updateRequest(id, patch, actor) {
     state.requests = (state.requests || []).map((r) =>

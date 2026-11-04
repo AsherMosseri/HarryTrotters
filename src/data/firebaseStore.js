@@ -1384,6 +1384,11 @@ export const firebaseStore = {
   async disputeDecide(req) {
     return (await callable('disputeDecide')(req)).data;
   },
+  // Coin requests (/request @person amount; functions/coinRequests.js):
+  // create, pay, decline, cancel, peek. Returns { ok } or { note }.
+  async coinRequest(req) {
+    return (await callable('coinRequest')(req)).data;
+  },
   subscribeDisputes(actor, cb) {
     const owner = actor.admin && actor.name === REQUESTS_TO;
     const q = owner ? collection(db, 'disputes') : query(collection(db, 'disputes'), where('by', '==', actor.name));
@@ -1597,8 +1602,10 @@ export const firebaseStore = {
   subscribeRequests(cb, onError) {
     return onSnapshot(requestsCol, (snap) => cb(snap.docs.map(readDoc).sort((a, b) => b.at - a.at)), onError);
   },
+  // Resolves the new request's id (/request posts a card that links to it).
   addRequest(text, actor, kind = '') {
-    return setDoc(doc(requestsCol), { text, ...actorFields(actor), at: Date.now(), status: 'new', votes: {}, ...(kind ? { kind } : {}) });
+    const ref = doc(requestsCol);
+    return setDoc(ref, { text, ...actorFields(actor), at: Date.now(), status: 'new', votes: {}, ...(kind ? { kind } : {}) }).then(() => ref.id);
   },
   updateRequest(id, patch, actor) {
     return updateDoc(doc(requestsCol, id), { ...patch, updatedBy: actor.name, updatedAt: Date.now() });
