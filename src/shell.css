@@ -1084,13 +1084,16 @@ button, [role='button'] { -webkit-user-select: none; user-select: none; -webkit-
 .pit-line.bad .pit-dot { background: #ff5a4f; box-shadow: 0 0 0 3px rgb(255 90 79 / 22%); }
 .pit-line.warn .pit-dot { background: #ffb020; }
 .pit-line.good .pit-dot { background: #3ddc84; }
-.pit-actions { display: flex; gap: 8px; }
+.pit-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .pit-btn {
   display: inline-flex; align-items: center; gap: 7px; height: 36px; padding: 0 14px; border-radius: 8px; font: inherit; font-size: 14.5px; font-weight: 650;
   border: 1px solid rgb(255 255 255 / 30%); background: #fff; color: #14284b;
 }
 .pit-btn.on { background: rgb(255 255 255 / 10%); color: #fff; }
 .pit-btn .mono { font-family: var(--mono); font-weight: 500; }
+/* One line each ("On shift 1h 16m"); on a narrow phone the second button goes under the first instead of squeezing both. */
+.pit-btn { white-space: nowrap; flex: 0 1 auto; justify-content: center; }
+@media (max-width: 480px) { .pit-btn { flex: 1 1 auto; } }
 .pit-robot {
   position: relative; z-index: 0; width: 240px; height: auto; flex: none; align-self: flex-end; margin: -10px 22px -8px 0;
   filter: drop-shadow(0 18px 18px rgb(0 0 0 / 45%));
@@ -4623,3 +4626,41 @@ html.kb-open .report-note { min-height: 56px; }
 .coins-history li.held .coins-label { color: #a16207; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme='light']) .coins-history li.held .coins-label { color: #fbbf24; } }
 :root[data-theme='dark'] .coins-history li.held .coins-label { color: #fbbf24; }
+
+/* The owner's add / take away / set coins, on a person's page in Coins, Everyone. */
+.cv-adjust { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; margin: 8px 0; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); }
+.cv-adjust-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.cv-adjust-row .input.mono { width: 110px; flex: none; }
+.cv-adjust-row .input.grow { flex: 1; min-width: 140px; }
+
+/* ==========================================================================
+   Learn: steady taps. The bar under each question stays in one spot from
+   question to answer (Skip | difficulty, then the verdict | Next), Next never
+   sits where Skip or a choice will be, and on long questions the bar sticks
+   to the bottom of the screen (opaque, so a tap there is always the bar).
+   The explanation shows up under the bar, so nothing above it moves; pictures
+   keep their size before they load. Taps right after a change are ignored for
+   a moment in the code (learn/tapGuard.js).
+   ========================================================================== */
+.lq-actions {
+  position: sticky; bottom: 0; z-index: 3; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  min-height: 56px; margin: -4px 0; padding: 6px 0; background: var(--surface); border-top: 1px solid var(--border);
+}
+.lq-actions .lq-skip-btn { color: var(--muted); font-weight: 500; padding: 10px 0; }
+.lq-actions .lq-level { margin-right: 4px; }
+.lq-verdict { display: flex; align-items: center; gap: 10px; min-width: 0; flex-wrap: wrap; }
+.lq-verdict b { font-size: 17px; }
+.lq-verdict .lq-fb-icon { width: 28px; height: 28px; }
+.lq-actions.is-wrong .lq-fb-icon { background: var(--lq-bad); }
+.lq-actions .lq-next { min-height: 44px; padding: 0 20px; gap: 4px; flex: none; }
+.lq-feedback .lq-report { align-self: flex-start; padding: 4px 0; }
+/* Part photos: the box has its size before the picture loads. */
+.lq-photo img { height: 260px; max-height: none; }
+.lq-daily-img { width: 220px; height: 160px; max-width: 100%; }
+/* After an auto run: Draw another on the left, not where Run it was. */
+.lq-auto-tools .btn.primary.lq-again { margin-left: 0; }
+@media (max-width: 760px) {
+  .lq-actions { min-height: 60px; }
+  .lq-actions .lq-next { min-height: 46px; padding: 0 22px; }
+  .lq-photo img { height: min(260px, 56vw); }
+}

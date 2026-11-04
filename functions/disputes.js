@@ -1,17 +1,18 @@
 // Casino reports on the server. A teammate reports a result that looks wrong;
-// team management reviews it and refunds by hand, or dismisses it. Nothing is
-// ever refunded automatically.
+// the team owner (Asher, `owner`: the same person feature requests go to)
+// reviews it and refunds by hand, or dismisses it. Other team managers don't
+// get or decide reports. Nothing is ever refunded automatically.
 //
 // Callables:
 //   dispute({ conv, msgId, reason, note })        report a casino result you were part of
-//   disputeDecide({ id, decision, note })         team management: 'refund' or 'dismiss'
+//   disputeDecide({ id, decision, note })         the owner only: 'refund' or 'dismiss'
 //
 // Everything is checked here, against the card on the message (which only the
 // server writes) and never against numbers the app sends. A report is one per
 // message per person (its id), at most LIMITS.perDay a team day (a counter doc
 // changed in the same transaction), and a refund pays at most what the card
 // shows the person lost, once (a key doc and the report's status, in one
-// transaction, so two team managers deciding at the same moment can't pay twice).
+// transaction, so deciding twice at the same moment, on two devices, can't pay twice).
 // The rules never let the app write disputes, refund keys, or refunds.
 
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
@@ -22,7 +23,7 @@ import { teamDay } from './shared/coins.js';
 
 const OPEN = { maxInstances: 5, invoker: 'public' };
 
-export function disputeFunctions({ db, coinData, notify, bankRef }) {
+export function disputeFunctions({ db, coinData, notify, bankRef, owner }) {
   const note = (title, body = '') => ({ note: { title, body } });
   const first = (n) => (n || 'Someone').split(' ')[0];
   const validId = (id) => typeof id === 'string' && /^[\w-]{1,60}$/.test(id);
@@ -35,17 +36,7 @@ export function disputeFunctions({ db, coinData, notify, bankRef }) {
     const data = await coinData();
     return { uid, me: data.rename(member.get('name')), admin: member.get('admin') === true, data };
   }
-  async function managers(rename) {
-    const snap = await db.collection('members').where('admin', '==', true).get();
-    return [
-      ...new Set(
-        snap.docs
-          .filter((m) => memberOk(m.data()))
-          .map((m) => rename(m.get('name') || ''))
-          .filter(Boolean),
-      ),
-    ];
-  }
+  const ownerFirst = first(owner);
 
   const dispute = onCall(OPEN, async (req) => {
     const { me, data } = await caller(req);
@@ -63,7 +54,7 @@ export function disputeFunctions({ db, coinData, notify, bankRef }) {
       const msg = m.exists ? { id: m.id, ...m.data() } : null;
       const problem = d.reportProblem(msg, me, data.rename);
       if (problem) return note('Can’t report that.', problem);
-      if (old.exists) return note('You already reported this one.', 'Team management will get to it.');
+      if (old.exists) return note('You already reported this one.', `${ownerFirst} will get to it.`);
       const n = lim.exists ? lim.get('n') || 0 : 0;
       if (n >= d.LIMITS.perDay) return note(`That’s ${d.LIMITS.perDay} reports today.`, 'Try again tomorrow.');
       const snapshot = d.snapshotOf(msg, me, data.rename);
@@ -85,25 +76,28 @@ export function disputeFunctions({ db, coinData, notify, bankRef }) {
       return { ok: true, id, snapshot };
     });
     if (!res.ok) return res;
-    const boss = await managers(data.rename);
+    // Only the owner hears about it (not about their own).
+    const boss = data.rename(owner);
     await notify(
-      boss
-        .filter((n) => n !== me)
-        .map((to) => ({
-          to,
-          type: 'dispute',
-          title: `${first(me)} reported a ${d.GAME_LABEL[res.snapshot.game]} result`,
-          body: d.REASONS[reason],
-          open: 'disputes:',
-          by: me,
-        })),
+      boss === me
+        ? []
+        : [
+            {
+              to: boss,
+              type: 'dispute',
+              title: `${first(me)} reported a ${d.GAME_LABEL[res.snapshot.game]} result`,
+              body: d.REASONS[reason],
+              open: 'disputes:',
+              by: me,
+            },
+          ],
     ).catch((e) => logger.warn('dispute notify', e.message));
     return { ok: true, id };
   });
 
   const disputeDecide = onCall(OPEN, async (req) => {
     const { me, admin, data } = await caller(req);
-    if (!admin) throw new HttpsError('permission-denied', 'Team management only.');
+    if (!admin || me !== data.rename(owner)) throw new HttpsError('permission-denied', `Only ${ownerFirst} can do that.`);
     const { id, decision, note: text } = req.data || {};
     if (!validId(id)) return note('Which report?');
     if (decision !== 'refund' && decision !== 'dismiss') return note('Refund or dismiss?');
@@ -162,8 +156,8 @@ export function disputeFunctions({ db, coinData, notify, bankRef }) {
         title: out.status === 'refunded' ? `${out.refund} coins refunded` : 'Your report was looked at',
         body:
           out.status === 'refunded'
-            ? `Team management refunded your ${d.GAME_LABEL[out.x.cmd] || 'casino'} result.${resolution ? ` ${resolution}` : ''}`
-            : `Team management kept the result as it was.${resolution ? ` ${resolution}` : ''}`,
+            ? `${ownerFirst} refunded your ${d.GAME_LABEL[out.x.cmd] || 'casino'} result.${resolution ? ` ${resolution}` : ''}`
+            : `${ownerFirst} kept the result as it was.${resolution ? ` ${resolution}` : ''}`,
         open: 'disputes:',
         by: me,
       },

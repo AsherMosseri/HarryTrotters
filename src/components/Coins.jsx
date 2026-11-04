@@ -24,7 +24,7 @@ const WHO = (n) => n.split(' ')[0];
 // The exact day and time of a history line (casino lines come in quick runs).
 const whenAt = (at) => new Date(at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
-export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onMarket, onClose, isManager = false, onCheck, stale, onRefresh, disputes = [], initialTab = 'wallet' }) {
+export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onMarket, onClose, isManager = false, onCheck, stale, onRefresh, disputes = [], initialTab = 'wallet', onAdjust }) {
   useEscape(onClose);
   const [tab, setTab] = useState(initialTab);
   const [range, setRange] = useState('week');
@@ -102,7 +102,7 @@ export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onMarket
           </div>
           <StaleBanner stale={stale} onRefresh={onRefresh} />
           <div className="coins-body">
-            {tab === 'everyone' && isManager && onCheck && <EveryoneCoins roster={roster} data={data} cfg={cfg} onCheck={onCheck} />}
+            {tab === 'everyone' && isManager && onCheck && <EveryoneCoins roster={roster} data={data} cfg={cfg} onCheck={onCheck} onAdjust={onAdjust} />}
             {tab === 'wallet' &&
               (wallet.history.length ? (
                 <ul className="coins-history">

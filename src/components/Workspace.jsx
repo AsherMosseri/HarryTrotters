@@ -1829,19 +1829,22 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
     [api, actor.name],
   );
 
-  // Casino reports (Disputes.jsx): team management sees every report and
-  // decides; everyone else sees their own under Jackson coins, Reports.
+  // Casino reports (Disputes.jsx): only the owner (Asher, REQUESTS_TO) sees
+  // every report and decides; everyone else, other team managers too, sees
+  // their own under Jackson coins, Reports.
+  const ownsReports = actor.admin && actor.name === REQUESTS_TO;
   const [disputes, setDisputes] = useState([]);
   const [disputesOpen, setDisputesOpen] = useState(false);
   const [coinsTab, setCoinsTab] = useState('wallet');
   useEffect(() => (store.subscribeDisputes ? store.subscribeDisputes(actor, setDisputes) : undefined), [store, actor.name, actor.admin]);
-  const openDisputes = disputes.filter((x) => x.status === 'open').length;
+  const openDisputes = ownsReports ? disputes.filter((x) => x.status === 'open').length : 0;
+  const myDisputes = useMemo(() => disputes.filter((x) => x.by === actor.name), [disputes, actor.name]);
 
   // Where a notification points: 'task:<id>', 'chat:<channel>', or 'view:<tab>'.
   const liveTasks = useRef(tasks);
   liveTasks.current = tasks;
-  const liveAdmin = useRef(actor.admin);
-  liveAdmin.current = actor.admin;
+  const liveOwner = useRef(ownsReports);
+  liveOwner.current = ownsReports;
   // What happens after you book / order from an ad (adOrders.js): only yours.
   const [adOrders, setAdOrders] = useState([]);
   useEffect(() => store.subscribeAdOrders(actor.name, setAdOrders), [store, actor.name]);
@@ -1858,7 +1861,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
         setView('chat');
       } else if (kind === 'view') setView(id);
       else if (kind === 'disputes') {
-        if (liveAdmin.current) setDisputesOpen(true);
+        if (liveOwner.current) setDisputesOpen(true);
         else {
           setCoinsTab('reports');
           setCoinsOpen(true);
@@ -2459,7 +2462,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
         {onPhone && <button onClick={go('tabs', () => setEditTabs(true))}>Edit tabs</button>}
         <button onClick={go('help', () => setShowHelp(true))}>Help</button>
         <button onClick={go('password', () => setPasswordOpen(true))}>Change password</button>
-        {actor.admin && controls.isOn('coins') && (
+        {ownsReports && controls.isOn('coins') && (
           <button onClick={go('disputes', () => setDisputesOpen(true))}>
             Casino reports {openDisputes > 0 && <span className="me-badge">{openDisputes}</span>}
           </button>
@@ -2681,7 +2684,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
                     joinRequests={joinRequests}
                     chanWaiting={requestsOn ? chanWaiting : 0}
                     onChannelRequests={() => setChanDlg('review')}
-                    disputes={actor.admin && controls.isOn('coins') ? openDisputes : 0}
+                    disputes={ownsReports && controls.isOn('coins') ? openDisputes : 0}
                     onDisputes={() => setDisputesOpen(true)}
                     api={api}
                     shifts={namedShifts}
@@ -3309,7 +3312,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
               onClose={ads.closeBlock}
             />
           )}
-          {disputesOpen && actor.admin && (
+          {disputesOpen && ownsReports && (
             <DisputesDialog
               list={disputes}
               api={api}
@@ -3323,7 +3326,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
           )}
           {coinsOpen && (
             <CoinsDialog
-              disputes={disputes}
+              disputes={myDisputes}
               initialTab={coinsTab}
               actor={actor}
               wallet={myWallet}
@@ -3333,6 +3336,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
               onGift={(g) => api.play({ action: 'gift', ...g })}
               isManager={!!actor.admin}
               onCheck={api.coinCheck}
+              onAdjust={isOwner ? (g) => api.addCoins({ type: 'grant', by: actor.name, ...g }) : undefined}
               stale={sync.stale}
               onRefresh={() => {
                 setCoinReload((n) => n + 1);
