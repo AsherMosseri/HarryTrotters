@@ -7,6 +7,7 @@ import { PetRequestContext, RequestPetDialog } from './PetRequest.jsx';
 import { StyleRequest } from './People.jsx';
 import { ASK_KEYWORDS, IDEA_MAX } from '../requestCommand.js';
 import { GIFT_MAX } from '../../functions/shared/coins.js';
+import { coinsText } from '../../functions/shared/coinText.js';
 import { EXPIRES, REASON_MAX, coinText } from '../../functions/shared/coinRequests.js';
 import { REQUESTS_TO } from '../config.js';
 import { firstName, useEscape } from '../util.js';
@@ -180,7 +181,7 @@ function CoinsForm({ ask, api, roster, actor, onClose }) {
           <input className="input" value={reason} maxLength={REASON_MAX} placeholder="for pizza" onChange={(e) => setReason(e.target.value)} />
         </label>
         <p className="muted tiny">
-          Up to {GIFT_MAX} at a time, like /give. It stays open for {EXPIRES / 3600000} hours; you can cancel it.
+          Up to {coinsText(GIFT_MAX)} at a time, like /give. It stays open for {EXPIRES / 3600000} hours; you can cancel it.
         </p>
         {error && (
           <p className="form-error" role="alert">

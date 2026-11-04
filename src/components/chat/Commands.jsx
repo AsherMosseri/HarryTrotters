@@ -15,6 +15,7 @@ import { DailyCard } from '../learn/DailyCard.jsx';
 import { priorityById } from '../../config.js';
 import { daysBetween, todayISO } from '../../teamCommands.js';
 import { serverNow } from '../../serverTime.js';
+import { CoinNum } from '../CoinNum.jsx';
 
 // What slash commands look like in chat (commands.js does the work): the
 // Trotbot card on a command's message, and the notes only you can see.
@@ -234,7 +235,7 @@ function Body({ c, by, onPerson, fresh }) {
                 <b>{c.open ?? 0}</b> open
               </span>
               <span>
-                <b>{c.coins ?? 0}</b> 🪙
+                <CoinNum as="b" n={c.coins ?? 0} /> 🪙
               </span>
             </div>
             {c.onShift && <div className="small cmd-onshift">At the lab right now</div>}

@@ -12,6 +12,7 @@
 import { GIFT_MAX, giftEntry } from './coins.js';
 import { looksLikeAmount, parseAmount } from './amount.js';
 import { GROUP_MAX, namesShort } from './groups.js';
+import { coinsText } from './coinText.js';
 
 export const EXPIRES = 24 * 3600000; // a request is open for a day
 export const MAX_OPEN = 3; // requests one person can have waiting at once
@@ -20,7 +21,8 @@ export const REASON_MAX = 140; // the same as a gift's note
 export const MOVES = ['pay', 'decline', 'cancel', 'peek'];
 export const BOT = 'Trotbot';
 const first = (n) => String(n || '').split(' ')[0];
-export const coinText = (n) => `${n} 🪙`;
+// With commas (1,234 🪙): requests always show the exact amount.
+export const coinText = (n) => `${coinsText(n)} 🪙`;
 
 // What the card and notifications say: "asks Cooper for 25 🪙: for pizza".
 export const askLine = (p) => `asks ${first(p.to)} for ${coinText(p.amount)}${p.reason ? `: ${p.reason}` : ''}`;
@@ -76,7 +78,7 @@ export function startAsk({ me, to, amount, reason = '', roster = [], active = fa
   if (!roster.includes(to)) return { error: 'Who’s that?', body: usage };
   if (typeof amount !== 'number' || !Number.isInteger(amount) || amount < 1)
     return { error: 'Ask for a whole number of coins, at least 1.', body: usage };
-  if (amount > GIFT_MAX) return { error: 'That’s a lot.', body: `Up to ${GIFT_MAX} at a time, the same as /give.` };
+  if (amount > GIFT_MAX) return { error: 'That’s a lot.', body: `Up to ${coinsText(GIFT_MAX)} at a time, the same as /give.` };
   if (!active) return { error: `${first(to)} isn’t on the team.` };
   // open: one-person requests ({ to }) and group requests ({ people: the
   // ones still waiting on }), each counting as one toward MAX_OPEN.
@@ -145,7 +147,7 @@ export function startGroupAsk({ me, people = [], label = '', amount, reason = ''
   const usage = `Try: /request ${label || '@Programming'} 5 for pizza`;
   if (typeof amount !== 'number' || !Number.isInteger(amount) || amount < 1)
     return { error: 'Ask for a whole number of coins each, at least 1.', body: usage };
-  if (amount > GIFT_MAX) return { error: 'That’s a lot.', body: `Up to ${GIFT_MAX} each, the same as /give.` };
+  if (amount > GIFT_MAX) return { error: 'That’s a lot.', body: `Up to ${coinsText(GIFT_MAX)} each, the same as /give.` };
   if (people.some((n) => n === me || !n)) return { error: 'That’s you.', body: 'Your coins are already yours.' };
   if (!people.length) return { error: `Nobody in ${label || 'that group'} to ask.` };
   if (people.length > GROUP_MAX) return { error: `That’s ${people.length} people.`, body: `Up to ${GROUP_MAX} at a time.` };

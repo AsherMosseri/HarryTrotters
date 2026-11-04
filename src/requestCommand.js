@@ -13,6 +13,7 @@
 import { parseAsk } from '../functions/shared/coinRequests.js';
 import { GIFT_MAX } from '../functions/shared/coins.js';
 import { amountTip, parseAmount } from '../functions/shared/amount.js';
+import { coinsText } from '../functions/shared/coinText.js';
 import { SUBTEAMS } from '../functions/shared/team.js';
 import { groupTargets } from './groups.js';
 
@@ -98,7 +99,7 @@ async function groupCoins(t, ctx) {
   const w = words[at].replace('🪙', '');
   const amount = parseAmount(w, { positive: true });
   if (amount === null) return note('Ask for a whole number of coins each, at least 1.', amountTip(w) || usage);
-  if (amount > GIFT_MAX) return note('That’s a lot.', `Up to ${GIFT_MAX} each, the same as /give.`);
+  if (amount > GIFT_MAX) return note('That’s a lot.', `Up to ${coinsText(GIFT_MAX)} each, the same as /give.`);
   const reason = words.slice(at + 1).join(' ');
   const r = await ctx.coinRequest({ action: 'create', group: t.ask, amount, reason, key: ctx.key });
   if (r?.note) return { note: r.note };

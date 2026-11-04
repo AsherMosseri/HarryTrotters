@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Avatar, CloseIcon } from '../common.jsx';
 import { Icon } from '../shell/icons.jsx';
 import CountUp from '../CountUp.jsx';
+import { CoinNum, useCoinFormat } from '../CoinNum.jsx';
 import { celebrate } from '../../motion.js';
 import { useEscape } from '../../util.js';
 import * as fun from '../../../functions/shared/funGames.js';
@@ -347,7 +348,7 @@ function TournamentRow({ t, me, onPlay }) {
       <div className="grow">
         <b>{t.title}</b>
         <div className="muted small">
-          Pot <span className="mono">{t.pot || 0}</span> coins · ends in{' '}
+          Pot <CoinNum n={t.pot || 0} className="mono" /> coins · ends in{' '}
           <span className="mono">{hours >= 48 ? `${Math.round(hours / 24)} days` : `${hours} h`}</span>
           {joined && !t.players[me].voided && (
             <>
@@ -448,6 +449,7 @@ function Play({ game, session, pick, api, actor, onEnd }) {
 }
 
 function Result({ game, session, pick, result, conv, api, onAgain, onPicker, onClose }) {
+  const coins = useCoinFormat();
   const [posted, setPosted] = useState('');
   const r = result || {};
   const s = r.result || r.local || {};
@@ -529,7 +531,7 @@ function Result({ game, session, pick, result, conv, api, onAgain, onPicker, onC
       {mode === 'race' && <div className="small muted">The race card in #arcade shows who won once you’re both done.</div>}
       {r.paid > 0 && (
         <div className="fun-coins">
-          +<CountUp value={r.paid} /> coins
+          +<CountUp value={r.paid} format={coins.n} /> coins
         </div>
       )}
       {r.coins > 0 && !r.paid && <div className="muted small">That’s all the game coins for today.</div>}

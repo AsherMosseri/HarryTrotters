@@ -18,6 +18,7 @@ import { LEVELS } from './minesweeper.js';
 import * as challenge from './challenge.js';
 import { secureRandom } from './rng.js';
 import { holdEntry } from './casino.js';
+import { coinsText } from './coinText.js';
 
 export const MULTI = ['rps', 'tictactoe', 'connect4', 'duel', 'trivia', 'hangman', 'typerace', 'heist', 'battleship', 'tetris', 'minesweep', 'challenge'];
 export const CHALLENGES = ['rps', 'tictactoe', 'connect4', 'duel', 'battleship', 'tetris', 'minesweep'];
@@ -326,7 +327,7 @@ export function start(
     if (them === BOT && RACES.includes(game)) return { error: `Race Trotbot from the game screen: type /${game} and pick Trotbot.` };
     const bet = betWord ? parseBet(betWord, balance) : 0;
     if (bet == null || bet < 0) return { error: 'That’s not a bet.' };
-    if (bet > balance) return { error: `You only have ${balance} coins.` };
+    if (bet > balance) return { error: `You only have ${coinsText(balance)} coins.` };
     const bot = them === BOT;
     const p = { a: me, b: them, bet, at: now, expiresAt: now + TIMES.challenge, status: bot ? 'playing' : 'open', lastAt: now };
     const secret = {};
@@ -348,8 +349,8 @@ export function start(
 
   if (game === 'heist') {
     const bet = parseBet(words[0], balance);
-    if (!bet || bet < 1) return { error: `/heist needs a bet. Try: /heist 20. You have ${balance} coins.` };
-    if (bet > balance) return { error: `You only have ${balance} coins.` };
+    if (!bet || bet < 1) return { error: `/heist needs a bet. Try: /heist 20. You have ${coinsText(balance)} coins.` };
+    if (bet > balance) return { error: `You only have ${coinsText(balance)} coins.` };
     return { pub: { status: 'open', bet, crew: [me], endsAt: now + TIMES.heist }, secret: {}, money: take(me, bet), mentions: [] };
   }
 
@@ -445,7 +446,7 @@ export function move(game, { pub, secret = {}, me, move: mv, balance = 0, now = 
       if (m === 'decline') return end('', 'declined', refund(p.a, p.bet));
       const accepting = m === 'accept' || (game === 'rps' && RPS[m]);
       if (!accepting) return { error: 'Accept the challenge first.' };
-      if (p.bet > balance) return { error: `It’s a ${p.bet} coin bet. You have ${balance}.` };
+      if (p.bet > balance) return { error: `It’s a ${coinsText(p.bet)} coin bet. You have ${coinsText(balance)}.` };
       Object.assign(p, { status: 'playing', lastAt: now });
       if (game === 'duel') startDuel(p, s, now, rng);
       if (game === 'battleship') startPlacing(p, s, now, rng);
@@ -584,7 +585,7 @@ export function move(game, { pub, secret = {}, me, move: mv, balance = 0, now = 
     if (m !== 'join') return { error: 'Join the crew?' };
     if (now >= p.endsAt) return resolve();
     if (p.crew.includes(me)) return { error: 'You’re already in.' };
-    if (p.bet > balance) return { error: `It costs ${p.bet} coins to join. You have ${balance}.` };
+    if (p.bet > balance) return { error: `It costs ${coinsText(p.bet)} coins to join. You have ${coinsText(balance)}.` };
     p.crew = [...p.crew, me];
     return out(take(me, p.bet));
   }

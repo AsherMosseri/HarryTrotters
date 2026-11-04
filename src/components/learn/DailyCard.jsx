@@ -3,6 +3,7 @@
 // answer, why, and your daily streak (your answer doc, dailyAnswers/).
 import { createContext, useContext, useEffect, useState } from 'react';
 import { Icon } from '../shell/icons.jsx';
+import { CoinNum } from '../CoinNum.jsx';
 import { celebrate } from '../../motion.js';
 import { CodeView, Citation, ManualText, isTrueFalse } from './Visuals.jsx';
 import { AFTER_GRADE, useTapGuard } from './tapGuard.js';
@@ -86,7 +87,7 @@ export function DailyCard({ c, onPerson }) {
             <b>{mine.correct ? (mine.rank && mine.rank <= 3 ? `Right, #${mine.rank} today` : 'Right') : 'Not quite'}</b>
             {mine.coins > 0 && (
               <span className="chip lq-chip-coin">
-                <Icon name="coin" size={13} /> <span className="mono">+{mine.coins}</span>
+                <Icon name="coin" size={13} /> <CoinNum n={mine.coins} signed className="mono" />
               </span>
             )}
             <span className="lq-streak on small" title="Daily streak (school days)">

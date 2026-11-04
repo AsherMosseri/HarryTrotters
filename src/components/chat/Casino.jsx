@@ -19,6 +19,8 @@ import { Die } from './Die.jsx';
 import { Bomb, CoinMark, FlipCoin, Gem, PlayingCard, Rocket, RouletteWheel, ensureCasinoDefs } from './casinoArt.jsx';
 import { useMove } from './useMove.js';
 import { GroupFaces } from './MoreCards.jsx';
+import { CoinNum, useCoinFormat } from '../CoinNum.jsx';
+import { coinStyled, exactCoins } from '../../coinFormat.js';
 
 // The Jackson coins economy and casino cards (the play function rolls; these
 // show it). Live games (blackjack, crash, mines, high-low) have buttons for
@@ -67,9 +69,10 @@ function BigWin({ c, pop, delay = '', jackpot }) {
 }
 
 // An amount of Jackson coins: the number, then the coin.
+// The number follows Appearance → Coin numbers (coinFormat.js).
 export const Amt = ({ n }) => (
   <span className="cz-amt">
-    <span className="mono">{n}</span>
+    <CoinNum n={n} className="mono" />
     <CoinMark />
   </span>
 );
@@ -88,7 +91,7 @@ function Outcome({ c, reveal = '' }) {
           5 at 1.95x reads "Got 9 back (+4)" (payouts round down). */}
       {net > 0 ? (
         <>
-          Got <Amt n={c.bet + net} /> back <span className="casino-net">(+{net})</span>
+          Got <Amt n={c.bet + net} /> back <span className="casino-net">(<CoinNum n={net} signed />)</span>
         </>
       ) : net < 0 ? (
         <>
@@ -99,7 +102,7 @@ function Outcome({ c, reveal = '' }) {
       )}
       <span className="muted small">
         {' '}
-        · bet <span className="mono">{c.bet}</span>
+        · bet <CoinNum n={c.bet} className="mono" />
       </span>
     </div>
   );
@@ -432,7 +435,8 @@ function Crash({ c, mine, mv }) {
     refs.area.current?.setAttribute('d', g.area);
     if (refs.rocket.current) refs.rocket.current.style.transform = at(g.end);
     if (refs.mult.current) refs.mult.current.textContent = `${mult.toFixed(2)}×`;
-    if (refs.cash.current) refs.cash.current.textContent = String(Math.floor(c.bet * mult));
+    // In this device's coin style (read each frame, so a change shows at once).
+    if (refs.cash.current) refs.cash.current.textContent = coinStyled(Math.floor(c.bet * mult));
   };
   // Finished: the curve up to where it ended.
   const endAt = playing ? 1 : c.game.at || 1;
@@ -865,6 +869,7 @@ function Podium({ top, Name }) {
 }
 
 function Economy({ c, by, Name }) {
+  const f = useCoinFormat();
   switch (c.name) {
     case 'daily':
       return (
@@ -880,8 +885,8 @@ function Economy({ c, by, Name }) {
           </div>
           <div className="muted tiny">
             {c.limit
-              ? `Daily limit reached: /daily and game prizes pay up to ${c.limit} coins a day together. Your streak still counts.`
-              : `Come back tomorrow for up to ${Math.min(dailyAmount(c.streak + 1), AWARD_CAPS.game)}. It shares the ${AWARD_CAPS.game}-a-day limit with game prizes.`}
+              ? `Daily limit reached: /daily and game prizes pay up to ${f.n(c.limit)} coins a day together. Your streak still counts.`
+              : `Come back tomorrow for up to ${f.n(Math.min(dailyAmount(c.streak + 1), AWARD_CAPS.game))}. It shares the ${f.n(AWARD_CAPS.game)}-a-day limit with game prizes.`}
           </div>
         </Econ>
       );
@@ -899,7 +904,7 @@ function Economy({ c, by, Name }) {
         <Econ icon="hand" tone="green" title="Begging">
           <Plus n={c.amount} />
           <div>
-            {c.who[0].toUpperCase() + c.who.slice(1)} {c.verb} {c.amount} coin{c.amount > 1 ? 's' : ''}. <span className="muted">{c.joke}</span>
+            {c.who[0].toUpperCase() + c.who.slice(1)} {c.verb} <CoinNum n={c.amount} /> coin{c.amount > 1 ? 's' : ''}. <span className="muted">{c.joke}</span>
           </div>
         </Econ>
       ) : (
@@ -935,8 +940,8 @@ function Economy({ c, by, Name }) {
               <Amt n={c.amount} /> <span className="small muted">each</span>
             </div>
             <div>
-              <Name name={by} /> sent <b className="grp-label">{c.group}</b> <b>{c.amount}</b> coin{c.amount === 1 ? '' : 's'} each:{' '}
-              <b className="mono">{c.total}</b> in all
+              <Name name={by} /> sent <b className="grp-label">{c.group}</b> <CoinNum n={c.amount} as="b" /> coin{c.amount === 1 ? '' : 's'} each:{' '}
+              <CoinNum n={c.total} as="b" className="mono" /> in all
             </div>
             <GroupFaces people={c.people} count={c.count} Name={Name} />
           </Econ>
@@ -947,7 +952,7 @@ function Economy({ c, by, Name }) {
             <Amt n={c.amount} />
           </div>
           <div>
-            <Name name={by} /> sent <Name name={c.to} /> <b>{c.amount}</b> coin{c.amount === 1 ? '' : 's'}
+            <Name name={by} /> sent <Name name={c.to} /> <CoinNum n={c.amount} as="b" /> coin{c.amount === 1 ? '' : 's'}
           </div>
         </Econ>
       );
@@ -962,18 +967,17 @@ function Economy({ c, by, Name }) {
             </div>
             <div className="cmd-stats">
               <span className="cz-pill">
-                <b className="mono">{c.earned}</b> earned
+                <CoinNum n={c.earned} as="b" className="mono" /> earned
               </span>
               <span className="cz-pill">
-                <b className={`mono ${c.casino > 0 ? 'cz-up' : c.casino < 0 ? 'cz-down' : ''}`}>
-                  {c.casino >= 0 ? '+' : ''}
-                  {c.casino}
+                <b className={`mono ${c.casino > 0 ? 'cz-up' : c.casino < 0 ? 'cz-down' : ''}`} title={f.title(c.casino)}>
+                  {c.casino > 0 ? f.signed(c.casino) : f.n(c.casino)}
                 </b>{' '}
                 casino &amp; economy
               </span>
               {c.played > 0 && (
                 <span className="cz-pill">
-                  <b className="mono">{c.played}</b> games · best win <b className="mono">{c.best}</b>
+                  <b className="mono">{c.played}</b> games · best win <CoinNum n={c.best} as="b" className="mono" />
                 </span>
               )}
             </div>
@@ -1043,7 +1047,7 @@ export function CasinoBody({ m, me, Name, onMove, onBuy }) {
   const bet =
     c.name !== 'lottery' && c.bet > 0 ? (
       <div className="cz-betbar">
-        <span className="cz-betpill" title={`${m.by} bet ${c.bet} Jackson coins`}>
+        <span className="cz-betpill" title={`${m.by} bet ${exactCoins(c.name === 'blackjack' && c.game?.bet ? c.game.bet : c.bet)} Jackson coins`}>
           <span className="cz-betpill-k">Bet</span> <Amt n={c.name === 'blackjack' && c.game?.bet ? c.game.bet : c.bet} />
           {c.name === 'blackjack' && c.game?.doubled ? <span className="cz-betpill-k"> · doubled</span> : null}
         </span>

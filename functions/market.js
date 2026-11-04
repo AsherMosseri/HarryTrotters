@@ -29,6 +29,7 @@ import { petFamily } from './petfamily.js';
 import { petPhotos } from './petphotos.js';
 import { PHOTO_ACTIONS } from './shared/petphotos.js';
 import { memberOk } from './shared/team.js';
+import { coinsText } from './shared/coinText.js';
 
 const OPEN = { maxInstances: 5, invoker: 'public' };
 
@@ -222,7 +223,7 @@ export function marketFunctions({ db, coinData, freshCoins, notify, bankRef, per
           to: n,
           type: 'market',
           icon: '🏆',
-          title: won.has(n) ? `You won ${won.get(n)} coins in ${out.t.title}` : `${out.t.title} is over`,
+          title: won.has(n) ? `You won ${coinsText(won.get(n))} coins in ${out.t.title}` : `${out.t.title} is over`,
           body: out.winners.length
             ? won.has(n)
               ? 'Best score. Nice.'
@@ -269,7 +270,7 @@ export function marketFunctions({ db, coinData, freshCoins, notify, bankRef, per
             type: 'market',
             icon: r.status === 'approved' ? '✅' : '↩️',
             title: r.status === 'approved' ? `“${r.p.name}” is approved` : `“${r.p.name}” was declined`,
-            body: r.status === 'approved' ? 'Team management will make it happen.' : `Your ${r.p.price} coins are back.`,
+            body: r.status === 'approved' ? 'Team management will make it happen.' : `Your ${coinsText(r.p.price)} coins are back.`,
             open: 'view:market',
             by: me,
           },

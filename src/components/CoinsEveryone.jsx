@@ -5,6 +5,8 @@ import { breakdown, breakdownGaps, historyGroup, historyKey, wallet as walletOf 
 import { Avatar } from './common.jsx';
 import { Icon } from './shell/icons.jsx';
 import { confirmDialog } from './Dialogs.jsx';
+import { useCoinFormat } from './CoinNum.jsx';
+import { coinLabel, exactCoins } from '../coinFormat.js';
 
 const KIND = {
   task: 'Finished tasks',
@@ -18,7 +20,6 @@ const KIND = {
   prize: 'Prizes',
   casino: 'Casino and economy',
 };
-const sign = (n) => (n > 0 ? `+${n}` : n < 0 ? `−${Math.abs(n)}` : '0');
 const when = (at) => new Date(at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
 // "They match", or by how much and where they don't.
@@ -31,12 +32,13 @@ export function compareLine(app, server) {
   return {
     match: false,
     gaps,
-    text: `The app and the server disagree by ${Math.abs(off)}${where.length ? `: ${where.join(', ')}` : ''}.`,
+    text: `The app and the server disagree by ${exactCoins(Math.abs(off))}${where.length ? `: ${where.join(', ')}` : ''}.`,
   };
 }
 
 // A collapsed section: the server's numbers next to the app's, per kind.
 export function CompareWithServer({ name, mine, onCheck }) {
+  const f = useCoinFormat();
   const [state, setState] = useState({ busy: false, result: null, error: '' });
   const run = async () => {
     setState((s) => ({ ...s, busy: true, error: '' }));
@@ -81,16 +83,16 @@ export function CompareWithServer({ name, mine, onCheck }) {
                 {rows.map((r) => (
                   <tr key={r.k} className={r.app !== r.server ? 'off' : ''}>
                     <td>{KIND[r.k] || r.k}</td>
-                    <td className="mono">{sign(r.app)}</td>
-                    <td className="mono">{sign(r.server)}</td>
-                    <td className="mono">{r.app === r.server ? '' : sign(r.app - r.server)}</td>
+                    <td className="mono">{f.signed(r.app)}</td>
+                    <td className="mono">{f.signed(r.server)}</td>
+                    <td className="mono">{r.app === r.server ? '' : f.signed(r.app - r.server)}</td>
                   </tr>
                 ))}
                 <tr className={`total${mine.balance !== result.balance ? ' off' : ''}`}>
                   <td>Balance</td>
-                  <td className="mono">{mine.balance}</td>
-                  <td className="mono">{result.balance}</td>
-                  <td className="mono">{mine.balance === result.balance ? '' : sign(mine.balance - result.balance)}</td>
+                  <td className="mono" title={f.title(mine.balance)}>{f.n(mine.balance)}</td>
+                  <td className="mono" title={f.title(result.balance)}>{f.n(result.balance)}</td>
+                  <td className="mono">{mine.balance === result.balance ? '' : f.signed(mine.balance - result.balance)}</td>
                 </tr>
               </tbody>
             </table>
@@ -140,6 +142,7 @@ const CHIPS = [
 
 // Team management: everyone's coins. A list of people, then one person's full history.
 export function EveryoneCoins({ roster, data, cfg, onCheck, onAdjust }) {
+  const f = useCoinFormat();
   const [who, setWho] = useState(null);
   const [q, setQ] = useState('');
   const wallets = useMemo(() => Object.fromEntries(roster.map((n) => [n, walletOf(n, data)])), [roster, data]);
@@ -170,9 +173,9 @@ export function EveryoneCoins({ roster, data, cfg, onCheck, onAdjust }) {
             <button className="cv-person" onClick={() => setWho(r.name)}>
               <Avatar name={r.name} size={28} />
               <span className="grow cv-name">{r.name}</span>
-              <b className="mono">{r.w.balance}</b>
-              <span className="mono muted">{r.w.earned}</span>
-              <span className={`mono ${r.casino < 0 ? 'coins-minus' : r.casino > 0 ? 'coins-plus' : 'muted'}`}>{r.casino ? sign(r.casino) : '0'}</span>
+              <b className="mono" title={f.title(r.w.balance)}>{f.n(r.w.balance)}</b>
+              <span className="mono muted" title={f.title(r.w.earned)}>{f.n(r.w.earned)}</span>
+              <span className={`mono ${r.casino < 0 ? 'coins-minus' : r.casino > 0 ? 'coins-plus' : 'muted'}`}>{f.signed(r.casino)}</span>
             </button>
           </li>
         ))}
@@ -184,6 +187,7 @@ export function EveryoneCoins({ roster, data, cfg, onCheck, onAdjust }) {
 }
 
 function Person({ name, w, casino, cfg, onCheck, onAdjust, onBack }) {
+  const f = useCoinFormat();
   const [chip, setChip] = useState('all');
   // The balance after each entry: start from today's and walk back.
   const all = useMemo(() => {
@@ -207,8 +211,9 @@ function Person({ name, w, casino, cfg, onCheck, onAdjust, onBack }) {
         <span className="grow">
           <b>{name}</b>
           <span className="muted tiny">
-            <span className="mono">{w.balance}</span> now · <span className="mono">{w.earned}</span> earned ·{' '}
-            <span className="mono">{casino ? sign(casino) : '0'}</span> casino
+            <span className="mono" title={f.title(w.balance)}>{f.n(w.balance)}</span> now ·{' '}
+            <span className="mono" title={f.title(w.earned)}>{f.n(w.earned)}</span> earned ·{' '}
+            <span className="mono">{f.signed(casino)}</span> casino
           </span>
         </span>
       </div>
@@ -230,7 +235,7 @@ function Person({ name, w, casino, cfg, onCheck, onAdjust, onBack }) {
               </span>
               <span className="grow">
                 <span className="coins-label">
-                  {x.label} <ReversedTag rev={rev} x={x} />
+                  {f.label(x.label)} <ReversedTag rev={rev} x={x} />
                 </span>
                 <span className="muted tiny">
                   <span className="mono">{when(x.at)}</span>
@@ -239,9 +244,9 @@ function Person({ name, w, casino, cfg, onCheck, onAdjust, onBack }) {
                 </span>
               </span>
               <span className="cv-amt">
-                <b className={`mono ${x.amount < 0 ? 'coins-minus' : x.amount > 0 ? 'coins-plus' : 'muted'}`}>{sign(x.amount)}</b>
+                <b className={`mono ${x.amount < 0 ? 'coins-minus' : x.amount > 0 ? 'coins-plus' : 'muted'}`}>{f.signed(x.amount)}</b>
                 <span className="mono muted tiny" title="Balance after this">
-                  {x.after}
+                  {f.n(x.after)}
                 </span>
               </span>
             </li>
@@ -255,7 +260,7 @@ function Person({ name, w, casino, cfg, onCheck, onAdjust, onBack }) {
           {shown.length} {shown.length === 1 ? 'entry' : 'entries'}
           {chip === 'all' ? '' : ` in ${CHIPS.find(([id]) => id === chip)[1]}`}
         </span>
-        <b className="mono">{sign(total)}</b>
+        <b className="mono">{f.signed(total)}</b>
       </p>
       <CompareWithServer key={name} name={name} mine={w} onCheck={onCheck} />
     </>
@@ -287,7 +292,7 @@ function AdjustCoins({ name, balance, onCheck, onAdjust }) {
       }
       const delta = mode === 'add' ? n : mode === 'remove' ? -n : n - now;
       if (!delta) {
-        setMsg(`${name.split(' ')[0]} already has ${now}.`);
+        setMsg(`${name.split(' ')[0]} already has ${exactCoins(now)}.`);
         return;
       }
       if (Math.abs(delta) > OWNER_MAX) {
@@ -296,16 +301,16 @@ function AdjustCoins({ name, balance, onCheck, onAdjust }) {
       }
       const after = now + delta;
       const yes = await confirmDialog({
-        title: mode === 'set' ? `Set ${name.split(' ')[0]} to ${n}?` : `${delta > 0 ? 'Give' : 'Take'} ${Math.abs(delta)} coins?`,
-        body: `${name} goes from ${now} to ${after} coins.${after < 0 ? ' That’s below zero.' : ''}`,
+        title: mode === 'set' ? `Set ${name.split(' ')[0]} to ${exactCoins(n)}?` : `${delta > 0 ? 'Give' : 'Take'} ${exactCoins(Math.abs(delta))} coins?`,
+        body: `${name} goes from ${exactCoins(now)} to ${exactCoins(after)} coins.${after < 0 ? ' That’s below zero.' : ''}`,
         okLabel: delta > 0 ? 'Give' : 'Take',
         danger: delta < 0,
       });
       if (!yes) return;
-      const label = note.trim() || (mode === 'set' ? `Balance set to ${n}` : delta > 0 ? 'Bonus' : 'Taken away');
+      const label = note.trim() || (mode === 'set' ? `Balance set to ${exactCoins(n)}` : delta > 0 ? 'Bonus' : 'Taken away');
       const done = await onAdjust({ to: name, amount: delta, note: label.slice(0, 140), at: Date.now() });
       if (done !== false) {
-        setMsg(`Done: ${name.split(' ')[0]} has ${after} now.`);
+        setMsg(`Done: ${name.split(' ')[0]} has ${exactCoins(after)} now.`);
         setAmount('');
         setNote('');
       }
@@ -350,11 +355,11 @@ export function useReverse(name, history, onAdjust) {
     if (!can(x) || busy) return;
     const key = historyKey(x);
     const refund = x.amount < 0;
-    const n = Math.abs(x.amount).toLocaleString();
+    const n = exactCoins(Math.abs(x.amount));
     const first = name.split(' ')[0];
     const ok = await confirmDialog({
       title: refund ? `Refund ${n} coins to ${first}?` : `Take ${n} coins away from ${first}?`,
-      body: `“${x.label}” (${when(x.at)}). ${first}’s history keeps the line, marked Reversed, with a “Reversed” line for the ${refund ? 'refund' : 'take-away'}.`,
+      body: `“${coinLabel(x.label)}” (${when(x.at)}). ${first}’s history keeps the line, marked Reversed, with a “Reversed” line for the ${refund ? 'refund' : 'take-away'}.`,
       okLabel: refund ? 'Refund' : 'Take away',
       danger: !refund,
     });

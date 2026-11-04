@@ -5,6 +5,7 @@ import { REQUEST_STATUSES } from '../Requests.jsx';
 import { confirmDialog } from '../Dialogs.jsx';
 import { serverNow } from '../../serverTime.js';
 import { coinText } from '../../../functions/shared/coinRequests.js';
+import { coinsText } from '../../../functions/shared/coinText.js';
 
 // /request cards in chat (src/requestCommand.js).
 //   kind 'idea':  a feature request someone sent; 👍 and Open read the live
@@ -89,7 +90,7 @@ function Coins({ c, me, onAsk }) {
     const ok = await confirmDialog({
       title: `Pay ${first(a.from)} ${coinText(a.amount)}?`,
       body: `${a.reason ? `“${a.reason}”\n` : ''}It comes out of your Jackson coins, like /give.`,
-      okLabel: `Pay ${a.amount}`,
+      okLabel: `Pay ${coinsText(a.amount)}`,
     });
     if (ok) act('pay');
   };
@@ -209,7 +210,7 @@ function GroupCoins({ c, me, onAsk }) {
     const ok = await confirmDialog({
       title: `Pay ${first(a.from)} ${coinText(a.amount)}?`,
       body: `${a.reason ? `“${a.reason}”\n` : ''}${first(a.from)} asked ${a.label || c.group?.label || 'a group'}. It comes out of your Jackson coins, like /give.`,
-      okLabel: `Pay ${a.amount}`,
+      okLabel: `Pay ${coinsText(a.amount)}`,
     });
     if (ok) act('pay');
   };

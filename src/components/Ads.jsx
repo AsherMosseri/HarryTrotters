@@ -11,6 +11,7 @@ import { answerText, defaults, fill, flowFor, summaryOf, templateVars } from '..
 import { FlowFields } from './AdFlow.jsx';
 import { SUBTEAMS } from '../config.js';
 import { Coin, Coins, CoinsAdmin } from './Coins.jsx';
+import { CoinNum } from './CoinNum.jsx';
 import { reducedMotion, useEscape } from '../util.js';
 import { CloseIcon, Overlay } from './common.jsx';
 import { confirmDialog, promptDialog } from './Dialogs.jsx';
@@ -929,7 +930,7 @@ export function FullScreenAd({ ad, onClose }) {
                 else setPaying(false);
               }}
             >
-              ⏭ Skip now for <Coin size={13} /> {skipPrice}
+              ⏭ Skip now for <Coin size={13} /> <CoinNum n={skipPrice} />
             </button>
           )}
           {left > 0 ? (
@@ -1109,7 +1110,7 @@ export function RemoveAdsDialog({ prices, balance, coupon, onBuy, onClose }) {
                   >
                     <span>{HOW_LONG[k][4].toUpperCase() + HOW_LONG[k].slice(5)}</span>
                     <span className="remove-ads-price">
-                      {coupon && <s className="muted">{prices[k]}</s>}
+                      {coupon && <CoinNum as="s" className="muted" n={prices[k]} />}
                       <Coins n={couponPrice(prices[k], coupon)} />
                     </span>
                   </button>
@@ -1126,7 +1127,7 @@ export function RemoveAdsDialog({ prices, balance, coupon, onBuy, onClose }) {
               </div>
               <h2>Payment complete</h2>
               <p className="muted">
-                Paid <Coins n={paid} />. Ads are off {HOW_LONG[done]}, on all your devices.
+                Paid <Coins n={paid} exact />. Ads are off {HOW_LONG[done]}, on all your devices.
               </p>
               <p className="muted tiny">Receipt #{receipt}</p>
               <button className="btn primary big-btn" onClick={onClose}>
@@ -2008,7 +2009,9 @@ function PeopleStats({ roster, stats, ledger }) {
               <td>{r.taps}</td>
               <td>{r.views ? Math.round((r.taps / r.views) * 100) : 0}%</td>
               <td>{r.breaks}</td>
-              <td>{r.spent}</td>
+              <td>
+                <CoinNum n={r.spent} />
+              </td>
             </tr>
           ))}
         </tbody>

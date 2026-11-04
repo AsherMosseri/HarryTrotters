@@ -5182,3 +5182,31 @@ button.bs-cell:focus-visible { outline: 2px solid var(--accent); outline-offset:
 .cv-reversed { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px; font-size: 11px; font-weight: 650; vertical-align: 1px; color: var(--muted); background: var(--surface-2); border: 1px solid var(--border); }
 .cv-reversed.busy { font-style: italic; }
 .cv-rev-hint { margin: 4px 0 2px; }
+
+/* ---------- Coin numbers (3.1.1): 1,234 · 1234 · 1.2k (coinFormat.js) ----------
+   With commas the coin pill can be wider than the ~90px the iPad headers used
+   to leave for it (1,234,567 is 9 characters). The pill says how many
+   characters it shows (data-chars) and the page gets --coin-room: the space
+   headers keep clear on their right. Six or fewer keep the old 112px. */
+.app-scroll:has(> .coin-slot .coin-pill[data-chars='7']) { --coin-room: 118px; }
+.app-scroll:has(> .coin-slot .coin-pill[data-chars='8']) { --coin-room: 126px; }
+.app-scroll:has(> .coin-slot .coin-pill[data-chars='9']) { --coin-room: 134px; }
+.app-scroll:has(> .coin-slot .coin-pill[data-chars='10']) { --coin-room: 142px; }
+.app-scroll:has(> .coin-slot .coin-pill[data-chars='11']) { --coin-room: 150px; }
+.app-scroll:has(> .coin-slot .coin-pill[data-chars='12']) { --coin-room: 158px; }
+.app-scroll:has(> .coin-slot .coin-pill[data-chars='13']) { --coin-room: 166px; }
+.app-scroll:has(> .coin-slot) .page-head,
+.app-scroll:has(> .coin-slot) .chat-head,
+.app-scroll:has(> .coin-slot) .content.chat.with-side > .chat-side .chat-side-head { padding-right: var(--coin-room, 112px); }
+.app-scroll:has(> .coin-slot) .ms-header,
+.app-scroll:has(> .coin-slot) .mk-head { padding-right: calc(var(--coin-room, 112px) - 28px); }
+/* The embedded parts chat puts its header under the pill instead (above). */
+.app-scroll:has(> .coin-slot) .content.chat.embedded .chat-head { padding-right: 20px; }
+/* A phone bar with a shift running and a long balance (12,345 and up): the pill
+   and the title tighten up so more of the title shows. */
+.phone-top:has(.shift-pill):has(.coin-pill:is([data-chars='6'], [data-chars='7'], [data-chars='8'], [data-chars='9'], [data-chars='10'], [data-chars='11'], [data-chars='12'], [data-chars='13'])) .phone-title { font-size: 20px; }
+.phone-top:has(.shift-pill) .coin-pill:is([data-chars='6'], [data-chars='7'], [data-chars='8'], [data-chars='9'], [data-chars='10'], [data-chars='11'], [data-chars='12'], [data-chars='13']) { padding: 0 7px 0 5px; gap: 4px; font-size: 11.5px; }
+.phone-top:has(.shift-pill) .coin-pill:is([data-chars='6'], [data-chars='7'], [data-chars='8'], [data-chars='9'], [data-chars='10'], [data-chars='11'], [data-chars='12'], [data-chars='13']) .count-up { letter-spacing: -0.06em; }
+/* Numbers in the pill and bet pills never wrap or squeeze. */
+.coin-pill .count-up, .cz-betpill .cz-amt, .cz-amt .mono, .jcoins { white-space: nowrap; }
+.cz-betpill { white-space: nowrap; flex: none; }

@@ -7,6 +7,7 @@
 import { secureRandom } from './rng.js';
 import { keepRecent } from './coins.js';
 import { amountTip, parseAmount } from './amount.js';
+import { coinsText } from './coinText.js';
 
 export const TICKET = 5; // lottery ticket price
 export const MINUTE = 60000;
@@ -483,7 +484,7 @@ export function lotteryNote(bought, mine, pot, openConv, conv) {
   const tickets = `${mine} ticket${mine === 1 ? '' : 's'}`;
   return {
     title: bought ? `🎟️ Bought ${bought} ticket${bought > 1 ? 's' : ''}` : '🎟️ The lottery is already open',
-    body: `You have ${tickets} in. Pot: ${pot} coins.${openConv === conv ? ' The lottery card is higher up in this channel.' : ` The lottery card is in #${openConv}.`}`,
+    body: `You have ${tickets} in. Pot: ${coinsText(pot)} coins.${openConv === conv ? ' The lottery card is higher up in this channel.' : ` The lottery card is in #${openConv}.`}`,
     ...(openConv !== conv && { go: openConv }),
   };
 }

@@ -5,6 +5,8 @@ import { Icon } from '../shell/icons.jsx';
 import { confirmDialog } from '../Dialogs.jsx';
 import { Invite, Result, Versus } from './Arcade.jsx';
 import { openGameView } from './liveGames.js';
+import { CoinNum } from '../CoinNum.jsx';
+import { exactCoins } from '../../coinFormat.js';
 
 // Battleship. In the chat, a summary card (who's playing, the rules, what just
 // happened, both boards' shots) with a big Play or Watch button; the game
@@ -326,7 +328,7 @@ function Rematch({ g, me, onRematch }) {
       <ModePicker value={mode} onChange={setMode} />
       <button type="button" className="btn" disabled={busy} aria-busy={busy ? 'true' : undefined} onClick={go}>
         <Icon name="repeat" /> {busy ? 'Sending…' : `Rematch ${first(other)}`}
-        {g.bet ? <span className="muted small"> · {g.bet} each</span> : null}
+        {g.bet ? <span className="muted small"> · <CoinNum n={g.bet} /> each</span> : null}
       </button>
       {note && <div className="casino-error small">{note}</div>}
     </div>
@@ -360,7 +362,7 @@ export function BattleshipView({ g, me, act, Name, now, mv, msgId }) {
     mv.send(`fire:${i}`);
   });
   const resign = async () => {
-    const ok = await confirmDialog({ title: 'Resign this game?', body: `${first(other)} wins${g.bet ? ` both bets (${g.bet * 2} coins)` : ''}.`, okLabel: 'Resign', danger: true });
+    const ok = await confirmDialog({ title: 'Resign this game?', body: `${first(other)} wins${g.bet ? ` both bets (${exactCoins(g.bet * 2)} coins)` : ''}.`, okLabel: 'Resign', danger: true });
     if (ok) act('resign');
   };
 

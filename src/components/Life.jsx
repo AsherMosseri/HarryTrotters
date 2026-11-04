@@ -8,6 +8,7 @@ import { isOnline } from '../connection.js';
 import { FULL_COINS, LINE_COINS, SIZE } from '../../functions/shared/bingo.js';
 import { streakShout } from '../../functions/shared/recap.js';
 import { MAX_SCORE, MIN_GUESSERS, WIN_COINS, isLive, matchRoundId, winnerLine } from '../../functions/shared/predict.js';
+import { CoinNum } from './CoinNum.jsx';
 
 // Team life on screen (3.0): the weekly recap card (#general), lab bingo
 // (Today), and score guesses (Match log and the pit screen). The server
@@ -318,7 +319,7 @@ export function BingoCard({ actor, api, sig }) {
               {coins > 0 && (
                 <>
                   {' · '}
-                  <span className="mono">+{coins}</span> coins
+                  <CoinNum n={coins} signed className="mono" /> coins
                 </>
               )}
             </span>
@@ -384,7 +385,7 @@ function BingoDialog({ card, onClose, onOpen }) {
             {coins > 0 && (
               <>
                 {' · '}
-                <span className="mono">+{coins}</span> coins this week
+                <CoinNum n={coins} signed className="mono" /> coins this week
               </>
             )}
           </p>
@@ -392,7 +393,7 @@ function BingoDialog({ card, onClose, onOpen }) {
           <p className="muted small bingo-how">
             Squares fill in by themselves from your shifts, lab logs, tasks and the match log (lab logs count on days you had a
             shift). A full row, column or diagonal pays{' '}
-            <span className="mono">{LINE_COINS}</span> coins, and the whole card <span className="mono">{FULL_COINS}</span> more. Same card
+            <CoinNum n={LINE_COINS} className="mono" /> coins, and the whole card <CoinNum n={FULL_COINS} className="mono" /> more. Same card
             for everyone; a new one every Monday.
           </p>
         </div>
@@ -461,7 +462,7 @@ function Guesses({ round }) {
           <span className="guess-name">{firstName(n)}</span>
           {g != null && <b className="mono">{g}</b>}
           {(round.loggedBy || []).includes(n) && <span className="muted tiny">logged the run</span>}
-          {round.paid?.[n] > 0 && <span className="guess-coins mono">+{round.paid[n]}</span>}
+          {round.paid?.[n] > 0 && <CoinNum n={round.paid[n]} signed className="guess-coins mono" />}
         </li>
       ))}
     </ul>
@@ -517,7 +518,7 @@ function RoundBox({ round, title, actor, api, mine, remember, onGuess, canLock, 
             />
             {hint && (
               <p className="muted small">
-                Closest guess wins <span className="mono">{WIN_COINS}</span> coins (spot on, double). One guess each, hidden until it
+                Closest guess wins <CoinNum n={WIN_COINS} className="mono" /> coins (spot on, double). One guess each, hidden until it
                 starts. Whoever logs the score can’t win it.
               </p>
             )}
@@ -579,7 +580,7 @@ export function GuessCard({ predictions = [], matches = [], actor, api }) {
         <div className="guess-start">
           <p className="small">
             About to do a practice run? Start a round and everyone can guess the total. Closest wins{' '}
-            <span className="mono">{WIN_COINS}</span> coins (at least <span className="mono">{MIN_GUESSERS}</span> guesses).
+            <CoinNum n={WIN_COINS} className="mono" /> coins (at least <span className="mono">{MIN_GUESSERS}</span> guesses).
           </p>
           <button className="btn" disabled={busy} onClick={start}>
             <Icon name="target" size={16} /> Start guessing

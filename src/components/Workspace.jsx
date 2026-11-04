@@ -105,6 +105,8 @@ import { confirmDialog } from './Dialogs.jsx';
 import { LoanSettings, loanLines, useLoans } from './Loans.jsx';
 import { openLoanForm } from '../loanCommand.js';
 import { RequestForms } from './RequestForms.jsx';
+import { CoinFormatSetting } from './CoinNum.jsx';
+import { coinStyled } from '../coinFormat.js';
 
 // Versions were renumbered once (2.0 became 1.9, 2.1 became 2.0, and so
 // on). Move this device's "last seen" version along so What's new doesn't
@@ -401,6 +403,7 @@ function AppearanceDialog({ themeMenuProps, onClose }) {
               </label>
             ))}
           </div>
+          <CoinFormatSetting />
         </div>
       </div>
     </Overlay>
@@ -2105,7 +2108,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
     const total = fresh.reduce((t, x) => t + x.amount, 0);
     const streak = fresh.find((x) => x.source === 'streak');
     const big = streak || fresh.find((x) => x.source === 'predict' || /full card/.test(x.label || ''));
-    setToast({ text: `${(streak || fresh.at(-1)).label.replace(/^Streak: /, '')}: +${total} coins` });
+    setToast({ text: `${(streak || fresh.at(-1)).label.replace(/^Streak: /, '')}: +${coinStyled(total)} coins` });
     if (big) celebrate();
   }, [ledger, rename, actor.name]);
   const [coinsOpen, setCoinsOpen] = useState(false);

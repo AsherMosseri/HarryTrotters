@@ -9,6 +9,8 @@ import { VIEW_GAMES, noteCard, openGameView, useFreshCmd } from './liveGames.js'
 import { Icon } from '../shell/icons.jsx';
 import { Die } from './Die.jsx';
 import { ActBtn, Amt } from './Casino.jsx';
+import { useCoinFormat } from '../CoinNum.jsx';
+import { exactCoins } from '../../coinFormat.js';
 import { FlipCoin, ensureCasinoDefs } from './casinoArt.jsx';
 import { useMove } from './useMove.js';
 import { KINDS } from '../../../functions/shared/challenge.js';
@@ -22,12 +24,13 @@ const coins = (n) => <Amt n={n} />;
 
 // Prizes the daily game limit cut short (the server puts what it paid in g.paid).
 function LimitLine({ g, me }) {
+  const f = useCoinFormat();
   const cut = Object.entries(g.paid || {});
   if (!cut.length) return null;
-  const who = cut.map(([n, k]) => `${n === me ? 'you' : n.split(' ')[0]} got ${k}`).join(' · ');
+  const who = cut.map(([n, k]) => `${n === me ? 'you' : n.split(' ')[0]} got ${f.n(k)}`).join(' · ');
   return (
     <div className="muted tiny">
-      Daily limit reached ({who}): game prizes and /daily pay up to {AWARD_CAPS.game} coins a day.
+      Daily limit reached ({who}): game prizes and /daily pay up to {f.n(AWARD_CAPS.game)} coins a day.
     </div>
   );
 }
@@ -81,7 +84,7 @@ export function BetPill({ each, pot, people = 'each' }) {
       </span>
     );
   return (
-    <span className="cz-betpill arc-betpill" title={`${each} Jackson coins ${people}, ${pot} in the pot`}>
+    <span className="cz-betpill arc-betpill" title={`${exactCoins(each)} Jackson coins ${people}, ${exactCoins(pot)} in the pot`}>
       <span className="cz-betpill-k">Bet</span> <Amt n={each} /> {people} <span className="cz-betpill-k">· pot</span> <Amt n={pot} />
     </span>
   );
