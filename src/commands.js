@@ -9,8 +9,10 @@
 import { overdueTasks, parseMatch, parseTask, seasonRecord, todayISO } from './teamCommands.js';
 import { blocked, isOff } from '../functions/shared/commandRules.js';
 import { gameArgs } from './components/games/launch.js';
-import { MORE_COMMANDS, runMore } from './moreCommands.js';
+import { GROUP_ROWS, MORE_COMMANDS, runMore } from './moreCommands.js';
 import { runRequest } from './requestCommand.js';
+import { groupNotify, groupTargets } from './groups.js';
+import { GIFT_MAX } from '../functions/shared/coins.js';
 
 export const GROUPS = [
   ['basics', 'Basics'],
@@ -29,7 +31,7 @@ export const GROUPS = [
 export const COMMANDS = [
   { name: 'help', group: 'basics', args: '', desc: 'Every command, and what it does' },
   { name: 'ping', group: 'basics', args: '', desc: 'Is Trotbot awake? (and how fast)' },
-  { name: 'whois', bare: true, group: 'basics', args: '@person', desc: 'Someone’s hours, tasks, coins, and status' },
+  { name: 'whois', bare: true, group: 'basics', args: '@person | @group', desc: 'Someone’s hours, tasks, coins, and status' },
   { name: 'avatar', bare: true, group: 'basics', args: '@person', desc: 'Their profile picture, big' },
   { name: 'countdown', group: 'basics', args: '', desc: 'Days until competition' },
   { name: 'afk', bare: true, group: 'basics', args: 'reason', desc: 'Away: Trotbot tells people who @ you' },
@@ -54,17 +56,17 @@ export const COMMANDS = [
   { name: 'wyr', group: 'random', args: '', desc: 'Would you rather… (everyone votes)' },
   { name: 'fortune', group: 'random', args: '', desc: 'Open a fortune cookie' },
 
-  { name: 'pet', group: 'actions', args: '@person', desc: 'Pat pat pat' },
-  { name: 'hug', group: 'actions', args: '@person', desc: 'A big hug' },
-  { name: 'highfive', group: 'actions', args: '@person', desc: 'Up top!' },
-  { name: 'bonk', group: 'actions', args: '@person', desc: 'Cartoon bonk 🔨' },
-  { name: 'wave', group: 'actions', args: '@person', desc: 'Say hi' },
+  { name: 'pet', group: 'actions', args: '@person | @group', desc: 'Pat pat pat' },
+  { name: 'hug', group: 'actions', args: '@person | @group', desc: 'A big hug' },
+  { name: 'highfive', group: 'actions', args: '@person | @group', desc: 'Up top!' },
+  { name: 'bonk', group: 'actions', args: '@person | @group', desc: 'Cartoon bonk 🔨' },
+  { name: 'wave', group: 'actions', args: '@person | @group', desc: 'Say hi' },
 
   { name: 'balance', bare: true, group: 'economy', args: '@person', desc: 'How many Jackson coins (yours or theirs)' },
   { name: 'daily', group: 'economy', args: '', desc: 'Free coins once a day: 5, plus 1 for each day in a row, up to 15 (shares the 20-a-day game limit)', server: true },
   { name: 'work', group: 'economy', args: '', desc: 'Coins for your work, while you’re clocked in (once an hour)', server: true },
   { name: 'beg', group: 'economy', args: '', desc: 'Ask around for coins. No promises.', server: true },
-  { name: 'give', group: 'economy', args: '@person amount', desc: 'Send someone coins' },
+  { name: 'give', group: 'economy', args: '@person | @group amount', desc: 'Send someone coins (to a group: that much to each person)' },
   { name: 'rob', group: 'economy', args: '@person', desc: '35% chance to steal some. Or pay a fine.', server: true },
   { name: 'leaderboard', group: 'economy', args: '', desc: 'Who has the most coins' },
 
@@ -431,7 +433,10 @@ export function parseRemind(text, now = Date.now()) {
 // ---------- running one ----------
 
 // What happens when you send "/name args". ctx: { actor, roster, competitionDate,
-// countdown(), whois(name), ping(), setAfk(reason), addReminder(at, text) }.
+// countdown(), whois(name), ping(), setAfk(reason), addReminder(at, text) },
+// and for groups (src/groups.js): subteamsOf(name), isDm, isManager,
+// mentionsOn, everyoneOn, giftGroup(ask, amount, key), key (the same for a
+// second send of the same text, so a /give can't pay twice).
 // Returns one of:
 //   { post: { text, cmd?, poll?, votes?, mentions? } }   a message everyone sees
 //   { note: { title, body?, lines? } }                  only you see it
@@ -448,6 +453,12 @@ export async function runCommand({ cmd, args }, ctx) {
   // Turned off, or not in this channel (Asher's Commands page).
   const stop = blocked(cmd.name, cmd.group, ctx.conv, ctx.commandCfg);
   if (stop) return { note: stop };
+  // A group (@Programming, @everyone) where the command takes people:
+  // src/groups.js works out who, or says why not (a command that's one
+  // person at a time, a DM, nobody in it). null: no group, as before.
+  const group = /@/.test(cmd.args) || cmd.name === 'pick' ? groupTargets(cmd.name, args, ctx) : null;
+  if (group?.note) return { note: group.note };
+  const pings = (kind) => groupNotify(group, kind, ctx);
   // Tetris and Minesweeper alone or against Trotbot open the game screen;
   // with someone named, it's a race challenge (the server posts the card).
   if ((cmd.name === 'tetris' || cmd.name === 'minesweep') && !namesSomeone(args)) return { game: { ...gameArgs(cmd.name, args), conv: ctx.conv } };
@@ -473,6 +484,32 @@ export async function runCommand({ cmd, args }, ctx) {
       const last = args.trim().split(/\s+/).pop() || '';
       const amount = /^\d+$/.test(last) ? +last : 0;
       const who = args.trim().slice(0, -last.length).trim();
+      // A group: each person gets the amount, all or nothing, on the server,
+      // which works out who's in the group itself (functions/index.js giveMany).
+      if (group) {
+        const n = group.people.length;
+        if (!amount) return { note: { title: 'Give how much each?', body: `Try: /give ${group.label} 10 (10 coins to each person)` } };
+        if (amount > GIFT_MAX) return { note: { title: 'That’s a lot.', body: `Up to ${GIFT_MAX} each.` } };
+        const have = ctx.wallet(me).balance;
+        if (amount * n > have)
+          return {
+            note: { title: `That’s ${amount * n} coins (${amount} each for ${n} ${n === 1 ? 'person' : 'people'}).`, body: `You have ${have}.` },
+          };
+        const r = await ctx.giftGroup(group.ask, amount, ctx.key);
+        if (!r?.ok) return { note: r?.note || { title: 'That didn’t go through.' } };
+        const paid = r.people || [];
+        return card(
+          {
+            group: r.group || group.label,
+            people: paid.slice(0, 60),
+            count: paid.length,
+            amount: r.amount,
+            total: r.total,
+            line: `sent you ${r.amount} Jackson coins`,
+          },
+          groupNotify({ ...group, people: paid }, 'gift', ctx),
+        );
+      }
       const to = who && findPerson(who, ctx.roster);
       if (!to || !amount) return { note: { title: 'Give who how much?', body: 'Try: /give @Cooper 20' } };
       // A first name or start of a name that fits more than one person: ask.
@@ -484,7 +521,7 @@ export async function runCommand({ cmd, args }, ctx) {
       const have = ctx.wallet(me).balance;
       if (amount > have) return { note: { title: `You only have ${have} coins.` } };
       if (amount > 5000) return { note: { title: 'That’s a lot.', body: 'Up to 5000 at a time.' } };
-      const r = await ctx.gift(to, amount);
+      const r = await ctx.gift(to, amount, '', ctx.key);
       if (!r?.ok) return { note: r?.note || { title: 'That didn’t go through.' } };
       return card({ to, amount, line: `sent you ${amount} Jackson coins` }, { mentions: [to] });
     }
@@ -553,6 +590,26 @@ export async function runCommand({ cmd, args }, ctx) {
     }
     case 'whois':
     case 'avatar': {
+      // /whois @Programming: a row each, A to Z.
+      if (group) {
+        const list = [...group.people].sort((a, b) => a.localeCompare(b));
+        const grid = list.slice(0, GROUP_ROWS).map((n) => {
+          const w = ctx.whois(n);
+          return { name: n, c: [`${w.week ?? 0} h`, String(w.open ?? 0), String(w.coins ?? 0)], dot: !!w.onShift };
+        });
+        return card(
+          {
+            view: 'grid',
+            title: `Who’s in ${group.label}`,
+            sub: `${list.length} ${list.length === 1 ? 'person' : 'people'}`,
+            cols: ['This week', 'Open tasks', 'Coins'],
+            grid,
+            more: Math.max(0, list.length - GROUP_ROWS),
+            dotLabel: 'At the lab',
+          },
+          pings('lookup'),
+        );
+      }
       const who = args ? findPerson(args, ctx.roster) : me;
       if (!who) return { note: { title: `Who’s “${args}”?`, body: 'Pick someone with @' } };
       return card({ to: who, ...(cmd.name === 'whois' ? ctx.whois(who) : {}) }, { mentions: [] });
@@ -680,6 +737,11 @@ export async function runCommand({ cmd, args }, ctx) {
     case 'highfive':
     case 'bonk':
     case 'wave': {
+      // One card for the whole group: "Asher high-fives @Programming."
+      if (group) {
+        const line = pick(ACTION[cmd.name].lines).replace('{to}', group.label);
+        return card({ to: '', group: group.label, people: group.people.slice(0, 60), count: group.people.length, line }, pings('action'));
+      }
       const to = args ? findPerson(args, ctx.roster) : null;
       if (args && !to) return { note: { title: `Who’s “${args}”?`, body: `Try: /${cmd.name} @name` } };
       if (!to && cmd.name !== 'wave') return need('someone (@name)');
@@ -688,7 +750,7 @@ export async function runCommand({ cmd, args }, ctx) {
       return card({ to: to || '', line }, { mentions: to && !self ? [to] : [] });
     }
     default:
-      return (await runMore({ cmd, args }, ctx, { card, need })) || { note: { title: `/${cmd.name} isn’t ready yet` } };
+      return (await runMore({ cmd, args }, ctx, { card, need, group, pings })) || { note: { title: `/${cmd.name} isn’t ready yet` } };
   }
 }
 

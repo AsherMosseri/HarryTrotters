@@ -14,6 +14,7 @@
 
 import { mergedMs } from './hours.js';
 import { nameKey } from './team.js';
+import { BOT, GROUP_MAX } from './groups.js';
 import { secureRandom } from './rng.js';
 
 // The team day 3.0's earning rules start (4 an hour in 15-minute steps, cut
@@ -215,7 +216,25 @@ const SPEND_ICON = { skip: '⏭', market: '🛍️', tournament: '🏆' };
 // Someone's entries in the ledger, as signed amounts.
 export function ledgerItems(name, ledger = []) {
   const out = [];
+  // A group gift (/give @Programming 10) is one ledger entry per person, and
+  // one line for the giver: "Gave 10 each to @Programming (5 people)" −50.
+  const batches = new Map();
   for (const x of ledger) {
+    if (x.type === 'gift' && x.from === name && x.batch) {
+      const b = batches.get(x.batch);
+      if (b) {
+        b.amount -= x.amount;
+        b.n += 1;
+        b.same = b.same && x.amount === b.each;
+        b.at = Math.max(b.at, x.at);
+        continue;
+      }
+      const item = { kind: 'gift-out', at: x.at, amount: -x.amount, icon: '🎁', label: '' };
+      Object.assign(item, { n: 1, each: x.amount, same: true, group: x.group || 'a group', note: x.note || '' });
+      batches.set(x.batch, item);
+      out.push(item);
+      continue;
+    }
     if (x.type === 'spend' && x.person === name)
       out.push({ kind: 'spend', at: x.at, amount: -x.amount, icon: SPEND_ICON[x.what] || '🚫', label: x.label || 'Spent', what: x.what || '' });
     // Coins back from the market (functions/market.js): a declined perk, a
@@ -247,6 +266,15 @@ export function ledgerItems(name, ledger = []) {
         icon: x.amount >= 0 ? '⭐' : '⚠️',
         label: x.note || (x.amount >= 0 ? 'Bonus' : 'Taken away'),
       });
+  }
+  for (const b of batches.values()) {
+    const who = `${b.group} (${b.n} ${b.n === 1 ? 'person' : 'people'})`;
+    b.label = `${b.same ? `Gave ${b.each} each to` : 'Gave to'} ${who}${b.note ? `: “${b.note}”` : ''}`;
+    delete b.n;
+    delete b.each;
+    delete b.same;
+    delete b.group;
+    delete b.note;
   }
   return out;
 }
@@ -505,6 +533,31 @@ export function giftEntry(from, { to, amount, note }, { roster, balance, now = D
   if (n > GIFT_MAX) return { error: 'That’s a lot.', body: `Up to ${GIFT_MAX} at a time.` };
   if (n > balance) return { error: `You only have ${balance} coins.` };
   return { type: 'gift', from, to, amount: n, note: text(note, 140).trim(), at: now };
+}
+
+// A gift to a group (/give @Programming 10): the same checks as one /give
+// to each person, then the whole total against the balance. All or nothing:
+// { entries } (one gift entry per person, sharing a batch id, so the giver's
+// history shows one line) or { error, body } saying who and why.
+// people: who it goes to (already worked out from the server's own team).
+export function groupGiftEntries(from, { people = [], amount, note, batch, group }, { roster, balance, now = Date.now() }) {
+  if (!people.length) return { error: 'Nobody to give to.', body: `${group || 'That group'} has nobody in it besides you.` };
+  if (people.length > GROUP_MAX) return { error: 'That’s too many people at once.', body: `Up to ${GROUP_MAX}.` };
+  const entries = [];
+  for (const to of people) {
+    if (!roster.includes(to) || to === BOT)
+      return { error: `${to} can’t get coins right now.`, body: `They aren’t on the team. Nothing was sent.` };
+    const e = giftEntry(from, { to, amount, note }, { roster, balance: Infinity, now });
+    if (e.error) return { error: e.error, body: [e.body, people.length > 1 ? 'Nothing was sent.' : ''].filter(Boolean).join(' ') };
+    entries.push({ ...e, batch: String(batch || ''), group: String(group || '').slice(0, 80) });
+  }
+  const total = entries.reduce((t, e) => t + e.amount, 0);
+  if (total > balance)
+    return {
+      error: `That’s ${total} coins (${entries[0].amount} each for ${entries.length} ${entries.length === 1 ? 'person' : 'people'}).`,
+      body: `You have ${balance}. Nothing was sent.`,
+    };
+  return { entries, total };
 }
 
 export function prizeEntry(name, { what, amount, label }, { ledger, gameCap, now = Date.now(), rng = secureRandom }) {

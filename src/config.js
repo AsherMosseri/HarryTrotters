@@ -64,7 +64,9 @@ export const STATUSES = [
 ];
 
 // "Design" means CAD. Colors are used for milestone bars and the org chart.
-export const SUBTEAMS = ['Team Management', 'CAD', 'Mechanical', 'Assembly', 'Electrical', 'Programming'];
+// The subteams (functions/shared/team.js): @Subteam in chat and in commands.
+export { SUBTEAMS } from '../functions/shared/team.js';
+import { SUBTEAMS } from '../functions/shared/team.js';
 export const SUBTEAM_COLORS = {
   'Team Management': '#0d9488',
   CAD: '#8b5cf6',
@@ -106,32 +108,9 @@ export const VAPID_KEY = '';
 
 export const COMPETITION = { name: 'Competition', date: '2026-11-14' };
 
-// Starting org chart. Anything edited on the Team tab is saved to the database
-// and overrides these.
-export const ORG_DEFAULTS = {
-  'Asher Mosseri': {
-    title: '',
-    subteams: ['Team Management', 'Programming', 'Secretary'],
-    responsibilities: ['Programming', 'Secretary', 'Team management'],
-  },
-  'Sebastian Tolbert': {
-    title: '',
-    subteams: ['Team Management', 'Assembly'],
-    responsibilities: ['Team management', 'Logistics', 'Assembly'],
-  },
-  'Katarina Jurasic': { title: '', subteams: ['Programming'], responsibilities: ['Programming'] },
-  'Sophia Bermudez': {
-    title: '',
-    subteams: ['Mechanical', 'Assembly', 'Electrical'],
-    responsibilities: ['Fabrication', 'Assembly', 'Logistics', 'Electrical'],
-  },
-  'Shrey Kumar': { title: '', subteams: ['CAD'], responsibilities: ['Design (CAD)'] },
-  'Jackson Lucks': { title: '', subteams: ['Assembly', 'Electrical'], responsibilities: ['Assembly', 'Electrical'] },
-  'Matthew Kuehl': { title: '', subteams: ['CAD'], responsibilities: ['Design (CAD)'] },
-  'Cooper Mlezcko': { title: '', subteams: ['Assembly'], responsibilities: ['Assembly'] },
-  'Ira Kumar': { title: '', subteams: ['Assembly'], responsibilities: ['Assembly'] },
-  'Michael Meidan': { title: '', subteams: ['Programming', 'CAD'], responsibilities: ['Programming', 'Design (CAD)'] },
-};
+// Starting org chart (functions/shared/team.js, so the server can tell who's
+// in a subteam too). Anything edited on the Team tab overrides these.
+export { ORG_DEFAULTS } from '../functions/shared/team.js';
 
 export const PRIORITIES = [
   { id: 'urgent', label: 'Urgent', rank: 0 },

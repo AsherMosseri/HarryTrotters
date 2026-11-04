@@ -20,7 +20,8 @@ import * as challenge from '../../functions/shared/challenge.js';
 import * as dispute from '../../functions/shared/disputes.js';
 import { blocked, isOff, serverGroup } from '../../functions/shared/commandRules.js';
 import * as coinAsk from '../../functions/shared/coinRequests.js';
-import { AWARD_CAPS, breakdown, giftEntry, prizeEntry, teamDay, teamMidnight } from '../../functions/shared/coins.js';
+import { AWARD_CAPS, breakdown, giftEntry, groupGiftEntries, prizeEntry, teamDay, teamMidnight } from '../../functions/shared/coins.js';
+import { BOT, groupLabel, resolveTargets } from '../../functions/shared/groups.js';
 import * as fun from '../../functions/shared/funGames.js';
 import * as mines from '../../functions/shared/minesweeper.js';
 const MINE_LEVELS = mines.LEVELS;
@@ -29,7 +30,7 @@ import { asksOn } from '../../functions/shared/checkin.js';
 import * as market from '../../functions/shared/market.js';
 import { PERK_IDEAS } from '../../functions/shared/market.js';
 import { giftAccept, giftEnd, giftOffer, petEdit, petsIn } from '../../functions/shared/pets.js';
-import { ROSTER, cleanName, sameName } from '../../functions/shared/team.js';
+import { ROSTER, SUBTEAMS, cleanName, sameName } from '../../functions/shared/team.js';
 import * as chan from '../../functions/shared/channels.js';
 import { checkPicks, myPicks, personOptionId, usesVoteButton } from '../../functions/shared/polls.js';
 import { demoLife } from './demoLife.js';
@@ -1775,7 +1776,7 @@ export const demoStore = {
   // The casino and economy, run here the way the play function runs them on
   // the server (functions/index.js), with the same rules (casino.js).
   // balanceOf(name): the person's coins, from the app's wallet; roster: the team.
-  async play(req, actor, { balanceOf, roster = [] }, verified = null) {
+  async play(req, actor, { balanceOf, roster = [], subteamsOf = () => [] }, verified = null) {
     const now = Date.now();
     const me = actor.name;
     const { action, game, conv = '', args = [], msgId, move } = req;
@@ -1827,6 +1828,31 @@ export const demoStore = {
         setBank(x.name, casino.bankAfter(bank(x.name), x.name, x.delta, arcade.moneyLine(x, card.game, card.id), x.extra || {}, now));
     };
 
+    // A group gift (/give @Programming 10): the same rules as the server's
+    // giveMany, against the demo team. A second send with the same key is
+    // already done.
+    if (action === 'gift' && req.group) {
+      const g = req.group;
+      const groups = (g.groups || []).filter((x) => SUBTEAMS.includes(x));
+      const team = roster.filter((n) => n !== BOT);
+      for (const n of g.people || [])
+        if (n !== me && !team.includes(n)) return note(`Who’s ${n}?`, 'They aren’t on the team. Nothing was sent.');
+      const people = resolveTargets({ groups, everyone: !!g.everyone, people: g.people || [] }, { roster: team, subteamsOf, me });
+      const label = groupLabel({ groups, everyone: !!g.everyone });
+      if (!people.length) return note(`Nobody in ${label} to give to.`, `${label} has nobody in it besides you.`);
+      const batch = `${personId(me)}-${req.key}`;
+      const before = (state.coins || []).filter((x) => x.type === 'gift' && x.batch === batch);
+      const total = before.reduce((t, x) => t + x.amount, 0);
+      if (before.length) return { ok: true, repeat: true, people: before.map((x) => x.to), amount: before[0].amount, total, group: label };
+      const made = groupGiftEntries(
+        me,
+        { people, amount: req.amount, note: req.note, batch, group: label },
+        { roster: team, balance: balanceOf(me), now },
+      );
+      if (made.error) return note(made.error, made.body);
+      for (const e of made.entries) await demoStore.addCoinTx(e);
+      return { ok: true, people, amount: made.entries[0].amount, total: made.total, group: label };
+    }
     // Gifts and ad prizes, checked the way the server checks them.
     if (action === 'gift' || action === 'prize') {
       const entry =

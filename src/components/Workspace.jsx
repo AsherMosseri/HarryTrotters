@@ -1476,7 +1476,11 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
       play: (req) => {
         const sent = Date.now();
         return store
-          .play(req, actor, { balanceOf: (n) => cmdData.current.wallet(n).balance, roster: cmdData.current.roster })
+          .play(req, actor, {
+            balanceOf: (n) => cmdData.current.wallet(n).balance,
+            roster: cmdData.current.roster,
+            subteamsOf: (n) => cmdData.current.team?.subteamsOf?.(n) || [],
+          })
           .then((r) => (setServerSkew(r?.serverNow, sent), coinSync.current?.noteServer(r?.balance), r))
           .catch((e) => ({ note: noteFor(e, 'Trotbot couldn’t do that') }));
       },
@@ -1499,7 +1503,10 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
       richest: () => cmdData.current.richest(),
       lottery: () => cmdData.current.lottery,
       // Gifts and ad prizes go through the play function, which checks the balance and today's limits.
-      gift: (to, amount, note) => api.play({ action: 'gift', to, amount, note: note || '' }),
+      // key: the same for a second send of the same /give, so it can't pay twice.
+      gift: (to, amount, note, key) => api.play({ action: 'gift', to, amount, note: note || '', ...(key && { key }) }),
+      // A /give to a group (src/groups.js): the server works out who's in it.
+      giftGroup: (group, amount, key) => api.play({ action: 'gift', group, amount, note: '', key }),
       whois: (name) => cmdData.current.whois(name),
       // For the team commands (/task, /shift, /match…).
       team: () => cmdData.current.team,
