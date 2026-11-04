@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { GIFT_MAX, leaderboard, perHourOf, teamDay, teamMidnight, wallet as walletOf } from '../coins.js';
 import { mondayOf } from '../milestones.js';
 import { relTime, useEscape } from '../util.js';
@@ -6,6 +6,7 @@ import { Avatar, CloseIcon, Overlay } from './common.jsx';
 import { Icon } from './shell/icons.jsx';
 import { CompareWithServer, EveryoneCoins, StaleBanner } from './CoinsEveryone.jsx';
 import { MyReports } from './Disputes.jsx';
+import { LoansPanel } from './Loans.jsx';
 
 // A Jackson coin: a little gold coin with a J.
 export const Coin = ({ size = 16 }) => (
@@ -24,9 +25,11 @@ const WHO = (n) => n.split(' ')[0];
 // The exact day and time of a history line (casino lines come in quick runs).
 const whenAt = (at) => new Date(at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
-export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onMarket, onClose, isManager = false, onCheck, stale, onRefresh, disputes = [], initialTab = 'wallet', onAdjust }) {
+export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onMarket, onClose, isManager = false, onCheck, stale, onRefresh, disputes = [], initialTab = 'wallet', onAdjust, loans = null, loanFocus = null, onToast }) {
   useEscape(onClose);
   const [tab, setTab] = useState(initialTab);
+  // Opened again from a notification while it's already open.
+  useEffect(() => setTab(initialTab), [initialTab]);
   const [range, setRange] = useState('week');
   // Two boards: what everyone has now (matches balances and /leaderboard),
   // and what they earned by working (tasks, lab hours, grants).
@@ -83,6 +86,17 @@ export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onMarket
             {[
               ['wallet', 'History'],
               ['send', 'Send'],
+              // Borrowing and lending (Loans.jsx), while coins are on.
+              ...(loans
+                ? [
+                    [
+                      'loans',
+                      <>
+                        Loans{(loans.myTurn.length > 0 || loans.lock) && <span className="tab-dot" aria-label="(needs you)" />}
+                      </>,
+                    ],
+                  ]
+                : []),
               ['board', 'Leaderboard'],
               // Team management sees everyone's coins.
               ...(isManager && onCheck ? [['everyone', 'Everyone']] : []),
@@ -211,6 +225,7 @@ export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onMarket
               ))}
 
             {tab === 'reports' && <MyReports list={disputes} />}
+            {tab === 'loans' && loans && <LoansPanel loans={loans} actor={actor} roster={roster} focus={loanFocus} onToast={onToast} />}
 
             {tab === 'board' && (
               <>

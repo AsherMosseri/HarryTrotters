@@ -2,8 +2,9 @@
 // same balance (and earned total) for the same Firestore documents.
 //
 // It builds randomized teams (renames, old spellings, bank docs, ledger
-// entries of every kind, shifts, tasks), works out the true balance from how
-// the data was made, then reads the documents the way the app does
+// entries of every kind, loans from the bank and between people, shifts,
+// tasks), works out the true balance from how the data was made, then reads
+// the documents the way the app does
 // (Workspace.jsx: subscribeBank, subscribeCoins, tasks, shifts, coinInput)
 // and the way the server does (functions/index.js freshCoins: alias queries
 // on the ledger, bank/{nameKey} reads, freshWallet). All three must agree.
@@ -28,6 +29,7 @@ import {
 } from '../functions/shared/coins.js';
 import { bankAfter, closeHold, holdEntry } from '../functions/shared/casino.js';
 import { moneyLine } from '../functions/shared/arcade.js';
+import { collectOf, loanEntry } from '../functions/shared/loans.js';
 import { nameKey } from '../functions/shared/team.js';
 
 const CASES = Number(process.argv[2]) || 400;
@@ -203,6 +205,21 @@ function makeWorld(seed) {
         ...(deleted && { deletedAt: at + 1 }),
       };
       tasks.push(row);
+    }
+  }
+  // Loans (shared/loans.js loanEntry): bank loans (one side is nobody) and
+  // loans between two people, every kind of move, under the names they had
+  // then. A peer entry counts for both people.
+  for (const p of people) {
+    for (let i = int(0, 4); i > 0; i--) {
+      const at = t0();
+      const peer = chance(0.5) ? pick(people.filter((q) => q !== p)) : null;
+      const loan = { id: `l${seed}-${i}`, bank: !peer, borrower: p.current, lender: peer ? peer.current : '' };
+      const entry = loanEntry(loan, pick(['lend', 'repay', 'collect', 'forgive', 'extend']), int(1, 250), at);
+      const then = (n) => (n ? nameAt(people.find((q) => q.current === n), at) : n);
+      ledger.push({ ...entry, ...(entry.from && { from: then(entry.from) }), ...(entry.to && { to: then(entry.to) }) });
+      truth[p.current].ledger.push(entry);
+      if (peer) truth[peer.current].ledger.push(entry);
     }
   }
   // Truth for tasks: the same rows with current names.
@@ -499,6 +516,45 @@ console.log(`${CASES} random teams checked; ${bankSharedCases} people had a capi
   ok(items.reduce((t, x) => t + x.amount, 0) === b.net, 'overflow: the history still adds up');
   ok(b.recent.some((x) => x.hold === 'keep'), 'overflow: the held bet is kept');
   ok(b.recent.length === 60, `overflow: keeps 60 lines (${b.recent.length})`);
+  {
+  // Loans: Cooper borrows 100 from the bank at 10%, gives 80 to Mia, and on
+  // the due date the 110 is taken from his 70: he's at −40 (locked), the
+  // history says so line by line, and the app and server agree. Then Mia
+  // borrows 30 from Cooper (his own coins) and pays back 33.
+  const loan = { id: 'b1', bank: true, borrower: 'Cooper Mlezcko', lender: '', terms: { amount: 100, style: 'flat', rate: 10, term: 1 }, status: 'active', startAt: NOW - 8 * DAY, dueAt: NOW - DAY, paid: 0 };
+  const c = collectOf(loan, { balance: 70, now: NOW - DAY });
+  const peer = { id: 'p1', bank: false, borrower: 'Mia Teammate', lender: 'cooper mlezcko' };
+  const w = {
+    rename: (n) => (n === 'cooper mlezcko' ? 'Cooper Mlezcko' : n),
+    aliasesOf: (n) => (n === 'Cooper Mlezcko' ? ['Cooper Mlezcko', 'cooper mlezcko'] : [n]),
+    people: [{ current: 'Cooper Mlezcko' }, { current: 'Mia Teammate' }],
+    cfg: coinSettings({}),
+    shifts: [],
+    tasks: [],
+    ledger: [
+      { type: 'grant', to: 'Cooper Mlezcko', amount: 50, note: 'Bonus', at: NOW - 9 * DAY },
+      loanEntry(loan, 'lend', 100, NOW - 8 * DAY),
+      { type: 'gift', from: 'Cooper Mlezcko', to: 'Mia Teammate', amount: 80, note: '', at: NOW - 7 * DAY },
+      loanEntry(loan, 'collect', c.take, NOW - DAY),
+      loanEntry(peer, 'lend', 30, NOW - 2 * HOUR),
+      loanEntry(peer, 'repay', 33, NOW - HOUR),
+    ],
+    bank: new Map(),
+  };
+  const a = appView(w, 'Cooper Mlezcko');
+  const s = serverView(w, 'Cooper Mlezcko');
+  const lines = a.history.filter((x) => x.kind === 'loan').map((x) => `${x.label} ${x.amount}`);
+  console.log(`loan case: Cooper ${a.balance} (server ${s.balance}); ${lines.join(' | ')}`);
+  ok(c.take === 110 && c.patch.status === 'overdue' && c.patch.short === 40, `collection takes 110 past zero: ${JSON.stringify(c)}`);
+  ok(a.balance === 50 + 100 - 80 - 110 - 30 + 33 && s.balance === a.balance, `loan balance: app ${a.balance}, server ${s.balance}`);
+  ok(a.history.reduce((t, x) => t + x.amount, 0) === a.balance, 'loan history adds up');
+  ok(
+    ['Loan from the bank 100', 'Loan repaid to the bank (due date) -110', 'Loan to Mia Teammate -30', 'Mia Teammate repaid 33'].every((l) => lines.includes(l)),
+    `loan lines: ${lines}`,
+  );
+  const m = appView(w, 'Mia Teammate');
+  ok(m.balance === 80 + 30 - 33 && serverView(w, 'Mia Teammate').balance === m.balance, `Mia: ${m.balance}`);
+  }
 }
 
 console.log(failures ? `${failures} FAILURES` : 'ALL OK');

@@ -126,6 +126,17 @@ const SECTIONS = [
     ],
   ],
   [
+    'Loans',
+    [
+      `Loans: borrow Jackson coins from the bank or from a teammate. Open your coins (the gold pill at the top right), then Loans, and tap Ask the bank or Ask a teammate. Say how many coins, the interest and when you’ll pay it back (1, 2 or 4 weeks). ${REQUESTS_TO.split(' ')[0]} answers for the bank; its coins are made up, not his. A teammate lends their own coins.`,
+      'Loans: interest is Standard (the bank’s rate, or 10% once from a teammate), Once (100 at 10% means you pay back 110) or Per week (5% a week for every week started until you pay it back; pay early and you pay less). Up to 50%, rounded up to whole coins.',
+      'Loans: whoever you asked can say yes, say no, or counter with a different amount, interest or length. You can take a counter, say no, or counter back. Every step is in the loan’s History. You get a notification for each answer.',
+      'Loans: pay back any amount any time with Pay, or Pay all. You get a reminder 2 days before it’s due. On the due date, whatever is left is taken from your coins, even if that puts you below zero.',
+      `Loans: below zero after a due date, you’re locked until you’re back to 0: no betting, no Market, no sending coins, no lending and no new loans. Coins you earn still count and get you there. The lender (${REQUESTS_TO.split(' ')[0]} for the bank) can forgive the loan or give more time.`,
+      'Loans: by default, one bank loan at a time (up to 500 coins) and two from teammates. Nobody lends while paying back a loan of their own, and two people can only have one loan between them at a time.',
+    ],
+  ],
+  [
     'Match Log',
     [
       'After each practice run or match, log Auto, TeleOp, and Endgame points.',
@@ -196,6 +207,7 @@ const SECTIONS = [
 ];
 
 const MANAGER_TIPS = [
+  `Bank loans: only ${REQUESTS_TO.split(' ')[0]} answers bank loan requests (Today and his menu show what’s waiting; Approve, Counter or Say no), and can forgive or extend any bank loan. Controls, Loans sets the bank: on or off, the most in one loan, loans at a time, its standard rate and the lengths it allows.`,
   'Everyone’s coins: in the Coins screen, the Everyone tab lists each person’s balance, earned coins and casino net (search by name). Tap someone for their whole history with the balance after each entry, filters (Earned, Spent, Casino, Gifts, Prizes, Market), a total, and Compare with the server for that person.',
   'Roster: Edit anyone’s role, subteams, responsibilities, and name. Add or remove people. Removing someone signs them out everywhere and deletes their password; their messages, tasks, shifts and coins stay. Someone new (or removed) who signs in waits at the top under Waiting to join until you tap Approve (or Turn away).',
   'Market: add perks (or pick from the ideas), approve or decline purchases, and start tournaments. In a tournament’s results you can void anyone’s result, and Clear or Void runs that need a check.',
@@ -315,7 +327,7 @@ const SECTION_TABS = {
   'Robot (3D)': 'robot',
 };
 const LINE_FEATURES = [
-  [/^Casino and coins|^Games in #arcade|^Jackson coins|^Spend Jackson coins|^Pets:|^Tournaments:|^Guess the score|^Market:/, 'coins'],
+  [/^Casino and coins|^Games in #arcade|^Jackson coins|^Spend Jackson coins|^Pets:|^Tournaments:|^Guess the score|^Market:|^Loans:|^Bank loans:/, 'coins'],
   [/^Lab check-in|Lab check-in asks/, 'checkins'],
   [/^Required polls/, 'requiredPolls'],
   [/^Polls:/, 'polls'],

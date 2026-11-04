@@ -102,6 +102,7 @@ import { teamDay } from '../../functions/shared/coins.js';
 import { hasLabel, newBattery, putOnRobot, statusPatch } from '../batteries.js';
 import { streaksOf } from '../../functions/shared/streaks.js';
 import { confirmDialog } from './Dialogs.jsx';
+import { LoanSettings, loanLines, useLoans } from './Loans.jsx';
 
 // Versions were renumbered once (2.0 became 1.9, 2.1 became 2.0, and so
 // on). Move this device's "last seen" version along so What's new doesn't
@@ -1463,6 +1464,12 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
       // Casino reports (Disputes.jsx).
       dispute: (req) => store.dispute(req, actor).catch((e) => ({ note: noteFor(e, 'That didn’t go through') })),
       disputeDecide: (req) => store.disputeDecide(req, actor).catch((e) => ({ note: noteFor(e, 'That didn’t go through') })),
+      // Loans (Loans.jsx, functions/loans.js): fn is loanRequest, loanRespond, loanRepay or loanManage.
+      loan: (fn, req) =>
+        store
+          .loan(fn, req, actor, { balanceOf: (n) => cmdData.current.wallet(n).balance, roster: cmdData.current.roster })
+          .then((r) => (coinSync.current?.noteServer(r?.balance), r))
+          .catch((e) => ({ note: noteFor(e, 'That didn’t go through') })),
       play: (req) => {
         const sent = Date.now();
         return store
@@ -1845,6 +1852,8 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
   const [disputes, setDisputes] = useState([]);
   const [disputesOpen, setDisputesOpen] = useState(false);
   const [coinsTab, setCoinsTab] = useState('wallet');
+  // Which loan a notification or Today line opened (Loans.jsx scrolls to it).
+  const [loanFocus, setLoanFocus] = useState(null);
   useEffect(() => (store.subscribeDisputes ? store.subscribeDisputes(actor, setDisputes) : undefined), [store, actor.name, actor.admin]);
   const openDisputes = ownsReports ? disputes.filter((x) => x.status === 'open').length : 0;
   const myDisputes = useMemo(() => disputes.filter((x) => x.by === actor.name), [disputes, actor.name]);
@@ -1869,7 +1878,11 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
         setChatChannel(id);
         setView('chat');
       } else if (kind === 'view') setView(id);
-      else if (kind === 'disputes') {
+      else if (kind === 'loans') {
+        setLoanFocus(id || null);
+        setCoinsTab('loans');
+        setCoinsOpen(true);
+      } else if (kind === 'disputes') {
         if (liveOwner.current) setDisputesOpen(true);
         else {
           setCoinsTab('reports');
@@ -2088,6 +2101,13 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
   const myWallet = useMemo(() => walletOf(actor.name), [walletOf, actor.name]);
   const sync = useCoinSync(myWallet);
   coinSync.current = { noteServer: sync.noteServer, walletOf };
+  // Loans (Loans.jsx): mine, either side, and every bank loan for the owner.
+  const loans = useLoans({ store, actor, call: api.loan, balance: myWallet.balance, walletOf });
+  const openLoans = useCallback((id) => {
+    setLoanFocus(id || null);
+    setCoinsTab('loans');
+    setCoinsOpen(true);
+  }, []);
   // The market and pets (market.js): perks, purchases, pets, tournaments.
   const market = useMarketData(store, {
     actor,
@@ -2476,6 +2496,11 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
             Casino reports {openDisputes > 0 && <span className="me-badge">{openDisputes}</span>}
           </button>
         )}
+        {isOwner && controls.isOn('coins') && (
+          <button onClick={go('coins', () => openLoans())}>
+            Bank loans {loans.bankWaiting > 0 && <span className="me-badge">{loans.bankWaiting}</span>}
+          </button>
+        )}
         {isOwner && <button onClick={go('controls', () => setControlsPage(true))}>Controls</button>}
       </div>
       <button
@@ -2695,6 +2720,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
                     onChannelRequests={() => setChanDlg('review')}
                     disputes={ownsReports && controls.isOn('coins') ? openDisputes : 0}
                     onDisputes={() => setDisputesOpen(true)}
+                    extraLines={controls.isOn('coins') ? loanLines(loans, openLoans) : []}
                     api={api}
                     shifts={namedShifts}
                     runs={runs}
@@ -3336,6 +3362,9 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
           {coinsOpen && (
             <CoinsDialog
               disputes={myDisputes}
+              loans={controls.isOn('coins') ? loans : null}
+              loanFocus={loanFocus}
+              onToast={(text) => setToast({ text })}
               initialTab={coinsTab}
               actor={actor}
               wallet={myWallet}
@@ -3362,6 +3391,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
               onClose={() => {
                 setCoinsOpen(false);
                 setCoinsTab('wallet');
+                setLoanFocus(null);
                 goBack('coins');
               }}
             />
@@ -3459,6 +3489,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
               onCommands={() => setCommandsPage(true)}
               onAds={() => setAdsPage(true)}
               account={(data) => store.account(data)}
+              loanSettings={<LoanSettings cfg={loans.cfg} call={api.loan} />}
               me={actor.name}
               onClose={() => {
                 setControlsPage(false);

@@ -32,7 +32,7 @@ import { memberOk } from './shared/team.js';
 
 const OPEN = { maxInstances: 5, invoker: 'public' };
 
-export function marketFunctions({ db, coinData, freshCoins, notify, bankRef, personId, owner, timeZone }) {
+export function marketFunctions({ db, coinData, freshCoins, notify, bankRef, personId, owner, timeZone, loanLock = async () => null }) {
   const note = (title, body = '') => ({ note: { title, body } });
   const first = (n) => (n || 'Someone').split(' ')[0];
 
@@ -62,6 +62,11 @@ export function marketFunctions({ db, coinData, freshCoins, notify, bankRef, per
     const controls = (await db.doc('settings/controls').get()).data() || {};
     return (controls.off || []).includes('coins');
   }
+  // An overdue loan (functions/loans.js) locks buying until it's paid.
+  async function locked(me) {
+    const lock = await loanLock(me);
+    return lock ? note(lock.title, lock.body) : null;
+  }
   // Team management's names (current spellings), for notifications.
   async function managers(rename) {
     const snap = await db.collection('members').where('admin', '==', true).get();
@@ -81,6 +86,8 @@ export function marketFunctions({ db, coinData, freshCoins, notify, bankRef, per
   const buy = onCall(OPEN, async (req) => {
     const { me, data, aliases } = await caller(req);
     if (await coinsOff(me)) return note('🪙 Jackson coins are off right now.');
+    const lock = await locked(me);
+    if (lock) return lock;
     const item = String(req.data?.item || '').slice(0, 80);
     const [kind, id] = item.split(/:(.*)/s);
     if (!['pet', 'perk', 'extra'].includes(kind) || !id || !/^[\w-]{1,40}$/.test(id)) return note('That isn’t for sale.');
@@ -142,6 +149,8 @@ export function marketFunctions({ db, coinData, freshCoins, notify, bankRef, per
   const joinTournament = onCall(OPEN, async (req) => {
     const { me, data, aliases } = await caller(req);
     if (await coinsOff(me)) return note('🪙 Jackson coins are off right now.');
+    const lock = await locked(me);
+    if (lock) return lock;
     const id = String(req.data?.id || '');
     if (!/^[\w-]{1,40}$/.test(id)) return note('Which tournament?');
     const ref = db.doc(`tournaments/${id}`);

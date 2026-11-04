@@ -22,6 +22,8 @@ export default function ControlsPage({
   onAds,
   account,
   me,
+  // The bank's loan settings (Loans.jsx LoanSettings).
+  loanSettings = null,
   onClose,
 }) {
   // Shutdown or Commands open on top: Escape closes that one, not this.
@@ -110,6 +112,7 @@ export default function ControlsPage({
               ['tabs', 'Tabs'],
               ['channels', 'Channels'],
               ['accounts', 'Accounts'],
+              ...(loanSettings ? [['loans', 'Loans']] : []),
             ].map(([id, label]) => (
               <button
                 key={id}
@@ -124,6 +127,7 @@ export default function ControlsPage({
           </div>
           <div className="ads-body">
             {tab === 'accounts' && <Accounts people={people} account={account} me={me} />}
+            {tab === 'loans' && loanSettings}
             {tab === 'features' && (
               <>
                 {FEATURE_GROUPS.map(([g, label, items]) => group('off', label, items))}

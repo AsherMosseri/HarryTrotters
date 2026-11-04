@@ -133,6 +133,7 @@ const CHIPS = [
   ['spent', 'Spent'],
   ['casino', 'Casino'],
   ['gifts', 'Gifts'],
+  ['loans', 'Loans'],
   ['prizes', 'Prizes'],
   ['market', 'Market'],
 ];
