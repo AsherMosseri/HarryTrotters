@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Icon } from '../shell/icons.jsx';
 import { Avatar, DisplayName } from '../common.jsx';
 import { COMMANDS, GROUPS } from '../../commands.js';
@@ -15,6 +15,7 @@ import { DailyCard } from '../learn/DailyCard.jsx';
 import { priorityById } from '../../config.js';
 import { daysBetween, todayISO } from '../../teamCommands.js';
 import { serverNow } from '../../serverTime.js';
+import { isLive } from '../../../functions/shared/arcade.js';
 
 // What slash commands look like in chat (commands.js does the work): the
 // Trotbot card on a command's message, and the notes only you can see.
@@ -422,6 +423,31 @@ function Body({ c, by, onPerson, fresh }) {
   }
 }
 
+// A game being played that the chat must hold still for (ChatView never
+// scrolls it under your finger while it's in view): 'me' for your own live
+// casino game or a game you're a player in, 'all' for one anyone can play
+// (it holds once you've tapped it).
+const LIVE_CASINO = ['blackjack', 'crash', 'mines', 'highlow'];
+function liveFor(m, me) {
+  const c = m.cmd;
+  if (LIVE_CASINO.includes(c.name)) return c.status === 'playing' && m.by === me ? 'me' : null;
+  if (!ARCADE_CARDS.includes(c.name) || !isLive(c.status)) return null;
+  const g = c.game || {};
+  return c.status !== 'open' && (me === g.a || me === g.b) ? 'me' : 'all';
+}
+
+// The game's state a while after it ends: the chat stays still for a few
+// seconds more (a crash that crashed, a bomb), not only while it's live.
+function useLinger(value, ms) {
+  const [last, setLast] = useState(value);
+  useEffect(() => {
+    if (value) return setLast(value);
+    const t = setTimeout(() => setLast(null), ms);
+    return () => clearTimeout(t);
+  }, [value, ms]);
+  return value || last;
+}
+
 export function CommandCard({ m, onPerson, me, onMove, onBuy, onChallenge, onReport, onAsk, onRun, conv }) {
   const n = m.cmd.name;
   const kind = ARCADE_CARDS.includes(n)
@@ -441,8 +467,10 @@ export function CommandCard({ m, onPerson, me, onMove, onBuy, onChallenge, onRep
   });
   // A /roll tumbles only when it was just rolled.
   const [fresh] = useState(() => serverNow() - m.at < 8000);
+  const [since] = useState(() => Math.round(performance.now()));
+  const live = useLinger(liveFor(m, me), 3000);
   return (
-    <div className={`cmd-card cmd-card-${n}${kind ? ` cmd-${kind}` : ''}`}>
+    <div className={`cmd-card cmd-card-${n}${kind ? ` cmd-${kind}` : ''}`} data-live={live || undefined} data-since={live ? since : undefined}>
       <Trotbot name={n === 'dailyq' ? '' : n} />
       {n === 'request' ? (
         <AskBody m={m} me={me} Name={PersonName} onAsk={onAsk} />

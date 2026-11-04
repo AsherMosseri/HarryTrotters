@@ -5182,3 +5182,12 @@ button.bs-cell:focus-visible { outline: 2px solid var(--accent); outline-offset:
 .cv-reversed { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px; font-size: 11px; font-weight: 650; vertical-align: 1px; color: var(--muted); background: var(--surface-2); border: 1px solid var(--border); }
 .cv-reversed.busy { font-style: italic; }
 .cv-rev-hint { margin: 4px 0 2px; }
+
+/* ---------- 3.1.1: nothing moves under a tap in a game ---------- */
+/* While a game is played, "N new messages" sits in the line under the chat
+   (ChatView), never over a card where the next tap lands. */
+.typing-line { position: relative; }
+.new-below.docked {
+  position: absolute; left: auto; right: 10px; top: 50%; bottom: auto; transform: translateY(-50%);
+  padding: 1px 10px; font-size: 12px; line-height: 18px; box-shadow: none;
+}
