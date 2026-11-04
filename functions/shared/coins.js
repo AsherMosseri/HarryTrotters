@@ -236,6 +236,8 @@ export function ledgerItems(name, ledger = []) {
         label: x.label || 'Prize',
         what: x.what || '',
       });
+    // Loans (functions/loans.js, shared/loans.js): only the server writes these.
+    else if (x.type === 'loan' && (x.to === name || x.from === name)) out.push(loanItem(name, x));
     else if (x.type === 'grant' && x.to === name)
       out.push({
         kind: 'grant',
@@ -246,6 +248,30 @@ export function ledgerItems(name, ledger = []) {
       });
   }
   return out;
+}
+
+// A loan's coins as a history line. A side with no name is the bank, which
+// makes the coins it lends and keeps nothing it's paid back. Interest is part
+// of the payments (100 borrowed at 10%: +100, then −110 paid back).
+function loanItem(name, x) {
+  const mine = x.to === name; // coins coming to this person
+  const them = mine ? x.from : x.to;
+  const labels = mine
+    ? {
+        lend: them ? `Loan from ${them}` : 'Loan from the bank',
+        repay: `${them} repaid`,
+        collect: `${them} repaid (due date)`,
+        forgive: them ? `${them} forgave your loan` : 'The bank forgave your loan',
+        extend: them ? `${them} extended your loan` : 'The bank extended your loan',
+      }
+    : {
+        lend: `Loan to ${them}`,
+        repay: them ? `Loan repaid to ${them}` : 'Loan repaid to the bank',
+        collect: them ? `Loan repaid to ${them} (due date)` : 'Loan repaid to the bank (due date)',
+        forgive: `Forgave ${them}’s loan`,
+        extend: `Extended ${them}’s loan`,
+      };
+  return { kind: 'loan', at: x.at, amount: mine ? x.amount : -x.amount, icon: them ? '🤝' : '🏦', label: labels[x.what] || 'Loan', what: x.what || '' };
 }
 
 // Casino and economy commands (daily, work, bets…), from the person's bank
@@ -285,6 +311,7 @@ export function historyGroup(x) {
   if (x.kind === 'casino') return 'casino';
   if (x.kind === 'gift-in' || x.kind === 'gift-out') return 'gifts';
   if (x.kind === 'prize') return 'prizes';
+  if (x.kind === 'loan') return 'loans';
   if (x.kind === 'refund' || (x.kind === 'spend' && (x.what === 'market' || x.what === 'tournament'))) return 'market';
   if (x.kind === 'spend') return 'spent';
   return 'earned'; // tasks, hours, awards, bonuses

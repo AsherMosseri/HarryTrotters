@@ -88,7 +88,7 @@ service cloud.firestore {
     // settings/names (renames) is readable before joining so the join screen shows current names.
     match /settings/{id} {
       allow read: if isMember() || (id == 'names' && signedIn());
-      allow write: if isManager() && id != 'shutdown' && id != 'controls';
+      allow write: if isManager() && id != 'shutdown' && id != 'controls' && id != 'loans';
       // settings/controls: Asher's switches (src/controls.js). Asher only.
       allow write: if id == 'controls' && isOwner()
         && request.resource.data.keys().hasOnly(['off', 'tabsOff', 'channelsOff', 'labLog', 'by', 'updatedAt'])
@@ -311,6 +311,15 @@ service cloud.firestore {
     }
     match /refundKeys/{id} {
       allow read, write: if false;
+    }
+    // Loans (functions/loans.js): the borrower and the lender read theirs, and
+    // the owner (Asher, who runs the bank) reads every bank loan. Only the
+    // server writes them, and the coins they move (settings/loans, the bank's
+    // limits, is written by the loanManage function too).
+    match /loans/{id} {
+      allow read: if isMember() && (isMe(resource.data.borrower) || isMe(resource.data.get('lender', ''))
+        || (resource.data.get('bank', false) == true && isOwner()));
+      allow write: if false;
     }
     // Decks, mine spots, and crash points: the server only.
     match /gameSecrets/{id} {

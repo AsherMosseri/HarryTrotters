@@ -45,6 +45,7 @@ import { petEventFunctions } from './petevents.js';
 import { lifeFunctions } from './life.js';
 import { learnFunctions } from './learn.js';
 import { channelFunctions } from './channels.js';
+import { loanFunctions } from './loans.js';
 
 // Functions run next to the database. The deploy workflow writes location.json
 // from the database's location; nam5 (the US multi-region) pairs with us-central1.
@@ -1283,6 +1284,11 @@ function withBalance(handler) {
   };
 }
 
+// Loans (functions/loans.js): from the bank or a teammate. loans.lockOf(name)
+// is the overdue lock that play and the market check.
+const loans = loanFunctions({ db, coinData, freshCoins, bankRef, notify, owner: REQUESTS_TO, timeZone: TIME_ZONE });
+export const { loanRequest, loanRespond, loanRepay, loanManage, loanTick, loanRenames } = loans;
+
 // The market and pets (functions/market.js): buying, tournaments, pet care.
 export const { buy, joinTournament, marketManage, pet, payTournaments } = marketFunctions({
   db,
@@ -1293,6 +1299,7 @@ export const { buy, joinTournament, marketManage, pet, payTournaments } = market
   personId,
   owner: REQUESTS_TO,
   timeZone: TIME_ZONE,
+  loanLock: (name) => loans.lockOf(name),
 });
 
 // Compare my balance with the server's (Coins screen).
@@ -1493,6 +1500,16 @@ export const play = onCall({ maxInstances: 5, invoker: 'public' }, withBalance(a
   const { action, game, conv = '', args = [], msgId, move, replyTo = null } = req.data || {};
   const now = Date.now();
   const words = (Array.isArray(args) ? args : []).map(String).slice(0, 6);
+
+  // Loans (functions/loans.js): an overdue loan locks gifts, bets and moves
+  // that put coins in, until it's paid. Free games and earning still work.
+  const betting =
+    action === 'gift' ||
+    (action === 'move'
+      ? ['accept', 'join', 'double', 'rock', 'paper', 'scissors'].includes(String(move))
+      : action !== 'prize' && (casino.CASINO.includes(game) || (arcade.MULTI.includes(game) && !['trivia', 'hangman', 'typerace'].includes(game))));
+  const lock = betting ? await loans.lockOf(me) : null;
+  if (lock) return note(lock.title, lock.body);
 
   // A gift to a teammate, or a prize from an ad game or the prize wheel. The
   // bank doc is read and touched so two at once (or one during a bet) take
