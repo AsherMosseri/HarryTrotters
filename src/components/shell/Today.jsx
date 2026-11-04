@@ -102,6 +102,7 @@ export default function Today({
   onEditProfile,
   disputes = 0,
   onDisputes,
+  extraLines = [],
 }) {
   const people = usePeople();
   const today = todayISO();
@@ -131,7 +132,7 @@ export default function Today({
     <UsualToday
       {...{ actor, tasks, milestones, competition, shifts, runs, myShift, convs, unread, chat, on, onOpenTask, onOpenConv, onPage, onNewTask, roster, joinRequests, chanWaiting, onChannelRequests }}
       {...{ settings, checklists, parts, onShowTasks, onShowParts }}
-      {...{ onStartShift, onOpenShift, onPerson, onEditProfile, people, today, api, disputes, onDisputes }}
+      {...{ onStartShift, onOpenShift, onPerson, onEditProfile, people, today, api, disputes, onDisputes, extraLines }}
       pitButton={
         compOn ? (
           <button className="pit-btn on" onClick={() => setUsualOn('')}>
@@ -182,6 +183,8 @@ function UsualToday({
   onChannelRequests,
   disputes = 0,
   onDisputes,
+  // More lines from elsewhere: loans (Loans.jsx loanLines), { tone, text, go }.
+  extraLines = [],
 }) {
   const lab = useContext(LabLogContext);
   const market = useMarket();
@@ -250,6 +253,7 @@ function UsualToday({
         text: disputes === 1 ? 'A casino result was reported' : `${disputes} casino results were reported`,
         go: onDisputes,
       },
+    ...extraLines,
     // Team management: photos of real pets waiting for a yes or no (Market, Pets).
     actor.admin &&
       openPark &&

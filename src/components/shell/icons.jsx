@@ -445,6 +445,8 @@ const PATHS = {
       <path d="M12.3 7.6c-.4-.7-1.2-1.1-2.3-1.1-1.4 0-2.3.7-2.3 1.7 0 2.4 4.8 1.2 4.8 3.7 0 1-1 1.8-2.5 1.8-1.1 0-2-.5-2.4-1.2M10 5v1.5M10 13.7v1.3" />
     </>
   ),
+  // Loans: the bank (a roof on columns).
+  bank: <path d="M3 7.5 10 3.5l7 4M4 8h12M5.5 8v6.5M8.5 8v6.5M11.5 8v6.5M14.5 8v6.5M3 16.5h14" />,
   cross: <path d="m5.5 5.5 9 9M14.5 5.5l-9 9" />,
   order: <path d="M4 5.5h8M4 10h6M4 14.5h4M15 4v12m0 0-2.5-2.5M15 16l2.5-2.5" />,
   // Game controls (Tetris, Minesweeper, Battleship).

@@ -35,6 +35,7 @@ import { demoLife } from './demoLife.js';
 import { demoLearn } from './demoLearn.js';
 import { demoEvents } from './demoEvents.js';
 import { demoPetPhotos } from './demoPetPhotos.js';
+import { demoLoans } from './demoLoans.js';
 import { PHOTO_ACTIONS } from '../../functions/shared/petphotos.js';
 import { earnedIds } from '../../functions/shared/events.js';
 
@@ -951,6 +952,8 @@ life.seedSamples();
 const events = demoEvents({ get: () => state, commit: () => commit(), uid });
 const petPhotos = demoPetPhotos({ get: () => state, commit: () => commit(), uid });
 events.seedSamples();
+// Loans (demoLoans.js): the same checks as functions/loans.js.
+const loans = demoLoans({ get: () => state, commit: () => commit(), uid });
 
 function commit() {
   try {
@@ -1443,6 +1446,9 @@ export const demoStore = {
     const done = (r) => (commit(), r);
     const myPet = () => (state.pets || []).find((p) => p.person === me);
     if (coinsOff && (fn === 'buy' || fn === 'joinTournament')) return note('🪙 Jackson coins are off right now.');
+    // An overdue loan locks buying (functions/market.js does the same).
+    const lock = fn === 'buy' || fn === 'joinTournament' ? loans.lockFor(me, balanceOf) : null;
+    if (lock) return note(lock.title, lock.body);
 
     if (fn === 'buy') {
       const item = String(data.item || '');
@@ -1728,6 +1734,14 @@ export const demoStore = {
       return m;
     };
     const done = (r) => (commit(), r);
+    // An overdue loan locks gifts and bets, the same check as play on the server.
+    const betting =
+      action === 'gift' ||
+      (action === 'move'
+        ? ['accept', 'join', 'double', 'rock', 'paper', 'scissors'].includes(String(move))
+        : action !== 'prize' && (casino.CASINO.includes(game) || (arcade.MULTI.includes(game) && !['trivia', 'hangman', 'typerace'].includes(game))));
+    const lock = betting ? loans.lockFor(me, balanceOf) : null;
+    if (lock) return note(lock.title, lock.body);
     // Several people's coins at once (multiplayer games).
     const payOut = (money) => {
       for (const x of money) setBank(x.name, casino.bankAfter(bank(x.name), x.name, x.delta, x.entry, x.extra || {}, now));
@@ -2207,6 +2221,20 @@ export const demoStore = {
   },
   subscribeControls(cb) {
     return listen(() => cb(state.controls || {}));
+  },
+  // Loans (functions/loans.js; demoLoans.js here). ctx: { balanceOf, roster }.
+  async loan(fn, req, actor, ctx) {
+    return loans.call(fn, req, actor, ctx);
+  },
+  subscribeLoans(actor, cb) {
+    return listen(() => cb(loans.visible(actor).map((l) => ({ ...l }))));
+  },
+  subscribeLoanSettings(cb) {
+    return listen(() => cb(state.loanSettings || {}));
+  },
+  // The server's loanTick (due dates, reminders), run while the app is open.
+  loanTick(ctx) {
+    loans.tick(ctx);
   },
   async saveControls(patch, actor) {
     state.controls = { ...(state.controls || {}), ...patch, by: actor.name, updatedAt: Date.now() };

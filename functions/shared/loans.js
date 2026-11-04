@@ -106,7 +106,7 @@ const sameTerms = (a, b) => ['amount', 'style', 'rate', 'term'].every((k) => a?.
 // Weeks started since the coins moved, counted up to the due date (at least 1).
 export function weeksStarted(loan, now) {
   const end = Math.min(now, loan.dueAt || now);
-  return Math.max(1, Math.ceil((end - (loan.startAt || end)) / WEEK));
+  return Math.max(1, Math.ceil((end - (loan.startAt ?? end)) / WEEK));
 }
 // Everything owed on a loan (rounded up to a whole coin, so no fraction is
 // ever left over), before what's been paid.
@@ -151,7 +151,7 @@ export function lockOf(asBorrower, balance, now = Date.now()) {
   if (owe <= 0) return null;
   return {
     owe,
-    title: `Locked: pay back ${owe} to unlock`,
+    title: `Locked: pay back ${owe.toLocaleString('en-US')} to unlock`,
     body: 'A loan is overdue. Betting, the Market, sending coins, lending and new loans are off until it’s paid. Coins you earn go toward it.',
   };
 }

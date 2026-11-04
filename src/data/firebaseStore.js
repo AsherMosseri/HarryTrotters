@@ -1387,6 +1387,42 @@ export const firebaseStore = {
       (e) => console.warn('disputes', e),
     );
   },
+  // Loans (functions/loans.js): fn is 'loanRequest', 'loanRespond',
+  // 'loanRepay' or 'loanManage'; each returns { ok, … } or { note }. The
+  // borrower and lender see their loans; the owner (Asher) sees every bank
+  // loan (the rules allow nothing more).
+  async loan(fn, req) {
+    return (await callable(fn)(req)).data;
+  },
+  subscribeLoans(actor, cb) {
+    const owner = actor.admin && actor.name === REQUESTS_TO;
+    const parts = {};
+    const send = () => {
+      const all = new Map();
+      for (const list of Object.values(parts)) for (const l of list) all.set(l.id, l);
+      cb([...all.values()].sort((a, b) => (b.updatedAt || b.askedAt || 0) - (a.updatedAt || a.askedAt || 0)));
+    };
+    const watch = (key, q) =>
+      onSnapshot(
+        q,
+        (snap) => {
+          parts[key] = snap.docs.map(readDoc);
+          send();
+        },
+        (e) => console.warn('loans', key, e),
+      );
+    const col = collection(db, 'loans');
+    const offs = [watch('borrower', query(col, where('borrower', '==', actor.name))), watch('lender', query(col, where('lender', '==', actor.name)))];
+    if (owner) offs.push(watch('bank', query(col, where('bank', '==', true))));
+    return () => offs.forEach((off) => off());
+  },
+  subscribeLoanSettings(cb) {
+    return onSnapshot(
+      doc(db, 'settings', 'loans'),
+      (snap) => cb(snap.data() || {}),
+      () => cb({}),
+    );
+  },
   // Tetris and Minesweeper (functions/shared/funGames.js): the funGame
   // function starts a game (the seed) and finishes it (replays the moves).
   // What the server counts for someone: your own, or anyone's for team management.

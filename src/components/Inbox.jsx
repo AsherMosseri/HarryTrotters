@@ -20,6 +20,7 @@ const ICONS = {
   queue: 'trophy',
   // Ads and coupons get a tag, not the product's emoji.
   ad: 'tag',
+  loan: 'bank',
 };
 
 function BellIcon() {
