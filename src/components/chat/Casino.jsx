@@ -1039,6 +1039,21 @@ export function CasinoBody({ m, me, Name, onMove, onBuy }) {
     highlow: <HighLow {...props} />,
     lottery: <Lottery m={m} c={c} me={me} onBuy={onBuy} />,
   }[c.name];
+  // The bet, at the top of every game for everyone to see (the lottery shows its tickets instead).
+  const bet =
+    c.name !== 'lottery' && c.bet > 0 ? (
+      <div className="cz-betbar">
+        <span className="cz-betpill" title={`${m.by} bet ${c.bet} Jackson coins`}>
+          <span className="cz-betpill-k">Bet</span> <Amt n={c.name === 'blackjack' && c.game?.bet ? c.game.bet : c.bet} />
+          {c.name === 'blackjack' && c.game?.doubled ? <span className="cz-betpill-k"> · doubled</span> : null}
+        </span>
+      </div>
+    ) : null;
   // casino-live: the card takes the next tap as soon as its new state shows.
-  return <div className={`cz-body cz-${c.name}${LIVE.includes(c.name) ? ' casino-live' : ''}`}>{body}</div>;
+  return (
+    <div className={`cz-body cz-${c.name}${LIVE.includes(c.name) ? ' casino-live' : ''}`}>
+      {bet}
+      {body}
+    </div>
+  );
 }
