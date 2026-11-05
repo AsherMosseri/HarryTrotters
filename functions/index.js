@@ -61,6 +61,8 @@ import { learnFunctions } from './learn.js';
 import { channelFunctions } from './channels.js';
 import { loanFunctions } from './loans.js';
 import { coinRequestFunctions } from './coinRequests.js';
+import { buddyFunctions } from './buddy.js';
+import { buddyBlocks, lockNote } from './shared/buddy.js';
 import { apiFunction } from './api.js';
 import { coinsText } from './shared/coinText.js';
 
@@ -1324,6 +1326,11 @@ function withBalance(handler) {
 const loans = loanFunctions({ db, coinData, freshCoins, bankRef, notify, owner: REQUESTS_TO, timeZone: TIME_ZONE });
 export const { loanRequest, loanRespond, loanRepay, loanManage, loanTick, loanRenames } = loans;
 
+// Gambling buddy (functions/buddy.js): a teammate's password locks someone's
+// casino games. buddies.lockOf(name) is the lock play checks.
+const buddies = buddyFunctions({ db, coinData, notify, owner: REQUESTS_TO });
+export const { buddy } = buddies;
+
 // The market and pets (functions/market.js): buying, tournaments, pet care.
 export const { buy, joinTournament, marketManage, pet, payTournaments } = marketFunctions({
   db,
@@ -1675,6 +1682,13 @@ export const play = onCall({ maxInstances: 5, invoker: 'public' }, withBalance(a
       : action !== 'prize' && (casino.CASINO.includes(game) || (arcade.MULTI.includes(game) && !['trivia', 'hangman', 'typerace'].includes(game))));
   const lock = betting ? await loans.lockOf(me) : null;
   if (lock) return note(lock.title, lock.body);
+  // Gambling buddy (functions/buddy.js): a lock that's on refuses every new
+  // casino bet (casino games, lottery tickets, doubling down). Games already
+  // going can be finished; arcade games, gifts and prizes aren't touched.
+  if (buddyBlocks({ action, game, move })) {
+    const b = await buddies.lockOf(me);
+    if (b) return note(lockNote(b).title, lockNote(b).body);
+  }
 
   // A gift to a teammate, or a prize from an ad game or the prize wheel. The
   // bank doc is read and touched so two at once (or one during a bet) take
@@ -2564,6 +2578,7 @@ export const api = apiFunction({
   disputeRefundAll,
   ownerRefund,
   coinCheck,
+  buddy,
   buy,
   joinTournament,
   marketManage,

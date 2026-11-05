@@ -33,6 +33,7 @@ export const API_FNS = [
   'disputeRefundAll',
   'ownerRefund',
   'coinCheck',
+  'buddy',
   // The market and pets
   'buy',
   'joinTournament',

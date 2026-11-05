@@ -325,6 +325,16 @@ service cloud.firestore {
         || (resource.data.get('bank', false) == true && isOwner()));
       allow write: if false;
     }
+    // Gambling buddy (functions/buddy.js): the lock is read by the person, their
+    // buddy and the owner (Asher); the password hash is read by nobody. Only
+    // the buddy function writes either, so nobody can turn a lock off by hand.
+    match /buddyLocks/{id} {
+      allow read: if isMember() && (isMe(resource.data.person) || isMe(resource.data.buddy) || isOwner());
+      allow write: if false;
+    }
+    match /buddySecrets/{id} {
+      allow read, write: if false;
+    }
     // Coin requests (/request @person amount; functions/coinRequests.js): the
     // request (who, how much, its status) and each person's waiting list are
     // written by the coinRequest function only. The card in chat is a copy.
