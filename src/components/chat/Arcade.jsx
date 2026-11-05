@@ -513,7 +513,7 @@ function Hangman({ g, me, act, Name }) {
                   {g.lastGuess.name.split(' ')[0]} guessed {g.lastGuess.letter} {g.lastGuess.hit ? '✅' : '❌'}
                 </>
               ) : (
-                ' '
+                '\u00a0'
               )}
             </div>
           )}

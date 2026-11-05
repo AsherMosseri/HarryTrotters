@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Icon } from '../shell/icons.jsx';
 import { Avatar, DisplayName } from '../common.jsx';
+import { keepHeight } from './keepHeight.js';
 import { COMMANDS, GROUPS } from '../../commands.js';
 import { CASINO_CARDS, CasinoBody, ECONOMY_CARDS } from './Casino.jsx';
 import { ARCADE_CARDS, ArcadeBody } from './Arcade.jsx';
@@ -473,6 +474,21 @@ function useLinger(value, ms) {
   return value || last;
 }
 
+// A card that was waiting on you keeps its height for a while once it's done
+// (the game ended, Trotbot shot first, someone else closed it): nothing under
+// it moves up into the spot your finger was coming down on.
+function useHeightAfter(ref, waiting, ms) {
+  const tall = useRef(0);
+  const was = useRef(waiting);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    if (was.current && !waiting && tall.current) keepHeight(el, ms, tall.current);
+    was.current = waiting;
+    if (waiting) tall.current = el.getBoundingClientRect().height;
+  });
+}
+
 export function CommandCard({ m, onPerson, me, onMove, onBuy, onChallenge, onReport, onAsk, onRun, conv }) {
   const n = m.cmd.name;
   const kind = ARCADE_CARDS.includes(n)
@@ -497,8 +513,10 @@ export function CommandCard({ m, onPerson, me, onMove, onBuy, onChallenge, onRep
   const justHere = useFresh(m.by === me || want === 'all' || INVITES.includes(n), FRESH_HOLD);
   // 'fresh': held while it has something to tap (ChatView checks).
   const live = useLinger(want === 'me' ? 'me' : justHere ? 'fresh' : want, 3000);
+  const box = useRef(null);
+  useHeightAfter(box, want === 'me', 3000);
   return (
-    <div className={`cmd-card cmd-card-${n}${kind ? ` cmd-${kind}` : ''}`} data-live={live || undefined} data-since={live ? since : undefined}>
+    <div ref={box} className={`cmd-card cmd-card-${n}${kind ? ` cmd-${kind}` : ''}`} data-live={live || undefined} data-since={live ? since : undefined}>
       <Trotbot name={n === 'dailyq' ? '' : n} />
       {n === 'request' ? (
         <AskBody m={m} me={me} Name={PersonName} onAsk={onAsk} />

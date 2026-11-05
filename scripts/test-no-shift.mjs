@@ -358,6 +358,22 @@ async function newPage(vpName, as = '') {
         return si.apply(this, a);
       };
       addEventListener('scroll', (e) => e.target?.classList?.contains?.('msg-list') && log.push(`${Math.round(performance.now())} scroll event ${Math.round(e.target.scrollTop)}`), true);
+      // Every message's height change, and what the chat holds for (data-live).
+      const sizes = new Map();
+      const ro = new ResizeObserver((es) => {
+        for (const e of es) {
+          const h = Math.round(e.target.getBoundingClientRect().height);
+          const was = sizes.get(e.target);
+          sizes.set(e.target, h);
+          if (was != null && was !== h) log.push(`${Math.round(performance.now())} size ${e.target.id || e.target.className} ${was}→${h} top ${Math.round(e.target.getBoundingClientRect().top)}`);
+        }
+      });
+      const watch = () => document.querySelectorAll('.msg-list > *').forEach((x) => ro.observe(x));
+      setInterval(watch, 200);
+      new MutationObserver((ms) => {
+        for (const m of ms)
+          if (m.attributeName === 'data-live') log.push(`${Math.round(performance.now())} data-live ${m.target.closest('.msg')?.id} ${m.oldValue}→${m.target.getAttribute('data-live')}`);
+      }).observe(document, { subtree: true, attributes: true, attributeFilter: ['data-live'], attributeOldValue: true });
     });
   await ctx.route('**/__ns/*', async (route) => {
     await sleep(rand(300, 900));

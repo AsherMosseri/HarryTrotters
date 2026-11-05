@@ -14,6 +14,7 @@ import { ChannelDialog, ChannelIcon, MembersPanel, NewDmDialog, NotifyMenu, Pinn
 import { Icon } from './shell/icons.jsx';
 import { BotReplies, ChatAd, chatAdSpots, useAds } from './Ads.jsx';
 import GameView from './chat/GameView.jsx';
+import { keepHeight } from './chat/keepHeight.js';
 import { onOpenGameView } from './chat/liveGames.js';
 import { MULTI, isLive } from '../../functions/shared/arcade.js';
 
@@ -558,27 +559,12 @@ export default function ChatView({
     if (!cardEl) return;
     hold.current.until = Math.max(hold.current.until, performance.now() + CARD_HOLD);
     tapped.current = { node: e.target.closest('button, input, textarea, select, a') || cardEl, msg: cardEl.closest('.msg') || cardEl, at: performance.now() };
-    if (cardEl.matches('.cmd-arcade, .cmd-money, .cmd-card-request, .cmd-card-dailyq') && !e.target.closest('.card-actions')) keepHeight(cardEl);
+    // A game card you tap keeps at least its height until you leave it alone
+    // for CARD_HOLD: a game that ends with the tap (a duel's shot, a request
+    // paid) doesn't pull what's under it up under your finger.
+    if (cardEl.matches('.cmd-arcade, .cmd-money, .cmd-card-request, .cmd-card-dailyq') && !e.target.closest('.card-actions')) keepHeight(cardEl, CARD_HOLD);
     takeAnchor();
   };
-  // A game card you tap keeps at least its height until you leave it alone
-  // for CARD_HOLD: a game that ends with the tap (a duel's shot, a request
-  // paid) doesn't pull what's under it up under your finger.
-  const heightLock = useRef({ el: null, t: 0 });
-  const keepHeight = (cardEl) => {
-    const k = heightLock.current;
-    clearTimeout(k.t);
-    if (k.el && k.el !== cardEl) k.el.style.minHeight = '';
-    const cs = getComputedStyle(cardEl);
-    const extra = cs.boxSizing === 'border-box' ? 0 : ['paddingTop', 'paddingBottom', 'borderTopWidth', 'borderBottomWidth'].reduce((s, p) => s + (parseFloat(cs[p]) || 0), 0);
-    cardEl.style.minHeight = `${cardEl.getBoundingClientRect().height - extra}px`;
-    k.el = cardEl;
-    k.t = setTimeout(() => {
-      cardEl.style.minHeight = '';
-      k.el = null;
-    }, CARD_HOLD);
-  };
-  useEffect(() => () => clearTimeout(heightLock.current.t), []);
 
   // The game view (GameView.jsx), opened from a card. The list stays exactly
   // where it was underneath, and is back there when it closes.
