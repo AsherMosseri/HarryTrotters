@@ -67,10 +67,12 @@ eq(title(R('bank 1.2345k')), 'Ask for a whole number of coins, at least 1.', 'ru
 eq(R('bank 1.2345k').note.body, '1.2345k is 1234.5 coins. Coins are whole: try 1235.', 'run: nearest whole amount');
 eq(title(R('bank -5')), 'Ask for a whole number of coins, at least 1.', 'run: -5');
 eq(title(R('bank 0')), 'Ask for a whole number of coins, at least 1.', 'run: 0');
-eq(title(R('bank 2m')), 'Up to 500 coins from the bank.', 'run: 2m is over the bank cap');
-eq(title(R('bank 501')), 'Up to 500 coins from the bank.', 'run: 501 is over the bank cap');
+eq(R('bank 2m').loan?.amount, 2000000, 'run: 2m from the bank (no 500 cap since 3.1.3)');
+eq(R('bank 501').loan?.amount, 501, 'run: 501 from the bank');
+eq(/^Up to .* coins from the bank\.$/.test(title(R('bank 2t')) || ''), true, 'run: 2t is over the bank cap of 1 trillion');
 eq(R('bank 500').loan.amount, 500, 'run: 500 from the bank');
-eq(title(R('@Cooper 5001')), 'Up to 5000 coins from a teammate.', 'run: over the teammate cap');
+eq(R('@Cooper 5001').loan?.amount, 5001, 'run: 5001 from a teammate (no 5000 cap since 3.1.3)');
+eq(/^Up to .* coins from a teammate\.$/.test(title(R('@Cooper 2t')) || ''), true, 'run: 2t is over the teammate cap of 1 trillion');
 eq(R('@Cooper 5k').loan.amount, 5000, 'run: 5k from a teammate');
 eq(title(R('bank 100 60%')), 'Interest is a whole number from 0 to 50%.', 'run: 60%');
 eq(title(R('bank 100 2.5%')), 'Interest is a whole number from 0 to 50%.', 'run: 2.5%');
