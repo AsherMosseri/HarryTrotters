@@ -237,6 +237,12 @@ service cloud.firestore {
       allow read: if isMember();
       allow write: if false;
     }
+    // Best scores in the pet games (functions/petgames.js): the team
+    // boards, read by everyone, written by the server.
+    match /petGames/{id} {
+      allow read: if isMember();
+      allow write: if false;
+    }
     // Photos of real pets (functions/petphotos.js): petPhotos holds the
     // approved ones everyone sees; petPhotoRequests holds each person's latest
     // photo and where it stands (read by them and team management only). The

@@ -13,7 +13,8 @@
 //                                  or void a run held for review
 //   pet({ action, … })             adopt, rename, show in chat, rehome, style,
 //                                  hatch a baby, give a pet to a teammate,
-//                                  photos of real pets (petphotos.js)
+//                                  photos of real pets (petphotos.js), best
+//                                  scores in the pet games (petgames.js)
 // Scheduled: payTournaments (every 10 minutes) pays out the ones that ended.
 // The checks themselves are in shared/market.js and shared/pets.js (demo
 // mode runs the same ones).
@@ -27,6 +28,7 @@ import * as market from './shared/market.js';
 import { petsIn } from './shared/pets.js';
 import { petFamily } from './petfamily.js';
 import { petPhotos } from './petphotos.js';
+import { petGames } from './petgames.js';
 import { PHOTO_ACTIONS } from './shared/petphotos.js';
 import { memberOk } from './shared/team.js';
 import { coinsText } from './shared/coinText.js';
@@ -361,9 +363,12 @@ export function marketFunctions({ db, coinData, freshCoins, notify, bankRef, per
   const runPet = petFamily({ db, notify, personId });
   // Photos of real pets (petphotos.js) ride on the same callable.
   const runPhotos = petPhotos({ db, notify, personId, managers, owner });
+  // Best scores in the pet games, for the team boards (petgames.js).
+  const runGames = petGames({ db, personId });
   const pet = onCall(OPEN, async (req) => {
     const ctx = await caller(req);
     if (PHOTO_ACTIONS.includes(req.data?.action)) return runPhotos(ctx, req.data);
+    if (req.data?.action === 'gameScore') return runGames(ctx, req.data);
     return runPet(ctx, req.data || {});
   });
 
