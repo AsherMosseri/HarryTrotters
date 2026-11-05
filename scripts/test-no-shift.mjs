@@ -30,7 +30,9 @@
 //   -v                   print every tap
 //
 // Per tap, from the finger coming down until the move's answer has shown and
-// settled (lag + 1.4 s):
+// settled (lag + 1.4 s), as painted (each frame after it's drawn; a move
+// counts once it's on screen two frames running), aimed at where the control
+// was painted in two frames running:
 //   moved  - the control the finger aimed at (or, once it's gone, its card)
 //            moved on screen by more than 2 px
 //   wrong  - the finger landed on something other than what it aimed at
@@ -129,6 +131,12 @@ function inPage({ engine, busy }) {
     const r = op.getBoundingClientRect();
     return { top: r.top + op.clientTop + el.offsetTop, left: r.left + op.clientLeft + el.offsetLeft };
   };
+  // Right after the next frame is painted: what's on screen (a picture that
+  // just loaded has its room made up for by then, in the same frame).
+  const ch = new MessageChannel();
+  const queued = [];
+  ch.port1.onmessage = () => queued.shift()?.();
+  const afterPaint = (fn) => requestAnimationFrame(() => (queued.push(fn), ch.port2.postMessage(0)));
   const holderByKey = (k) => (k.startsWith('view:') ? document.querySelector(`.game-sheet[data-msg="${k.slice(5)}"]`) : k.startsWith('msg-') ? document.getElementById(k) : null);
   const find = (key) => {
     const h = holderByKey(key.split('|')[0]);
@@ -145,6 +153,22 @@ function inPage({ engine, busy }) {
   const ns = {
     rec: null,
     keyOf,
+    // Where a control is on screen: measured after a frame is painted, the
+    // same two frames running (what a person sees and aims at).
+    box(el) {
+      return new Promise((done) => {
+        let last = null;
+        let n = 0;
+        const look = () => {
+          const r = el.getBoundingClientRect();
+          const b = { x: r.x, y: r.y, width: r.width, height: r.height };
+          if ((last && Math.abs(last.y - b.y) < 1 && Math.abs(last.x - b.x) < 1) || ++n > 20) return done(b);
+          last = b;
+          afterPaint(look);
+        };
+        afterPaint(look);
+      });
+    },
     // Arm one tap: the control marked data-ns-aim, aimed at (its box then) at x, y.
     arm({ x, y, aimTop, aimLeft, watch, label }) {
       const aimEl = document.querySelector('[data-ns-aim]');
@@ -174,19 +198,26 @@ function inPage({ engine, busy }) {
         rec.vv0 = window.visualViewport ? window.visualViewport.offsetTop : 0;
         aimEl?.removeAttribute('data-ns-aim');
         let el0 = el;
+        const prev = { ctl: 0, card: 0 };
         const loop = () => {
           const dt = performance.now() - rec.t0;
           const cur = el0 && el0.isConnected && keyOf(el0) === want ? el0 : find(want);
           el0 = cur;
+          // A move counts once it's on screen two frames running (a picture
+          // that loads between frames is made up for before it's painted).
           if (cur && rec.top0 != null) {
             const b = spot(cur);
-            const d = Math.max(Math.abs(b.top - rec.top0), Math.abs(b.left - rec.left0));
+            const d0 = Math.max(Math.abs(b.top - rec.top0), Math.abs(b.left - rec.left0));
+            const d = Math.min(d0, prev.ctl);
+            prev.ctl = d0;
             if (d > rec.moved) rec.moved = d;
             if (d > 2 && rec.movedAt == null) rec.movedAt = Math.round(dt);
           }
           const h = holderByKey(rec.cardKey);
           if (h && rec.card0 != null) {
-            const d = Math.abs(h.getBoundingClientRect().top - rec.card0);
+            const d0 = Math.abs(h.getBoundingClientRect().top - rec.card0);
+            const d = Math.min(d0, prev.card);
+            prev.card = d0;
             if (d > rec.movedCard) rec.movedCard = d;
             if (d > 2 && rec.movedAt == null) rec.movedAt = Math.round(dt);
           }
@@ -195,7 +226,7 @@ function inPage({ engine, busy }) {
             rec.scroll[k] = Math.max(rec.scroll[k] || 0, Math.abs(v.scrollTop - rec.s0[k]));
           }
           if (window.visualViewport) rec.scroll.vv = Math.max(rec.scroll.vv || 0, Math.abs(window.visualViewport.offsetTop - rec.vv0));
-          if (dt < watch) return requestAnimationFrame(loop);
+          if (dt < watch) return afterPaint(loop);
           // The next tap at the same spot.
           const at = document.elementFromPoint(x, y);
           rec.nextKey = keyOf(at);
@@ -207,7 +238,7 @@ function inPage({ engine, busy }) {
           rec.movedCard = Math.round(rec.movedCard * 10) / 10;
           rec.done = true;
         };
-        requestAnimationFrame(loop);
+        afterPaint(loop);
       };
       addEventListener('touchstart', start, { capture: true, once: true });
       addEventListener('pointerdown', start, { capture: true, once: true });
@@ -500,7 +531,7 @@ async function tap(p, loc, label, { think = false, ambush = false, watch = LAG +
     document.querySelectorAll('[data-ns-aim]').forEach((x) => x.removeAttribute('data-ns-aim'));
     el.setAttribute('data-ns-aim', '1');
   });
-  const box = await loc.boundingBox();
+  const box = await loc.evaluate((el) => (el.isConnected && el.getClientRects().length ? window.__ns.box(el) : null));
   if (!box) return null;
   const jx = Math.min(6, box.width * 0.2);
   const jy = Math.min(6, box.height * 0.2);

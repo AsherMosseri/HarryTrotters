@@ -378,13 +378,15 @@ export default function ChatView({
     const top = el.getBoundingClientRect().top;
     const at = (node) => (node ? { node, off: node.getBoundingClientRect().top - top } : null);
     const t = tapped.current;
+    // (top: the list's scroll then, see keepAnchor.)
+    const scrolled = el.scrollTop;
     if (performance.now() < hold.current.until && t.msg?.isConnected && el.contains(t.msg)) {
-      anchor.current = { ...at(t.node?.isConnected && t.msg.contains(t.node) ? t.node : t.msg), back: at(t.msg) };
+      anchor.current = { ...at(t.node?.isConnected && t.msg.contains(t.node) ? t.node : t.msg), back: at(t.msg), top: scrolled };
       return;
     }
     const game = liveCard();
     if (game) {
-      anchor.current = at(game);
+      anchor.current = { ...at(game), top: scrolled };
       return;
     }
     // The first message still showing at the top (its bottom below the list's top edge).
@@ -399,21 +401,25 @@ export default function ChatView({
         hi = mid - 1;
       } else lo = mid + 1;
     }
-    anchor.current = k >= 0 ? at(nodes[k]) : null;
+    anchor.current = k >= 0 ? { ...at(nodes[k]), top: scrolled } : null;
   };
   const keepAnchor = () => {
     const el = list.current;
-    let a = anchor.current;
+    const was = anchor.current;
+    let a = was;
     // The tapped control is gone (the game ended): its message instead.
     if (a && !(a.node.isConnected && el?.contains(a.node))) a = a.back;
     if (!el || !a || !a.node.isConnected || !el.contains(a.node)) return takeAnchor();
-    const moved = a.node.getBoundingClientRect().top - el.getBoundingClientRect().top - a.off;
+    // A scroll since the anchor was taken whose scroll event hasn't come yet
+    // (Safari sends them late; a fling, or the list sent to a message) stays:
+    // only what changed size is made up for, never the scroll undone.
+    const scrolled = el.scrollTop - (was.top ?? el.scrollTop);
+    const moved = a.node.getBoundingClientRect().top - el.getBoundingClientRect().top - (a.off - scrolled);
     if (Math.abs(moved) >= 1) setTop(el, el.scrollTop + moved, 'anchor');
     // The anchor for the next change (it can be another one now). The same
     // one keeps where it should be, so moves under a pixel don't add up.
-    const was = anchor.current;
     takeAnchor();
-    if (was && anchor.current?.node === was.node) anchor.current = was;
+    if (was && !scrolled && anchor.current?.node === was.node) anchor.current = { ...was, top: el.scrollTop };
   };
   // After anything changed size: at the bottom (and free to move), stay there;
   // otherwise keep what you're looking at where it is.
