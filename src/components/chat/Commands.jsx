@@ -4,7 +4,7 @@ import { Avatar, DisplayName } from '../common.jsx';
 import { COMMANDS, GROUPS } from '../../commands.js';
 import { CASINO_CARDS, CasinoBody, ECONOMY_CARDS } from './Casino.jsx';
 import { ARCADE_CARDS, ArcadeBody } from './Arcade.jsx';
-import { CardActions } from './CardActions.jsx';
+import { CardActions, GiftUndo } from './CardActions.jsx';
 import { FIXABLE } from '../../../functions/shared/disputes.js';
 import { Die } from './Die.jsx';
 import { GroupFaces, MoreBody } from './MoreCards.jsx';
@@ -487,6 +487,7 @@ export function CommandCard({ m, onPerson, me, onMove, onBuy, onChallenge, onRep
         <Body c={m.cmd} by={m.by} onPerson={onPerson} fresh={fresh} />
       )}
       {FIXABLE.includes(n) && <CardActions m={m} me={me} onChallenge={onChallenge} onReport={onReport} onFix={onFix} />}
+      {n === 'give' && <GiftUndo m={m} onFix={onFix} />}
     </div>
   );
 }

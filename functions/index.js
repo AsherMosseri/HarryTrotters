@@ -1619,7 +1619,7 @@ async function giveMany(me, body, data, now) {
     if (before.length) {
       const sent = before.filter((x) => data.rename(x.from || '') === me);
       const total = sent.reduce((t, x) => t + x.amount, 0);
-      return { ok: true, repeat: true, people: sent.map((x) => x.to), amount: sent[0]?.amount || 0, total, group: label };
+      return { ok: true, repeat: true, people: sent.map((x) => x.to), amount: sent[0]?.amount || 0, total, group: label, batch };
     }
     const mine = await freshCoins(me, myBank, data);
     // Everyone it goes to, for the ceiling: one who'd go over a googol
@@ -1646,7 +1646,7 @@ async function giveMany(me, body, data, now) {
     if (made.error) return note(made.error, made.body);
     made.entries.forEach((e, i) => tx.set(refs[i], e));
     tx.set(bankRef(me), { ...myBank, name: me, touched: now });
-    return { ok: true, entry: made.entries[0], people, amount: made.entries[0].amount, total: made.total, group: label };
+    return { ok: true, entry: made.entries[0], people, amount: made.entries[0].amount, total: made.total, group: label, batch };
   });
 }
 

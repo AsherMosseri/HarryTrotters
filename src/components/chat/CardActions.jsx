@@ -5,7 +5,7 @@ import { adjustOf, cardNets, fixEntry, gameLabel } from '../../../functions/shar
 import { usePeople } from '../common.jsx';
 import { Icon } from '../shell/icons.jsx';
 import { confirmDialog } from '../Dialogs.jsx';
-import { coinStyled, exactNote } from '../../coinFormat.js';
+import { coinStyled, exactNote, withExact } from '../../coinFormat.js';
 import { REPORTS_TO, reportInfo } from '../Disputes.jsx';
 
 // Small actions under a finished game card: dare someone to the same coin
@@ -68,6 +68,60 @@ export function CardActions({ m, me, onChallenge, onReport, onFix }) {
         </div>
       )}
       {asking && canDare && <Dare c={c} me={me} roster={people?.roster || []} onChallenge={onChallenge} onDone={() => setAsking(false)} />}
+    </div>
+  );
+}
+
+// A /give card (3.1.4): the owner's Undo (every gift on it goes back to the
+// giver, functions/disputes.js undoGift), and the "Undone by Asher" tag after.
+export function GiftUndo({ m, onFix }) {
+  const c = m.cmd;
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  if (c.undone)
+    return (
+      <div className="card-actions">
+        <div className="card-fixed">
+          <span className="card-fixed-tag takeback">
+            <Icon name="rotateCcw" size={13} /> Undone by {first(c.undone.by)}
+          </span>
+        </div>
+      </div>
+    );
+  if (!onFix || !c.batch) return null;
+  const n = c.group ? c.count || c.people?.length || 0 : 1;
+  const total = c.group ? c.total || c.amount * n : c.amount;
+  const giver = first(m.by);
+  const go = async () => {
+    if (busy) return;
+    setError('');
+    const ok = await confirmDialog({
+      title: c.group ? `Undo ${giver}’s gift to ${c.group}?` : `Undo ${giver}’s gift to ${first(c.to)}?`,
+      body: withExact(
+        `${c.group ? `${n} ${n === 1 ? 'person' : 'people'} each lose ${coinStyled(c.amount)}` : `${first(c.to)} loses ${coinStyled(c.amount)}`}, and ${giver} gets ${coinStyled(total)} back. If they’ve spent it, their balance can go below zero. They’re told, and the card says “Undone by ${first(REPORTS_TO)}”.`,
+        total,
+      ),
+      okLabel: 'Undo gift',
+      danger: true,
+    });
+    if (!ok) return;
+    setBusy(true);
+    const r = await onFix(m.by, 'undogift');
+    setBusy(false);
+    if (!r?.ok) setError(r?.note ? [r.note.title, r.note.body].filter(Boolean).join(' ') : 'That didn’t go through.');
+  };
+  return (
+    <div className="card-actions">
+      <div className="card-actions-row">
+        <button className="link-btn small card-fix takeback" onClick={go} disabled={busy} title={`Undo this gift (${coinStyled(total)} back to ${giver})`}>
+          <Icon name="rotateCcw" size={15} /> {busy ? '…' : 'Undo gift'}
+        </button>
+        {error && (
+          <span className="casino-error card-fix-error" role="status">
+            {error}
+          </span>
+        )}
+      </div>
     </div>
   );
 }

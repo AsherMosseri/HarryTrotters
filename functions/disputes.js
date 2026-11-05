@@ -301,11 +301,78 @@ export function disputeFunctions({ db, coinData, freshCoins, notify, bankRef, ow
 
   // The owner's Refund / Take back on a finished game card, for one person in
   // it, with or without a report. The amount is what the card shows.
+  // The owner's Undo on a /give card (3.1.4, mode 'undogift'): every gift
+  // the card sent goes back to the giver, once. The card keeps the gift's
+  // batch (functions/index.js giveMany); the gifts are found by it and must be
+  // from the card's poster. One key doc per batch (refundKeys/gift-{batch})
+  // and the card's cmd.undone, in one transaction, so it can't happen twice.
+  // A person who spent the coins can go below zero, like Take back.
+  async function undoGift({ conv, msgId, me, data }) {
+    const mref = db.doc(`channels/${conv}/messages/${msgId}`);
+    const m0 = await mref.get();
+    const c = m0.exists ? m0.get('cmd') : null;
+    if (!c || c.name !== 'give') return note('That gift is gone.');
+    const batch = String(c.batch || '');
+    if (!/^[\w-]{8,90}$/.test(batch))
+      return note('This gift can’t be undone from its card.', 'It was sent before Undo existed. Reverse it from their coin history instead.');
+    const giver = data.rename(m0.get('by') || '');
+    const found = (await db.collection('coins').where('batch', '==', batch).limit(500).get()).docs.map((x) => x.ref);
+    const refs = found.length ? found : c.to ? [db.doc(`coins/gift-${batch}-${nameKey(data.rename(String(c.to)))}`)] : [];
+    if (!refs.length) return note('I can’t find that gift in the coin history.', 'Nothing was changed.');
+    const keyRef = db.doc(`refundKeys/gift-${batch}`);
+    const now = Date.now();
+    const out = await db.runTransaction(async (tx) => {
+      const [key, msg, ...gifts] = await Promise.all([tx.get(keyRef), tx.get(mref), ...refs.map((r) => tx.get(r))]);
+      if (key.exists || msg.get('cmd.undone')) return note('That gift was already undone.');
+      const list = gifts.filter((g) => g.exists && g.get('type') === 'gift' && data.rename(g.get('from') || '') === giver).map((g) => g.data());
+      if (!list.length) return note('I can’t find that gift in the coin history.', 'Nothing was changed.');
+      const total = list.reduce((t, x) => t + x.amount, 0);
+      const toWhat = c.group || list[0].to;
+      tx.set(keyRef, { via: 'gift', mode: 'undogift', batch, giver, total, n: list.length, by: me, at: now });
+      for (const x of list)
+        tx.set(db.collection('coins').doc(`undo-${batch}-${nameKey(x.to)}`), {
+          type: 'refund',
+          person: x.to,
+          amount: -x.amount,
+          label: `Gift undone by ${ownerFirst}: from ${x.from}`,
+          at: now,
+        });
+      tx.set(db.collection('coins').doc(`undo-${batch}-from`), {
+        type: 'refund',
+        person: giver,
+        amount: total,
+        label: `Gift undone by ${ownerFirst}: to ${toWhat}`,
+        at: now,
+      });
+      tx.update(mref, new FieldPath('cmd', 'undone'), { by: me, at: now, total, n: list.length });
+      return { ok: true, giver, list, total };
+    });
+    if (!out.ok) return out;
+    await notify([
+      ...out.list
+        .filter((x) => data.rename(x.to) !== me)
+        .map((x) => ({
+          to: x.to,
+          type: 'dispute',
+          icon: '↩️',
+          title: `${ownerFirst} undid ${first(x.from)}’s gift: −${coinsText(x.amount)}`,
+          body: 'It’s in your coin history.',
+          open: `chat:${conv}`,
+          by: me,
+        })),
+      ...(out.giver !== me
+        ? [{ to: out.giver, type: 'dispute', icon: '↩️', title: `${ownerFirst} undid your gift: +${coinsText(out.total)} back`, body: 'It’s in your coin history.', open: `chat:${conv}`, by: me }]
+        : []),
+    ]).catch((e) => logger.warn('undoGift notify', e.message));
+    return { ok: true, mode: 'undogift', total: out.total, n: out.list.length };
+  }
+
   const ownerRefund = onCall(OPEN, async (req) => {
     const { me, admin, data } = await caller(req);
     if (!admin || me !== data.rename(owner)) throw new HttpsError('permission-denied', `Only ${ownerFirst} can do that.`);
     const { conv, msgId, person, mode } = req.data || {};
     if (!validId(conv) || !validId(msgId)) return note('Which game?');
+    if (mode === 'undogift') return undoGift({ conv, msgId, me, data });
     if (mode !== 'refund' && mode !== 'takeback') return note('Refund or take back?');
     if (typeof person !== 'string' || !person.trim() || person.length > 80) return note('Whose result?');
     const who = data.rename(person.trim());
