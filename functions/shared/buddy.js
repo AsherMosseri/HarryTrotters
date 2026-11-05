@@ -30,9 +30,10 @@ export const BUDDY = {
   tries: 5, // wrong passwords allowed per lock in a rolling hour
   window: 3600000,
 };
-// The games a buddy lock stops: the casino and the lottery. Arcade games
-// (challenges, heists, races), gifts, loans and requests still work.
-export const LOCKED_GAMES = CASINO;
+// The games a buddy lock stops: the casino, the lottery and /challenge
+// (starting or accepting one; the play function checks accepts). Other arcade
+// games (heists, races), gifts, loans and requests still work.
+export const LOCKED_GAMES = [...CASINO, 'challenge'];
 export const lockId = (name) => nameKey(name);
 const first = (n) => String(n || 'Someone').split(' ')[0];
 
@@ -51,7 +52,7 @@ export function buddyBlocks({ action, game, move, args = [] } = {}) {
 export function lockNote(lock) {
   return {
     title: '🔒 Gambling is locked by your buddy',
-    body: `${first(lock?.buddy)} is your gambling buddy, so casino games are paused until they unlock them. Arcade games, gifts and loans still work.`,
+    body: `${first(lock?.buddy)} is your gambling buddy, so casino games are paused until they unlock them. Challenges are paused too; other arcade games, gifts and loans still work.`,
   };
 }
 
@@ -151,7 +152,7 @@ export function buddyAction(lock, req = {}, ctx = {}) {
     return out(
       next,
       'set',
-      [{ to: person, title: `${first(me)} is your gambling buddy now`, body: 'Casino games are locked until they unlock them. Arcade games, gifts and loans still work.', open }],
+      [{ to: person, title: `${first(me)} is your gambling buddy now`, body: 'Casino games are locked until they unlock them. Challenges are paused too; other arcade games, gifts and loans still work.', open }],
       `You’re ${first(person)}’s gambling buddy. Their casino games are locked.`,
     );
   }

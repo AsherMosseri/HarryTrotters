@@ -2116,6 +2116,11 @@ export const demoStore = {
       const secret = (state.gameSecrets || {})[msgId];
       if (!m?.cmd || !secret) return note('That game is gone.');
       const c = m.cmd;
+      // Gambling buddy: accepting a challenge is a bet too, like the server.
+      if (String(move) === 'accept' && c.name === 'challenge') {
+        const bl = buddies.lockFor(me);
+        if (bl) return note(lockNote(bl).title, lockNote(bl).body);
+      }
       // Controls: Casino and games during shifts off: no accepting or joining while clocked in.
       if (
         (move === 'accept' || move === 'join') &&

@@ -494,7 +494,7 @@ function BuddyRow({ buddy, roster, me }) {
           </b>
           <span className="muted small">
             {mine.state === 'on'
-              ? `${b} can unlock them from their app, or type their password here. Arcade games, gifts and loans still work.`
+              ? `${b} can unlock them from their app, or type their password here. Challenges are paused too; other arcade games, gifts and loans still work.`
               : mine.state === 'asked'
                 ? `Once ${b} sets a password, your casino games lock. Nothing is locked yet.`
                 : 'Casino games are unlocked. Lock them again any time; the same password unlocks them.'}

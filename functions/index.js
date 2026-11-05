@@ -1745,6 +1745,15 @@ export const play = onCall({ maxInstances: 5, invoker: 'public' }, withBalance(a
           return note(...casino.SHIFT_NOTE);
       }
     }
+    // Gambling buddy: accepting a challenge is a bet too (starting one is
+    // refused above, as a locked game).
+    if (String(move) === 'accept') {
+      const card = await db.doc(`channels/${conv}/messages/${msgId}`).get();
+      if (card.get('cmd')?.name === 'challenge') {
+        const b = await buddies.lockOf(me);
+        if (b) return note(lockNote(b).title, lockNote(b).body);
+      }
+    }
     return runMove({ conv, msgId, me, move: String(move), data, now });
   }
 
