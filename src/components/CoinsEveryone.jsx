@@ -275,8 +275,10 @@ function Person({ name, w, casino, cfg, onCheck, onAdjust, onFix, onBack }) {
 // The owner only: add, take away, or set someone's Jackson coins. It goes in
 // as a grant (bonus or "taken away") with a note, like the Ads page's grants;
 // "set" works out the difference from the server's balance when it can.
-// The most the owner can add or take away at once (the rules allow the same).
-const OWNER_MAX = 1000000000000;
+// The most the owner can add, take away or set at once: a googol (the rules
+// allow any finite amount from the owner). Past about 9 quadrillion amounts are
+// rounded, like every big balance.
+const OWNER_MAX = 1e100;
 function AdjustCoins({ name, balance, onCheck, onAdjust }) {
   const [mode, setMode] = useState('add');
   const [amount, setAmount] = useState('');
