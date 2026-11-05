@@ -15,6 +15,7 @@ import { getMessaging } from 'firebase-admin/messaging';
 import { fetchPage, firstLink, readPreview } from './preview.js';
 import {
   AWARD_CAPS,
+  capWin,
   coinSettings,
   coinsByName,
   coinTasks,
@@ -1280,6 +1281,18 @@ async function freshCoins(name, bank, data) {
   return freshWallet(name, mine, { ledger: [...ledger.values()], banks });
 }
 const nyDay = (ms) => new Date(ms).toLocaleDateString('en-CA', { timeZone: TIME_ZONE });
+// What each of these people has now ({ name: balance }), for the ceiling
+// (MAX_BALANCE) on coins sent to them. Their bank docs are read in the
+// transaction (tx) when there is one, so a bet of theirs at the same moment
+// takes turns with this.
+async function balancesOf(names, data, tx = null) {
+  const list = [...new Set(names.filter(Boolean))];
+  if (!list.length) return {};
+  const refs = list.map((n) => bankRef(n));
+  const snaps = tx ? await tx.getAll(...refs) : await db.getAll(...refs);
+  const out = await Promise.all(list.map((n, i) => freshCoins(n, snaps[i].data() || {}, data).then((w) => w.balance)));
+  return Object.fromEntries(list.map((n, i) => [n, out[i]]));
+}
 
 // The server's balance after a coin command, sent back with the answer so the
 // app can check its own number against it (and say so if they differ). Never
@@ -1329,7 +1342,7 @@ export const { coinCheck } = coinCheckFunctions({ db, coinData, freshCoins, bank
 // Casino reports (functions/disputes.js): a teammate reports a result, team
 // management refunds by hand or dismisses it.
 // The owner's Refund / Take back on a game card in chat (ownerRefund) shares their refund key.
-export const { dispute, disputeDecide, disputeRefundAll, ownerRefund } = disputeFunctions({ db, coinData, notify, bankRef, owner: REQUESTS_TO });
+export const { dispute, disputeDecide, disputeRefundAll, ownerRefund } = disputeFunctions({ db, coinData, freshCoins, notify, bankRef, owner: REQUESTS_TO });
 
 // Team events: the team's lab time fills a meter, tiers give pet gear.
 export const { petEvent, petEventTick } = petEventFunctions({
@@ -1379,13 +1392,23 @@ async function workContext(me, data) {
 // (Prizes from the free games are awards instead: payAwards.)
 // card: { game, id }, so a bet held for the game and its result share one
 // line in each person's history (arcade.moneyLine).
-async function payOut(tx, money, banks, now, card) {
+// A win that would put someone over 1 quadrillion (MAX_BALANCE) is cut so
+// they end there (arcade.capMoney, from their balance read fresh); the rest
+// of the pot isn't paid. Returns { name: net paid } for the wins it cut, for
+// the card (pub.capped).
+async function payOut(tx, money, banks, now, card, data) {
   const names = [...new Set(money.map((x) => x.name))];
   for (const n of names) if (!banks[n]) banks[n] = (await tx.get(bankRef(n))).data() || {};
-  for (const x of money)
+  const winners = [...new Set(money.filter((x) => x.delta > 0 && x.entry?.shown > 0).map((x) => x.name))];
+  const balances = Object.fromEntries(await Promise.all(winners.map(async (n) => [n, (await freshCoins(n, banks[n], data)).balance])));
+  const { money: paid, capped } = arcade.capMoney(money, balances);
+  for (const x of paid)
     banks[x.name] = casino.bankAfter(banks[x.name], x.name, x.delta, arcade.moneyLine(x, card.game, card.id, card.conv), x.extra || {}, now);
   for (const n of names) tx.set(bankRef(n), banks[n]);
+  return capped;
 }
+// The card keeps the wins the ceiling cut (pub.capped: { name: net paid }).
+const withCapped = (pub, capped) => (Object.keys(capped).length ? { ...pub, capped: { ...(pub.capped || {}), ...capped } } : pub);
 
 // The Friday lottery: one doc, drawn by drawLottery.
 const lotteryRef = db.doc('lottery/current');
@@ -1453,8 +1476,8 @@ async function runMove({ conv, msgId, me, move, data, now, house = false, verifi
       });
       if (r.error) return note(r.error);
       if (!r.write) return { ok: true, serverNow: now };
-      await payOut(tx, r.money, house ? {} : { [me]: myBank }, now, { game: c.name, id: msgId, conv });
-      const { status, ...game } = r.pub;
+      const capped = await payOut(tx, r.money, house ? {} : { [me]: myBank }, now, { game: c.name, id: msgId, conv }, data);
+      const { status, ...game } = withCapped(r.pub, capped);
       if (arcade.isLive(status)) tx.set(secretRef, secretWith(r.secret, conv, now, playersOf(r.pub)));
       else tx.delete(secretRef);
       tx.update(msgRef, { 'cmd.game': game, 'cmd.status': status });
@@ -1479,18 +1502,23 @@ async function runMove({ conv, msgId, me, move, data, now, house = false, verifi
     const update = { 'cmd.game': game, 'cmd.status': status, 'cmd.bet': bet };
     if (r.done) {
       // The bet was taken when the game started (and again when doubling):
-      // pay back what it won; the history shows the overall result.
-      const net = r.payout - bet;
+      // pay back what it won; the history shows the overall result. A win
+      // that would put them over 1 quadrillion pays up to it (capWin): their
+      // balance before the game is what they have now plus the bet held.
+      const won = r.payout - bet;
+      const net = won > 0 ? capWin(won, (await balanceOf(player, bank, data)) + c.bet) : won;
+      const capped = net < won;
+      const payout = bet + net;
       const entry = {
         game: c.name,
         icon: ICON[c.name],
-        label: `${LABEL[c.name]}: ${net > 0 ? `won ${net}` : net < 0 ? `lost ${-net}` : 'bet back'}`,
+        label: `${LABEL[c.name]}: ${net > 0 ? `won ${net}` : net < 0 ? `lost ${-net}` : 'bet back'}${capped ? casino.CAPPED : ''}`,
         shown: net,
         settles: msgId,
         card: `${conv}/${msgId}`,
       };
-      tx.set(bankRef(player), casino.bankAfter(bank, player, r.payout - (r.extraBet || 0), entry, {}, now));
-      Object.assign(update, { 'cmd.payout': r.payout, 'cmd.net': net });
+      tx.set(bankRef(player), casino.bankAfter(bank, player, payout - (r.extraBet || 0), entry, {}, now));
+      Object.assign(update, { 'cmd.payout': payout, 'cmd.net': net, ...(capped && { 'cmd.capped': true }) });
       tx.delete(secretRef);
     } else tx.set(secretRef, secretWith(r.secret, conv, now, [player]));
     tx.update(msgRef, update);
@@ -1498,7 +1526,7 @@ async function runMove({ conv, msgId, me, move, data, now, house = false, verifi
     // The card as written goes back too: on a slow connection the player's
     // copy of the chat can be seconds behind (a Mines tile tapped again there
     // was "Pick a closed tile").
-    const card = { game, status, bet, ...(r.done && { payout: update['cmd.payout'], net: update['cmd.net'] }) };
+    const card = { game, status, bet, ...(r.done && { payout: update['cmd.payout'], net: update['cmd.net'], ...(update['cmd.capped'] && { capped: true }) }) };
     return { ok: true, serverNow: now, card, ...(!r.done && { still: true }) };
   });
   const { awards, ...rest } = res || {};
@@ -1591,14 +1619,25 @@ async function giveMany(me, body, data, now) {
       return { ok: true, repeat: true, people: sent.map((x) => x.to), amount: sent[0]?.amount || 0, total, group: label };
     }
     const mine = await freshCoins(me, myBank, data);
+    // Everyone it goes to, for the ceiling: one who'd go over 1 quadrillion
+    // stops the whole gift (all or nothing, like the balance check).
+    const balances = await balancesOf(
+      people.filter((n) => n !== me),
+      data,
+      tx,
+    );
     const made = g
       ? groupGiftEntries(
           me,
           { people, amount: body.amount, note: body.note, batch, group: label },
-          { roster: team.roster, balance: mine.balance, now },
+          { roster: team.roster, balance: mine.balance, balances, now },
         )
       : (() => {
-          const e = giftEntry(me, { to: people[0], amount: body.amount, note: body.note }, { roster: team.roster, balance: mine.balance, now });
+          const e = giftEntry(
+            me,
+            { to: people[0], amount: body.amount, note: body.note },
+            { roster: team.roster, balance: mine.balance, toBalance: balances[people[0]], now },
+          );
           return e.error ? e : { entries: [e], total: e.amount };
         })();
     if (made.error) return note(made.error, made.body);
@@ -1646,12 +1685,15 @@ export const play = onCall({ maxInstances: 5, invoker: 'public' }, withBalance(a
     if (action === 'gift' && (body.group || body.key)) return giveMany(me, body, data, now);
     const roster =
       action === 'gift' ? (await db.collection('people').get()).docs.map((d) => data.rename(d.get('name') || '')).filter(Boolean) : [];
+    const to = action === 'gift' ? data.rename(String(body.to || '')) : '';
     return db.runTransaction(async (tx) => {
       const myBank = (await tx.get(bankRef(me))).data() || {};
       const mine = await freshCoins(me, myBank, data);
+      // The person it goes to, for the ceiling (MAX_BALANCE).
+      const toBalance = to && to !== me && roster.includes(to) ? (await balancesOf([to], data, tx))[to] : undefined;
       const entry =
         action === 'gift'
-          ? giftEntry(me, { ...body, to: data.rename(String(body.to || '')) }, { roster, balance: mine.balance, now })
+          ? giftEntry(me, { ...body, to }, { roster, balance: mine.balance, toBalance, now })
           : prizeEntry(me, body, { ledger: mine.ledger, gameCap: data.gameCap, now });
       if (entry.error) return note(entry.error, entry.body);
       tx.set(db.collection('coins').doc(), entry);
@@ -1757,9 +1799,9 @@ export const play = onCall({ maxInstances: 5, invoker: 'public' }, withBalance(a
       if (r.error) return note(r.error);
       // Where this card is, so "one challenge waiting at a time" can be checked later.
       if (r.open) r.money[0].extra = { ...r.money[0].extra, chOpen: { conv, id: msgRef.id } };
-      await payOut(tx, r.money, { [me]: myBank }, now, { game, id: msgRef.id, conv });
+      const capped = await payOut(tx, r.money, { [me]: myBank }, now, { game, id: msgRef.id, conv }, data);
       tx.set(db.doc(`gameSecrets/${msgRef.id}`), secretWith(r.secret, conv, now, [me, ...playersOf(r.pub)]));
-      const { status, ...g } = r.pub;
+      const { status, ...g } = withCapped(r.pub, capped);
       post(tx, { game: g, status, bet: g.bet || 0 }, r.mentions);
       return { ok: true, serverNow: now };
     }
@@ -1772,19 +1814,21 @@ export const play = onCall({ maxInstances: 5, invoker: 'public' }, withBalance(a
       if (r.error) return note(r.error);
       const { status = 'done', ...game2 } = r.pub;
       if (r.done) {
-        const net = r.payout - bet;
+        // A win that would put them over 1 quadrillion pays up to it (capWin).
+        const net = capWin(r.payout - bet, balance);
+        const capped = net < r.payout - bet;
         tx.set(
           bankRef(me),
           casino.bankAfter(
             myBank,
             me,
             net,
-            { game, icon: ICON[game], label: `${LABEL[game]}: ${net >= 0 ? `won ${net}` : `lost ${-net}`}`, card: `${conv}/${msgRef.id}` },
+            { game, icon: ICON[game], label: `${LABEL[game]}: ${net >= 0 ? `won ${net}` : `lost ${-net}`}${capped ? casino.CAPPED : ''}`, card: `${conv}/${msgRef.id}` },
             {},
             now,
           ),
         );
-        post(tx, { game: game2, status, bet, payout: r.payout, net });
+        post(tx, { game: game2, status, bet, payout: bet + net, net, ...(capped && { capped: true }) });
       } else {
         // Take the bet now; the end of the game pays back what it won. The
         // history shows it as held until then.
@@ -1805,7 +1849,9 @@ export const play = onCall({ maxInstances: 5, invoker: 'public' }, withBalance(a
       if (!them) return note('Rob who?', 'Try: /rob @name');
       if (them === me) return note('You can’t rob yourself.', 'You’d just be moving coins between pockets.');
       const theirBank = (await tx.get(bankRef(them))).data() || {};
-      const r = casino.rob(myBank, balance, await balanceOf(them, theirBank, data), now);
+      const theirBalance = await balanceOf(them, theirBank, data);
+      // Near the ceiling, whoever gets the coins takes in only up to it (capRob).
+      const r = casino.capRob(casino.rob(myBank, balance, theirBalance, now), balance, theirBalance);
       if (r.error) return note(r.error);
       tx.set(
         bankRef(me),
@@ -1847,6 +1893,11 @@ export const play = onCall({ maxInstances: 5, invoker: 'public' }, withBalance(a
           ? casino.work(myBank, now, secureRandom, await workContext(me, data))
           : casino.beg(myBank, now);
     if (r.error) return note(r.error);
+    // /work and /beg pay up to the ceiling (MAX_BALANCE) at most.
+    if (game !== 'daily' && capWin(r.amount, balance) < r.amount) {
+      r.amount = capWin(r.amount, balance);
+      r.card = { ...r.card, amount: r.amount, capped: true };
+    }
     const label = { daily: `Daily coins (streak ${r.card.streak})`, work: `Work: ${r.card.job}`, beg: 'Begging' }[game];
     if (game === 'daily') {
       // /daily is an award (source 'game'): it shares the 20-a-day limit
@@ -2252,17 +2303,25 @@ export const drawLottery = onSchedule({ schedule: '0 18 * * 5', timeZone: TIME_Z
     let r = Math.floor(secureRandom() * total);
     const [winner, theirs] = entries.find(([, n]) => (r -= n) < 0) || entries[0];
     const bank = (await tx.get(bankRef(winner))).data() || {};
-    if (openCard) tx.update(openRef, { 'cmd.closed': true, 'cmd.pot': lot.pot, 'cmd.people': entries.length, 'cmd.winner': winner });
-    tx.set(bankRef(winner), casino.bankAfter(bank, winner, lot.pot, { icon: '🎟️', label: `Won the lottery (${lot.pot} coins)` }, {}, now));
-    const last = { winner, pot: lot.pot, tickets: theirs, of: total, people: entries.length, at: now };
+    // The pot pays up to the ceiling (MAX_BALANCE) at most; the rest isn't
+    // paid to anyone. pot: what was in it; won: what the winner got.
+    const won = capWin(lot.pot, await balanceOf(winner, bank, await coinData()));
+    const capped = won < lot.pot;
+    if (openCard)
+      tx.update(openRef, { 'cmd.closed': true, 'cmd.pot': lot.pot, 'cmd.people': entries.length, 'cmd.winner': winner, ...(capped && { 'cmd.won': won }) });
+    tx.set(
+      bankRef(winner),
+      casino.bankAfter(bank, winner, won, { icon: '🎟️', label: `Won the lottery (${won} coins)${capped ? casino.CAPPED : ''}` }, {}, now),
+    );
+    const last = { winner, pot: lot.pot, tickets: theirs, of: total, people: entries.length, at: now, ...(capped && { won }) };
     tx.set(lotteryRef, { pot: 0, tickets: {}, drawAt: nextFriday(now + 60000), round: (lot.round || 1) + 1, last });
     tx.set(db.collection('channels/arcade/messages').doc(), {
-      text: `🎟️ ${winner} won the lottery: ${coinsText(lot.pot)} coins!`,
+      text: `🎟️ ${winner} won the lottery: ${coinsText(won)} coins!${capped ? ' (capped at 1 quadrillion)' : ''}`,
       by: 'Trotbot',
       byUid: 'trotbot',
       bot: true,
       at: now,
-      cmd: { name: 'lottery', draw: last, line: `won the lottery: ${coinsText(lot.pot)} coins` },
+      cmd: { name: 'lottery', draw: last, line: `won the lottery: ${coinsText(won)} coins${capped ? ' (capped at 1 quadrillion)' : ''}` },
       mentions: [winner],
       taskIds: [],
       replyTo: null,

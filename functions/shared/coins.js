@@ -526,6 +526,29 @@ export function oldBankIds(name, aliases) {
 // checks still apply.
 export const NO_LIMIT = 1000000000000;
 export const GIFT_MAX = NO_LIMIT;
+
+// The most anyone can hold (3.1.4): 1 quadrillion. Balances are sums of
+// ledger lines, and JavaScript numbers are exact only up to 2^53 (about 9
+// quadrillion), so no balance may grow past this, however many grants, gifts
+// or all-in wins it takes. Coins sent to someone (gifts, /request, loans,
+// refunds, the owner's Add/Set) that would put them over are refused; game
+// wins are cut so the balance ends at MAX_BALANCE (capWin). Earned coins
+// (tasks, lab time) and the small daily-capped awards and prizes aren't
+// checked: they can't come near 2^53.
+export const MAX_BALANCE = 1000000000000000;
+// How many more coins someone with `balance` can take in (never below 0).
+export const ceilingRoom = (balance) => Math.max(0, MAX_BALANCE - (Number(balance) || 0));
+// Would adding `amount` put someone with `balance` over the ceiling?
+export const overCeiling = (balance, amount) => amount > 0 && (Number(balance) || 0) + amount > MAX_BALANCE;
+// The note for a refused credit: "That would put Cooper over 1 quadrillion coins."
+export const ceilingNote = (name, body = 'Nobody can hold more than that.') => ({
+  error: `That would put ${String(name || 'them').split(' ')[0]} over 1 quadrillion coins.`,
+  body,
+});
+// A game's result for someone whose balance before it was `before`: a win
+// is cut so they end at MAX_BALANCE at most (never below 0); a loss or a
+// push is unchanged.
+export const capWin = (net, before) => (net > 0 ? Math.min(net, ceilingRoom(before)) : net);
 // The prize wheel's slices, in the order AdGames.jsx draws them, and how
 // likely each one is. The server spins it (prizeEntry); the app only shows
 // where it landed, so it can't pick the +10.
@@ -548,13 +571,16 @@ export const GAME_PRIZE_MAX = 20;
 const text = (v, n) => String(v || '').slice(0, n);
 
 // amount: a number, or the text of one ("2k", "1,000"; amount.js).
-export function giftEntry(from, { to, amount, note }, { roster, balance, now = Date.now() }) {
+// toBalance: what the person it goes to has (the server reads it fresh), for
+// the ceiling (MAX_BALANCE); left out, it isn't checked.
+export function giftEntry(from, { to, amount, note }, { roster, balance, toBalance, now = Date.now() }) {
   const n = typeof amount === 'string' ? (parseAmount(amount) ?? NaN) : Number(amount);
   if (!roster.includes(to)) return { error: 'Who’s that?' };
   if (to === from) return { error: 'That’s you.', body: 'Your coins are already yours.' };
   if (!Number.isInteger(n) || n < 1) return { error: 'Send at least 1 coin.' };
   if (n > GIFT_MAX) return { error: 'That’s a lot.', body: `Up to ${coinsText(GIFT_MAX)} at a time.` };
   if (n > balance) return { error: `You only have ${coinsText(balance)} coins.` };
+  if (typeof toBalance === 'number' && overCeiling(toBalance, n)) return ceilingNote(to);
   return { type: 'gift', from, to, amount: n, note: text(note, 140).trim(), at: now };
 }
 
@@ -563,14 +589,16 @@ export function giftEntry(from, { to, amount, note }, { roster, balance, now = D
 // { entries } (one gift entry per person, sharing a batch id, so the giver's
 // history shows one line) or { error, body } saying who and why.
 // people: who it goes to (already worked out from the server's own team).
-export function groupGiftEntries(from, { people = [], amount, note, batch, group }, { roster, balance, now = Date.now() }) {
+// balances: { name: balance } of the people it goes to, for the ceiling
+// (MAX_BALANCE); anyone left out isn't checked.
+export function groupGiftEntries(from, { people = [], amount, note, batch, group }, { roster, balance, balances = {}, now = Date.now() }) {
   if (!people.length) return { error: 'Nobody to give to.', body: `${group || 'That group'} has nobody in it besides you.` };
   if (people.length > GROUP_MAX) return { error: 'That’s too many people at once.', body: `Up to ${GROUP_MAX}.` };
   const entries = [];
   for (const to of people) {
     if (!roster.includes(to) || to === BOT)
       return { error: `${to} can’t get coins right now.`, body: `They aren’t on the team. Nothing was sent.` };
-    const e = giftEntry(from, { to, amount, note }, { roster, balance: Infinity, now });
+    const e = giftEntry(from, { to, amount, note }, { roster, balance: Infinity, toBalance: balances[to], now });
     if (e.error) return { error: e.error, body: [e.body, people.length > 1 ? 'Nothing was sent.' : ''].filter(Boolean).join(' ') };
     entries.push({ ...e, batch: String(batch || ''), group: String(group || '').slice(0, 80) });
   }

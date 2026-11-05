@@ -410,11 +410,15 @@ export function coinRequestFunctions({ db, coinData, freshCoins, bankRef, notify
       // transaction, like a gift, so it takes turns with their bets and gifts).
       let bank = null;
       let balance = 0;
+      let toBalance;
       if (mv === 'pay' && me && me === pub.to && pub.status === 'open' && now < pub.expiresAt) {
         bank = (await tx.get(bankRef(me))).data() || {};
         balance = (await freshCoins(me, bank, data)).balance;
+        // What the person asking has, for the ceiling (MAX_BALANCE): a pay
+        // that would put them over is refused, and nothing moves.
+        if (pub.from && pub.from !== me) toBalance = (await freshCoins(pub.from, (await tx.get(bankRef(pub.from))).data() || {}, data)).balance;
       }
-      const r = ask.askMove({ pub, me, move: mv, balance, roster, now });
+      const r = ask.askMove({ pub, me, move: mv, balance, toBalance, roster, now });
       if (!r.write) return r.error ? note(r.error, r.body) : { ok: true, status: pub.status, ...(r.already && { already: r.already }) };
       const { status, decidedAt, paidAt } = r.pub;
       if (r.entry) {

@@ -5,7 +5,7 @@
 // code locally. A game returns { pub, secret, done, payout }: pub goes on the
 // chat message, payout is everything paid back (0 = lost the bet, bet = push).
 import { secureRandom } from './rng.js';
-import { keepRecent } from './coins.js';
+import { capWin, keepRecent } from './coins.js';
 import { amountTip, parseAmount } from './amount.js';
 import { coinsText } from './coinText.js';
 
@@ -415,6 +415,22 @@ export function beg(bank, now, rng = secureRandom) {
   const [who, verb, joke] = pickOf(rng, DONORS);
   const amount = rint(rng, 1, 8);
   return { amount, card: { amount, who, verb, joke }, bank: set };
+}
+
+// The end of a history line for a win cut at the ceiling (coins.js
+// MAX_BALANCE): "Slots: won 120 (capped at 1 quadrillion)".
+export const CAPPED = ' (capped at 1 quadrillion)';
+
+// /rob near the ceiling (coins.js MAX_BALANCE): whoever the coins go to (the
+// robber, or the person robbed when the robber is caught and fined) takes in
+// at most what keeps them at 1 quadrillion, and the other side loses only
+// that, so no coins are made or lost. myBalance, theirBalance: before the rob.
+export function capRob(r, myBalance, theirBalance) {
+  if (r.error) return r;
+  const mine = r.amount > 0;
+  const n = mine ? capWin(r.amount, myBalance) : capWin(r.theirs, theirBalance);
+  if (n === (mine ? r.amount : r.theirs)) return r;
+  return { ...r, amount: mine ? n : -n, theirs: mine ? -n : n, card: { ...r.card, amount: n, capped: true } };
 }
 
 // Robbing: 35% chance. Success takes 10–25% of their coins (up to 100);

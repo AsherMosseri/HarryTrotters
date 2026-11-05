@@ -101,7 +101,8 @@ export function startAsk({ me, to, amount, reason = '', roster = [], active = fa
 // { write: true, pub, entry?, error? }: the new state, and for pay the gift to
 // add to the ledger. A pay on a request that just ran out writes 'expired' and
 // says so.
-export function askMove({ pub, me, move, balance = 0, roster = [], now = Date.now() }) {
+// toBalance: what the person asking has now (for the ceiling, MAX_BALANCE).
+export function askMove({ pub, me, move, balance = 0, toBalance, roster = [], now = Date.now() }) {
   const m = String(move || '');
   if (!MOVES.includes(m)) return { error: 'Unknown move.' };
   if (pub.status !== 'open') return { write: false, already: pub.status };
@@ -116,7 +117,7 @@ export function askMove({ pub, me, move, balance = 0, roster = [], now = Date.no
     return { error: me === pub.from ? `Waiting for ${first(pub.to)}.` : `This request is for ${first(pub.to)}.` };
   if (m === 'decline') return end('declined');
   // Pay: a gift from the person asked to the person asking, checked like /give.
-  const entry = giftEntry(me, { to: pub.from, amount: pub.amount, note: pub.reason }, { roster, balance, now });
+  const entry = giftEntry(me, { to: pub.from, amount: pub.amount, note: pub.reason }, { roster, balance, toBalance, now });
   if (entry.error) return { error: entry.error, ...(entry.body && { body: entry.body }) };
   return { ...end('paid', { paidAt: now }), entry };
 }

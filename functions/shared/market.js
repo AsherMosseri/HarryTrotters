@@ -9,7 +9,7 @@
 // Only the server sells anything (functions/market.js): it reads the balance
 // fresh and writes the spend itself. These checks are shared with demo mode.
 
-import { teamMidnight, teamDay } from './coins.js';
+import { capWin, teamMidnight, teamDay } from './coins.js';
 import { weekStart } from './streaks.js';
 import { PET_ITEMS, careAfter, petItem } from './pets.js';
 import { coinsText } from './coinText.js';
@@ -309,6 +309,20 @@ export function payoutOf(t, rename = (n) => n) {
   };
 }
 export const prizeLabel = (t) => `Tournament: ${t.title}`.slice(0, 80);
+
+// Prizes or entries back near the ceiling (coins.js MAX_BALANCE): each pays
+// up to what keeps its person at 1 quadrillion, counting what they already
+// got from this list. have: { name: balance now }. Ones cut to 0 are left out.
+export function capPays(pays = [], have = {}) {
+  const left = { ...have };
+  const out = [];
+  for (const p of pays) {
+    const amount = typeof left[p.name] === 'number' ? capWin(p.amount, left[p.name]) : p.amount;
+    if (typeof left[p.name] === 'number') left[p.name] += amount;
+    if (amount > 0) out.push(amount < p.amount ? { ...p, amount, capped: true } : p);
+  }
+  return out;
+}
 
 // Results in order, best first (voided ones left out), and the voided names.
 export function standings(t) {

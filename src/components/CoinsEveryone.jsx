@@ -1,7 +1,7 @@
 // Coins screen extras: comparing the app's balance with the server's, and
 // (team management only) everyone's coin history.
 import { useMemo, useState } from 'react';
-import { breakdown, breakdownGaps, historyGroup, historyKey, wallet as walletOf } from '../coins.js';
+import { MAX_BALANCE, breakdown, breakdownGaps, ceilingNote, historyGroup, historyKey, overCeiling, wallet as walletOf } from '../coins.js';
 import { Avatar } from './common.jsx';
 import { Icon } from './shell/icons.jsx';
 import { alertDialog, confirmDialog } from './Dialogs.jsx';
@@ -276,6 +276,10 @@ function Person({ name, w, casino, cfg, onCheck, onAdjust, onFix, onBack }) {
 // as a grant (bonus or "taken away") with a note, like the Ads page's grants;
 // "set" works out the difference from the server's balance when it can.
 // The most the owner can add or take away at once (the rules allow the same).
+// Grants are written from here (the rules can't read balances), so the
+// ceiling (MAX_BALANCE, 1 quadrillion) is checked here too: an Add or Set
+// that would put them over it is refused, against the server's balance when
+// it answers.
 const OWNER_MAX = 1000000000000;
 function AdjustCoins({ name, balance, onCheck, onAdjust }) {
   const [mode, setMode] = useState('add');
@@ -284,20 +288,26 @@ function AdjustCoins({ name, balance, onCheck, onAdjust }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
   const n = Math.floor(Number(amount));
-  const ok = Number.isFinite(n) && amount !== '' && (mode === 'set' ? n >= 0 : n > 0) && n <= OWNER_MAX;
+  // Set to more than the ceiling can never work, whatever the difference.
+  const ok = Number.isFinite(n) && amount !== '' && (mode === 'set' ? n >= 0 && n <= MAX_BALANCE : n > 0 && n <= OWNER_MAX);
   const go = async () => {
     if (!ok || busy) return;
     setBusy(true);
     setMsg('');
     try {
       let now = balance;
-      if (mode === 'set' && onCheck) {
+      if (mode !== 'remove' && onCheck) {
         const r = await onCheck(name).catch(() => null);
         if (Number.isFinite(r?.balance)) now = r.balance;
       }
       const delta = mode === 'add' ? n : mode === 'remove' ? -n : n - now;
       if (!delta) {
         setMsg(`${name.split(' ')[0]} already has ${exactCoins(now)}.`);
+        return;
+      }
+      if (overCeiling(now, delta)) {
+        const c = ceilingNote(name);
+        setMsg(`${c.error} ${c.body}`);
         return;
       }
       if (Math.abs(delta) > OWNER_MAX) {
@@ -343,6 +353,7 @@ function AdjustCoins({ name, balance, onCheck, onAdjust }) {
           {busy ? '…' : 'Save'}
         </button>
       </div>
+      {mode === 'set' && amount !== '' && n > MAX_BALANCE && <p className="muted tiny">Nobody can hold more than 1 quadrillion coins.</p>}
       {msg && <p className="muted tiny">{msg}</p>}
     </div>
   );
@@ -371,6 +382,13 @@ export function useReverse(name, history, onAdjust, onFix) {
     const first = name.split(' ')[0];
     const viaCard = !!(x.card && onFix);
     const [conv, msgId] = viaCard ? String(x.card).split('/') : [];
+    // A refund written from here (a grant) can't put them over 1 quadrillion
+    // either (the card's refund is checked by the server).
+    if (refund && !viaCard && overCeiling(history.reduce((t, y) => t + y.amount, 0), -x.amount)) {
+      const c = ceilingNote(name);
+      await alertDialog({ title: c.error, body: c.body });
+      return;
+    }
     const older = !viaCard && x.kind === 'casino' && GAME_LINE.test(x.label || '');
     const ok = await confirmDialog({
       title: refund ? `Refund ${n} coins to ${first}?` : `Take ${n} coins away from ${first}?`,

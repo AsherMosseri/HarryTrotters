@@ -17,7 +17,8 @@ import { RACE_COUNTDOWN, RACE_PRIZE, rank, raceLimit } from './funGames.js';
 import { LEVELS } from './minesweeper.js';
 import * as challenge from './challenge.js';
 import { secureRandom } from './rng.js';
-import { holdEntry } from './casino.js';
+import { CAPPED, holdEntry } from './casino.js';
+import { capWin } from './coins.js';
 import { coinsText } from './coinText.js';
 
 export const MULTI = ['rps', 'tictactoe', 'connect4', 'duel', 'trivia', 'hangman', 'typerace', 'heist', 'battleship', 'tetris', 'minesweep', 'challenge'];
@@ -143,6 +144,35 @@ export function moneyLine(x, game, id, conv = '') {
   if (x.delta < 0) return holdEntry(ICON[game] || '🎲', LABEL[game] || 'Game', -x.delta, id);
   if (x.delta > 0) return { icon: ICON[game] || '🎲', label: `${LABEL[game] || 'Game'}: bet back`, shown: 0, settles: id, ...card };
   return null;
+}
+
+// Wins near the ceiling (coins.js MAX_BALANCE). Each payout in `money` that
+// would put its person over 1 quadrillion is cut so they end there: their
+// balance before the game is what they have now plus the stake coming back
+// to them (delta − shown: a bet that was held). What's cut isn't paid to
+// anyone, so a pot can lose coins here but never make them. balances:
+// { name: balance now, before this money }, for everyone with a win in it
+// (anyone left out isn't checked). Money for the same person later in the
+// list counts what came before it. Returns { money, capped: { name: net } }.
+export function capMoney(money = [], balances = {}) {
+  const have = { ...balances };
+  const capped = {};
+  const out = money.map((x) => {
+    let y = x;
+    const shown = x.entry?.shown;
+    if (shown > 0 && x.delta > 0 && typeof have[x.name] === 'number') {
+      const held = x.delta - shown;
+      const net = capWin(shown, have[x.name] + held);
+      if (net < shown) {
+        const prefix = String(x.entry.label || '').split(':')[0] || 'Game';
+        y = { ...x, delta: held + net, entry: { ...x.entry, shown: net, label: `${prefix}: won ${net}${CAPPED}` } };
+        capped[x.name] = net;
+      }
+    }
+    if (typeof have[x.name] === 'number') have[x.name] += y.delta;
+    return y;
+  });
+  return { money: out, capped };
 }
 
 // A challenge's bets: the winner gets both; a tie gives both back.

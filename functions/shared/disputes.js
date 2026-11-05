@@ -159,18 +159,21 @@ export function cardNets(cmd, by, rename = (n) => n) {
   const g = cmd.game || {};
   const people = (list) => [...new Set(list.filter((n) => n && n !== BOT).map(rename))].filter((n) => n && n !== BOT);
   const bet = Math.max(0, Math.floor(g.bet || 0));
+  // A win the ceiling cut (g.capped: { name: net paid }, 3.1.4) is what was paid.
+  const cut = Object.fromEntries(Object.entries(g.capped || {}).map(([n, v]) => [rename(n), Math.max(0, Math.floor(v || 0))]));
+  const won = (name, net) => (net > 0 && name in cut ? Math.min(net, cut[name]) : net);
   if (cmd.name === 'challenge' || CHALLENGES.includes(cmd.name)) {
     // The winner takes the other's bet (Trotbot's house pays too); no winner
     // (a tie, or it was declined, cancelled or ran out) gives the bets back.
     const final = cmd.status === 'done';
     const played = cmd.name !== 'challenge' || g.how === 'rolled';
     const winner = final && played && g.winner ? rename(g.winner) : '';
-    return { final, nets: people([g.a, g.b]).map((name) => ({ name, net: !winner || !bet ? 0 : name === winner ? bet : -bet })) };
+    return { final, nets: people([g.a, g.b]).map((name) => ({ name, net: !winner || !bet ? 0 : name === winner ? won(name, bet) : -bet })) };
   }
   if (cmd.name === 'heist') {
     const final = cmd.status === 'done';
     const each = Math.max(0, Math.floor(g.each || 0));
-    return { final, nets: people(g.crew || []).map((name) => ({ name, net: !final ? 0 : g.ok ? each - bet : -bet })) };
+    return { final, nets: people(g.crew || []).map((name) => ({ name, net: !final ? 0 : g.ok ? won(name, each - bet) : -bet })) };
   }
   // A casino card has `net` once the server has paid it out.
   const final = typeof cmd.net === 'number';

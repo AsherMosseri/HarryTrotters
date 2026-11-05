@@ -2,7 +2,7 @@
 // styles, picked per device in Appearance → Coin numbers:
 //   commas (the default)  1,234,567
 //   plain                 1234567
-//   short                 1.2m   (999 · 1k · 1.1k · 82.2k · 2.3m · 1.5b)
+//   short                 1.2m   (999 · 1k · 1.1k · 82.2k · 2.3m · 1.5b · 1q)
 // Short is for showing only: confirm dialogs (refunds, Send, loans, paying,
 // coin requests) always write the exact number with commas (exactCoins).
 // Negative amounts use the app's minus sign (−, U+2212), never a hyphen.
@@ -26,6 +26,7 @@ const UNITS = [
   [1e6, 'm'],
   [1e9, 'b'],
   [1e12, 't'],
+  [1e15, 'q'],
 ];
 // One decimal, rounded to nearest, without a trailing ".0". Rounding that
 // reaches 1000 of a unit moves up a unit: 999,950 is "1m", never "1000k".
@@ -72,7 +73,7 @@ export function coinTitle(n, style) {
 // known coin amounts in them are rewritten only when shown. Other numbers in
 // a label (hours, streaks, names, notes) are left alone.
 const LABEL_COINS =
-  /(: won |: lost |, lost |\(won |\(lost |Heist: got away with |Prize wheel: \+|^Gave |^Balance set to |Won the lottery \()(\d{4,})(?=$|\)| coins\)| each to )|^(Bet held: .+ )(\d{4,})(?= \(playing\)$)/g;
+  /(: won |: lost |, lost |\(won |\(lost |Heist: got away with |Prize wheel: \+|^Gave |^Balance set to |Won the lottery \()(\d{4,})(?=$|\)| coins\)| each to | \(capped)|^(Bet held: .+ )(\d{4,})(?= \(playing\)$)/g;
 export function coinLabel(label, style = 'commas') {
   return String(label ?? '').replace(LABEL_COINS, (m, a, n, b, n2) => (a ? a + formatCoins(n, style) : b + formatCoins(n2, style)));
 }

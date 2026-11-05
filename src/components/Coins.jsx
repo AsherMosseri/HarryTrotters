@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { GIFT_MAX, leaderboard, perHourOf, teamDay, teamMidnight, wallet as walletOf } from '../coins.js';
+import { GIFT_MAX, ceilingNote, leaderboard, overCeiling, perHourOf, teamDay, teamMidnight, wallet as walletOf } from '../coins.js';
 import { mondayOf } from '../milestones.js';
 import { relTime, useEscape } from '../util.js';
 import { Avatar, CloseIcon, Overlay } from './common.jsx';
@@ -312,7 +312,15 @@ export function CoinsAdmin({ cfg, setCfg, roster, balances, onGrant, ledger, onU
   const [who, setWho] = useState('');
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
+  const [msg, setMsg] = useState('');
   const num = (v) => Math.max(0, Math.floor(Number(v) || 0));
+  // Nobody goes over 1 quadrillion (MAX_BALANCE): a grant, or undoing a
+  // take-away, that would put them over isn't written. '' when it's fine.
+  const overNote = (to, amount) => {
+    if (!overCeiling(balances[to] ?? 0, amount)) return '';
+    const c = ceilingNote(to);
+    return `${c.error} ${c.body}`;
+  };
   // At least 1 (the ledger won't take a free purchase).
   const setPrice = (k, v) => setCfg({ ...cfg, prices: { ...cfg.prices, [k]: Math.max(1, num(v)) } });
   const grants = ledger.filter((x) => x.type === 'grant').sort((a, b) => b.at - a.at);
@@ -386,6 +394,9 @@ export function CoinsAdmin({ cfg, setCfg, roster, balances, onGrant, ledger, onU
           className="btn primary"
           disabled={!who || !n}
           onClick={() => {
+            const over = overNote(who, n);
+            setMsg(over);
+            if (over) return;
             onGrant({ to: who, amount: n, note: note.trim() });
             setAmount('');
             setNote('');
@@ -394,6 +405,7 @@ export function CoinsAdmin({ cfg, setCfg, roster, balances, onGrant, ledger, onU
           {n < 0 ? 'Take' : 'Give'}
         </button>
       </div>
+      {msg && <p className="muted small">{msg}</p>}
       {grants.length > 0 && (
         <ul className="coins-history">
           {grants.slice(0, 20).map((g) => (
@@ -407,7 +419,14 @@ export function CoinsAdmin({ cfg, setCfg, roster, balances, onGrant, ledger, onU
                 <span className="muted tiny">{relTime(g.at)}</span>
               </span>
               <CoinNum as="b" signed n={g.amount} className={g.amount < 0 ? 'coins-minus' : 'coins-plus'} />
-              <button className="link-btn small" onClick={() => onUndo(g)}>
+              <button
+                className="link-btn small"
+                onClick={() => {
+                  const over = overNote(g.to, -g.amount);
+                  setMsg(over);
+                  if (!over) onUndo(g);
+                }}
+              >
                 Undo
               </button>
             </li>

@@ -29,7 +29,7 @@ import { onDocumentWritten } from 'firebase-functions/v2/firestore';
 import { logger } from 'firebase-functions';
 import * as L from './shared/loans.js';
 import { cleanName, memberOk } from './shared/team.js';
-import { teamDay } from './shared/coins.js';
+import { ceilingNote, overCeiling, teamDay } from './shared/coins.js';
 import { coinsText } from './shared/coinText.js';
 
 const OPEN_FN = { maxInstances: 5, invoker: 'public' };
@@ -170,6 +170,14 @@ export function loanFunctions({ db, coinData, freshCoins, bankRef, notify, owner
         if (await lockFrom(borrower, bList, data, undefined, now))
           return note(`${role === 'borrower' ? 'You have' : `${first(borrower)} has`} an overdue loan, so this one can’t start now.`);
         if (await coinsOff(borrower, boss)) return note('🪙 Jackson coins are off right now.');
+        // The ceiling (MAX_BALANCE): a loan that would put the borrower over
+        // 1 quadrillion doesn't start. Their bank doc is read here too, so a
+        // bet of theirs at the same moment takes turns with this.
+        const borrowerBank = await tx.get(bankRef(borrower));
+        if (overCeiling(await balanceOf(borrower, data, borrowerBank.data() || {}), loan.terms.amount)) {
+          const c = ceilingNote(borrower, 'Nobody can hold more than that. The loan didn’t start.');
+          return note(c.error, c.body);
+        }
         if (lender) {
           // The lender's own coins: checked fresh, and their bank doc touched so
           // a bet or buy at the same moment waits for this.
@@ -235,6 +243,15 @@ export function loanFunctions({ db, coinData, freshCoins, bankRef, notify, owner
       const r = L.repayCheck(loan, { role, amount, balance, now });
       if (r.error) return note(r.error, r.body);
       const lender = loan.bank ? '' : data.rename(loan.lender);
+      // The ceiling (MAX_BALANCE): a payment that would put a teammate lender
+      // over 1 quadrillion is refused (the bank keeps nothing it's paid).
+      if (lender) {
+        const lenderBank = await tx.get(bankRef(lender));
+        if (overCeiling(await balanceOf(lender, data, lenderBank.data() || {}), r.amount)) {
+          const c = ceilingNote(lender, 'Nobody can hold more than that. Nothing was paid.');
+          return note(c.error, c.body);
+        }
+      }
       tx.set(coinsRef(L.entryId(id, 'repay', loan.moves || 0)), L.loanEntry({ ...loan, borrower: me, lender }, 'repay', r.amount, now));
       const done = r.left === 0;
       tx.update(

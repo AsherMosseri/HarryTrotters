@@ -10,6 +10,8 @@
 //                                                 or every one from one person, each checked like disputeDecide
 //   ownerRefund({ conv, msgId, person, mode })     the owner only, from the card in chat (3.1.1):
 //                                                 'refund' a loss or 'takeback' a win, report or not
+// A refund that would put the person over 1 quadrillion (MAX_BALANCE, 3.1.4)
+// is refused and nothing changes; Refund all skips it and it stays waiting.
 //
 // Everything is checked here, against the card on the message (which only the
 // server writes) and never against numbers the app sends. A report is one per
@@ -33,12 +35,12 @@ import { FieldPath } from 'firebase-admin/firestore';
 import { logger } from 'firebase-functions';
 import * as d from './shared/disputes.js';
 import { memberOk, nameKey } from './shared/team.js';
-import { teamDay } from './shared/coins.js';
+import { ceilingNote, overCeiling, teamDay } from './shared/coins.js';
 import { coinsText } from './shared/coinText.js';
 
 const OPEN = { maxInstances: 5, invoker: 'public' };
 
-export function disputeFunctions({ db, coinData, notify, bankRef, owner }) {
+export function disputeFunctions({ db, coinData, freshCoins, notify, bankRef, owner }) {
   const note = (title, body = '') => ({ note: { title, body } });
   const first = (n) => (n || 'Someone').split(' ')[0];
   const validId = (id) => typeof id === 'string' && /^[\w-]{1,60}$/.test(id);
@@ -137,6 +139,16 @@ export function disputeFunctions({ db, coinData, notify, bankRef, owner }) {
     return { ok: true, id };
   });
 
+  // A refund restores a past loss, but still never puts anyone over 1
+  // quadrillion (MAX_BALANCE): { problem } when it would, inside the
+  // transaction (their bank doc read in it), before anything is written.
+  async function ceilingCheck(tx, who, amount, data) {
+    const bank = (await tx.get(bankRef(who))).data() || {};
+    if (!overCeiling((await freshCoins(who, bank, data)).balance, amount)) return null;
+    const c = ceilingNote(who, 'Nobody can hold more than that. Nothing was refunded.');
+    return { problem: note(c.error, c.body) };
+  }
+
   const isOwner = ({ me, admin, data }) => admin && me === data.rename(owner);
   const resolutionOf = (text) =>
     String(text || '')
@@ -193,6 +205,8 @@ export function disputeFunctions({ db, coinData, notify, bankRef, owner }) {
         cardAt: kept.cardAt || x.at,
       });
       if (link.problem) return link.problem;
+      const over = await ceilingCheck(tx, who, loss, data);
+      if (over) return over.problem;
       tx.set(keyRef, { dispute: id, via: 'report', mode: 'refund', person: who, amount: loss, by: me, at: now });
       tx.set(db.collection('coins').doc(`dispute-${id}`), d.refundEntry(who, loss, x.cmd, id, now, link.reverses));
       tx.update(dref, { status: 'refunded', handledBy: me, handledAt: now, refund: loss, resolutionNote: resolution, history: seen });
@@ -312,6 +326,10 @@ export function disputeFunctions({ db, coinData, notify, bankRef, owner }) {
       if (link.problem) return link.problem;
       const now = Date.now();
       const amount = check.amount;
+      if (mode === 'refund') {
+        const over = await ceilingCheck(tx, who, amount, data);
+        if (over) return over.problem;
+      }
       tx.set(keyRef, { via: 'card', mode, person: who, amount, by: me, conv, msgId, at: now });
       tx.set(
         db.collection('coins').doc(`card-${msgId}-${nameKey(who)}`),

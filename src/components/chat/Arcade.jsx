@@ -34,6 +34,15 @@ function LimitLine({ g, me }) {
     </div>
   );
 }
+// Wins the ceiling cut (the server puts what it paid in g.capped): nobody
+// holds more than 1 quadrillion coins (functions/shared/coins.js MAX_BALANCE).
+function CapLine({ g, me }) {
+  const f = useCoinFormat();
+  const cut = Object.entries(g.capped || {});
+  if (!cut.length) return null;
+  const who = cut.map(([n, k]) => `${n === me ? 'you' : n.split(' ')[0]} won ${f.n(k)}`).join(' · ');
+  return <div className="muted tiny">Capped ({who}): nobody can hold more than 1 quadrillion coins.</div>;
+}
 const secs = (ms) => Math.max(0, Math.ceil(ms / 1000));
 const clock = (ms) => {
   const s = secs(ms);
@@ -783,6 +792,7 @@ export function ArcadeBody({ m, me, Name, onMove, conv, view = false, onRun }) {
   return (
     <>
       {body}
+      {!live && <CapLine g={g} me={me} />}
       {/* The Battleship game view says it in its status line (no line appearing under the board). */}
       {error && !(view && c.name === 'battleship') && <div className="casino-error">{error}</div>}
     </>

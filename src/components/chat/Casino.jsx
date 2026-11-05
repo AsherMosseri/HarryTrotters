@@ -77,6 +77,10 @@ export const Amt = ({ n }) => (
   </span>
 );
 
+// A win the ceiling cut (functions/shared/coins.js MAX_BALANCE): the card
+// shows what was paid, and says why.
+export const CapNote = ({ on }) => (on ? <div className="muted tiny">Capped: nobody can hold more than 1 quadrillion coins.</div> : null);
+
 function Outcome({ c, reveal = '' }) {
   if (c.status === 'playing')
     return (
@@ -104,6 +108,7 @@ function Outcome({ c, reveal = '' }) {
         {' '}
         · bet <CoinNum n={c.bet} className="mono" />
       </span>
+      <CapNote on={c.capped} />
     </div>
   );
 }
@@ -734,6 +739,12 @@ function Lottery({ m, c, me, onBuy }) {
             <Amt n={c.draw.pot} /> pot · <span className="mono">{c.draw.tickets}</span> of <span className="mono">{c.draw.of}</span> tickets ·{' '}
             <span className="mono">{c.draw.people}</span> players
           </div>
+          {c.draw.won !== undefined && (
+            <div className="small">
+              Paid <Amt n={c.draw.won} />
+              <CapNote on />
+            </div>
+          )}
         </Ticket>
       </div>
     );
@@ -897,6 +908,7 @@ function Economy({ c, by, Name }) {
           <div>
             You {c.job}. <span className="muted">{c.joke}</span>
           </div>
+          <CapNote on={c.capped} />
         </Econ>
       );
     case 'beg':
@@ -906,6 +918,7 @@ function Economy({ c, by, Name }) {
           <div>
             {c.who[0].toUpperCase() + c.who.slice(1)} {c.verb} <CoinNum n={c.amount} /> coin{c.amount > 1 ? 's' : ''}. <span className="muted">{c.joke}</span>
           </div>
+          <CapNote on={c.capped} />
         </Econ>
       ) : (
         <Econ icon="hand" tone="muted" title="Begging">
@@ -922,6 +935,7 @@ function Economy({ c, by, Name }) {
           <div>
             <Name name={by} /> robbed <Name name={c.to} />!
           </div>
+          <CapNote on={c.capped} />
         </Econ>
       ) : (
         <Econ tone="red" title="Robbery" art={<Mugshot name={by} caught />}>
@@ -929,6 +943,7 @@ function Economy({ c, by, Name }) {
           <div>
             <Name name={by} /> tried to rob <Name name={c.to} /> and paid them a <Amt n={c.amount} /> fine.
           </div>
+          <CapNote on={c.capped} />
         </Econ>
       );
     case 'give':

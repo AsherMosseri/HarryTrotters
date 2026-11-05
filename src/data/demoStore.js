@@ -20,7 +20,7 @@ import * as challenge from '../../functions/shared/challenge.js';
 import * as dispute from '../../functions/shared/disputes.js';
 import { blocked, isOff, serverGroup } from '../../functions/shared/commandRules.js';
 import * as coinAsk from '../../functions/shared/coinRequests.js';
-import { AWARD_CAPS, breakdown, giftEntry, groupGiftEntries, prizeEntry, teamDay, teamMidnight } from '../../functions/shared/coins.js';
+import { AWARD_CAPS, breakdown, capWin, giftEntry, groupGiftEntries, prizeEntry, teamDay, teamMidnight } from '../../functions/shared/coins.js';
 import { BOT, GROUP_MAX, groupLabel, resolveTargets } from '../../functions/shared/groups.js';
 import * as fun from '../../functions/shared/funGames.js';
 import * as mines from '../../functions/shared/minesweeper.js';
@@ -1834,7 +1834,8 @@ export const demoStore = {
       const pub = asks[id];
       if (!pub) return note('That request is gone.');
       const balance = mv === 'pay' && me === pub.to ? balanceOf(me) : 0;
-      const r = coinAsk.askMove({ pub, me, move: mv, balance, roster, now });
+      const toBalance = mv === 'pay' && me === pub.to && pub.from !== me ? balanceOf(pub.from) : undefined;
+      const r = coinAsk.askMove({ pub, me, move: mv, balance, toBalance, roster, now });
       if (!r.write) return r.error ? note(r.error, r.body) : { ok: true, status: pub.status, ...(r.already && { already: r.already }) };
       const { status, decidedAt, paidAt } = r.pub;
       asks[id] = { ...pub, status, decidedAt, ...(paidAt && { paidAt }) };
@@ -1957,7 +1958,11 @@ export const demoStore = {
       mines: 'Mines',
       highlow: 'High-low',
     };
-    const result = (net, g) => ({ game: g, icon: ICON[g], label: `${LABEL[g]}: ${net >= 0 ? `won ${net}` : `lost ${-net}`}` });
+    const result = (net, g, capped = false) => ({
+      game: g,
+      icon: ICON[g],
+      label: `${LABEL[g]}: ${net >= 0 ? `won ${net}` : `lost ${-net}`}${capped ? casino.CAPPED : ''}`,
+    });
     const post = (cmd, mentions = []) => {
       const m = {
         id: uid(),
@@ -1985,10 +1990,16 @@ export const demoStore = {
     if (lock) return note(lock.title, lock.body);
     // Several people's coins at once (multiplayer games).
     // card: the game and its card's id, so a held bet and its result share a history line.
+    // A win past 1 quadrillion is cut (arcade.capMoney, like the server's payOut);
+    // returns { name: net paid } for the card (pub.capped).
     const payOut = (money, card) => {
-      for (const x of money)
+      const winners = money.filter((x) => x.delta > 0 && x.entry?.shown > 0).map((x) => x.name);
+      const { money: paid, capped } = arcade.capMoney(money, Object.fromEntries(winners.map((n) => [n, balanceOf(n)])));
+      for (const x of paid)
         setBank(x.name, casino.bankAfter(bank(x.name), x.name, x.delta, arcade.moneyLine(x, card.game, card.id, conv), x.extra || {}, now));
+      return capped;
     };
+    const withCapped = (pub, capped) => (Object.keys(capped).length ? { ...pub, capped: { ...(pub.capped || {}), ...capped } } : pub);
 
     // A group gift (/give @Programming 10): the same rules as the server's
     // giveMany, against the demo team. A second send with the same key is
@@ -2009,7 +2020,7 @@ export const demoStore = {
       const made = groupGiftEntries(
         me,
         { people, amount: req.amount, note: req.note, batch, group: label },
-        { roster: team, balance: balanceOf(me), now },
+        { roster: team, balance: balanceOf(me), balances: Object.fromEntries(people.filter((n) => n !== me).map((n) => [n, balanceOf(n)])), now },
       );
       if (made.error) return note(made.error, made.body);
       for (const e of made.entries) await demoStore.addCoinTx(e);
@@ -2019,7 +2030,7 @@ export const demoStore = {
     if (action === 'gift' || action === 'prize') {
       const entry =
         action === 'gift'
-          ? giftEntry(me, req, { roster, balance: balanceOf(me), now })
+          ? giftEntry(me, req, { roster, balance: balanceOf(me), toBalance: roster.includes(req.to) && req.to !== me ? balanceOf(req.to) : undefined, now })
           : prizeEntry(me, req, { ledger: state.coins || [], gameCap: state.settings?.ads?.games?.cap ?? 10, now });
       if (entry.error) return note(entry.error, entry.body);
       await demoStore.addCoinTx(entry);
@@ -2058,9 +2069,9 @@ export const demoStore = {
         });
         if (r.error) return note(r.error);
         if (!r.write) return { ok: true, serverNow: now };
-        payOut(r.money, { game: c.name, id: msgId });
+        const capped = payOut(r.money, { game: c.name, id: msgId });
         const cut = payDemoAwards(r.awards, msgId, now);
-        const { status, ...g } = r.pub;
+        const { status, ...g } = withCapped(r.pub, capped);
         if (Object.keys(cut).length) g.paid = cut;
         if (arcade.isLive(status)) state.gameSecrets = { ...state.gameSecrets, [msgId]: r.secret };
         else delete state.gameSecrets[msgId];
@@ -2077,13 +2088,17 @@ export const demoStore = {
       const { status, ...g } = r.pub;
       const cmd = { ...c, game: g, status, bet };
       if (r.done) {
-        const net = r.payout - bet;
-        setBank(m.by, casino.bankAfter(bank(m.by), m.by, r.payout - (r.extraBet || 0), { ...result(net, c.name), shown: net, settles: msgId, card: `${conv}/${msgId}` }, {}, now));
-        Object.assign(cmd, { payout: r.payout, net });
+        // Like the server: a win pays up to 1 quadrillion at most (before: now plus the bet held).
+        const won = r.payout - bet;
+        const net = won > 0 ? capWin(won, balanceOf(m.by) + c.bet) : won;
+        const capped = net < won;
+        const label = `${LABEL[c.name]}: ${net > 0 ? `won ${net}` : net < 0 ? `lost ${-net}` : 'bet back'}${capped ? casino.CAPPED : ''}`;
+        setBank(m.by, casino.bankAfter(bank(m.by), m.by, bet + net - (r.extraBet || 0), { ...result(net, c.name), label, shown: net, settles: msgId, card: `${conv}/${msgId}` }, {}, now));
+        Object.assign(cmd, { payout: bet + net, net, ...(capped && { capped: true }) });
         delete state.gameSecrets[msgId];
       } else state.gameSecrets = { ...state.gameSecrets, [msgId]: r.secret };
       state.chat = { ...state.chat, [conv]: list.map((x) => (x.id === msgId ? { ...x, cmd } : x)) };
-      const card = { game: g, status, bet, ...(r.done && { payout: cmd.payout, net: cmd.net }) };
+      const card = { game: g, status, bet, ...(r.done && { payout: cmd.payout, net: cmd.net, ...(cmd.capped && { capped: true }) }) };
       return done({ ok: true, serverNow: now, ...(localStorage.getItem('demo-no-card') ? {} : { card }) });
     }
 
@@ -2120,7 +2135,8 @@ export const demoStore = {
       if (r.error) return note(r.error);
       const { status, ...g } = r.pub;
       const m = post({ game: g, status, bet: g.bet || 0 }, r.mentions);
-      payOut(r.money, { game, id: m.id });
+      const capped = payOut(r.money, { game, id: m.id });
+      if (Object.keys(capped).length) setCard({ conv, id: m.id }, { game: withCapped(g, capped) });
       if (r.open) setBank(me, { ...bank(me), chOpen: { conv, id: m.id } });
       state.gameSecrets = { ...(state.gameSecrets || {}), [m.id]: r.secret };
       return done({ ok: true, serverNow: now });
@@ -2157,9 +2173,11 @@ export const demoStore = {
       if (r.error) return note(r.error);
       const { status = 'done', ...g } = r.pub;
       if (r.done) {
-        const net = r.payout - bet;
-        const m = post({ game: g, status, bet, payout: r.payout, net });
-        setBank(me, casino.bankAfter(mine, me, net, { ...result(net, game), card: `${conv}/${m.id}` }, {}, now));
+        // Like the server: a win pays up to 1 quadrillion at most.
+        const net = capWin(r.payout - bet, balance);
+        const capped = net < r.payout - bet;
+        const m = post({ game: g, status, bet, payout: bet + net, net, ...(capped && { capped: true }) });
+        setBank(me, casino.bankAfter(mine, me, net, { ...result(net, game, capped), card: `${conv}/${m.id}` }, {}, now));
       } else {
         const m = post({ game: g, status, bet });
         setBank(me, casino.bankAfter(mine, me, -bet, casino.holdEntry(ICON[game], LABEL[game], bet, m.id), {}, now));
@@ -2174,7 +2192,7 @@ export const demoStore = {
         people.find((n) => target.includes(n.toLowerCase())) || people.find((n) => n.toLowerCase().split(' ')[0] === target.split(' ')[0]);
       if (!them) return note('Rob who?', 'Try: /rob @name');
       if (them === me) return note('You can’t rob yourself.', 'You’d just be moving coins between pockets.');
-      const r = casino.rob(mine, balance, balanceOf(them), now);
+      const r = casino.capRob(casino.rob(mine, balance, balanceOf(them), now), balance, balanceOf(them));
       if (r.error) return note(r.error);
       setBank(
         me,
@@ -2220,6 +2238,11 @@ export const demoStore = {
             })
           : casino.beg(mine, now);
     if (r.error) return note(r.error);
+    // /work and /beg pay up to 1 quadrillion at most (like the server).
+    if (game !== 'daily' && capWin(r.amount, balance) < r.amount) {
+      r.amount = capWin(r.amount, balance);
+      r.card = { ...r.card, amount: r.amount, capped: true };
+    }
     const label = { daily: `Daily coins (streak ${r.card.streak})`, work: `Work: ${r.card.job}`, beg: 'Begging' }[game];
     if (game === 'daily') {
       // Like the server: an award within the 20-a-day game limit; the bank keeps the streak.
