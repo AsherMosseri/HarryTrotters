@@ -4052,6 +4052,10 @@ html.kb-bar .chat-side-body { padding-bottom: calc(8px + var(--kb-bar, 0px)); }
 /* Team management's list. */
 .dialog.disputes-dialog { width: min(600px, calc(100vw - 32px)); max-height: calc(var(--vvh, 100dvh) - 40px); display: flex; flex-direction: column; gap: 10px; }
 .disputes-body { gap: 12px; }
+/* Refund all (3.1.4): whose reports, and the button. */
+.disputes-bulk { align-items: center; }
+.disputes-bulk .disputes-who { flex: 1 1 180px; min-width: 0; width: auto; min-height: 44px; }
+.disputes-bulk .btn { min-height: 44px; margin-left: auto; }
 .report-card { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
 .report-card:not(.open) { opacity: 0.85; }
 .report-head { display: flex; align-items: center; gap: 10px; }

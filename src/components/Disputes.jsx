@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { DISPUTABLE, GAME_LABEL, LIMITS, REASONS, cardLoss, reportProblem } from '../../functions/shared/disputes.js';
 import { relTime, useEscape } from '../util.js';
 import { Avatar, CloseIcon, Overlay } from './common.jsx';
-import { confirmDialog } from './Dialogs.jsx';
+import { alertDialog, confirmDialog } from './Dialogs.jsx';
 import { Icon } from './shell/icons.jsx';
 import { REQUESTS_TO } from '../config.js';
 import { CoinNum, useCoinFormat } from './CoinNum.jsx';
@@ -154,8 +154,43 @@ export function MyReports({ list }) {
 export function DisputesDialog({ list, api, wallet, onToast, onClose }) {
   useEscape(onClose);
   const [tab, setTab] = useState('open');
-  const open = list.filter((x) => x.status === 'open');
+  const [who, setWho] = useState('');
+  const [busy, setBusy] = useState(false);
+  const allOpen = list.filter((x) => x.status === 'open');
+  // Who has reports waiting, most first, for the picker.
+  const people = [...allOpen.reduce((m, x) => m.set(x.by, (m.get(x.by) || 0) + 1), new Map())].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  const person = people.some(([n]) => n === who) ? who : '';
+  const open = person ? allOpen.filter((x) => x.by === person) : allOpen;
   const shown = tab === 'open' ? open : list.filter((x) => x.status !== 'open');
+  // Refund all: every waiting report shown (everyone's, or one person's). The
+  // server checks each one like its own Refund button and skips any it can't.
+  const refundAll = async () => {
+    const n = open.length;
+    const known = open.reduce((t, x) => t + (x.snapshot?.final ? x.snapshot.loss || 0 : 0), 0);
+    const unsure = open.some((x) => !x.snapshot?.final);
+    const ok = await confirmDialog({
+      title: `Refund ${n === 1 ? 'this report' : `all ${n} reports`}${person ? ` from ${first(person)}` : ''}?`,
+      body: `${unsure ? 'At least' : 'About'} ${exactCoins(known)} coins: each one pays back what its result shows they lost, once, checked like its own Refund button. Any that can’t be refunded stay waiting. It can’t be undone.`,
+      okLabel: n === 1 ? 'Refund' : `Refund ${n}`,
+    });
+    if (!ok) return;
+    setBusy(true);
+    const r = await api.disputeRefundAll({ ...(person && { person }) });
+    setBusy(false);
+    if (!r?.ok) {
+      await alertDialog({ title: r?.note?.title || 'That didn’t go through.', body: r?.note?.body || '' });
+      return;
+    }
+    if (r.refunded) onToast?.(`Refunded ${r.refunded} report${r.refunded === 1 ? '' : 's'}: ${exactCoins(r.coins)} coins.`);
+    if (r.skipped?.length)
+      await alertDialog({
+        title: `${r.skipped.length} stayed waiting`,
+        body: r.skipped
+          .slice(0, 12)
+          .map((x) => `${first(x.by)}, ${GAME_LABEL[x.game] || 'Casino'}: ${x.why}`)
+          .join('\n') + (r.skipped.length > 12 ? `\n…and ${r.skipped.length - 12} more.` : ''),
+      });
+  };
   return (
     <Overlay>
       <div className="panel-backdrop center" onClick={onClose}>
@@ -171,7 +206,7 @@ export function DisputesDialog({ list, api, wallet, onToast, onClose }) {
           </div>
           <div className="segmented coins-tabs" role="tablist">
             {[
-              ['open', `Waiting (${open.length})`],
+              ['open', `Waiting (${allOpen.length})`],
               ['done', 'Handled'],
             ].map(([id, label]) => (
               <button
@@ -185,6 +220,23 @@ export function DisputesDialog({ list, api, wallet, onToast, onClose }) {
               </button>
             ))}
           </div>
+          {tab === 'open' && allOpen.length > 0 && (
+            <div className="row gap wrap disputes-bulk">
+              {people.length > 1 && (
+                <select className="input disputes-who" value={person} aria-label="Whose reports" onChange={(e) => setWho(e.target.value)}>
+                  <option value="">Everyone ({allOpen.length})</option>
+                  {people.map(([n, c]) => (
+                    <option key={n} value={n}>
+                      {n} ({c})
+                    </option>
+                  ))}
+                </select>
+              )}
+              <button className="btn" disabled={busy || !open.length} onClick={refundAll}>
+                {busy ? 'Refunding…' : open.length === 1 ? 'Refund it' : `Refund all ${open.length}`}
+              </button>
+            </div>
+          )}
           <div className="coins-body disputes-body">
             {shown.length === 0 && (
               <p className="muted">{tab === 'open' ? 'Nothing waiting. Reports show up here.' : 'Nothing handled yet.'}</p>

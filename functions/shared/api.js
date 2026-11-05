@@ -30,6 +30,7 @@ export const API_FNS = [
   'coinRequest',
   'dispute',
   'disputeDecide',
+  'disputeRefundAll',
   'ownerRefund',
   'coinCheck',
   // The market and pets

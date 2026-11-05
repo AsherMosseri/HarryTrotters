@@ -2311,6 +2311,10 @@ export const demoStore = {
       if (m?.cmd) demoTag(x.conv, x.msgId, dispute.adjustTag({ person: x.by, mode: 'refund', amount: refund, by: actor.name, now, via: 'report' }));
     }
     Object.assign(x, { status: decision === 'refund' ? 'refunded' : 'dismissed', handledBy: actor.name, handledAt: now, refund, resolutionNote: resolution });
+    if (req.quiet) {
+      commit();
+      return { ok: true, status: x.status, refund, x };
+    }
     state.inbox = [
       {
         id: uid(),
@@ -2329,6 +2333,46 @@ export const demoStore = {
     ];
     commit();
     return { ok: true, status: x.status, refund };
+  },
+  // Refund all (the disputeRefundAll function): every waiting report, or one
+  // person's, each through disputeDecide; one notification per person.
+  async disputeRefundAll(req, actor) {
+    const note = (title, body = '') => ({ note: { title, body } });
+    if (!actor.admin || actor.name !== REQUESTS_TO) return note(`Only ${REQUESTS_TO.split(' ')[0]} can do that.`);
+    const only = String(req?.person || '').trim();
+    const open = (state.disputes || []).filter((x) => x.status === 'open' && (!only || x.by === only)).sort((a, b) => a.at - b.at);
+    if (!open.length) return note(only ? `Nothing waiting from ${only.split(' ')[0]}.` : 'Nothing waiting.');
+    const paid = new Map();
+    const skipped = [];
+    let coins = 0;
+    for (const x of open) {
+      const out = await this.disputeDecide({ id: x.id, decision: 'refund', note: req?.note, quiet: true }, actor);
+      if (out?.ok) {
+        const row = paid.get(x.by) || { count: 0, coins: 0, game: x.cmd };
+        row.count += 1;
+        row.coins += out.refund;
+        paid.set(x.by, row);
+        coins += out.refund;
+      } else skipped.push({ id: x.id, by: x.by, game: x.cmd || '', why: out?.note?.title || 'Skipped.' });
+    }
+    const now = Date.now();
+    const boss = REQUESTS_TO.split(' ')[0];
+    state.inbox = [
+      ...[...paid].map(([to, r]) => ({
+        id: uid(),
+        type: 'dispute',
+        icon: '↩️',
+        title: `${coinsText(r.coins)} coins refunded`,
+        body: r.count === 1 ? `${boss} refunded your ${dispute.GAME_LABEL[r.game] || 'casino'} result.` : `${boss} refunded ${r.count} of your casino reports.`,
+        open: 'disputes:',
+        at: now,
+        read: false,
+        to,
+      })),
+      ...(state.inbox || []),
+    ];
+    commit();
+    return { ok: true, refunded: [...paid.values()].reduce((n, r) => n + r.count, 0), coins, people: paid.size, skipped };
   },
   // The owner's Refund / Take back on a game card, checked the way the
   // ownerRefund function checks it (shared/disputes.js): the card's own

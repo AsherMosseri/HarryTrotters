@@ -1424,6 +1424,11 @@ export const firebaseStore = {
   async disputeDecide(req) {
     return (await callable('disputeDecide')(req)).data;
   },
+  // Refund every waiting report, or every one from { person } (the owner only):
+  // { ok, refunded, coins, people, skipped: [{ id, by, game, why }] } or { note }.
+  async disputeRefundAll(req) {
+    return (await callable('disputeRefundAll')(req)).data;
+  },
   // The owner's Refund / Take back on a game card in chat: { conv, msgId,
   // person, mode: 'refund' | 'takeback' }. The amount is the card's.
   async ownerRefund(req) {

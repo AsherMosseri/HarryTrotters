@@ -1471,6 +1471,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
       // Casino reports (Disputes.jsx).
       dispute: (req) => store.dispute(req, actor).catch((e) => ({ note: noteFor(e, 'That didn’t go through') })),
       disputeDecide: (req) => store.disputeDecide(req, actor).catch((e) => ({ note: noteFor(e, 'That didn’t go through') })),
+      disputeRefundAll: (req) => store.disputeRefundAll(req, actor).catch((e) => ({ note: noteFor(e, 'That didn’t go through') })),
       // The owner's Refund / Take back on a game card (CardActions.jsx, and coin history's Reverse).
       ownerRefund: (req) => store.ownerRefund(req, actor).catch((e) => ({ note: noteFor(e, 'That didn’t go through') })),
       // Loans (Loans.jsx, functions/loans.js): fn is loanRequest, loanRespond, loanRepay or loanManage.

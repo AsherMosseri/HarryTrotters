@@ -6,6 +6,8 @@
 // Callables:
 //   dispute({ conv, msgId, reason, note })        report a casino result you were part of
 //   disputeDecide({ id, decision, note })         the owner only: 'refund' or 'dismiss'
+//   disputeRefundAll({ person?, note })           the owner only (3.1.4): refund every waiting report,
+//                                                 or every one from one person, each checked like disputeDecide
 //   ownerRefund({ conv, msgId, person, mode })     the owner only, from the card in chat (3.1.1):
 //                                                 'refund' a loss or 'takeback' a win, report or not
 //
@@ -135,23 +137,22 @@ export function disputeFunctions({ db, coinData, notify, bankRef, owner }) {
     return { ok: true, id };
   });
 
-  const disputeDecide = onCall(OPEN, async (req) => {
-    const { me, admin, data } = await caller(req);
-    if (!admin || me !== data.rename(owner)) throw new HttpsError('permission-denied', `Only ${ownerFirst} can do that.`);
-    const { id, decision, note: text } = req.data || {};
-    if (!validId(id)) return note('Which report?');
-    if (decision !== 'refund' && decision !== 'dismiss') return note('Refund or dismiss?');
-    const dref = db.doc(`disputes/${id}`);
-    const resolution = String(text || '')
+  const isOwner = ({ me, admin, data }) => admin && me === data.rename(owner);
+  const resolutionOf = (text) =>
+    String(text || '')
       .trim()
       .slice(0, d.LIMITS.resolution);
+
+  // One report, refunded or dismissed, in one transaction: { ok, status, x, refund } or a note.
+  async function decideOne(id, decision, resolution, me, data) {
+    const dref = db.doc(`disputes/${id}`);
     // The person's recent casino history (their bank doc, under any name they've had).
     const peek = await dref.get();
     if (!peek.exists) return note('That report is gone.');
     const aliases = data.rename.aliases(peek.get('by')).slice(0, 30);
     const banks = await db.getAll(...aliases.map((n) => bankRef(n)));
     const recent = banks.flatMap((b) => (b.exists ? b.get('recent') || [] : []));
-    const out = await db.runTransaction(async (tx) => {
+    return db.runTransaction(async (tx) => {
       const snap = await tx.get(dref);
       const x = snap.data();
       if (!x) return note('That report is gone.');
@@ -200,6 +201,17 @@ export function disputeFunctions({ db, coinData, notify, bankRef, owner }) {
         tx.update(mref, new FieldPath('cmd', 'adjust', nameKey(who)), d.adjustTag({ person: who, mode: 'refund', amount: loss, by: me, now, via: 'report' }));
       return { ok: true, status: 'refunded', x, refund: loss };
     });
+  }
+
+  const disputeDecide = onCall(OPEN, async (req) => {
+    const who = await caller(req);
+    const { me, data } = who;
+    if (!isOwner(who)) throw new HttpsError('permission-denied', `Only ${ownerFirst} can do that.`);
+    const { id, decision, note: text } = req.data || {};
+    if (!validId(id)) return note('Which report?');
+    if (decision !== 'refund' && decision !== 'dismiss') return note('Refund or dismiss?');
+    const resolution = resolutionOf(text);
+    const out = await decideOne(id, decision, resolution, me, data);
     if (!out.ok) return out;
     await notify([
       {
@@ -216,6 +228,61 @@ export function disputeFunctions({ db, coinData, notify, bankRef, owner }) {
       },
     ]).catch((e) => logger.warn('dispute notify', e.message));
     return { ok: true, status: out.status, refund: out.refund };
+  });
+
+  // The owner's Refund all: every waiting report, or every one from `person`.
+  // Each report goes through decideOne exactly like its own Refund button (the
+  // card's loss, the history check, the shared once-only key), one at a time,
+  // so a report that can't be refunded is skipped and stays waiting. Each
+  // person gets one notification for all of theirs.
+  const disputeRefundAll = onCall({ ...OPEN, timeoutSeconds: 300 }, async (req) => {
+    const who = await caller(req);
+    const { me, data } = who;
+    if (!isOwner(who)) throw new HttpsError('permission-denied', `Only ${ownerFirst} can do that.`);
+    const { person, note: text } = req.data || {};
+    const resolution = resolutionOf(text);
+    const only = typeof person === 'string' && person.trim() ? data.rename(person.trim()) : '';
+    const open = (await db.collection('disputes').where('status', '==', 'open').limit(500).get()).docs
+      .filter((x) => !only || data.rename(x.get('by')) === only)
+      .sort((a, b) => (a.get('at') || 0) - (b.get('at') || 0))
+      .slice(0, 200);
+    if (!open.length) return note(only ? `Nothing waiting from ${first(only)}.` : 'Nothing waiting.');
+    const paid = new Map(); // person -> { to, count, coins, game }
+    const skipped = [];
+    let coins = 0;
+    for (const x of open) {
+      let out;
+      try {
+        out = await decideOne(x.id, 'refund', resolution, me, data);
+      } catch (e) {
+        logger.warn('disputeRefundAll', x.id, e.message);
+        out = note('That didn’t go through.');
+      }
+      if (out?.ok && out.status === 'refunded') {
+        const p = data.rename(out.x.by);
+        const row = paid.get(p) || { to: out.x.by, count: 0, coins: 0, game: out.x.cmd };
+        row.count += 1;
+        row.coins += out.refund;
+        paid.set(p, row);
+        coins += out.refund;
+      } else skipped.push({ id: x.id, by: x.get('by'), game: x.get('cmd') || '', why: out?.note?.title || 'Skipped.' });
+    }
+    await notify(
+      [...paid.values()].map((r) => ({
+        to: r.to,
+        type: 'dispute',
+        icon: '↩️',
+        title: `${coinsText(r.coins)} coins refunded`,
+        body:
+          r.count === 1
+            ? `${ownerFirst} refunded your ${d.GAME_LABEL[r.game] || 'casino'} result.${resolution ? ` ${resolution}` : ''}`
+            : `${ownerFirst} refunded ${r.count} of your casino reports.${resolution ? ` ${resolution}` : ''}`,
+        open: 'disputes:',
+        by: me,
+      })),
+    ).catch((e) => logger.warn('disputeRefundAll notify', e.message));
+    const refunded = [...paid.values()].reduce((n, r) => n + r.count, 0);
+    return { ok: true, refunded, coins, people: paid.size, skipped };
   });
 
   // The owner's Refund / Take back on a finished game card, for one person in
@@ -269,5 +336,5 @@ export function disputeFunctions({ db, coinData, notify, bankRef, owner }) {
     return out;
   });
 
-  return { dispute, disputeDecide, ownerRefund };
+  return { dispute, disputeDecide, disputeRefundAll, ownerRefund };
 }
