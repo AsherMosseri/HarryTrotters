@@ -14,9 +14,9 @@ export function useFitCanvas(wrap, canvas) {
     const el = wrap.current;
     if (!el) return undefined;
     const fit = () => {
-      const r = el.getBoundingClientRect();
-      const w = Math.max(1, Math.round(r.width));
-      const h = Math.max(1, Math.round(r.height));
+      // Layout size (not getBoundingClientRect: a dialog's opening zoom would shrink it).
+      const w = Math.max(1, el.clientWidth);
+      const h = Math.max(1, el.clientHeight);
       const dpr = Math.min(2, window.devicePixelRatio || 1);
       const cv = canvas.current;
       if (cv) {

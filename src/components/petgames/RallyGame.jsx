@@ -36,10 +36,13 @@ export default function RallyGame({ pet, stage, level: n, best, onEnd, onQuit, o
   const pausedRef = useRef(false);
   const ended = useRef(false);
   const timeEl = useRef(null);
+  // The best before this run (the parent's changes as soon as it ends).
+  const before = useRef(best);
   const barEl = useRef(null);
   useNoScroll(wrap);
 
   const fresh = useCallback(() => {
+    before.current = best;
     car.current = Rally.newCar(level);
     cam.current = { x: car.current.x, y: car.current.y, lead: 0 };
     acc.current = 0;
@@ -48,7 +51,7 @@ export default function RallyGame({ pet, stage, level: n, best, onEnd, onQuit, o
     pads.current = { gas: new Set(), brake: new Set() };
     setPressed({ gas: false, brake: false });
     setHud({ status: 'ready', t: 0, pct: 0 });
-  }, [level]);
+  }, [level, best]);
   // One level a screen (the parent keys this by level).
   if (!car.current) {
     car.current = Rally.newCar(level);
@@ -125,6 +128,7 @@ export default function RallyGame({ pet, stage, level: n, best, onEnd, onQuit, o
     const c = car.current;
     const { w, h, dpr } = live.current;
     if (!h || !canvas.current) return;
+    wrap.current.pgState = c; // read by the Playwright check (scripts) only
     const input = { gas: keys.current.gas || pads.current.gas.size > 0, brake: keys.current.brake || pads.current.brake.size > 0 };
     if (!pausedRef.current) {
       acc.current += dt;
@@ -163,7 +167,7 @@ export default function RallyGame({ pet, stage, level: n, best, onEnd, onQuit, o
   const st = hud.status;
   const won = st === 'won';
   const failed = FAIL[st];
-  const newBest = won && (!best || Math.round(hud.t * 1000) < best);
+  const newBest = won && (!before.current || Math.round(hud.t * 1000) < before.current);
   return (
     <div className="pg-play pg-rally">
       <div ref={wrap} className="pg-stage" onContextMenu={(e) => e.preventDefault()}>
@@ -175,8 +179,8 @@ export default function RallyGame({ pet, stage, level: n, best, onEnd, onQuit, o
           aria-hidden="true"
         >
           <CarBack />
-          <div className="pr-pet" style={{ left: 73 * k, top: 66 * k, width: 110 * k, height: 110 * k }}>
-            <PetWithGear species={pet.species} gear={pet.gear} stage={stage} mood={failed ? 'sad' : 'happy'} size={110 * k} still={!movingOn()} />
+          <div className="pr-pet" style={{ left: (140 - 12 - PET / 2) * k, top: (175 - PET_Y - PET / 2) * k, width: PET * k, height: PET * k }}>
+            <PetWithGear species={pet.species} gear={pet.gear} stage={stage} mood={failed ? 'sad' : 'happy'} size={PET * k} still={!movingOn()} />
           </div>
           <CarFront />
         </div>
@@ -239,7 +243,7 @@ export default function RallyGame({ pet, stage, level: n, best, onEnd, onQuit, o
             <span className="pg-panel-big mono">{rallyTime(hud.t * 1000)}</span>
             <span className="muted">
               Level {n}, {level.name}
-              {best && !newBest ? ` · best ${rallyTime(best)}` : ''}
+              {!newBest && best ? ` · best ${rallyTime(best)}` : ''}
             </span>
             <div className="pg-panel-btns">
               {n < RALLY_COUNT ? (
@@ -278,6 +282,9 @@ export default function RallyGame({ pet, stage, level: n, best, onEnd, onQuit, o
 }
 
 // ---------- the car (drawn in cm, 0,0 at the body's middle, y down) ----------
+// The pet sits in it: PET cm tall, its middle PET_Y cm above the body's.
+const PET = 148;
+const PET_Y = 60;
 const RED = '#e0475b';
 const RED_DARK = '#9b2335';
 function CarBack() {
@@ -320,18 +327,18 @@ function CarFront() {
 // Pixels a meter: about 12 m across a phone, more on an iPad.
 export function scaleOf(w, h) {
   if (!w || !h) return 40;
-  return Math.max(24, Math.min(64, Math.min(w / 12, h / 7.5)));
+  return Math.max(26, Math.min(64, Math.min(w / 10.5, h / 7.5)));
 }
 function camera(cam, c, w, h, dt) {
   const ppm = scaleOf(w, h);
   // Look ahead when going fast; follow up and down softly.
-  const lead = Math.max(-1, Math.min(4, c.vx * 0.35));
+  const lead = Math.max(-1, Math.min(4, (w * 0.2) / ppm, c.vx * 0.35));
   const f = 1 - Math.exp(-dt * 3);
   cam.lead += (lead - cam.lead) * f;
   cam.x = c.x + cam.lead;
   cam.y += (c.y - cam.y) * (1 - Math.exp(-dt * 5));
-  const ox = w * 0.36;
-  const oy = h * 0.58;
+  const ox = w * 0.42;
+  const oy = h * (h > w ? 0.56 : 0.6);
   return {
     ppm,
     sx: (x) => ox + (x - cam.x) * ppm,

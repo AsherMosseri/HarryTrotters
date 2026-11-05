@@ -117,8 +117,8 @@
 .pg-board-val { font-size: 14px; white-space: nowrap; }
 
 /* ---------- playing: the whole screen ---------- */
-.pg-backdrop.playing { padding: 0; }
-.pg-dialog.playing {
+.panel-backdrop.center.pg-backdrop.playing { padding: 0; overflow: hidden; align-items: stretch; }
+.panel-backdrop.center > .dialog.pg-dialog.playing {
   width: 100%; max-width: none; height: 100dvh; max-height: none; border-radius: 0; padding: 0; gap: 0; overflow: hidden;
   animation: none;
 }
@@ -132,6 +132,8 @@
 .pg-canvas { position: absolute; left: 0; top: 0; display: block; }
 .pg-sprite, .pr-car { position: absolute; left: 0; top: 0; pointer-events: none; will-change: transform; }
 .pg-sprite .pet-geared, .pr-pet .pet-geared { display: block; }
+/* No ground shadow under a pet in the air or in a car. */
+.pg-sprite svg.pet-art > ellipse, .pr-pet svg.pet-art > ellipse { display: none; }
 .pr-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
 .pr-pet { position: absolute; }
 
@@ -145,7 +147,7 @@
   background: var(--pg-glass); color: var(--pg-glass-text); box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18); touch-action: manipulation;
 }
 .pg-score { flex: 1; display: flex; flex-direction: column; align-items: center; color: #fff; pointer-events: none; text-shadow: 0 2px 0 rgba(0, 0, 0, 0.35), 0 0 8px rgba(0, 0, 0, 0.25); }
-.pg-score b { font-size: 48px; font-weight: 800; line-height: 1; }
+.pg-score b { font-size: 48px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
 .pg-score span { font-size: 14px; font-weight: 650; }
 .pg-hud-gap { width: 44px; flex: none; }
 .pg-hint {

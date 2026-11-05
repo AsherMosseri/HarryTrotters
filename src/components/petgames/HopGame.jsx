@@ -25,15 +25,18 @@ export default function HopGame({ pet, stage, best, onEnd, onQuit }) {
   const pausedRef = useRef(false);
   const overAt = useRef(0);
   const ended = useRef(false);
+  // The best before this round (the parent's goes up as soon as it ends).
+  const before = useRef(best || 0);
   useNoScroll(wrap);
 
   const fresh = useCallback(() => {
+    before.current = Math.max(before.current, game.current?.score || 0, best || 0);
     const { w, h } = live.current;
     game.current = Hop.newHop({ width: h ? (w / h) * Hop.H : 60, seed: (Date.now() ^ (Math.random() * 1e9)) >>> 0 });
     acc.current = 0;
     ended.current = false;
     setHud({ score: 0, status: 'ready' });
-  }, [live]);
+  }, [live, best]);
   if (!game.current) game.current = Hop.newHop({ width: 60 });
 
   // The world is as wide as the screen's shape; it follows a turned device.
@@ -88,17 +91,18 @@ export default function HopGame({ pet, stage, best, onEnd, onQuit }) {
     const g = game.current;
     const { w, h, dpr } = live.current;
     if (!h || !canvas.current) return;
+    wrap.current.pgState = g; // read by the Playwright check (scripts) only
     if (!pausedRef.current) {
       acc.current += dt;
       let n = 0;
       while (acc.current >= Hop.DT && n < 24) {
-        const before = g.score;
+        const prev = g.score;
         const was = g.status;
         Hop.step(g, flap.current);
         flap.current = false;
         acc.current -= Hop.DT;
         n++;
-        if (g.score !== before || g.status !== was) setHud({ score: g.score, status: g.status });
+        if (g.score !== prev || g.status !== was) setHud({ score: g.score, status: g.status });
         if (g.status === 'over' && was !== 'over') {
           overAt.current = Date.now();
           if (!ended.current) {
@@ -119,7 +123,7 @@ export default function HopGame({ pet, stage, best, onEnd, onQuit }) {
   });
 
   const px = Math.round((SPRITE * size.h) / Hop.H) || 48;
-  const isBest = hud.status === 'over' && hud.score > 0 && hud.score > (best || 0);
+  const isBest = hud.status === 'over' && hud.score > before.current;
   return (
     <div className="pg-play pg-hop">
       <div
@@ -142,7 +146,7 @@ export default function HopGame({ pet, stage, best, onEnd, onQuit }) {
             <Icon name={hud.status === 'go' ? 'pause' : 'left'} size={20} />
           </button>
           <div className="pg-score" aria-live="polite">
-            <b className="mono">{hud.score}</b>
+            <b>{hud.score}</b>
             <span className="mono">Best {Math.max(best || 0, hud.score)}</span>
           </div>
           <span className="pg-hud-gap" />
