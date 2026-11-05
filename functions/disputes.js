@@ -35,7 +35,7 @@ import { FieldPath } from 'firebase-admin/firestore';
 import { logger } from 'firebase-functions';
 import * as d from './shared/disputes.js';
 import { memberOk, nameKey } from './shared/team.js';
-import { ceilingNote, overCeiling, teamDay } from './shared/coins.js';
+import { ceilingNote, overCeiling, sumCoins, teamDay } from './shared/coins.js';
 import { coinsText } from './shared/coinText.js';
 
 const OPEN = { maxInstances: 5, invoker: 'public' };
@@ -326,7 +326,10 @@ export function disputeFunctions({ db, coinData, freshCoins, notify, bankRef, ow
       if (key.exists || msg.get('cmd.undone')) return note('That gift was already undone.');
       const list = gifts.filter((g) => g.exists && g.get('type') === 'gift' && data.rename(g.get('from') || '') === giver).map((g) => g.data());
       if (!list.length) return note('I can’t find that gift in the coin history.', 'Nothing was changed.');
-      const total = list.reduce((t, x) => t + x.amount, 0);
+      const total = sumCoins(list);
+      // The giver gets it all back, but never past a googol (MAX_BALANCE).
+      const over = await ceilingCheck(tx, giver, total, data);
+      if (over) return note(ceilingNote(giver).error, 'Nobody can hold more than that. Nothing was undone.');
       const toWhat = c.group || list[0].to;
       tx.set(keyRef, { via: 'gift', mode: 'undogift', batch, giver, total, n: list.length, by: me, at: now });
       for (const x of list)

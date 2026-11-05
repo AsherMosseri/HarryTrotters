@@ -20,7 +20,7 @@ import * as challenge from '../../functions/shared/challenge.js';
 import * as dispute from '../../functions/shared/disputes.js';
 import { blocked, isOff, serverGroup } from '../../functions/shared/commandRules.js';
 import * as coinAsk from '../../functions/shared/coinRequests.js';
-import { AWARD_CAPS, breakdown, capWin, ceilingNote, giftEntry, overCeiling, groupGiftEntries, prizeEntry, teamDay, teamMidnight } from '../../functions/shared/coins.js';
+import { AWARD_CAPS, breakdown, capWin, ceilingNote, giftEntry, overCeiling, sumCoins, groupGiftEntries, prizeEntry, teamDay, teamMidnight } from '../../functions/shared/coins.js';
 import { BOT, groupLabel, resolveTargets } from '../../functions/shared/groups.js';
 import * as fun from '../../functions/shared/funGames.js';
 import * as mines from '../../functions/shared/minesweeper.js';
@@ -2415,7 +2415,9 @@ export const demoStore = {
       const boss = REQUESTS_TO.split(' ')[0];
       const list = (state.coins || []).filter((x) => x.type === 'gift' && (x.batch === c.batch || x.key === c.batch) && x.from === m.by);
       if (!list.length) return note('I can’t find that gift in the coin history.', 'Nothing was changed.');
-      const total = list.reduce((t, x) => t + x.amount, 0);
+      const total = sumCoins(list);
+      // Like the server: the giver never goes past a googol.
+      if (ctx.balanceOf && overCeiling(ctx.balanceOf(m.by), total)) return note(ceilingNote(m.by).error, 'Nobody can hold more than that. Nothing was undone.');
       state.coins = [
         ...(state.coins || []),
         ...list.map((x) => ({ id: `undo-${c.batch}-${personId(x.to)}`, type: 'refund', person: x.to, amount: -x.amount, label: `Gift undone by ${boss}: from ${x.from}`, at: now })),
