@@ -198,7 +198,7 @@ eq(g('1e3').amount, 1000, 'gift "1e3" is 1000 (3.1.5)');
 eq(g('1.5e0').error, 'Send at least 1 coin.', 'gift "1.5e0" refused');
 eq(g(NaN).error, 'Send at least 1 coin.', 'gift NaN refused');
 eq(g(Infinity, Infinity).error, 'Send at least 1 coin.', 'gift Infinity refused');
-eq(g('2e101', Infinity).error, 'Send at least 1 coin.', 'gift over a googol refused');
+eq(g('2e101', Infinity).error, 'That’s more than a googol.', 'gift "2e101" refused: over a googol');
 eq(g(2e100, Infinity).error, 'That’s more than a googol.', 'gift number over a googol refused');
 eq(g(2.5).error, 'Send at least 1 coin.', 'gift 2.5 refused, as before');
 eq(g(0).error, 'Send at least 1 coin.', 'gift 0 refused');

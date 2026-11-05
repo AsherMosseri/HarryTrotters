@@ -16,7 +16,7 @@ import { mergedMs } from './hours.js';
 import { nameKey } from './team.js';
 import { BOT } from './groups.js';
 import { secureRandom } from './rng.js';
-import { parseAmount } from './amount.js';
+import { parseAmount, readAmount } from './amount.js';
 import { coinsText } from './coinText.js';
 
 // The team day 3.0's earning rules start (4 an hour in 15-minute steps, cut
@@ -624,9 +624,10 @@ const text = (v, n) => String(v || '').slice(0, n);
 // toBalance: what the person it goes to has (the server reads it fresh), for
 // the ceiling (MAX_BALANCE); left out, it isn't checked.
 export function giftEntry(from, { to, amount, note }, { roster, balance, toBalance, now = Date.now() }) {
-  const n = typeof amount === 'string' ? (parseAmount(amount) ?? NaN) : Number(amount);
+  const n = typeof amount === 'string' ? (parseAmount(amount) ?? (readAmount(amount)?.over ? Infinity : NaN)) : Number(amount);
   if (!roster.includes(to)) return { error: 'Who’s that?' };
   if (to === from) return { error: 'That’s you.', body: 'Your coins are already yours.' };
+  if (n === Infinity && typeof amount === 'string') return { error: 'That’s more than a googol.', body: 'Nobody can hold more than that.' };
   if (!Number.isInteger(n) || n < 1) return { error: 'Send at least 1 coin.' };
   if (n > GIFT_MAX) return { error: 'That’s more than a googol.', body: 'Nobody can hold more than that.' };
   if (n > balance) return { error: `You only have ${coinsText(balance)} coins.` };
