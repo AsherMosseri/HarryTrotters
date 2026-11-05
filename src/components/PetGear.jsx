@@ -1,6 +1,7 @@
-import { PetArt } from './PetArt.jsx';
+import { useId } from 'react';
+import { PetArt, gemOutline } from './PetArt.jsx';
 import { cleanGear } from '../../functions/shared/pets.js';
-import { PET_ANCHORS, petStage, stageAnchors } from './petAnchors.js';
+import { PET_ANCHORS, bodyAnchor, petStage, stageAnchors } from './petAnchors.js';
 
 // Gear for pets (unlocked by level, see functions/shared/pets.js): small flat
 // SVGs drawn over the pet art in the same 64x64 box, so any pet can wear any
@@ -64,6 +65,32 @@ const HEAD = {
       <circle cx="0" cy="-20" r="1.4" fill="#a94700" />
       <circle cx="0" cy="-8.6" r="2.3" fill="#fff" opacity="0.92" />
       <path d="M0 -10.6 V-6.6 M-2 -8.6 H2" stroke="#a94700" strokeWidth="0.9" strokeLinecap="round" />
+    </>
+  ),
+  // Level 50: a grander crown than the level 25 one: red velvet under gold
+  // arches set with pearls, a jeweled band, and an orb and cross on top.
+  royalcrown: (
+    <>
+      <path d="M-10.4 -9.4 C-11 -15.4 -6.6 -18.8 0 -18.8 C6.6 -18.8 11 -15.4 10.4 -9.4 Z" fill="#b3173a" stroke="#6f0d24" strokeWidth="1" strokeLinejoin="round" />
+      <path d="M-7.6 -11 C-8 -14.4 -5.6 -16.8 -2.4 -17.4" stroke="#e2577a" strokeWidth="1.6" fill="none" strokeLinecap="round" opacity="0.7" />
+      <path d="M-9.4 -10 C-9.6 -15 -5.4 -18.2 0 -18.6 C5.4 -18.2 9.6 -15 9.4 -10 M0 -9.8 V-18.6" stroke={GOLD_DARK} strokeWidth="2.7" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M-9.4 -10 C-9.6 -15 -5.4 -18.2 0 -18.6 C5.4 -18.2 9.6 -15 9.4 -10 M0 -9.8 V-18.6" stroke={GOLD} strokeWidth="1.6" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      {[[-8.9, -14], [-5.6, -17.2], [5.6, -17.2], [8.9, -14], [0, -14.4]].map(([x, y]) => (
+        <circle key={`${x} ${y}`} cx={x} cy={y} r="0.8" fill="#fffaf0" stroke="#c9b48a" strokeWidth="0.3" />
+      ))}
+      <circle cx="0" cy="-19.9" r="1.8" fill={GOLD} stroke={GOLD_DARK} strokeWidth="0.9" />
+      <path d="M0 -21.4 V-24.4 M-1.4 -23 H1.4" stroke={GOLD_DARK} strokeWidth="2.1" strokeLinecap="round" />
+      <path d="M0 -21.4 V-24.4 M-1.4 -23 H1.4" stroke="#ffd85c" strokeWidth="1" strokeLinecap="round" />
+      <rect x="-11.8" y="-11.6" width="23.6" height="4.8" rx="1.3" fill={GOLD} stroke={GOLD_DARK} strokeWidth="1.1" />
+      <path d="M-10.6 -10.6 H10.6" stroke="#ffe9a8" strokeWidth="0.7" strokeLinecap="round" opacity="0.9" />
+      <ellipse cx="0" cy="-9.2" rx="1.8" ry="1.5" fill="#e0224a" stroke="#8f0f2a" strokeWidth="0.6" />
+      <ellipse cx="-5.6" cy="-9.2" rx="1.35" ry="1.15" fill="#2f6fe0" stroke="#173c8a" strokeWidth="0.55" />
+      <ellipse cx="5.6" cy="-9.2" rx="1.35" ry="1.15" fill="#2f6fe0" stroke="#173c8a" strokeWidth="0.55" />
+      <circle cx="-9.7" cy="-9.2" r="0.95" fill="#1fb072" stroke="#0e6a43" strokeWidth="0.5" />
+      <circle cx="9.7" cy="-9.2" r="0.95" fill="#1fb072" stroke="#0e6a43" strokeWidth="0.5" />
+      <circle cx="-0.6" cy="-9.8" r="0.45" fill="#fff" opacity="0.85" />
+      <circle cx="-6" cy="-9.7" r="0.35" fill="#fff" opacity="0.85" />
+      <circle cx="5.2" cy="-9.7" r="0.35" fill="#fff" opacity="0.85" />
     </>
   ),
   crown: (
@@ -168,6 +195,119 @@ function Neck({ id, neck }) {
   return null;
 }
 
+// ---- Outfits (the body slot), drawn between the pet's body and its head. ----
+const RED = '#d62839';
+const RED_DARK = '#9b1b2b';
+const BLUE = '#1f3f99';
+const BLUE_DARK = '#142a6b';
+// "12" in block athletic numbers (a 6-tall box), white with a blue outline.
+const ONE = 'M0.7 1.4 L2 0.3 V6';
+const TWO = 'M0.3 1.7 C0.3 0.2 3.3 0.1 3.3 1.8 C3.3 3.1 0.5 4.1 0.3 6 H3.4';
+function Twelve({ x, y, h }) {
+  const k = h / 6;
+  const at = (dx) => `translate(${x + dx * k} ${y - h / 2}) scale(${k})`;
+  const digits = (stroke, w) => (
+    <g stroke={stroke} strokeWidth={w} fill="none" strokeLinecap="square" strokeLinejoin="round">
+      <path d={ONE} transform={at(-3.3)} />
+      <path d={TWO} transform={at(-0.7)} />
+    </g>
+  );
+  return (
+    <>
+      {digits(BLUE_DARK, 2.3)}
+      {digits('#ffffff', 1.15)}
+    </>
+  );
+}
+
+// The level 100 jersey: a red American football jersey with blue sides and
+// sleeves piped in white, a blue V collar, a blue and white hem, and a big 12.
+// b: bodyAnchor (the torso, in the body's own coordinates). It fills the torso
+// ellipse (or the gem's outline) between the head and the hem.
+function Jersey({ b, uid, outline }) {
+  const { x, y, rx, ry, top, hem } = b;
+  const side = rx * 0.64;
+  const cut = outline ? top : 0;
+  const ny = (top + hem) / 2 + 0.3;
+  const nh = Math.min(6.4, (hem - top) * 0.6);
+  const half = Math.abs(hem - y) < ry ? rx * Math.sqrt(1 - ((hem - y) / ry) ** 2) : 0;
+  const shape = outline ? <path d={outline} /> : <ellipse cx={x} cy={y} rx={rx} ry={ry} />;
+  return (
+    <>
+      <defs>
+        <clipPath id={`${uid}s`} clipPath={outline ? `url(#${uid}e)` : undefined}>
+          {shape}
+        </clipPath>
+        {/* On the gem: the stone's outline, and only its middle (a bib, not the point). */}
+        {outline && (
+          <>
+            <clipPath id={`${uid}e`}>
+              <ellipse cx={x} cy={y} rx={rx} ry={ry} />
+            </clipPath>
+            <clipPath id={`${uid}o`}>
+              <path d={outline} />
+            </clipPath>
+          </>
+        )}
+        <clipPath id={`${uid}h`}>
+          <rect x="0" y={cut} width="64" height={hem - cut} />
+        </clipPath>
+      </defs>
+      <g clipPath={`url(#${uid}h)`}>
+        <g clipPath={`url(#${uid}s)`}>
+          <rect x="0" y="0" width="64" height="64" fill={RED} />
+          <ellipse cx={x - rx * 0.3} cy={top + 3} rx={rx * 0.5} ry={ry * 0.45} fill="#fff" opacity="0.14" />
+          <path d={`M0 0 H${x - side} V64 H0Z M64 0 H${x + side} V64 H64Z`} fill={BLUE} />
+          <path d={`M${x - side} 0 V64 M${x + side} 0 V64`} stroke="#fff" strokeWidth="1.1" />
+          <path d={`M0 ${top + 2.6} H${x - side - 1.6} M0 ${top + 4.6} H${x - side - 1.6} M64 ${top + 2.6} H${x + side + 1.6} M64 ${top + 4.6} H${x + side + 1.6}`} stroke="#fff" strokeWidth="0.9" />
+          <path d={`M${x - 5.6} ${top - 5} L${x} ${top + 2.2} L${x + 5.6} ${top - 5}`} fill={BLUE} stroke="#fff" strokeWidth="1" strokeLinejoin="round" />
+          <rect x="0" y={hem - 1.7} width="64" height="1.7" fill={BLUE} />
+          <rect x="0" y={hem - 2.5} width="64" height="0.8" fill="#fff" />
+          {/* soft shade toward the edges, so it wraps round the body */}
+          {outline && <path d={outline} fill="none" stroke="#000" strokeOpacity="0.16" strokeWidth="3" />}
+          <ellipse cx={x} cy={y} rx={rx} ry={ry} fill="none" stroke="#000" strokeOpacity="0.16" strokeWidth="3" />
+        </g>
+        {outline ? (
+          <>
+            <path d={outline} fill="none" stroke={RED_DARK} strokeWidth="1.1" clipPath={`url(#${uid}e)`} />
+            <ellipse cx={x} cy={y} rx={rx} ry={ry} fill="none" stroke={RED_DARK} strokeWidth="1.1" clipPath={`url(#${uid}o)`} />
+          </>
+        ) : (
+          <ellipse cx={x} cy={y} rx={rx} ry={ry} fill="none" stroke={RED_DARK} strokeWidth="1.1" />
+        )}
+      </g>
+      {half > 0 && !outline && <path d={`M${x - half} ${hem} H${x + half}`} stroke={BLUE_DARK} strokeWidth="1" strokeLinecap="round" />}
+      {outline && (
+        <g clipPath={`url(#${uid}s)`}>
+          <path d={`M0 ${top} H64`} stroke="#fff" strokeWidth="1.6" />
+          <path d={`M0 ${top} H64`} stroke={BLUE_DARK} strokeWidth="0.6" transform="translate(0 -1)" />
+        </g>
+      )}
+      <Twelve x={x} y={ny} h={nh} />
+    </>
+  );
+}
+
+// The outfit layer: its own svg between PetArt's two layers, with the same
+// stage transforms PetArt gives the body (so it fits any species at any stage),
+// and never tinted by a fur tint.
+function OutfitLayer({ id, species, stage, mood, size, still }) {
+  const uid = 'o' + useId().replace(/[^a-zA-Z0-9]/g, '');
+  const b = bodyAnchor(species, stage);
+  const { s, body: kb } = petStage(species, stage);
+  const bodyT = kb !== 1 ? `translate(32 58) scale(${kb}) translate(-32 -58)` : undefined;
+  return (
+    <svg className={`pet-art pet-layer pet-${mood}${still ? '' : ' anim'}`} width={size} height={size} viewBox="0 0 64 64" aria-hidden="true">
+      <g className="pet-bob">
+        <rect x="0" y="0" width="64" height="64" fill="none" />
+        <g transform={`translate(${32 - 32 * s} ${60 - 60 * s}) scale(${s})`}>
+          <g transform={bodyT}>{id === 'jersey' && <Jersey b={b} uid={uid} outline={b.gem ? gemOutline(stage) : null} />}</g>
+        </g>
+      </g>
+    </svg>
+  );
+}
+
 // Over a hat it floats higher.
 function Halo({ head, high }) {
   const y = head.y - head.r - head.up - (high ? 9 : 3.4);
@@ -221,9 +361,19 @@ export function PetWithGear({ gear, size = 64, ...art }) {
     const { s } = petStage(art.species, art.stage);
     neck = <Neck id={g.neck} neck={{ x: n.x, y: n.y - 3 / s, w: Math.min(12, n.w * s * 0.45) / s }} />;
   }
+  const tint = `${art.className || ''}${g.palette ? ` pet-tint-${g.palette}` : ''}`;
+  // An outfit goes on the body and under the head: the pet in two layers with
+  // the outfit between them (it takes the place of a grown pet's scarf).
+  const outfit = g.body && (
+    <>
+      <PetArt {...art} size={size} className={tint} layer="base" scarf={false} title={undefined} />
+      <OutfitLayer id={g.body} species={art.species} stage={art.stage} mood={art.mood} size={size} still={art.still} />
+      <PetArt {...art} neck={neck} size={size} className={tint} layer="top" scarf={false} title={undefined} />
+    </>
+  );
   return (
-    <span className="pet-geared" style={{ width: size, height: size }}>
-      <PetArt {...art} neck={neck} size={size} className={`${art.className || ''}${g.palette ? ` pet-tint-${g.palette}` : ''}`} />
+    <span className="pet-geared" style={{ width: size, height: size }} role={outfit && art.title ? 'img' : undefined} aria-label={outfit ? art.title : undefined}>
+      {outfit || <PetArt {...art} neck={neck} size={size} className={tint} />}
       {worn && <GearOverlay species={art.species} stage={art.stage} mood={art.mood} size={size} still={art.still} gear={g} />}
     </span>
   );

@@ -39,6 +39,7 @@ export default function ProfilePage({
   const people = usePeople();
   const market = useMarket();
   const hasPet = !!market?.petOf(name);
+  const petCount = market?.petsOf(name).length || 0;
   // A photo of their real pet, even with no pet in the app.
   const realPet = usePetPhoto(name);
   const phone = useMedia('(max-width: 760px)');
@@ -192,7 +193,7 @@ export default function ProfilePage({
                 <div className="pp-body">
                   {hasPet ? (
                     <section className="profile-section">
-                      <h3>Pet</h3>
+                      <h3>{petCount > 1 ? 'Pets' : 'Pet'}</h3>
                       <PetCard name={name} />
                       <PetExtras name={name} />
                     </section>

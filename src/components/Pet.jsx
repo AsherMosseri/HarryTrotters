@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import robot from '../assets/robot-dance.webp';
 import { PetArt } from './PetArt.jsx';
-import { SPECIES, cleanGear, moodLine, mascotState, ringOf, titleOf } from '../../functions/shared/pets.js';
+import { SPECIES, cleanGear, moodLine, mascotState, ringOf, speciesOf, titleOf } from '../../functions/shared/pets.js';
 import { useMarket } from '../market.js';
 import { Icon } from './shell/icons.jsx';
 import { confirmDialog, promptDialog } from './Dialogs.jsx';
@@ -19,7 +19,7 @@ export function PetBadge({ name }) {
   const market = useMarket();
   const mine = market?.petOf(name);
   if (!mine || mine.pet.inChat === false) return null;
-  // A ring around it for levels 10, 20 and 30; its fur tint too.
+  // A ring around it from level 10 (bronze) up to 100 (All-Star); its fur tint too.
   const ring = ringOf(mine.st.level);
   const tint = cleanGear(mine.pet.gear).palette;
   return (
@@ -39,6 +39,12 @@ export function Meter({ label, value, tone }) {
       <span className="pet-meter-num mono">{value}</span>
     </div>
   );
+}
+
+// "Loves clover": each species' favorite food (just for fun; any item feeds any pet).
+export function FavoriteFood({ species }) {
+  const food = speciesOf(species)?.food;
+  return food ? <p className="muted tiny pf-food">Loves {food}</p> : null;
 }
 
 // About how much lab time the next level needs (15 minutes an xp point).
@@ -80,6 +86,7 @@ export function PetCard({ name, big = false, owner = false, onCare }) {
         </div>
         <p className="pet-title">{titleOf(st.level)}</p>
         <p className="pet-mood">{moodLine(pet.name, st)}</p>
+        <FavoriteFood species={pet.species} />
         <div className="pet-xp" title={nextLevelLine(st)}>
           <span style={{ transform: `scaleX(${Math.max(0.02, st.progress)})` }} />
         </div>
@@ -113,7 +120,7 @@ export function PetCard({ name, big = false, owner = false, onCare }) {
               onClick={async () => {
                 const ok = await confirmDialog({
                   title: `Rehome ${pet.name}?`,
-                  body: `${pet.name} goes to a good home and you start over with no pet. Its level doesn’t come back.`,
+                  body: `${pet.name} goes to a good home. Its level doesn’t come back.`,
                   okLabel: 'Rehome',
                   danger: true,
                 });
@@ -130,7 +137,8 @@ export function PetCard({ name, big = false, owner = false, onCare }) {
 }
 
 // Adopting: pick a species and a name. Optional; nothing happens until you tap Adopt.
-export function AdoptPet() {
+// more: adopting another one (there's already a pet; the intro is left out).
+export function AdoptPet({ more = false, onDone }) {
   const market = useMarket();
   const [species, setSpecies] = useState('');
   const [name, setName] = useState('');
@@ -138,10 +146,12 @@ export function AdoptPet() {
   const [busy, setBusy] = useState(false);
   return (
     <div className="adopt">
-      <p className="muted small">
-        A pet is optional. It grows with your time at the lab, shows on your profile, and gets hungry and bored if nobody looks after it. It
-        never dies, but it misses you when you stay away.
-      </p>
+      {!more && (
+        <p className="muted small">
+          A pet is optional. It grows with your time at the lab, shows on your profile, and gets hungry and bored if nobody looks after it. It
+          never dies, but it misses you when you stay away.
+        </p>
+      )}
       <div className="adopt-grid" role="radiogroup" aria-label="Pick a pet">
         {SPECIES.map((s) => (
           <button
@@ -167,13 +177,14 @@ export function AdoptPet() {
             const r = await market.run('pet', { action: 'adopt', species, name });
             setBusy(false);
             if (r?.note) setError([r.note.title, r.note.body].filter(Boolean).join(' '));
+            else if (r?.ok) onDone?.();
           }}
         >
           Adopt
         </button>
       </div>
       {error && <p className="danger small">{error}</p>}
-      <RequestPetLink />
+      {!more && <RequestPetLink />}
     </div>
   );
 }
