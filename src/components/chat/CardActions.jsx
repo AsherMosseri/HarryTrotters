@@ -5,6 +5,7 @@ import { adjustOf, cardNets, fixEntry, gameLabel } from '../../../functions/shar
 import { usePeople } from '../common.jsx';
 import { Icon } from '../shell/icons.jsx';
 import { confirmDialog } from '../Dialogs.jsx';
+import { coinStyled, exactNote } from '../../coinFormat.js';
 import { REPORTS_TO, reportInfo } from '../Disputes.jsx';
 
 // Small actions under a finished game card: dare someone to the same coin
@@ -77,7 +78,8 @@ function FixButton({ c, row, multi, me, onFix }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const refund = row.net < 0;
-  const n = commas(row.net);
+  const n = coinStyled(Math.abs(row.net));
+  const exact = exactNote(row.net);
   const game = gameLabel(c.name);
   const who = row.name === me ? 'you' : first(row.name);
   const go = async () => {
@@ -92,6 +94,12 @@ function FixButton({ c, row, multi, me, onFix }) {
           {refund ? `${n} coins go back to them` : `${n} coins come off their balance`}, once, as “{line}” in their coin history
           {row.name === me ? '' : ', and they’re told'}. The card will say “{refund ? 'Refunded' : 'Taken back'} by {first(me)}”.
           {!refund && ' If they’ve spent it, their balance can go below zero.'}
+          {exact && (
+            <>
+              <br />
+              {exact}
+            </>
+          )}
         </>
       ),
       okLabel: refund ? `Refund ${n}` : `Take back ${n}`,

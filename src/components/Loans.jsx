@@ -7,7 +7,7 @@ import { confirmDialog } from './Dialogs.jsx';
 import { Switch } from './Ads.jsx';
 import { Icon } from './shell/icons.jsx';
 import { onLoanForm, peekLoanForm, takeLoanForm } from '../loanCommand.js';
-import { exactCoins } from '../coinFormat.js';
+import { coinStyled, withExact } from '../coinFormat.js';
 
 // Loans (3.1), a tab in the coins screen. Ask the bank (Asher answers; the
 // coins are made up, not his) or a teammate (their own coins) for coins, with
@@ -87,7 +87,7 @@ export function loanLines(loans, open) {
   if (soon && !loans.lock)
     out.push({
       tone: 'warn',
-      text: `Your loan is due ${new Date(soon.dueAt).toLocaleDateString('en-US', { weekday: 'long' })}: ${exactCoins(L.leftOf(soon, loans.now))} left`,
+      text: `Your loan is due ${new Date(soon.dueAt).toLocaleDateString('en-US', { weekday: 'long' })}: ${coinStyled(L.leftOf(soon, loans.now))} left`,
       go: () => open(soon.id),
     });
   return out;
@@ -266,7 +266,7 @@ function TermsFields({ value, onChange, bank, cfg, idPrefix }) {
         min={1}
         max={max}
         value={value.amount}
-        placeholder={`Up to ${exactCoins(max)}`}
+        placeholder={`Up to ${coinStyled(max)}`}
         onChange={(e) => set({ amount: e.target.value })}
       />
       <span className="field-label">Interest</span>
@@ -337,11 +337,11 @@ function Preview({ value, bank, cfg, you = true }) {
   return (
     <p className="small loan-preview">
       {you ? 'You’d pay back ' : 'They’d pay back '}
-      <b className="mono">{exactCoins(total)}</b> by <span className="mono">{DATE(due)}</span>
+      <b className="mono">{coinStyled(total)}</b> by <span className="mono">{DATE(due)}</span>
       {t.style === 'weekly' && t.term > 1 && t.rate > 0 ? (
         <span className="muted">
           {' '}
-          if it runs the whole time; <span className="mono">{exactCoins(oneWeek)}</span> if paid back in the first week.
+          if it runs the whole time; <span className="mono">{coinStyled(oneWeek)}</span> if paid back in the first week.
         </span>
       ) : (
         '.'
@@ -521,8 +521,8 @@ function LoanCard({ loan, loans, focus, onToast }) {
     // A teammate lending hands over their own coins: say so first.
     if (!asBorrower && !loan.bank) {
       const ok = await confirmDialog({
-        title: `Lend ${exactCoins(loan.terms.amount)} coins to ${first(loan.borrower)}?`,
-        body: `They come out of your coins now and come back with interest: ${exactCoins(L.fullOwed(loan.terms))} by the due date.`,
+        title: `Lend ${coinStyled(loan.terms.amount)} coins to ${first(loan.borrower)}?`,
+        body: withExact(`They come out of your coins now and come back with interest: ${coinStyled(L.fullOwed(loan.terms))} by the due date.`, loan.terms.amount),
         okLabel: 'Lend',
       });
       if (!ok) return;
@@ -530,7 +530,7 @@ function LoanCard({ loan, loans, focus, onToast }) {
     run(
       'loanRespond',
       { action: 'accept' },
-      asBorrower ? 'Loan started. The coins are yours.' : `Loan started: ${exactCoins(loan.terms.amount)} coins to ${first(loan.borrower)}.`,
+      asBorrower ? 'Loan started. The coins are yours.' : `Loan started: ${coinStyled(loan.terms.amount)} coins to ${first(loan.borrower)}.`,
     );
   };
   const forgive = async () => {
@@ -539,7 +539,7 @@ function LoanCard({ loan, loans, focus, onToast }) {
       body:
         loan.status === 'overdue'
           ? `What the due date took past zero goes back to them${loan.bank ? '' : ' from your coins'}, and they’re unlocked. It can’t be undone.`
-          : `They won’t owe the ${exactCoins(left)} left. It can’t be undone.`,
+          : `They won’t owe the ${coinStyled(left)} left. It can’t be undone.`,
       okLabel: 'Forgive',
       danger: true,
     });
@@ -573,8 +573,8 @@ function LoanCard({ loan, loans, focus, onToast }) {
               {loan.status === 'overdue'
                 ? !asBorrower && loans.everyone === false
                   ? '…'
-                  : exactCoins(Math.max(0, -(asBorrower ? balance : loans.balanceOf(loan.borrower))))
-                : exactCoins(left)}
+                  : coinStyled(Math.max(0, -(asBorrower ? balance : loans.balanceOf(loan.borrower))))
+                : coinStyled(left)}
             </b>
           </div>
           <div>
@@ -584,8 +584,8 @@ function LoanCard({ loan, loans, focus, onToast }) {
           <div>
             <span className="loan-k">Paid</span>
             <b className="mono">
-              {exactCoins(loan.paid || 0)}
-              {owed ? ` of ${exactCoins(owed)}` : ''}
+              {coinStyled(loan.paid || 0)}
+              {owed ? ` of ${coinStyled(owed)}` : ''}
             </b>
           </div>
           {loan.status === 'active' && (
@@ -686,21 +686,21 @@ function LoanCard({ loan, loans, focus, onToast }) {
             min={1}
             max={left}
             value={pay}
-            placeholder={`1 to ${exactCoins(left)}`}
+            placeholder={`1 to ${coinStyled(left)}`}
             aria-label="Coins to pay back"
             onChange={(e) => setPay(e.target.value)}
           />
           <button
             className="btn"
             disabled={busy || n < 1 || n > left || n > balance}
-            onClick={() => run('loanRepay', { amount: n }, (r) => (r.left ? `Paid ${exactCoins(r.paid)}. ${exactCoins(r.left)} left.` : 'Paid off.'))}
+            onClick={() => run('loanRepay', { amount: n }, (r) => (r.left ? `Paid ${coinStyled(r.paid)}. ${coinStyled(r.left)} left.` : 'Paid off.'))}
           >
             Pay
           </button>
           <button className="btn primary" disabled={busy || left > balance} onClick={() => run('loanRepay', { amount: left }, 'Paid off.')}>
-            Pay all <span className="mono">{exactCoins(left)}</span>
+            Pay all <span className="mono">{coinStyled(left)}</span>
           </button>
-          {(n > balance || left > balance) && <span className="muted tiny loan-have">You have {exactCoins(Math.max(0, balance))}.</span>}
+          {(n > balance || left > balance) && <span className="muted tiny loan-have">You have {coinStyled(Math.max(0, balance))}.</span>}
         </div>
       )}
 

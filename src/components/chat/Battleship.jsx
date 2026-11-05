@@ -6,7 +6,7 @@ import { confirmDialog } from '../Dialogs.jsx';
 import { Invite, Result, Versus } from './Arcade.jsx';
 import { openGameView } from './liveGames.js';
 import { CoinNum } from '../CoinNum.jsx';
-import { exactCoins } from '../../coinFormat.js';
+import { coinStyled, withExact } from '../../coinFormat.js';
 
 // Battleship. In the chat, a summary card (who's playing, the rules, what just
 // happened, both boards' shots) with a big Play or Watch button; the game
@@ -362,7 +362,7 @@ export function BattleshipView({ g, me, act, Name, now, mv, msgId }) {
     mv.send(`fire:${i}`);
   });
   const resign = async () => {
-    const ok = await confirmDialog({ title: 'Resign this game?', body: `${first(other)} wins${g.bet ? ` both bets (${exactCoins(g.bet * 2)} coins)` : ''}.`, okLabel: 'Resign', danger: true });
+    const ok = await confirmDialog({ title: 'Resign this game?', body: withExact(`${first(other)} wins${g.bet ? ` both bets (${coinStyled(g.bet * 2)} coins)` : ''}.`, g.bet ? g.bet * 2 : 0), okLabel: 'Resign', danger: true });
     if (ok) act('resign');
   };
 

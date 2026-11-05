@@ -8,7 +8,7 @@ import { CompareWithServer, EveryoneCoins, ReversedTag, StaleBanner, reverseProp
 import { MyReports } from './Disputes.jsx';
 import { LoansPanel } from './Loans.jsx';
 import { CoinNum, useCoinFormat } from './CoinNum.jsx';
-import { exactCoins } from '../coinFormat.js';
+import { coinStyled } from '../coinFormat.js';
 
 // A Jackson coin: a little gold coin with a J.
 export const Coin = ({ size = 16 }) => (
@@ -21,7 +21,7 @@ export const Coin = ({ size = 16 }) => (
 export const Coins = ({ n, size, exact = false }) => (
   <span className="jcoins">
     <Coin size={size} />
-    {exact ? exactCoins(n) : <CoinNum n={n} />}
+    {exact ? coinStyled(n) : <CoinNum n={n} />}
   </span>
 );
 

@@ -1,8 +1,8 @@
 // How Jackson coin amounts are written, everywhere in the app. One of three
 // styles, picked per device in Appearance → Coin numbers:
-//   commas (the default)  1,234,567
+//   commas                1,234,567
 //   plain                 1234567
-//   short                 1.2m   (999 · 1k · 1.1k · 82.2k · 2.3m · 1.5b · 1q)
+//   short (the default)   1.2m   (999 · 1k · 1.1k · 82.2k · 2.3m · 1.5b · 1q)
 // Short is for showing only: confirm dialogs (refunds, Send, loans, paying,
 // coin requests) always write the exact number with commas (exactCoins).
 // Negative amounts use the app's minus sign (−, U+2212), never a hyphen.
@@ -84,12 +84,12 @@ const KEY = 'coin-format';
 const read = () => {
   try {
     const v = JSON.parse(localStorage.getItem(KEY) || 'null');
-    return IDS.includes(v) ? v : 'commas';
+    return IDS.includes(v) ? v : 'short';
   } catch {
-    return 'commas';
+    return 'short';
   }
 };
-let current = typeof localStorage === 'undefined' ? 'commas' : read();
+let current = typeof localStorage === 'undefined' ? 'short' : read();
 const listeners = new Set();
 const emit = () => listeners.forEach((f) => f());
 
@@ -122,3 +122,13 @@ if (typeof window !== 'undefined')
 // For text built outside React components (toasts, card lines): the number
 // in this device's style right now.
 export const coinStyled = (n) => formatCoins(n, current);
+// Confirm dialogs show the number in this device's style; with Short, the
+// exact amount goes on a line under it so nobody misreads 135.9b for 13.59b.
+export const exactNote = (n) => {
+  const a = Math.abs(Number(n) || 0);
+  return current === 'short' && formatCoins(a, 'short') !== exactCoins(a) ? `Exactly ${exactCoins(a)} coins.` : '';
+};
+export const withExact = (text, n) => {
+  const e = exactNote(n);
+  return e ? `${text}\n${e}` : text;
+};
