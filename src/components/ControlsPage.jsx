@@ -192,6 +192,81 @@ export default function ControlsPage({
 // (games still going, open requests, pinned cards); Move asks first, then
 // runs in batches until it's done. Running it again only moves what's left.
 const KIND_LABEL = { request: '/request coins', give: '/give', balance: '/balance', leaderboard: '/leaderboard' };
+// Every kind of card the move covers: its group, name and what it is.
+const KIND_INFO = {
+  slots: ['Casino', 'Slots', 'Spin three reels for a payout'],
+  dice: ['Casino', 'Dice', 'Bet on a dice roll'],
+  coinflip: ['Casino', 'Coin flip', 'Heads or tails bet'],
+  roulette: ['Casino', 'Roulette', 'Bet on a number or color'],
+  blackjack: ['Casino', 'Blackjack', 'Card game against the dealer'],
+  crash: ['Casino', 'Crash', 'Cash out before the rocket crashes'],
+  mines: ['Casino', 'Mines', 'Reveal tiles without hitting a mine'],
+  highlow: ['Casino', 'High-low', 'Guess if the next card is higher or lower'],
+  lottery: ['Casino', 'Lottery', 'Tickets for the team draw'],
+  daily: ['Economy', '/daily', 'Daily coin bonus'],
+  work: ['Economy', '/work', 'Coins for working a shift'],
+  beg: ['Economy', '/beg', 'Ask for a few coins'],
+  rob: ['Economy', '/rob', 'Try to steal from a teammate'],
+  rps: ['Arcade', 'Rock paper scissors', 'Two-player match'],
+  tictactoe: ['Arcade', 'Tic-tac-toe', 'Two-player match'],
+  connect4: ['Arcade', 'Connect 4', 'Two-player match'],
+  duel: ['Arcade', 'Duel', 'Quick-draw match between two people'],
+  trivia: ['Arcade', 'Trivia', 'Answer questions for coins'],
+  hangman: ['Arcade', 'Hangman', 'Guess the word'],
+  typerace: ['Arcade', 'Type race', 'Fastest typer wins'],
+  heist: ['Arcade', 'Heist', 'Team up to rob the bank'],
+  battleship: ['Arcade', 'Battleship', 'Sink the other fleet'],
+  tetris: ['Arcade', 'Tetris', 'Falling blocks, solo or vs Trotbot'],
+  minesweep: ['Arcade', 'Minesweeper', 'Clear the board, solo or vs Trotbot'],
+  challenge: ['Arcade', 'Challenge', 'Head-to-head coin flip or dice bet'],
+  give: ['Coins', '/give', 'Coins sent to a teammate or group'],
+  balance: ['Coins', '/balance', 'Someone’s coin balance'],
+  leaderboard: ['Coins', '/leaderboard', 'The coin leaderboard'],
+  request: ['Coins', '/request coins', 'Asking a teammate for coins'],
+};
+const GROUP_ORDER = ['Casino', 'Economy', 'Arcade', 'Coins'];
+// Every kind of card: how many move now, how many wait, and what it is,
+// grouped (Casino, Economy, Arcade, Coins) with a subtotal per group.
+function KindTable({ plan }) {
+  const kinds = [...new Set([...Object.keys(plan.byKind || {}), ...Object.keys(plan.waitByKind || {})])];
+  const row = (k) => ({ k, info: KIND_INFO[k] || ['Other', KIND_LABEL[k] || `/${k}`, ''], move: plan.byKind?.[k] || 0, wait: plan.waitByKind?.[k] || 0 });
+  const rows = kinds.map(row);
+  const groups = [...GROUP_ORDER, 'Other'].map((g) => ({ g, rows: rows.filter((r) => r.info[0] === g).sort((a, b) => b.move + b.wait - (a.move + a.wait)) })).filter((x) => x.rows.length);
+  const hasWait = rows.some((r) => r.wait);
+  return (
+    <div className="move-kinds">
+      <table className="move-kinds-table small">
+        <thead>
+          <tr>
+            <th>Card</th>
+            <th className="num">Move</th>
+            {hasWait && <th className="num">Wait</th>}
+          </tr>
+        </thead>
+        {groups.map(({ g, rows: list }) => (
+          <tbody key={g}>
+            <tr className="move-kinds-group">
+              <th>{g}</th>
+              <td className="num">{list.reduce((t, r) => t + r.move, 0)}</td>
+              {hasWait && <td className="num">{list.reduce((t, r) => t + r.wait, 0) || ''}</td>}
+            </tr>
+            {list.map((r) => (
+              <tr key={r.k}>
+                <td>
+                  <b>{r.info[1]}</b>
+                  {r.info[2] && <span className="muted"> · {r.info[2]}</span>}
+                </td>
+                <td className="num">{r.move || ''}</td>
+                {hasWait && <td className="num">{r.wait || ''}</td>}
+              </tr>
+            ))}
+          </tbody>
+        ))}
+      </table>
+    </div>
+  );
+}
+
 function MoveToArcade({ run, channels }) {
   const [plan, setPlan] = useState(null);
   const [busy, setBusy] = useState('');
@@ -261,7 +336,8 @@ function MoveToArcade({ run, channels }) {
           {plan.total ? (
             <>
               <p className="small">
-                <b>{plan.total}</b> card{plan.total === 1 ? '' : 's'} to move:
+                <b>{plan.total + (plan.skippedCount || 0)}</b> coin and game card{plan.total + (plan.skippedCount || 0) === 1 ? '' : 's'} outside #arcade:{' '}
+                <b>{plan.total}</b> to move{plan.skippedCount ? <>, <b>{plan.skippedCount}</b> waiting</> : ''}. By channel:
               </p>
               <div className="move-arcade-counts small">
                 {Object.entries(plan.byChannel).map(([c, n]) => (
@@ -270,15 +346,13 @@ function MoveToArcade({ run, channels }) {
                   </span>
                 ))}
               </div>
-              <div className="move-arcade-counts small muted">
-                {Object.entries(plan.byKind)
-                  .sort((a, b) => b[1] - a[1])
-                  .map(([k, n]) => `${KIND_LABEL[k] || `/${k}`} ${n}`)
-                  .join(' · ')}
-              </div>
+              <KindTable plan={plan} />
             </>
           ) : (
-            <p className="small">Nothing to move.</p>
+            <>
+              <p className="small">Nothing to move{plan.skippedCount ? ` (${plan.skippedCount} waiting)` : ''}.</p>
+              {plan.skippedCount > 0 && <KindTable plan={plan} />}
+            </>
           )}
           {plan.skippedCount > 0 && <p className="small">Waiting for a later run ({plan.skippedCount}):</p>}
           {skipList(plan.skipped || [])}

@@ -157,7 +157,10 @@ export function moveArcadeFunctions({ db, owner, renamer }) {
       byKind[c.data.cmd.name] = (byKind[c.data.cmd.name] || 0) + 1;
       todo.push(c);
     }
-    const report = { byChannel, byKind, total: todo.length, skipped: skipped.slice(0, 100), skippedCount: skipped.length };
+    // Waiting cards by kind, so the owner sees the whole split (moving + waiting).
+    const waitByKind = {};
+    for (const x of skipped) waitByKind[x.kind] = (waitByKind[x.kind] || 0) + 1;
+    const report = { byChannel, byKind, waitByKind, total: todo.length, skipped: skipped.slice(0, 100), skippedCount: skipped.length };
     if (dry) return { ok: true, dry: true, ...report };
     let moved = 0;
     const late = [];

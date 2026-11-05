@@ -5413,3 +5413,9 @@ button.bs-cell:focus-visible { outline: 2px solid var(--accent); outline-offset:
 .move-arcade p { margin: 0; }
 .move-arcade-counts { display: flex; flex-wrap: wrap; gap: 6px; }
 .move-arcade-skips { margin: 0; padding-left: 18px; }
+.move-kinds { width: 100%; overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
+.move-kinds-table { width: 100%; border-collapse: collapse; }
+.move-kinds-table th, .move-kinds-table td { padding: 6px 10px; text-align: left; border-top: 1px solid var(--border); vertical-align: top; }
+.move-kinds-table thead th { border-top: 0; font-size: 12px; font-weight: 600; color: var(--muted); }
+.move-kinds-table .num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; width: 1%; }
+.move-kinds-group th, .move-kinds-group td { background: var(--surface-2); font-weight: 700; }

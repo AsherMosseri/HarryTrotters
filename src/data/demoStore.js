@@ -2596,7 +2596,10 @@ export const demoStore = {
         todo.push({ conv, m });
       }
     }
-    const report = { byChannel, byKind, total: todo.length, skipped: skipped.slice(0, 100), skippedCount: skipped.length };
+    // Waiting cards by kind, so the owner sees the whole split (moving + waiting).
+    const waitByKind = {};
+    for (const x of skipped) waitByKind[x.kind] = (waitByKind[x.kind] || 0) + 1;
+    const report = { byChannel, byKind, waitByKind, total: todo.length, skipped: skipped.slice(0, 100), skippedCount: skipped.length };
     if (req?.dry) return { ok: true, dry: true, ...report };
     const ids = new Set(todo.map((x) => x.m.id));
     const from = Object.fromEntries(todo.map((x) => [x.m.id, x.conv]));
