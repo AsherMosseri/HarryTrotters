@@ -334,8 +334,10 @@ export default function ChatView({
   // you've tapped; yours or one that invites a tap, for a while after it
   // showed up ('fresh', with something to tap); or any card you tapped in the
   // last TAP_HOLD. Not in its first moment, so a game you just started still
-  // shows in full as it fills in.
-  const liveCard = () => {
+  // shows in full as it fills in; but for someone else's new message (young)
+  // one already in full view holds from the start, so a quick tap on it
+  // (Cancel on a challenge you just sent) isn't beaten by the chat moving.
+  const liveCard = (young = false) => {
     const el = list.current;
     if (!el) return null;
     const box = el.getBoundingClientRect();
@@ -349,7 +351,10 @@ export default function ChatView({
     for (const c of el.querySelectorAll('.cmd-card[data-live]')) {
       const live = c.dataset.live;
       if (live === 'all' && !t.msg?.contains(c)) continue;
-      if (now - Number(c.dataset.since || 0) < 600) continue;
+      if (now - Number(c.dataset.since || 0) < 600) {
+        const r = c.getBoundingClientRect();
+        if (!young || r.top < box.top || r.bottom > box.bottom) continue;
+      }
       if (live === 'fresh' && !canTap(c)) continue;
       if (onScreen(c)) return c;
     }
@@ -358,7 +363,7 @@ export default function ChatView({
   };
   // Hands off: while a game is being played on screen nothing follows new
   // messages (the pill counts them), however long you think between taps.
-  const holding = () => viewOpen.current || hold.current.touching || performance.now() < hold.current.until || !!liveCard();
+  const holding = (young = false) => viewOpen.current || hold.current.touching || performance.now() < hold.current.until || !!liveCard(young);
   const distance = (el) => el.scrollHeight - el.scrollTop - el.clientHeight;
   // why: 'anchor' when it only puts the anchor back (onScroll keeps it then).
   const setTop = (el, top, why = true) => {
@@ -489,7 +494,7 @@ export default function ChatView({
       hold.current.until = 0;
       toBottom(el);
     }
-    else if (atBottom.current && !holding()) toBottom(el);
+    else if (atBottom.current && !holding(true)) toBottom(el);
     else {
       keepAnchor();
       // Held still (a finger, a card, the game view): it didn't follow, so it
@@ -500,7 +505,7 @@ export default function ChatView({
       if (!atBottom.current && added) {
         // In the line under the chat while it's held (never over a card you
         // play), including when the hold starts after the button showed up.
-        if (holding()) setPillDocked(true);
+        if (holding(true)) setPillDocked(true);
         else if (!newBelow) setPillDocked(false);
         setNewBelow((n) => n + added);
       }
