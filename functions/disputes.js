@@ -269,6 +269,7 @@ export function disputeFunctions({ db, coinData, freshCoins, notify, bankRef, ow
     const paid = new Map(); // person -> { to, count, coins, game }
     const skipped = [];
     let coins = 0;
+    let closed = 0;
     for (const x of open) {
       let out;
       try {
@@ -284,6 +285,11 @@ export function disputeFunctions({ db, coinData, freshCoins, notify, bankRef, ow
         row.coins += out.refund;
         paid.set(p, row);
         coins += out.refund;
+      } else if (/already (refunded|taken back)/.test(out?.note?.title || '')) {
+        // Already put right from its card: close the report, nothing more is paid.
+        const done = await decideOne(x.id, 'dismiss', 'Already put right from the card.', me, data).catch(() => null);
+        if (done?.ok) closed += 1;
+        else skipped.push({ id: x.id, by: x.get('by'), game: x.get('cmd') || '', why: out.note.title });
       } else skipped.push({ id: x.id, by: x.get('by'), game: x.get('cmd') || '', why: out?.note?.title || 'Skipped.' });
     }
     await notify(
@@ -301,7 +307,7 @@ export function disputeFunctions({ db, coinData, freshCoins, notify, bankRef, ow
       })),
     ).catch((e) => logger.warn('disputeRefundAll notify', e.message));
     const refunded = [...paid.values()].reduce((n, r) => n + r.count, 0);
-    return { ok: true, refunded, coins, people: paid.size, skipped };
+    return { ok: true, refunded, coins, people: paid.size, skipped, closed };
   });
 
   // The owner's Refund / Take back on a finished game card, for one person in

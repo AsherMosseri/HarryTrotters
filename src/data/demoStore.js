@@ -2365,6 +2365,7 @@ export const demoStore = {
     const paid = new Map();
     const skipped = [];
     let coins = 0;
+    let closed = 0;
     for (const x of open) {
       // What this run already paid each person counts toward their ceiling.
       const sofar = Object.fromEntries([...paid].map(([n, r]) => [n, r.coins]));
@@ -2375,6 +2376,10 @@ export const demoStore = {
         row.coins += out.refund;
         paid.set(x.by, row);
         coins += out.refund;
+      } else if (/already (refunded|taken back)/.test(out?.note?.title || '')) {
+        const done = await this.disputeDecide({ id: x.id, decision: 'dismiss', note: 'Already put right from the card.', quiet: true }, actor, ctx);
+        if (done?.ok) closed += 1;
+        else skipped.push({ id: x.id, by: x.by, game: x.cmd || '', why: out.note.title });
       } else skipped.push({ id: x.id, by: x.by, game: x.cmd || '', why: out?.note?.title || 'Skipped.' });
     }
     const now = Date.now();
@@ -2394,7 +2399,7 @@ export const demoStore = {
       ...(state.inbox || []),
     ];
     commit();
-    return { ok: true, refunded: [...paid.values()].reduce((n, r) => n + r.count, 0), coins, people: paid.size, skipped };
+    return { ok: true, refunded: [...paid.values()].reduce((n, r) => n + r.count, 0), coins, people: paid.size, skipped, closed };
   },
   // The owner's Refund / Take back on a game card, checked the way the
   // ownerRefund function checks it (shared/disputes.js): the card's own
