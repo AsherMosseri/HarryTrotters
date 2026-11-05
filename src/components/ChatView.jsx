@@ -441,7 +441,10 @@ export default function ChatView({
   const settle = () => {
     const el = list.current;
     if (!el) return;
-    if (atBottom.current && !holding()) return toBottom(el);
+    // (A new card of yours that's all on screen holds too: a message below it
+    // filling in doesn't pull it away; one still filling in past the bottom
+    // isn't all on screen, so the chat follows it down.)
+    if (atBottom.current && !holding(true)) return toBottom(el);
     keepAnchor();
     // Only you going down (or the pill) makes it follow again.
     if (distance(el) >= BOTTOM_PX) atBottom.current = false;
