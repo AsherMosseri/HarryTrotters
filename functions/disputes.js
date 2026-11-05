@@ -44,6 +44,11 @@ export function disputeFunctions({ db, coinData, freshCoins, notify, bankRef, ow
   const note = (title, body = '') => ({ note: { title, body } });
   const first = (n) => (n || 'Someone').split(' ')[0];
   const validId = (id) => typeof id === 'string' && /^[\w-]{1,60}$/.test(id);
+  // A chat is a channel id, or 'dm:' and a DM id (two people's ids, so longer).
+  const validConv = (c) => typeof c === 'string' && (validId(c) || /^dm:[\w-]{1,150}$/.test(c));
+  // DM messages live under dms/, channel messages under channels/.
+  const msgDoc = (conv, msgId) =>
+    db.doc(conv.startsWith('dm:') ? `dms/${conv.slice(3)}/messages/${msgId}` : `channels/${conv}/messages/${msgId}`);
 
   async function caller(req) {
     const uid = req.auth?.uid;
@@ -85,11 +90,11 @@ export function disputeFunctions({ db, coinData, freshCoins, notify, bankRef, ow
   const dispute = onCall(OPEN, async (req) => {
     const { me, data } = await caller(req);
     const { conv, msgId, reason, note: text } = req.data || {};
-    if (!validId(conv) || !validId(msgId)) return note('Which result?');
+    if (!validConv(conv) || !validId(msgId)) return note('Which result?');
     if (!d.REASONS[reason]) return note('What looks wrong?', 'Pick one of the reasons.');
     const now = Date.now();
     const day = teamDay(now);
-    const mref = db.doc(`channels/${conv}/messages/${msgId}`);
+    const mref = msgDoc(conv, msgId);
     const id = d.reportId(msgId, me);
     const dref = db.doc(`disputes/${id}`);
     const limitRef = db.doc(`disputeDays/${nameKey(me)}_${day}`);
@@ -178,7 +183,7 @@ export function disputeFunctions({ db, coinData, freshCoins, notify, bankRef, ow
       }
       // The card as it is now (the server's own record); if it's gone, what the
       // report kept when it was made.
-      const mref = db.doc(`channels/${x.conv}/messages/${x.msgId}`);
+      const mref = (validConv(x.conv) && validId(x.msgId) ? msgDoc(x.conv, x.msgId) : db.doc('channels/none/messages/none'));
       const keyRef = db.doc(`refundKeys/${d.refundKeyId(x.msgId, who)}`);
       const [m, key, ...whoBanks] = await Promise.all([tx.get(mref), tx.get(keyRef), ...bankRefsOf(who, data.rename).map((r) => tx.get(r))]);
       if (key.exists) return note(key.get('mode') === 'takeback' ? 'That win was already taken back.' : 'That result was already refunded.');
@@ -308,7 +313,7 @@ export function disputeFunctions({ db, coinData, freshCoins, notify, bankRef, ow
   // and the card's cmd.undone, in one transaction, so it can't happen twice.
   // A person who spent the coins can go below zero, like Take back.
   async function undoGift({ conv, msgId, me, data }) {
-    const mref = db.doc(`channels/${conv}/messages/${msgId}`);
+    const mref = msgDoc(conv, msgId);
     const m0 = await mref.get();
     const c = m0.exists ? m0.get('cmd') : null;
     if (!c || c.name !== 'give') return note('That gift is gone.');
@@ -374,13 +379,13 @@ export function disputeFunctions({ db, coinData, freshCoins, notify, bankRef, ow
     const { me, admin, data } = await caller(req);
     if (!admin || me !== data.rename(owner)) throw new HttpsError('permission-denied', `Only ${ownerFirst} can do that.`);
     const { conv, msgId, person, mode } = req.data || {};
-    if (!validId(conv) || !validId(msgId)) return note('Which game?');
+    if (!validConv(conv) || !validId(msgId)) return note('Which game?');
     if (mode === 'undogift') return undoGift({ conv, msgId, me, data });
     if (mode !== 'refund' && mode !== 'takeback') return note('Refund or take back?');
     if (typeof person !== 'string' || !person.trim() || person.length > 80) return note('Whose result?');
     const who = data.rename(person.trim());
     const aliases = data.rename.aliases(who).slice(0, 30);
-    const mref = db.doc(`channels/${conv}/messages/${msgId}`);
+    const mref = msgDoc(conv, msgId);
     const keyRef = db.doc(`refundKeys/${d.refundKeyId(msgId, who)}`);
     const dref = db.doc(`disputes/${d.reportId(msgId, who)}`);
     const bankRefs = bankRefsOf(who, data.rename);
