@@ -4,6 +4,20 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '3.1.4',
+    date: '2026-11-05',
+    title: 'Faster app, commas and Trotbot levels',
+    items: [
+      'The app opens faster: your coins and chat show sooner, and it downloads only what you need. A message you send shows the moment you tap Send, and chat stays smooth while lots of messages come in.',
+      'Casino taps, games, loans and requests answer faster: the server no longer has to wake up first.',
+      'Coin numbers have commas (1,234,567). Change it in Appearance, Coin numbers: commas, no commas, or short (1.2k, 82.2k, 2.3m).',
+      'Type amounts any way you like: /give @Cooper 2k, /request @Mia 200,000, bets of 1.5m, 1b or 1t.',
+      'New /loan: /loan 100 asks the bank, /loan @Cooper 50 asks a teammate, and /loan pay opens your loans. You check the form and send it.',
+      'Race Trotbot in Tetris or Minesweeper at five levels, from Beginner (slow and sloppy) to Insane (near perfect and very fast). Beating it pays 1, 1, 2, 4 or 6 coins by level, and /tetris bot insane or /minesweep bot beginner starts one from chat.',
+      'Someone else’s coins (/balance @name, /leaderboard, /whois) can take a moment the first time while everyone’s coins load.',
+    ],
+  },
+  {
     version: '3.1.3',
     date: '2026-11-04',
     title: 'No more coin limits',
