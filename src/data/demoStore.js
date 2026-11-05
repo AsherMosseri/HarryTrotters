@@ -2426,13 +2426,13 @@ export const demoStore = {
         s.seed = newSeed();
         if (game === 'tetris') s.level = Math.max(1, Math.min(15, Math.floor(Number(req.level)) || 1));
         else s.level = MINE_LEVELS[req.level] ? req.level : 'beginner';
-        if (mode === 'bot') s.speed = fun.SPEEDS.includes(req.speed) ? req.speed : 'medium';
+        if (mode === 'bot') Object.assign(s, fun.botPick(req));
       }
       const id = uid();
       games[id] = s;
       commit();
       const server = fun.serverRun(s);
-      return { ok: true, id, seed: server ? null : s.seed, server, mode, level: s.level, speed: s.speed, attempt: s.attempt || 0, serverNow: now };
+      return { ok: true, id, seed: server ? null : s.seed, server, mode, level: s.level, speed: s.speed, botLevel: s.botLevel || '', attempt: s.attempt || 0, serverNow: now };
     }
     const s = games[req.id];
     // A Minesweeper tournament tap, the way funGame 'sweep' plays it.

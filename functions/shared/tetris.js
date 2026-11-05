@@ -666,13 +666,144 @@ export function botMove(board, t) {
   return best;
 }
 
-// Trotbot's speed: frames per piece.
+// Trotbot's speed before 3.1.1: frames per piece, every piece placed as well
+// as it can. Games started then (and apps that still send 'easy', 'medium'
+// or 'hard' with no level) keep playing exactly this way.
 export const BOT_PACE = { easy: 75, medium: 45, hard: 27 };
 
-// Trotbot's own Sprint game on the same pieces, a piece every `pace` frames.
-// advance(frame) plays up to that frame (for the live picture); the server
-// calls result() for the whole race.
-export function newBot({ seed, pace = BOT_PACE.medium }) {
+// Trotbot's levels (3.1.1): each one plays at its own speed AND its own skill.
+//   pace: frames per piece on average, give or take `jitter`;
+//   think: per-1000 chance of a long pause (up to thinkFrames more);
+//   judge: how it scores a spot ('basic' barely minds holes or bumps,
+//     'classic' weighs height, holes, bumps and lines, 'el' is El-Tetris,
+//     'plus' is El-Tetris looking one piece ahead and saving a well for tetrises);
+//   slip: per-1000 chance it places a piece worse than its best,
+//   wild: per-1000 of those slips that drop it just anywhere.
+export const BOT_SKILL = {
+  beginner: { pace: 97, jitter: 32, think: 120, thinkFrames: 150, judge: 'basic', slip: 260, wild: 250 },
+  easy: { pace: 67, jitter: 22, think: 70, thinkFrames: 110, judge: 'basic', slip: 150, wild: 150 },
+  medium: { pace: 41, jitter: 13, think: 40, thinkFrames: 70, judge: 'classic', slip: 70, wild: 80 },
+  hard: { pace: 31, jitter: 8, think: 20, thinkFrames: 45, judge: 'el', slip: 20, wild: 0 },
+  insane: { pace: 23, jitter: 5, think: 0, thinkFrames: 0, judge: 'plus', slip: 0, wild: 0 },
+};
+
+const CAREFUL = 10; // rows high
+
+// Every spot piece t can drop straight into: [{ r, x, y }], in a fixed order.
+function spots(board, t) {
+  const out = [];
+  const seen = new Set();
+  for (let r = 0; r < 4; r++) {
+    const key = ROT[t][r]
+      .map(([x, y]) => `${x},${y}`)
+      .sort()
+      .join(' ');
+    if (seen.has(key)) continue;
+    seen.add(key);
+    for (let x = -3; x < W; x++) {
+      if (!fits(board, t, r, x, 0)) continue;
+      out.push({ r, x, y: dropY(board, t, r, x, 0) });
+    }
+  }
+  return out;
+}
+
+// The board after dropping t at a spot, and the rows that cleared.
+function place(board, t, { r, x, y }) {
+  const placed = board.slice();
+  for (const [cx, cy] of ROT[t][r]) placed[(y + cy) * W + x + cx] = t;
+  return clearLines(placed);
+}
+
+// The simple features most Tetris bots use: column heights (aggregate and
+// bumpiness), holes, and the deepest one-wide well (where a tetris goes).
+function shape(after) {
+  const heights = [];
+  let holes = 0;
+  for (let cx = 0; cx < W; cx++) {
+    let top = H;
+    for (let cy = 0; cy < H; cy++)
+      if (after[cy * W + cx] !== 0) {
+        top = cy;
+        break;
+      }
+    heights.push(H - top);
+    for (let cy = top + 1; cy < H; cy++) if (after[cy * W + cx] === 0) holes++;
+  }
+  let agg = 0;
+  let bump = 0;
+  let well = 0;
+  for (let cx = 0; cx < W; cx++) {
+    agg += heights[cx];
+    if (cx) bump += Math.abs(heights[cx] - heights[cx - 1]);
+    const side = Math.min(cx ? heights[cx - 1] : H, cx < W - 1 ? heights[cx + 1] : H);
+    well = Math.max(well, Math.min(4, side - heights[cx]));
+  }
+  return { agg, bump, holes, well, top: Math.max(...heights) };
+}
+
+// A spot's value for each judge (whole numbers, higher is better).
+function judgeSpot(judge, board, t, spot) {
+  if (judge === 'el' || judge === 'plus') return evaluate(board, t, spot.r, spot.x, spot.y);
+  const { board: after, rows } = place(board, t, spot);
+  const f = shape(after);
+  // 'classic': the well-known weights (aggregate height, lines, holes, bumpiness).
+  if (judge === 'classic') return -510 * f.agg + 761 * rows.length - 357 * f.holes - 184 * f.bump;
+  // 'basic': stays low and takes lines, but hardly notices holes or a ragged top.
+  return -510 * f.agg + 600 * rows.length - 250 * f.holes - 110 * f.bump;
+}
+
+// Trotbot's spot for piece t at a level: { r, x, y } (null if nothing fits).
+// next: the piece after it, for the judge that looks ahead.
+function levelMove(board, t, next, S, rng) {
+  const all = spots(board, t);
+  if (!all.length) return null;
+  const ranked = all.map((m, k) => ({ ...m, k, v: judgeSpot(S.judge, board, t, m) }));
+  const order = (a, b) => b.v - a.v || a.k - b.k;
+  if (S.judge === 'plus') {
+    // Look one piece ahead from its best few spots, and keep a clean well
+    // for a tetris while the stack is low.
+    ranked.sort(order);
+    ranked.forEach((m, i) => {
+      if (i >= 6) {
+        m.v = -1e12;
+        return;
+      }
+      const { board: after, rows } = place(board, t, m);
+      const f = shape(after);
+      let ahead = -1e11;
+      for (const n of spots(after, next)) ahead = Math.max(ahead, evaluate(after, next, n.r, n.x, n.y));
+      m.v = ahead + (rows.length === 4 ? 40000 : 0) + (f.top < 12 && f.well >= 3 && !f.holes ? 6000 : 0);
+    });
+  }
+  ranked.sort(order);
+  // A slip: a worse spot than its best (one of the next few), or, now and
+  // then, any spot at all. Like a person, it gets careful once the stack is
+  // over half way up, so a sloppy level is slow rather than doomed.
+  if (S.slip && ranked.length > 1 && rng.int(1000) < S.slip && shape(board).top < CAREFUL) {
+    if (S.wild && rng.int(1000) < S.wild) return ranked[rng.int(ranked.length)];
+    return ranked[1 + rng.int(Math.min(4, ranked.length - 1))];
+  }
+  return ranked[0];
+}
+
+// How long Trotbot takes over its next piece, in frames.
+function levelDelay(S, rng) {
+  let d = S.pace - S.jitter + rng.int(2 * S.jitter + 1);
+  if (S.think && rng.int(1000) < S.think) d += Math.floor(S.thinkFrames / 3) + rng.int(S.thinkFrames);
+  return Math.max(6, d);
+}
+
+// Trotbot's own Sprint game on the same pieces. With a `level` (BOT_SKILL)
+// it plays at that level's speed and skill; its slips and pauses come from a
+// generator seeded by the game's seed and the level (never Math.random), so
+// the phone's live picture and the server's replay are the same game.
+// Without one (games from before 3.1.1): a piece every `pace` frames, each
+// placed as well as it can. advance(frame) plays up to that frame (for the
+// live picture); the server calls result() for the whole race.
+export function newBot({ seed, pace = BOT_PACE.medium, level = '' }) {
+  const S = BOT_SKILL[level];
+  if (S) return levelBot(seed, level, S);
   const g = newGame({ seed, mode: 'sprint' });
   const advance = (frame) => {
     while (!isDone(g) && (g.pieces + 1) * pace <= frame) {
@@ -690,4 +821,27 @@ export function newBot({ seed, pace = BOT_PACE.medium }) {
     return g;
   };
   return { game: g, advance, result: (maxFrames = MAX_FRAMES) => summary(advance(maxFrames)) };
+}
+
+function levelBot(seed, level, S) {
+  const g = newGame({ seed, mode: 'sprint' });
+  const rng = seeded(`${seed}|trotbot|${level}`);
+  let at = levelDelay(S, rng);
+  const advance = (frame) => {
+    while (!isDone(g) && at <= frame && at <= MAX_FRAMES) {
+      g.frame = at;
+      const m = levelMove(g.board, g.cur.t, g.queue[0], S, rng);
+      if (!m) {
+        g.over = true;
+        g.reason = 'topout';
+        break;
+      }
+      Object.assign(g.cur, { r: m.r, x: m.x, y: m.y });
+      g.lastRotate = false;
+      lockPiece(g);
+      at += levelDelay(S, rng);
+    }
+    return g;
+  };
+  return { game: g, level, advance, result: (maxFrames = MAX_FRAMES) => summary(advance(maxFrames)) };
 }

@@ -6,7 +6,6 @@ import { CoinNum, useCoinFormat } from '../CoinNum.jsx';
 import { celebrate } from '../../motion.js';
 import { useEscape } from '../../util.js';
 import * as fun from '../../../functions/shared/funGames.js';
-import * as T from '../../../functions/shared/tetris.js';
 import * as M from '../../../functions/shared/minesweeper.js';
 import TetrisPlay, { boardText } from './TetrisPlay.jsx';
 import MinesPlay, { minesText } from './MinesPlay.jsx';
@@ -17,14 +16,25 @@ import MinesPlay, { minesText } from './MinesPlay.jsx';
 // coins. A Minesweeper tournament is played on the server tap by tap
 // (funGame 'sweep'), so its result is already in when the board ends.
 
-const SPEED_LABEL = { easy: 'Easy', medium: 'Medium', hard: 'Hard' };
 const LEVEL_KEYS = Object.keys(M.LEVELS);
+// The old speed closest to a level, for a server from before 3.1.1 (it
+// reads only `speed`; a newer one plays and pays `botLevel`).
+const OLD_SPEED = { beginner: 'easy', easy: 'easy', medium: 'medium', hard: 'hard', insane: 'hard' };
+const coinText = (n) => (n > 0 ? `${n} coin${n === 1 ? '' : 's'}` : 'No coins');
 
 export default function FunGame({ start, api, actor, roster, isOn, onClose }) {
   const [game, setGame] = useState(start.game || 'tetris');
-  // What's being played: { mode, level, speed, race, tournament } (null: the picker).
+  // What's being played: { mode, level, botLevel, race, tournament } (null: the picker).
   const [pick, setPick] = useState(
-    start.mode ? { mode: start.mode, level: start.level, speed: start.speed, race: start.race, tournament: start.tournament } : null,
+    start.mode
+      ? {
+          mode: start.mode,
+          level: start.level,
+          botLevel: fun.BOT_LEVELS.includes(start.botLevel) ? start.botLevel : 'medium',
+          race: start.race,
+          tournament: start.tournament,
+        }
+      : null,
   );
   const [phase, setPhase] = useState(start.mode ? 'count' : 'pick');
   const [session, setSession] = useState(null);
@@ -56,7 +66,7 @@ export default function FunGame({ start, api, actor, roster, isOn, onClose }) {
       game,
       mode: pick.mode,
       level: pick.level,
-      speed: pick.speed,
+      ...(pick.mode === 'bot' && { botLevel: pick.botLevel, speed: OLD_SPEED[pick.botLevel] }),
       race: pick.race,
       tournament: pick.tournament,
     });
@@ -153,9 +163,9 @@ export default function FunGame({ start, api, actor, roster, isOn, onClose }) {
 
 const modeLabel = (game, p) =>
   [
-    fun.MODES[game][p.mode],
+    // "Race Insane Trotbot (40 lines)", "Race Beginner Trotbot · Expert"
+    p.mode === 'bot' ? fun.MODES[game].bot.replace('Trotbot', `${fun.botLabel({ botLevel: p.botLevel })} Trotbot`) : fun.MODES[game][p.mode],
     game === 'minesweep' && p.level ? M.LEVELS[p.level]?.label : '',
-    p.mode === 'bot' ? SPEED_LABEL[p.speed || 'medium'] : '',
   ]
     .filter(Boolean)
     .join(' · ');
@@ -187,7 +197,7 @@ function Countdown({ until, onDone }) {
 
 function Picker({ game, setGame, api, actor, roster, isOn, onPlay, error, onClose, conv }) {
   const [level, setLevel] = useState('beginner');
-  const [speed, setSpeed] = useState('medium');
+  const [botLevel, setBotLevel] = useState('medium');
   const [startLevel, setStartLevel] = useState(1);
   const [rival, setRival] = useState('');
   const [sent, setSent] = useState('');
@@ -276,16 +286,33 @@ function Picker({ game, setGame, api, actor, roster, isOn, onPlay, error, onClos
         <p className="muted small">
           {game === 'tetris' ? 'Same pieces, first to 40 lines.' : 'Same board, first to clear it.'} Trotbot’s board shows next to yours.
         </p>
-        <div className="fun-row">
-          <div className="chips">
-            {fun.SPEEDS.map((s) => (
-              <button key={s} className={`chip${speed === s ? ' on' : ''}`} onClick={() => setSpeed(s)}>
-                {SPEED_LABEL[s]}
+        <div className="fun-bot-levels" role="radiogroup" aria-label="Trotbot’s level">
+          {fun.BOT_LEVELS.map((k, i) => {
+            const L = fun.BOT_LEVEL[k];
+            const coins = game === 'tetris' ? L.coins : fun.msBotCoins(level, L.coins);
+            return (
+              <button
+                key={k}
+                role="radio"
+                aria-checked={botLevel === k}
+                className={`chip fun-bot-level${botLevel === k ? ' on' : ''}`}
+                onClick={() => setBotLevel(k)}
+              >
+                <span className="fun-bot-pips" aria-hidden="true">
+                  {fun.BOT_LEVELS.map((x, j) => (
+                    <i key={x} className={j <= i ? 'lit' : ''} />
+                  ))}
+                </span>
+                <b>{L.label}</b>
+                <span className="fun-bot-desc">{L.desc}</span>
+                {coinsOn && <span className="fun-pay small">{coinText(coins)}</span>}
               </button>
-            ))}
-          </div>
-          <button className="btn primary" onClick={() => onPlay({ mode: 'bot', speed, level })}>
-            <Icon name="play" /> Race Trotbot
+            );
+          })}
+        </div>
+        <div className="fun-row">
+          <button className="btn primary" onClick={() => onPlay({ mode: 'bot', botLevel, level })}>
+            <Icon name="play" /> Race {fun.BOT_LEVEL[botLevel].label} Trotbot
           </button>
         </div>
       </section>
@@ -382,12 +409,9 @@ function TournamentRow({ t, me, onPlay }) {
 // One game on the board, with the other player's (or Trotbot's) picture.
 function Play({ game, session, pick, api, actor, onEnd }) {
   const opts = useMemo(() => fun.gameOpts({ ...session, game }), [session, game]);
-  const bot = useMemo(() => {
-    if (session.mode !== 'bot') return null;
-    return game === 'tetris'
-      ? T.newBot({ seed: session.seed, pace: T.BOT_PACE[session.speed] })
-      : M.newBot({ seed: session.seed, level: opts.level, pace: M.BOT_PACE[session.speed] });
-  }, [session, game, opts]);
+  // Trotbot's live picture: the same game the server replays at the end
+  // (fun.botFor, from the session the server started).
+  const bot = useMemo(() => (session.mode === 'bot' ? fun.botFor({ ...session, game }) : null), [session, game]);
   const race = pick.race?.msgId;
   const [other, setOther] = useState(null);
   useEffect(() => {
@@ -470,11 +494,13 @@ function Result({ game, session, pick, result, conv, api, onAgain, onPicker, onC
       </div>
     );
   const won = mode === 'bot' ? r.won : game === 'minesweep' ? s.won : mode === 'sprint' || mode === 'race' ? s.finished : null;
+  // Which Trotbot it was: the level the server started this game at.
+  const botName = mode === 'bot' ? `${fun.botLabel(session)} Trotbot` : '';
   const headline =
     mode === 'bot'
       ? r.won
-        ? 'You beat Trotbot!'
-        : 'Trotbot wins this one'
+        ? `You beat ${botName}!`
+        : `${botName} wins this one`
       : mode === 'race'
         ? 'Sent in'
         : mode === 'tournament'
@@ -513,7 +539,7 @@ function Result({ game, session, pick, result, conv, api, onAgain, onPicker, onC
             You: <b className="mono">{fun.resultLine(game, 'bot', s)}</b>
           </span>
           <span>
-            Trotbot: <b className="mono">{fun.resultLine(game, 'bot', r.bot)}</b>
+            {botName}: <b className="mono">{fun.resultLine(game, 'bot', r.bot)}</b>
           </span>
         </div>
       )}

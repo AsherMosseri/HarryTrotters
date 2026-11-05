@@ -108,6 +108,7 @@ const SECTIONS = [
       'Ten games to learn the robot and the game: Name that part, Rules check, Strategy, Wiring puzzle, Spot the problem, Fix the bug, Gear ratios, the Auto path planner, and quizzes from the team’s own work.',
       'Every answer comes with an explanation (and the rule and page). Something wrong with a question? Tap Report a problem.',
       'The daily question is posted in #general at 7 AM on school days. Answer on the card; the first right answers get the most coins.',
+      'Trotbot has five levels in Tetris and Minesweeper, from Beginner (slow and makes lots of mistakes) to Insane (near perfect and very fast). Pick one under Race Trotbot, or type /tetris bot insane or /minesweep bot beginner. Beating it pays 1, 1, 2, 4 or 6 coins by level (Minesweeper adds the board’s win coins), within the daily game limit.',
       'Just for fun: Tetris and Minesweeper, alone, against Trotbot, or racing a teammate. Battleship is in #arcade: /battleship @name, Classic rules (turn by turn) or add hitagain (a hit gets another turn). Tap Play on the card to play it big; anyone can Watch.',
     ],
   ],

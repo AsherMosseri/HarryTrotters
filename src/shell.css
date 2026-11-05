@@ -5211,6 +5211,33 @@ button.bs-cell:focus-visible { outline: 2px solid var(--accent); outline-offset:
 .coin-pill .count-up, .cz-betpill .cz-amt, .cz-amt .mono, .jcoins { white-space: nowrap; }
 .cz-betpill { white-space: nowrap; flex: none; }
 
+/* Trotbot's levels (3.1.1): the picker's five levels, each with what it's like and what beating it pays. */
+.fun-bot-levels { display: grid; gap: 6px; }
+.fun-pick .fun-bot-level {
+  display: grid; grid-template-columns: auto auto 1fr auto; align-items: center; gap: 4px 10px;
+  min-height: 44px; height: auto; padding: 8px 12px; border-radius: 10px; text-align: left; cursor: pointer;
+  color: var(--text); border: 1px solid transparent; font-weight: 400;
+}
+.fun-pick .fun-bot-level b { font-size: 14px; font-weight: 650; min-width: 64px; }
+.fun-pick .fun-bot-level .fun-bot-desc { font-size: 13px; color: var(--muted); min-width: 0; }
+.fun-pick .fun-bot-level .fun-pay { margin: 0; white-space: nowrap; justify-self: end; }
+.fun-pick .fun-bot-level.on { border-color: var(--accent); }
+.fun-pick .fun-bot-level.on .fun-bot-desc { color: var(--text); }
+.fun-bot-pips { display: inline-flex; gap: 2px; align-items: flex-end; height: 14px; }
+.fun-bot-pips i { width: 3px; border-radius: 1px; background: var(--border); }
+.fun-bot-pips i:nth-child(1) { height: 5px; }
+.fun-bot-pips i:nth-child(2) { height: 7px; }
+.fun-bot-pips i:nth-child(3) { height: 9px; }
+.fun-bot-pips i:nth-child(4) { height: 11px; }
+.fun-bot-pips i:nth-child(5) { height: 13px; }
+.fun-bot-pips i.lit { background: var(--muted); }
+.fun-bot-level.on .fun-bot-pips i.lit { background: var(--accent); }
+@media (max-width: 480px) {
+  /* Phones: the description goes under the name. */
+  .fun-pick .fun-bot-level { grid-template-columns: auto 1fr auto; }
+  .fun-pick .fun-bot-level .fun-bot-desc { grid-column: 2 / 4; grid-row: 2; }
+}
+
 /* Match log: who drove, operated, coached and was human player. */
 .run-roles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 12px; }
 .run-role { display: flex; flex-direction: column; gap: 4px; min-width: 0; font-size: 13px; font-weight: 600; color: var(--muted); }
