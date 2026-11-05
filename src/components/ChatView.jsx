@@ -378,9 +378,10 @@ export default function ChatView({
   };
   // A node's top on screen as laid out: its own animation (the pop of the
   // square you just played, a shake) doesn't count, or the list would chase it.
+  // (Measured from its positioned parent inside the list, a message.)
   const layoutTop = (node) => {
     const p = node.offsetParent;
-    return p ? p.getBoundingClientRect().top + p.clientTop + node.offsetTop : node.getBoundingClientRect().top;
+    return p && p !== list.current && list.current?.contains(p) ? p.getBoundingClientRect().top + p.clientTop + node.offsetTop : node.getBoundingClientRect().top;
   };
   // Where the anchor (see above) is now.
   const takeAnchor = () => {
