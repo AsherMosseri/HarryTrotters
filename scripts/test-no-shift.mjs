@@ -189,7 +189,8 @@ function inPage({ engine, busy }) {
           rec.nextKey = keyOf(at);
           rec.overlay = !!at?.closest?.('.panel-backdrop, [role="dialog"], [role="alertdialog"], .fun-dialog, .game-sheet') && !rec.want.startsWith('view:');
           const still = find(want);
-          rec.next = rec.overlay || rec.nextKey === want || (!still && rec.nextKey.split('|')[0] === rec.cardKey);
+          // (A dialog's OK closes it: nothing more to tap there.)
+          rec.next = rec.overlay || rec.nextKey === want || (!still && (rec.nextKey.split('|')[0] === rec.cardKey || rec.cardKey === 'dialog'));
           rec.moved = Math.round(rec.moved * 10) / 10;
           rec.movedCard = Math.round(rec.movedCard * 10) / 10;
           rec.done = true;
@@ -809,7 +810,8 @@ const GAMES = {
         await tap(p, name.first(), `${g}: a name`, { ambush: true });
         await closeDialogs(p);
       }
-      await tap(p, card(p, id).locator('.cz-econ, .cz-leaderboard, .cmd-whois').first(), `${g}: the card`);
+      // (Its middle can be a name: any spot on the card is the card.)
+      await tap(p, card(p, id).locator('.cz-econ, .cz-leaderboard, .cmd-whois').first(), `${g}: the card`, { loose: true });
     }
   },
   async learn(p) {

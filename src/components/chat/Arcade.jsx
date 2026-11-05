@@ -426,11 +426,10 @@ function Trivia({ g, me, act, Name, now }) {
   return (
     <div className="arc-trivia">
       <div className="trivia-q">{g.q}</div>
-      {live && (
-        <div className="arc-timer">
-          <span style={{ width: `${Math.min(100, ((g.endsAt - now) / TIMES.trivia) * 100)}%` }} />
-        </div>
-      )}
+      {/* Its space stays when time's up, so the answers don't move up under a finger. */}
+      <div className={`arc-timer${live ? '' : ' over'}`}>
+        <span style={{ width: live ? `${Math.min(100, ((g.endsAt - now) / TIMES.trivia) * 100)}%` : 0 }} />
+      </div>
       <div className="trivia-choices">
         {g.choices.map((c, i) => {
           const right = !live && g.answer === i;
@@ -506,9 +505,16 @@ function Hangman({ g, me, act, Name }) {
               ),
             )}
           </div>
-          {g.lastGuess && live && (
+          {/* Its line is there from the start, so the first guess doesn't push the keys down. */}
+          {live && (
             <div className="muted tiny">
-              {g.lastGuess.name.split(' ')[0]} guessed {g.lastGuess.letter} {g.lastGuess.hit ? '✅' : '❌'}
+              {g.lastGuess ? (
+                <>
+                  {g.lastGuess.name.split(' ')[0]} guessed {g.lastGuess.letter} {g.lastGuess.hit ? '✅' : '❌'}
+                </>
+              ) : (
+                ' '
+              )}
             </div>
           )}
         </div>

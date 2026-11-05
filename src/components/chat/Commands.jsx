@@ -423,17 +423,42 @@ function Body({ c, by, onPerson, fresh }) {
   }
 }
 
-// A game being played that the chat must hold still for (ChatView never
-// scrolls it under your finger while it's in view): 'me' for your own live
-// casino game or a game you're a player in, 'all' for one anyone can play
-// (it holds once you've tapped it).
+// A card waiting for your tap, that the chat must hold still for (ChatView
+// never scrolls it under your finger while it's in view): 'me' for your own
+// live casino game, a game you're a player in (or dared, or were dared to),
+// or a coin request waiting on you (or yours to cancel); 'all' for one anyone
+// can play (it holds once you've tapped it, or for a while after it shows up,
+// see CommandCard).
 const LIVE_CASINO = ['blackjack', 'crash', 'mines', 'highlow'];
 function liveFor(m, me) {
   const c = m.cmd;
   if (LIVE_CASINO.includes(c.name)) return c.status === 'playing' && m.by === me ? 'me' : null;
+  if (c.name === 'request') return askWaiting(c, me) ? 'me' : null;
   if (!ARCADE_CARDS.includes(c.name) || !isLive(c.status)) return null;
   const g = c.game || {};
-  return c.status !== 'open' && (me === g.a || me === g.b) ? 'me' : 'all';
+  return me === g.a || me === g.b ? 'me' : 'all';
+}
+function askWaiting(c, me) {
+  if (c.kind !== 'coins' || c.status !== 'open') return false;
+  if (c.ask?.from === me) return true;
+  if (c.rows) return Object.values(c.rows).some((r) => r.to === me && r.status === 'open');
+  return c.ask?.to === me;
+}
+// Cards anyone may tap that aren't games in play: a lottery's Buy, a posted
+// Tetris or Minesweeper score's Play, the daily question.
+const INVITES = ['lottery', 'tetris', 'minesweep', 'dailyq'];
+// How long a card holds the chat still after it shows up on your screen (you
+// posted it, or opened the chat to it), when it's yours or invites a tap.
+// ChatView holds only while it's on screen and has something to tap.
+const FRESH_HOLD = 20000;
+function useFresh(on, ms) {
+  const [fresh, setFresh] = useState(on);
+  useEffect(() => {
+    if (!fresh) return undefined;
+    const t = setTimeout(() => setFresh(false), ms);
+    return () => clearTimeout(t);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  return fresh && on;
 }
 
 // The game's state a while after it ends: the chat stays still for a few
@@ -468,7 +493,10 @@ export function CommandCard({ m, onPerson, me, onMove, onBuy, onChallenge, onRep
   // A /roll tumbles only when it was just rolled.
   const [fresh] = useState(() => serverNow() - m.at < 8000);
   const [since] = useState(() => Math.round(performance.now()));
-  const live = useLinger(liveFor(m, me), 3000);
+  const want = liveFor(m, me);
+  const justHere = useFresh(m.by === me || want === 'all' || INVITES.includes(n), FRESH_HOLD);
+  // 'fresh': held while it has something to tap (ChatView checks).
+  const live = useLinger(want === 'me' ? 'me' : justHere ? 'fresh' : want, 3000);
   return (
     <div className={`cmd-card cmd-card-${n}${kind ? ` cmd-${kind}` : ''}`} data-live={live || undefined} data-since={live ? since : undefined}>
       <Trotbot name={n === 'dailyq' ? '' : n} />

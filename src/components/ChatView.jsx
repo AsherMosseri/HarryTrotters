@@ -23,6 +23,9 @@ const PAGE = 60;
 const BOTTOM_PX = 32;
 // After a tap on a card, how long the list keeps still (ms).
 const CARD_HOLD = 4000;
+// And while that card is on screen and has something to tap, this long (ms):
+// the next tap on it (a Report after a spin, a second Buy) lands where it was.
+const TAP_HOLD = 20000;
 const NONE = [];
 
 // Messages by id, newest copy winning, oldest first.
@@ -210,7 +213,7 @@ export default function ChatView({
   // while the game view is open: then new messages only light up the pill.
   const hold = useRef({ touching: false, until: 0 });
   // The last card tapped: the control under the finger and its message.
-  const tapped = useRef({ node: null, msg: null });
+  const tapped = useRef({ node: null, msg: null, at: 0 });
   const viewOpen = useRef(false);
   // What stays put when things change size (a game card growing, a photo
   // loading, a reaction above): the control you just tapped on a card, else a
@@ -325,29 +328,41 @@ export default function ChatView({
     el.scrollTo({ top: Math.max(0, top), behavior: smooth ? 'smooth' : 'auto' });
   };
 
-  // A game you're playing (data-live on its card, Commands.jsx), on screen:
-  // yours, or one anyone plays that you've tapped. Not in its first moment,
-  // so a game you just started still shows in full as it fills in.
+  // A card waiting for your tap (data-live on it, Commands.jsx), on screen:
+  // a game you're playing or a request waiting on you; one anyone plays that
+  // you've tapped; yours or one that invites a tap, for a while after it
+  // showed up ('fresh', with something to tap); or any card you tapped in the
+  // last TAP_HOLD. Not in its first moment, so a game you just started still
+  // shows in full as it fills in.
   const liveCard = () => {
     const el = list.current;
     if (!el) return null;
     const box = el.getBoundingClientRect();
     const now = performance.now();
-    for (const c of el.querySelectorAll('.cmd-card[data-live]')) {
-      if (c.dataset.live !== 'me' && !tapped.current.msg?.contains(c)) continue;
-      if (now - Number(c.dataset.since || 0) < 600) continue;
+    const t = tapped.current;
+    const onScreen = (c) => {
       const r = c.getBoundingClientRect();
-      if (r.bottom > box.top + 24 && r.top < box.bottom - 24) return c;
+      return r.bottom > box.top + 24 && r.top < box.bottom - 24;
+    };
+    const canTap = (c) => !!c.querySelector('button:not(:disabled), input:not(:disabled), select:not(:disabled)');
+    for (const c of el.querySelectorAll('.cmd-card[data-live]')) {
+      const live = c.dataset.live;
+      if (live === 'all' && !t.msg?.contains(c)) continue;
+      if (now - Number(c.dataset.since || 0) < 600) continue;
+      if (live === 'fresh' && !canTap(c)) continue;
+      if (onScreen(c)) return c;
     }
-    return null;
+    const last = t.msg?.isConnected && el.contains(t.msg) && now - t.at < TAP_HOLD ? t.msg.querySelector('.cmd-card') : null;
+    return last && canTap(last) && onScreen(last) ? last : null;
   };
   // Hands off: while a game is being played on screen nothing follows new
   // messages (the pill counts them), however long you think between taps.
   const holding = () => viewOpen.current || hold.current.touching || performance.now() < hold.current.until || !!liveCard();
   const distance = (el) => el.scrollHeight - el.scrollTop - el.clientHeight;
-  const setTop = (el, top) => {
+  // why: 'anchor' when it only puts the anchor back (onScroll keeps it then).
+  const setTop = (el, top, why = true) => {
     if (Math.abs(el.scrollTop - top) < 1) return;
-    selfScroll.current = true;
+    selfScroll.current = why;
     el.scrollTop = top;
   };
   const toBottom = (el) => {
@@ -392,9 +407,12 @@ export default function ChatView({
     if (a && !(a.node.isConnected && el?.contains(a.node))) a = a.back;
     if (!el || !a || !a.node.isConnected || !el.contains(a.node)) return takeAnchor();
     const moved = a.node.getBoundingClientRect().top - el.getBoundingClientRect().top - a.off;
-    if (Math.abs(moved) >= 1) setTop(el, el.scrollTop + moved);
-    // Measured again for the next change.
+    if (Math.abs(moved) >= 1) setTop(el, el.scrollTop + moved, 'anchor');
+    // The anchor for the next change (it can be another one now). The same
+    // one keeps where it should be, so moves under a pixel don't add up.
+    const was = anchor.current;
     takeAnchor();
+    if (was && anchor.current?.node === was.node) anchor.current = was;
   };
   // After anything changed size: at the bottom (and free to move), stay there;
   // otherwise keep what you're looking at where it is.
@@ -524,7 +542,9 @@ export default function ChatView({
     const el = list.current;
     const mine = selfScroll.current;
     selfScroll.current = false;
-    takeAnchor();
+    // Putting the anchor back leaves it where it should be (re-measuring
+    // would keep the scroll's rounding, and those add up).
+    if (mine !== 'anchor') takeAnchor();
     if (mine) return;
     atBottom.current = distance(el) < BOTTOM_PX;
     if (atBottom.current) setNewBelow(0);
@@ -536,9 +556,28 @@ export default function ChatView({
     const cardEl = e.target.closest?.('.cmd-card');
     if (!cardEl) return;
     hold.current.until = Math.max(hold.current.until, performance.now() + CARD_HOLD);
-    tapped.current = { node: e.target.closest('button, input, textarea, select, a') || cardEl, msg: cardEl.closest('.msg') || cardEl };
+    tapped.current = { node: e.target.closest('button, input, textarea, select, a') || cardEl, msg: cardEl.closest('.msg') || cardEl, at: performance.now() };
+    if (cardEl.matches('.cmd-arcade, .cmd-money, .cmd-card-request, .cmd-card-dailyq') && !e.target.closest('.card-actions')) keepHeight(cardEl);
     takeAnchor();
   };
+  // A game card you tap keeps at least its height until you leave it alone
+  // for CARD_HOLD: a game that ends with the tap (a duel's shot, a request
+  // paid) doesn't pull what's under it up under your finger.
+  const heightLock = useRef({ el: null, t: 0 });
+  const keepHeight = (cardEl) => {
+    const k = heightLock.current;
+    clearTimeout(k.t);
+    if (k.el && k.el !== cardEl) k.el.style.minHeight = '';
+    const cs = getComputedStyle(cardEl);
+    const extra = cs.boxSizing === 'border-box' ? 0 : ['paddingTop', 'paddingBottom', 'borderTopWidth', 'borderBottomWidth'].reduce((s, p) => s + (parseFloat(cs[p]) || 0), 0);
+    cardEl.style.minHeight = `${cardEl.getBoundingClientRect().height - extra}px`;
+    k.el = cardEl;
+    k.t = setTimeout(() => {
+      cardEl.style.minHeight = '';
+      k.el = null;
+    }, CARD_HOLD);
+  };
+  useEffect(() => () => clearTimeout(heightLock.current.t), []);
 
   // The game view (GameView.jsx), opened from a card. The list stays exactly
   // where it was underneath, and is back there when it closes.
