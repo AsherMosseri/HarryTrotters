@@ -3,7 +3,8 @@
 // giving a pet to a teammate (offer, cancelOffer, accept, decline). Each move
 // is checked by the plain functions in shared/pets.js (demo mode runs the
 // same ones); this file only reads and writes the docs:
-//   pets/{personId}   a person's pets: the first at the top, the second in `extra`
+//   pets/{personId}   a person's pets: the first at the top, the second in `extra`,
+//                     any more in `more` (shared/pets.js petsIn and docOf)
 //   petGifts/{id}     an offer to give a pet away (read by the two people)
 //   petUnlocks/{id}   event gear a person earned (petevents.js); a style move checks it
 // Nothing here costs or pays coins.
@@ -114,7 +115,7 @@ export function petFamily({ db, notify, personId }) {
         const giver = data.rename(gift.from);
         const mine = await docOf(tx, aliases);
         const theirs = await docOf(tx, data.rename.aliases(giver).slice(0, 30));
-        const r = giftAccept(gift, { me, doc: mine.data, giverDoc: theirs.data, giver, now });
+        const r = giftAccept(gift, { me, doc: mine.data, giverDoc: theirs.data, giver, shifts: data.shifts, now });
         if (r.status && r.status !== 'accepted') tx.update(gSnap.ref, { status: r.status, decidedAt: now });
         if (r.note) return r;
         save(tx, mine, r.doc);

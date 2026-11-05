@@ -29,7 +29,7 @@ import { attemptSeed, newSeed, secureRandom } from '../../functions/shared/rng.j
 import { asksOn } from '../../functions/shared/checkin.js';
 import * as market from '../../functions/shared/market.js';
 import { PERK_IDEAS } from '../../functions/shared/market.js';
-import { giftAccept, giftEnd, giftOffer, petEdit, petsIn } from '../../functions/shared/pets.js';
+import { giftAccept, giftEnd, giftOffer, petEdit, petsIn, withPet } from '../../functions/shared/pets.js';
 import { ROSTER, SUBTEAMS, cleanName, sameName } from '../../functions/shared/team.js';
 import * as chan from '../../functions/shared/channels.js';
 import { checkPicks, myPicks, personOptionId, usesVoteButton } from '../../functions/shared/polls.js';
@@ -1553,10 +1553,9 @@ export const demoStore = {
       if (r.pet)
         state.pets = state.pets.map((p) => {
           if (p.person !== me) return p;
-          const second = data.born != null && p.extra && p.extra.adoptedAt === Number(data.born);
-          return second
-            ? { ...p, extra: { ...p.extra, ...r.pet, cared: (p.extra.cared || 0) + 1, caredAt: now } }
-            : { ...p, ...r.pet, cared: (p.cared || 0) + 1, caredAt: now };
+          const list = petsIn(p);
+          const at = data.born == null ? 0 : list.findIndex((x) => x.adoptedAt === Number(data.born));
+          return { ...withPet(p, at, { ...r.pet, cared: (list[at].cared || 0) + 1, caredAt: now }), id: p.id };
         });
       return done({ ok: true, price: r.price, purchase, pet: r.pet || null });
     }
@@ -1636,9 +1635,8 @@ export const demoStore = {
       const putDoc = (n, doc) => {
         state.pets = (state.pets || []).filter((p) => p.person !== n);
         if (!doc) return;
-        const { id: _a, extra, ...rest } = doc;
-        const { id: _b, ...second } = extra || {};
-        state.pets.push({ ...rest, id: personId(n), ...(extra && { extra: second }) });
+        // docOf already leaves ids off the pets after the first.
+        state.pets.push({ ...doc, id: personId(n) });
       };
       const tell = (to, title, body) => {
         state.inbox = [{ id: uid(), type: 'market', icon: '🐾', title, body, open: 'view:market', at: now, read: false, to }, ...(state.inbox || [])];
@@ -1682,7 +1680,7 @@ export const demoStore = {
           return done({ ok: true });
         }
         if (!gift || gift.to !== me) return note('That offer is gone.');
-        const r = giftAccept(gift, { me, doc: docOfName(me), giverDoc: docOfName(gift.from), giver: gift.from, now });
+        const r = giftAccept(gift, { me, doc: docOfName(me), giverDoc: docOfName(gift.from), giver: gift.from, shifts: state.shifts || [], now });
         if (r.status && r.status !== 'accepted') Object.assign(gift, { status: r.status, decidedAt: now });
         if (r.note) return done(r);
         putDoc(me, r.doc);
