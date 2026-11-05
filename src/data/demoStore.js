@@ -955,6 +955,30 @@ life.seedSamples();
 const events = demoEvents({ get: () => state, commit: () => commit(), uid });
 const petPhotos = demoPetPhotos({ get: () => state, commit: () => commit(), uid });
 events.seedSamples();
+// 3.2: one of the new pets in the park (Cooper had none). The food values are
+// stored as of a day ago, like the other sample pets.
+if (!state.pets32Seeded) {
+  const at = Date.now() - 9 * 86400000;
+  const fed = Date.now() - 86400000;
+  if (!(state.pets || []).some((p) => p.person === 'Cooper Mlezcko'))
+    state.pets = [
+      ...(state.pets || []),
+      {
+        id: 'cooper-mlezcko',
+        person: 'Cooper Mlezcko',
+        species: 'goldendoodle',
+        name: 'Waffles',
+        adoptedAt: at,
+        food: { v: 85, at: fed },
+        fun: { v: 90, at: fed },
+        inChat: true,
+        cared: 1,
+        gear: { head: '', face: '', neck: 'bandana', body: '', extra: '', palette: '' },
+        babyBorn: false,
+      },
+    ];
+  state.pets32Seeded = 1;
+}
 // Loans (demoLoans.js): the same checks as functions/loans.js.
 const loans = demoLoans({ get: () => state, commit: () => commit(), uid });
 
