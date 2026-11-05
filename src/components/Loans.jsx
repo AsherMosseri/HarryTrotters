@@ -8,6 +8,19 @@ import { Switch } from './Ads.jsx';
 import { Icon } from './shell/icons.jsx';
 import { onLoanForm, peekLoanForm, takeLoanForm } from '../loanCommand.js';
 import { coinStyled, withExact } from '../coinFormat.js';
+import { amountTip, readAmount } from '../../functions/shared/amount.js';
+
+// Typed like chat amounts: 500, 2.5k, 1,000,000, 7Sx or 2.5e40. NaN if it isn't one.
+const toCoins = (v) => {
+  const w = String(v ?? '').replace(/\s+/g, '');
+  return (w && readAmount(w)?.amount) ?? NaN;
+};
+// What to say under a box that can't be read yet ('' when it reads fine).
+const amountHint = (v) => {
+  const w = String(v ?? '').replace(/\s+/g, '');
+  if (!w) return '';
+  return readAmount(w) ? amountTip(w) : 'Try 500, 2.5k, 7Sx or 2.5e40.';
+};
 
 // Loans (3.1), a tab in the coins screen. Ask the bank (Asher answers; the
 // coins are made up, not his) or a teammate (their own coins) for coins, with
@@ -261,10 +274,12 @@ function TermsFields({ value, onChange, bank, cfg, idPrefix }) {
       <input
         id={`${idPrefix}-amount`}
         className="input loan-amount mono"
-        type="number"
-        inputMode="numeric"
-        min={1}
-        max={max}
+        type="text"
+        inputMode="text"
+        autoCapitalize="off"
+        autoCorrect="off"
+        spellCheck={false}
+        maxLength={60}
         value={value.amount}
         placeholder={`Up to ${coinStyled(max)}`}
         onChange={(e) => set({ amount: e.target.value })}
@@ -328,7 +343,9 @@ function TermsFields({ value, onChange, bank, cfg, idPrefix }) {
 
 // What these terms come to: "You’d pay back 110 by Wed, Nov 18."
 function Preview({ value, bank, cfg, you = true }) {
-  const r = L.cleanTerms(value, { bank, cfg });
+  const hint = amountHint(value.amount);
+  if (hint) return <p className="muted small loan-preview">{hint}</p>;
+  const r = L.cleanTerms({ ...value, amount: toCoins(value.amount) }, { bank, cfg });
   if (r.error) return <p className="muted small loan-preview">{value.amount ? r.error : 'Pick how many coins.'}</p>;
   const t = r.terms;
   const due = Date.now() + t.term * L.WEEK;
@@ -378,7 +395,7 @@ function AskForm({ loans, actor, roster, mode, setMode, onDone, prefill }) {
     const r = await call('loanRequest', {
       lender: bank ? 'bank' : who,
       ...value,
-      amount: Number(value.amount),
+      amount: toCoins(value.amount),
       rate: Number(value.rate),
       term: Number(value.term),
       note: text.trim(),
@@ -446,7 +463,7 @@ function AskForm({ loans, actor, roster, mode, setMode, onDone, prefill }) {
         <button className="btn" onClick={() => setMode(null)}>
           Cancel
         </button>
-        <button className="btn primary" disabled={busy || (!bank && !who) || !Number(value.amount)} onClick={send}>
+        <button className="btn primary" disabled={busy || (!bank && !who) || !(toCoins(value.amount) > 0)} onClick={send}>
           Send request
         </button>
       </div>
@@ -545,7 +562,7 @@ function LoanCard({ loan, loans, focus, onToast }) {
     });
     if (ok) run('loanManage', { action: 'forgive' }, 'Forgiven.');
   };
-  const n = Math.floor(Number(pay) || 0);
+  const n = Number.isFinite(toCoins(pay)) ? toCoins(pay) : 0;
   // What the last ask or counter said, shown while it waits for an answer.
   const lastNote = [...(loan.history || [])].reverse().find((h) => h.act === 'ask' || h.act === 'counter');
   return (
@@ -653,7 +670,7 @@ function LoanCard({ loan, loans, focus, onToast }) {
                   'loanRespond',
                   {
                     action: 'counter',
-                    terms: { ...value, amount: Number(value.amount), rate: Number(value.rate), term: Number(value.term) },
+                    terms: { ...value, amount: toCoins(value.amount), rate: Number(value.rate), term: Number(value.term) },
                     note: text.trim(),
                   },
                   'Counter sent.',
@@ -681,10 +698,12 @@ function LoanCard({ loan, loans, focus, onToast }) {
         <div className="loan-repay">
           <input
             className="input mono"
-            type="number"
-            inputMode="numeric"
-            min={1}
-            max={left}
+            type="text"
+            inputMode="text"
+            autoCapitalize="off"
+            autoCorrect="off"
+            spellCheck={false}
+            maxLength={60}
             value={pay}
             placeholder={`1 to ${coinStyled(left)}`}
             aria-label="Coins to pay back"
@@ -700,6 +719,7 @@ function LoanCard({ loan, loans, focus, onToast }) {
           <button className="btn primary" disabled={busy || left > balance} onClick={() => run('loanRepay', { amount: left }, 'Paid off.')}>
             Pay all <span className="mono">{coinStyled(left)}</span>
           </button>
+          {amountHint(pay) && <span className="muted tiny loan-have">{amountHint(pay)}</span>}
           {(n > balance || left > balance) && <span className="muted tiny loan-have">You have {coinStyled(Math.max(0, balance))}.</span>}
         </div>
       )}
