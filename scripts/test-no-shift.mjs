@@ -881,7 +881,7 @@ const GAMES = {
       const id = await newest(p, g);
       await p.evaluate((id) => (window.__ns.focusId = id), id);
       await sleep(400);
-      await tap(p, btn(p, id, /^Play/), `Play ${g}`, { ambush: true });
+      await tap(p, btn(p, id, /^\s*Play/), `Play ${g}`, { ambush: true });
       await closeDialogs(p);
       await sleep(300);
     }
