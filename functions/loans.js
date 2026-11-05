@@ -10,6 +10,10 @@
 //   loanManage({ action, id, weeks, settings, note })
 //                                              forgive | extend (the lender; the owner
 //                                              for bank loans) | settings (the owner)
+//   loanManage({ action: 'change', step, id, weeks | dueAt, note })
+//                                              a new length (3.2): either side asks
+//                                              (step 'ask'); the other side 'accept's
+//                                              or 'decline's; the asker can 'cancel'
 // Scheduled: loanTick (every 15 minutes) takes what's left on the due date,
 // reminds borrowers 2 days before, ends overdue loans once the borrower is
 // back above zero, and drops requests nobody answered in a week.
@@ -291,6 +295,7 @@ export function loanFunctions({ db, coinData, freshCoins, bankRef, notify, owner
       return { ok: true, settings: cfg };
     }
     if (!validId(id)) return note('Which loan?');
+    if (action === 'change') return changeLength(me, data, boss, req.data || {});
     if (action !== 'forgive' && action !== 'extend') return note('Forgive or extend?');
     const now = loanClock.now();
     const res = await db.runTransaction(async (tx) => {
@@ -338,6 +343,38 @@ export function loanFunctions({ db, coinData, freshCoins, bankRef, notify, owner
     ]);
     return { ok: true, status: res.loan.status, give: res.give };
   });
+
+  // A length change (3.2, shared/loans.js changeCheck): asked by either side,
+  // and the due date and terms only change when the other side accepts. One
+  // transaction reads the loan and checks its status and who's waiting, so a
+  // double tap or a race with the due date changes it once at most.
+  async function changeLength(me, data, boss, { id, step, weeks, dueAt, note: text }) {
+    if (!['ask', 'accept', 'decline', 'cancel'].includes(step)) return note('Ask, accept, or say no?');
+    const now = loanClock.now();
+    const res = await db.runTransaction(async (tx) => {
+      const snap = await tx.get(loanRef(id));
+      const loan = snap.exists ? { id, ...snap.data() } : null;
+      const role = L.roleOf(loan, me, { owner: boss, rename: data.rename });
+      if (!role) return note(loan ? 'That isn’t your loan.' : 'That loan is gone.');
+      const r = L.changeCheck(loan, { role, action: step, weeks, dueAt, note: text, now });
+      if (r.error) return note(r.error, r.body);
+      tx.update(loanRef(id), { ...r.patch, history: L.withLine(loan.history, r.history), updatedAt: now });
+      return { ok: true, loan: { ...loan, ...r.patch }, role, line: r.history, asked: loan.change };
+    });
+    if (!res.ok) return res;
+    const loan = res.loan;
+    const to = res.role === 'borrower' ? lenderOf(loan, boss) : data.rename(loan.borrower);
+    const who = res.role === 'borrower' ? first(loan.borrower) : loan.bank ? 'The bank' : first(loan.lender);
+    const day = (ms) => L.dueText(ms);
+    const msg = {
+      change: [`${who} asked to change your loan’s due date`, `To ${day(res.line.dueAt)} (now ${day(res.line.was)}). Accept or say no in Loans.`],
+      changeAccept: [`${who} agreed to the new due date`, `Your loan is now due ${day(res.line.dueAt)}.`],
+      changeDecline: [`${who} said no to the new due date`, `It’s still due ${day(loan.dueAt)}.`],
+      changeCancel: [`${who} took back their due date change`, `It’s still due ${day(loan.dueAt)}.`],
+    }[res.line.act];
+    if (msg) await tell([{ to, type: 'loan', title: msg[0], body: msg[1], open: `loans:${id}`, by: me }]);
+    return { ok: true, status: loan.status, dueAt: loan.dueAt, change: loan.change || null };
+  }
 
   // One loan's scheduled step. Each change re-reads the loan in a
   // transaction and checks its status, so two runs at once (or a retry)
