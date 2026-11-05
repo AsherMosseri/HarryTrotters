@@ -570,7 +570,11 @@ function LoanCard({ loan, loans, focus, onToast }) {
           <div>
             <span className="loan-k">{loan.status === 'overdue' ? 'Below zero' : 'Left to pay'}</span>
             <b className="mono loan-big">
-              {exactCoins(loan.status === 'overdue' ? Math.max(0, -(asBorrower ? balance : loans.balanceOf(loan.borrower))) : left)}
+              {loan.status === 'overdue'
+                ? !asBorrower && loans.everyone === false
+                  ? '…'
+                  : exactCoins(Math.max(0, -(asBorrower ? balance : loans.balanceOf(loan.borrower))))
+                : exactCoins(left)}
             </b>
           </div>
           <div>

@@ -243,10 +243,15 @@ export function renderRich(text, ctx = {}) {
 }
 
 // A message that's only 1–27 emoji shows them big, like Discord.
+let segmenter = null;
 export function isJumbo(text, emojiNames) {
   const t = (text || '').replace(/:([a-z0-9_]{2,32}):/g, (m, n) => (emojiNames?.has(n) ? '\u{1F600}' : m)).replace(/\s+/g, '');
   if (!t) return false;
-  const parts = typeof Intl.Segmenter === 'function' ? [...new Intl.Segmenter().segment(t)].map((s) => s.segment) : [...t];
+  // A letter or digit is never part of an emoji that counts (keycaps like 1️⃣
+  // don't either), so ordinary text answers here without splitting it up.
+  if (/[A-Za-z0-9]/.test(t)) return false;
+  if (typeof Intl.Segmenter === 'function') segmenter ||= new Intl.Segmenter();
+  const parts = segmenter ? [...segmenter.segment(t)].map((s) => s.segment) : [...t];
   return parts.length <= 27 && parts.every((p) => /\p{Extended_Pictographic}|\p{Regional_Indicator}/u.test(p));
 }
 

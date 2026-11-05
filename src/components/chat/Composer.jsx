@@ -345,6 +345,7 @@ export default function Composer({
         addReminder: (at, what) => api.addReminder({ at, text: what, conv }),
         play: (game, args) => api.play({ action: 'run', game, args, conv, replyTo: replyInfo() }),
         wallet: api.wallet,
+        everyoneCoins: api.everyoneCoins,
         richest: api.richest,
         gift: api.gift,
         // /request (requestCommand.js): Controls switches, a feature request, coins.

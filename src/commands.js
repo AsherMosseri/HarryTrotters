@@ -438,7 +438,9 @@ export function parseRemind(text, now = Date.now()) {
 // ---------- running one ----------
 
 // What happens when you send "/name args". ctx: { actor, roster, competitionDate,
-// countdown(), whois(name), ping(), setAfk(reason), addReminder(at, text) },
+// countdown(), whois(name), ping(), setAfk(reason), addReminder(at, text),
+// everyoneCoins() (before showing someone else's coins: true once everyone's
+// are loaded, false if they can't be right now) },
 // and for groups (src/groups.js): subteamsOf(name), isDm, isManager,
 // mentionsOn, everyoneOn, giftGroup(ask, amount, key), key (the same for a
 // second send of the same text, so a /give can't pay twice); for /loan,
@@ -457,6 +459,10 @@ export async function runCommand({ cmd, args }, ctx) {
     post: { text: `/${cmd.name}${args ? ` ${args}` : ''}`, cmd: { ...result, name: cmd.name }, ...extra },
   });
   const need = (what) => ({ note: { title: `/${cmd.name} needs ${what}`, body: `Try: /${cmd.name} ${cmd.args}` } });
+  // Someone else's coins: the app loads everyone's first (only yours load at
+  // the start). Never a card with a wrong number.
+  const everyone = async () => (await ctx.everyoneCoins?.()) !== false;
+  const notYet = { note: { title: 'Everyone’s coins are still loading', body: 'Try again in a moment. It needs internet.' } };
   // /loan with coins or loans switched off (Controls) says so, before the
   // Commands page check (which counts it as off then too, to hide it).
   // /loan pay still opens My loans while loans are off.
@@ -490,6 +496,7 @@ export async function runCommand({ cmd, args }, ctx) {
     case 'balance': {
       const who = args ? findPerson(args, ctx.roster) : me;
       if (!who) return { note: { title: `Who’s “${args}”?`, body: 'Try: /balance @name' } };
+      if (who !== me && !(await everyone())) return notYet;
       const w = ctx.wallet(who);
       return card(
         { to: who, balance: w.balance, earned: w.earned, casino: w.casino, played: w.stats.played || 0, best: w.stats.best || 0 },
@@ -497,6 +504,7 @@ export async function runCommand({ cmd, args }, ctx) {
       );
     }
     case 'leaderboard':
+      if (!(await everyone())) return notYet;
       return card({ top: ctx.richest() });
     case 'give': {
       // The amount is the last word, a whole number ("/give @Cooper 20",
@@ -614,6 +622,7 @@ export async function runCommand({ cmd, args }, ctx) {
     case 'avatar': {
       // /whois @Programming: a row each, A to Z.
       if (group) {
+        if (cmd.name === 'whois' && !(await everyone())) return notYet;
         const list = [...group.people].sort((a, b) => a.localeCompare(b));
         const grid = list.slice(0, GROUP_ROWS).map((n) => {
           const w = ctx.whois(n);
@@ -634,6 +643,7 @@ export async function runCommand({ cmd, args }, ctx) {
       }
       const who = args ? findPerson(args, ctx.roster) : me;
       if (!who) return { note: { title: `Who’s “${args}”?`, body: 'Pick someone with @' } };
+      if (cmd.name === 'whois' && who !== me && !(await everyone())) return notYet;
       return card({ to: who, ...(cmd.name === 'whois' ? ctx.whois(who) : {}) }, { mentions: [] });
     }
     case 'countdown': {

@@ -4,10 +4,10 @@ import {
   initializeFirestore,
   persistentLocalCache,
   persistentMultipleTabManager,
-  CACHE_SIZE_UNLIMITED,
   collection,
   doc,
   getDoc,
+  getDocFromCache,
   getDocFromServer,
   onSnapshot,
   serverTimestamp,
@@ -59,10 +59,15 @@ const auth = getAuth(app);
 const storage = getStorage(app);
 // The offline copy of the team's data (IndexedDB, shared by every tab): the
 // last-known schedule, tasks, checklists and chat stay readable with no
-// internet, and writes made offline wait there and send when it's back. The
-// cache is never trimmed, so what was loaded at the venue is still there.
+// internet, and writes made offline wait there and send when it's back.
+// Everything the app is listening to stays in it however big it gets. Only
+// once it passes CACHE_MAX is the oldest of the rest (older chat pages
+// scrolled back to, lists closed long ago) cleared out, so it can't grow
+// without end. (The team's data is far below that, so in practice nothing
+// is cleared.)
+const CACHE_MAX = 100 * 1024 * 1024;
 const db = initializeFirestore(app, {
-  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager(), cacheSizeBytes: CACHE_SIZE_UNLIMITED }),
+  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager(), cacheSizeBytes: CACHE_MAX }),
 });
 
 // Writes land in the offline copy at once, but the server's "done" only comes
@@ -685,12 +690,51 @@ export const firebaseStore = {
   // Jackson coins ledger: spending, gifts, and Asher's bonuses.
   // On an error, keep what was there (an empty ledger would hand back every
   // coin spent and every prize claimed today).
+  // cb(entries, { cached }): cached is true while the answer is this device's
+  // saved copy, which can be only part of the ledger (subscribeMyCoins saves
+  // just one person's entries); it's called again once the server's is in.
   subscribeCoins(cb) {
+    let cachedBefore = null;
     return onSnapshot(
       collection(db, 'coins'),
-      (snap) => cb(snap.docs.map(readDoc)),
+      { includeMetadataChanges: true },
+      (snap) => {
+        const cached = snap.metadata.fromCache;
+        // Only a write of yours being confirmed: nothing new to count.
+        if (cached === cachedBefore && !snap.docChanges().length) return;
+        cachedBefore = cached;
+        cb(snap.docs.map(readDoc), { cached });
+      },
       (e) => console.warn('coins', e),
     );
+  },
+  // Only the entries one person's balance is counted from: theirs, sent by
+  // them, or sent to them, under any name they've had (names: their current
+  // name first, then the old ones). The same three reads the server makes for
+  // a balance (functions/index.js freshCoins), so both count the same entries.
+  // cb gets nothing until all three have answered (a part of the ledger would
+  // be a wrong balance).
+  subscribeMyCoins(names, cb) {
+    const spellings = [...new Set(names)].slice(0, 30);
+    const parts = {};
+    const send = () => {
+      if (Object.keys(parts).length < 3) return;
+      const all = new Map();
+      for (const list of Object.values(parts)) for (const x of list) all.set(x.id, x);
+      // In id order, like the whole collection comes.
+      cb([...all.values()].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)));
+    };
+    const offs = ['person', 'from', 'to'].map((field) =>
+      onSnapshot(
+        query(collection(db, 'coins'), where(field, 'in', spellings)),
+        (snap) => {
+          parts[field] = snap.docs.map(readDoc);
+          send();
+        },
+        (e) => console.warn('coins', field, e),
+      ),
+    );
+    return () => offs.forEach((off) => off());
   },
   addCoinTx(tx) {
     return setDoc(doc(collection(db, 'coins')), { ...tx, at: Date.now() });
@@ -1154,6 +1198,14 @@ export const firebaseStore = {
     return onSnapshot(q, (snap) => cb(snap.docs.map(readDoc).reverse()), onError);
   },
 
+  // Only what came after `since` (the newest `count` of it), oldest first: a
+  // conversation that isn't on screen needs just its unread messages for the
+  // badges, not its whole last page on every start.
+  subscribeUnread(conv, since, count, cb, onError) {
+    const q = query(convCol(conv), where('at', '>', since), orderBy('at', 'desc'), limit(count));
+    return onSnapshot(q, (snap) => cb(snap.docs.map(readDoc).reverse()), onError);
+  },
+
   async loadOlderMessages(conv, beforeAt, count) {
     const snap = await getDocs(query(convCol(conv), orderBy('at', 'desc'), startAfter(beforeAt), limit(count)));
     return snap.docs.map(readDoc).reverse();
@@ -1177,13 +1229,24 @@ export const firebaseStore = {
     return snap.docs.map(readDoc);
   },
 
-  async sendMessage(conv, data, actor, photoFiles) {
+  // A new message's id, made on this device (the app shows the message under
+  // it right away, before the offline copy has it; sendMessage uses it).
+  newMessageId(conv) {
+    return doc(convCol(conv)).id;
+  },
+  // Done as soon as the message is in the offline copy, where it already shows
+  // (as a pending message), not when the server says so: that can take
+  // seconds on venue Wi-Fi, and the box kept the text and said "…" all that
+  // time. A refusal that comes after that goes to onError. id and at: the ones
+  // the app already showed it with (newMessageId).
+  async sendMessage(conv, data, actor, photoFiles, { onError, id, at: shownAt } = {}) {
     const msg = { text: '', mentions: [], taskIds: [], replyTo: null, photo: null, reactions: {}, ...data };
     if (photoFiles)
       msg.photo = { ...(await uploadPhoto(convFolder(conv), photoFiles)), width: photoFiles.width, height: photoFiles.height };
-    const at = Date.now();
-    const batch = writeBatch(db);
-    batch.set(doc(convCol(conv)), { ...msg, by: actor.name, byUid: actor.uid, at });
+    const at = shownAt || Date.now();
+    const batch = fsWriteBatch(db);
+    const ref = id ? doc(convCol(conv), id) : doc(convCol(conv));
+    batch.set(ref, { ...msg, by: actor.name, byUid: actor.uid, at });
     // DMs keep their latest message on the DM itself, for the list.
     if (isDm(conv)) {
       const lastText =
@@ -1201,7 +1264,17 @@ export const firebaseStore = {
                   : '');
       batch.update(doc(dmsCol, conv.slice(3)), { lastAt: at, lastBy: actor.name, lastText: lastText.slice(0, 120) });
     }
-    return batch.commit();
+    const sent = batch.commit();
+    // Reading it back from the offline copy waits in line behind the write,
+    // so this answers once the write is in.
+    const local = getDocFromCache(ref).then(
+      () => {},
+      () => {},
+    );
+    let answered = false;
+    const done = Promise.race([sent, local]).finally(() => (answered = true));
+    sent.catch((e) => answered && onError?.(e));
+    return done;
   },
 
   // Animated GIFs are uploaded as-is (not shrunk to JPEG, which would freeze them).
