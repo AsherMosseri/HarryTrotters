@@ -11,7 +11,7 @@ import { coinStyled } from '../coinFormat.js';
 
 // Things a coin never sits on (or next to).
 const KEEP_CLEAR =
-  'button, a, input, textarea, select, label, summary, [role="button"], [role="tab"], [role="radio"], [role="switch"], [role="menuitem"], [role="slider"], [contenteditable="true"], [tabindex]:not([tabindex="-1"]), .composer, .messages, .msg, .message, .chat-messages, .suggest, .bottom-nav, .panel-backdrop, .toast, .composer-more, [data-no-coin]';
+  'button, a, input, textarea, select, label, summary, [role="button"], [role="tab"], [role="radio"], [role="switch"], [role="menuitem"], [role="slider"], [contenteditable="true"], [tabindex]:not([tabindex="-1"]), .composer, .messages, .msg, .message, .chat-messages, .suggest, .msg-list, .bottom-nav, .panel-backdrop, .toast, .composer-more, [data-no-coin]';
 const SIZE = 34;
 const PAD = 10;
 
@@ -91,10 +91,9 @@ export default function HiddenCoin({ ask, demo = false }) {
       busy.current = false;
       if (stop) return;
       if (r?.off) return; // switched off: stop asking until the app opens again
-      if (r?.token) {
-        const spot = findSpot(el.current);
-        if (spot) setCoin({ token: r.token, ...spot, until: Math.min(r.exp || Infinity, Date.now() + FIND_SHOW_MS) });
-      }
+      // A coin waits (unseen) until there's a free spot for it: on another
+      // page, after the keyboard goes down. It shows for FIND_SHOW_MS from then.
+      if (r?.token) setCoin({ token: r.token, exp: r.exp || Date.now() + 600000, hidden: true, placed: false });
       if (r?.left === 0) return;
       next(demo ? 20000 : FIND_ASK_MS * (0.7 + Math.random() * 0.6));
     };
@@ -110,15 +109,20 @@ export default function HiddenCoin({ ask, demo = false }) {
   useEffect(() => {
     if (!coin) return undefined;
     const check = () => {
-      if (Date.now() > coin.until) return setCoin(null);
+      if (Date.now() > Math.min(coin.exp - 5000, coin.until || Infinity)) return setCoin(null);
       if (document.visibilityState !== 'visible') return;
-      if (!visibleArea()) return setCoin((c) => (c ? { ...c, hidden: true } : c));
+      if (!visibleArea()) return setCoin((c) => (c && !c.hidden ? { ...c, hidden: true } : c));
+      if (!coin.placed) {
+        const spot = findSpot(el.current);
+        if (spot) setCoin((c) => (c ? { ...c, ...spot, placed: true, hidden: false, until: Date.now() + FIND_SHOW_MS } : c));
+        return;
+      }
       if (!clearAt(coin.x, coin.y, el.current)) {
         const spot = findSpot(el.current);
         setCoin((c) => (c ? (spot ? { ...c, ...spot, hidden: false } : { ...c, hidden: true }) : c));
       } else if (coin.hidden) setCoin((c) => (c ? { ...c, hidden: false } : c));
     };
-    const t = setInterval(check, 900);
+    const t = setInterval(check, coin.placed ? 900 : 2000);
     window.addEventListener('scroll', check, true);
     window.visualViewport?.addEventListener('resize', check);
     return () => {

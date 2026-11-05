@@ -156,9 +156,11 @@ export function LoansPanel({ loans, actor, roster, focus, onToast }) {
     el?.scrollIntoView?.({ block: 'center' });
   }, [focus]);
   const card = (l) => <LoanCard key={l.id} loan={l} loans={loans} focus={focus === l.id} onToast={onToast} />;
+  // Waiting on the bank: new requests, and running loans whose borrower asked for a new due date (3.2).
+  const bankWaits = (l) => l.status === 'pending' || (l.status === 'active' && l.change?.by === 'borrower');
   const bankShown =
     bankTab === 'waiting'
-      ? bankLoans.filter((l) => l.status === 'pending')
+      ? bankLoans.filter(bankWaits)
       : bankTab === 'running'
         ? bankLoans.filter((l) => L.LIVE.includes(l.status))
         : bankLoans.filter((l) => !open(l));
@@ -181,7 +183,7 @@ export function LoansPanel({ loans, actor, roster, focus, onToast }) {
           </h3>
           <div className="segmented loan-tabs" role="tablist" aria-label="Bank loans">
             {[
-              ['waiting', `Waiting (${bankLoans.filter((l) => l.status === 'pending').length})`],
+              ['waiting', `Waiting (${bankLoans.filter(bankWaits).length})`],
               ['running', `Running (${bankLoans.filter((l) => L.LIVE.includes(l.status)).length})`],
               ['done', 'Closed'],
             ].map(([id, label]) => (
