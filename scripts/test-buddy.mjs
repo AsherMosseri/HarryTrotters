@@ -23,7 +23,9 @@ const C = 'Cooper Mlezcko';
 const S = 'Sophia Bermudez';
 
 // What it stops.
-for (const g of CASINO) ok(buddyBlocks({ action: 'run', game: g }), `blocks /${g}`);
+for (const g of CASINO) ok(buddyBlocks({ action: 'run', game: g, args: ['10'] }), `blocks /${g} 10`);
+ok(!buddyBlocks({ action: 'run', game: 'lottery', args: [] }), 'a bare /lottery only shows the card');
+ok(buddyBlocks({ action: 'run', game: 'slots', args: [] }), 'a bare /slots is still refused');
 for (const g of [...MULTI, 'daily', 'work', 'beg', 'rob']) ok(!buddyBlocks({ action: 'run', game: g }), `lets /${g} through`);
 ok(buddyBlocks({ action: 'move', move: 'double' }), 'blocks doubling down');
 for (const mv of ['hit', 'stand', 'cash', 'peek', '3', 'higher', 'accept', 'join']) ok(!buddyBlocks({ action: 'move', move: mv }), `lets the move ${mv} through`);

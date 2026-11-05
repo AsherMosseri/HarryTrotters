@@ -2270,7 +2270,10 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
     const v = buddyView(buddyLocks, actor.name, rename);
     return { ...v, all: buddyLocks, isOwner: !!isOwner, call: api.buddy };
   }, [buddyLocks, actor.name, rename, isOwner, api]);
-  useEffect(() => setBuddyLock(buddy.mine), [buddy.mine]);
+  useEffect(() => {
+    setBuddyLock(buddy.mine);
+    return () => setBuddyLock(null);
+  }, [buddy.mine]);
   const openLoans = useCallback((id) => {
     setLoanFocus(id || null);
     setCoinsTab('loans');

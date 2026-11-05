@@ -3,7 +3,7 @@
 // the chat's casino cards and the commands can see it without passing it down
 // through every component. Workspace sets it from the buddyLocks it watches.
 import { useSyncExternalStore } from 'react';
-import { LOCKED_GAMES, lockNote } from '../functions/shared/buddy.js';
+import { LOCKED_GAMES, buddyBlocks, lockNote } from '../functions/shared/buddy.js';
 
 export { LOCKED_GAMES, lockNote };
 
@@ -23,8 +23,8 @@ export const useBuddyLock = () => useSyncExternalStore(subscribe, getBuddyLock, 
 
 // A casino command while locked: the note to show instead of asking the
 // server (which refuses it too). null when it's fine.
-export function buddyCommandNote(name) {
-  return current && LOCKED_GAMES.includes(name) ? lockNote(current) : null;
+export function buddyCommandNote(name, args = []) {
+  return current && buddyBlocks({ action: 'run', game: name, args }) ? lockNote(current) : null;
 }
 
 // The locks this person is in: { mine (my own lock, any state), asBuddy

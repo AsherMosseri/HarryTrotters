@@ -492,7 +492,7 @@ export async function runCommand({ cmd, args }, ctx) {
   if (cmd.server) {
     // Locked by a gambling buddy (src/buddy.js): say so right away. The
     // server refuses it too.
-    const locked = buddyCommandNote(cmd.name);
+    const locked = buddyCommandNote(cmd.name, args ? args.split(/\s+/) : []);
     if (locked) return { note: locked };
     const r = await ctx.play(cmd.name, args ? args.split(/\s+/) : []);
     return r?.note ? { note: r.note } : { done: true };

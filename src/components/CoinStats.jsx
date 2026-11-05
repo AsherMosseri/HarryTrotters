@@ -4,6 +4,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { coinScale, coinStats } from '../coinStats.js';
 import { formatCoins } from '../coinFormat.js';
+import { sciText } from '../../functions/shared/coinText.js';
 import { CoinNum, useCoinFormat } from './CoinNum.jsx';
 import { Avatar } from './common.jsx';
 import { Icon } from './shell/icons.jsx';
@@ -15,7 +16,9 @@ const dayText = (day, opts = { weekday: 'short', month: 'short', day: 'numeric' 
   new Date(`${day}T12:00:00`).toLocaleDateString(undefined, opts);
 const atText = (at) => new Date(at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 // Axis labels: this device's style while short enough, else Short (1.2Qa, 1e40).
+// From 1e21 up, powers of ten in scientific (1e25, 1e50), not "10Sp".
 function axisText(v, style) {
+  if (v >= 1e21) return sciText(v);
   const s = formatCoins(v, style);
   return s.length <= 6 ? s : formatCoins(v, 'short');
 }
@@ -36,8 +39,8 @@ export function CoinStats({ wallet, buddy, roster = [], me }) {
           Gambling
         </h3>
         <div className="cs-tiles">
-          <Tile label="Won" n={g.won} tone="plus" />
-          <Tile label="Lost" n={-g.lost} tone="minus" signed />
+          <Tile label="Won" n={g.won} tone={g.won ? 'plus' : ''} />
+          <Tile label="Lost" n={-g.lost} tone={g.lost ? 'minus' : ''} signed />
           <Tile label="Net" n={g.net} tone={g.net > 0 ? 'plus' : g.net < 0 ? 'minus' : ''} signed />
         </div>
         <p className="muted tiny cs-note">
@@ -121,7 +124,7 @@ export function CoinStats({ wallet, buddy, roster = [], me }) {
         <h3 className="cs-head" id="cs-earned">
           Earned <CoinNum n={s.earned.total} className="cs-head-num" max={9} />
         </h3>
-        <Bars rows={s.earned.parts.map((p) => ({ id: p.id, label: p.label, n: p.coins, count: p.n }))} />
+        <Bars rows={s.earned.parts.filter((p) => p.n || p.id === 'task' || p.id === 'hours').map((p) => ({ id: p.id, label: p.label, n: p.coins, count: p.n }))} />
       </section>
 
       <section className="cs-sec" aria-labelledby="cs-moves">

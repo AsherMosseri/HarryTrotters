@@ -5372,3 +5372,5 @@ button.bs-cell:focus-visible { outline: 2px solid var(--accent); outline-offset:
   .cs-table th, .cs-table td { padding: 7px 6px; font-size: 13px; }
   .cs-table th:first-child { padding-left: 10px; }
 }
+/* With Stats in, the tabs stay one line each (the dot beside the word). */
+.coins-tabs button { white-space: nowrap; }

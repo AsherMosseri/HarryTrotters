@@ -1685,7 +1685,7 @@ export const play = onCall({ maxInstances: 5, invoker: 'public' }, withBalance(a
   // Gambling buddy (functions/buddy.js): a lock that's on refuses every new
   // casino bet (casino games, lottery tickets, doubling down). Games already
   // going can be finished; arcade games, gifts and prizes aren't touched.
-  if (buddyBlocks({ action, game, move })) {
+  if (buddyBlocks({ action, game, move, args: words })) {
     const b = await buddies.lockOf(me);
     if (b) return note(lockNote(b).title, lockNote(b).body);
   }

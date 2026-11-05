@@ -38,10 +38,12 @@ const first = (n) => String(n || 'Someone').split(' ')[0];
 
 // Does this play request start (or add to) a casino bet? A new casino
 // command, a lottery ticket, or doubling down in blackjack. Finishing a game
-// that's already going (hit, stand, cash out) is fine: its bet is in.
-export function buddyBlocks({ action, game, move } = {}) {
+// that's already going (hit, stand, cash out) is fine: its bet is in, and so
+// is a bare /lottery (it only shows the card; buying tickets is refused).
+export function buddyBlocks({ action, game, move, args = [] } = {}) {
   if (action === 'move') return String(move) === 'double';
   if (action === 'gift' || action === 'prize') return false;
+  if (game === 'lottery' && !String((Array.isArray(args) ? args : [])[0] ?? '').trim()) return false;
   return LOCKED_GAMES.includes(game);
 }
 

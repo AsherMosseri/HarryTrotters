@@ -1988,7 +1988,7 @@ export const demoStore = {
     const lock = betting ? loans.lockFor(me, balanceOf) : null;
     if (lock) return note(lock.title, lock.body);
     // A gambling buddy's lock refuses new casino bets, like the server's play.
-    const buddyLock = buddyBlocks({ action, game, move }) ? buddies.lockFor(me) : null;
+    const buddyLock = buddyBlocks({ action, game, move, args: words }) ? buddies.lockFor(me) : null;
     if (buddyLock) return note(lockNote(buddyLock).title, lockNote(buddyLock).body);
     // Several people's coins at once (multiplayer games).
     // card: the game and its card's id, so a held bet and its result share a history line.
