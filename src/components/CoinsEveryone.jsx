@@ -9,6 +9,7 @@ import { useCoinFormat } from './CoinNum.jsx';
 import { coinLabel, exactCoins, coinStyled, withExact } from '../coinFormat.js';
 import { FIXABLE, gameLabel } from '../../functions/shared/disputes.js';
 import { REQUESTS_TO } from '../config.js';
+import { amountTip, readAmount } from '../../functions/shared/amount.js';
 
 const OWNER = REQUESTS_TO.split(' ')[0];
 
@@ -306,9 +307,13 @@ function AdjustCoins({ name, balance, history = [], onCheck, onAdjust }) {
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
-  const n = Math.floor(Number(amount));
+  // Typed like chat amounts: 500, 2.5k, 1,000,000, 7Sx, 2.5e40 or googol.
+  const word = amount.replace(/\s+/g, '');
+  const read = word ? readAmount(word) : null;
+  const n = read?.amount ?? NaN;
+  const tip = !word ? '' : !read ? 'Try 500, 2.5k, 7Sx or 2.5e40.' : amountTip(word);
   // Set to more than the ceiling can never work, whatever the difference.
-  const ok = Number.isFinite(n) && amount !== '' && (mode === 'set' ? n >= 0 : n > 0) && n <= OWNER_MAX;
+  const ok = Number.isFinite(n) && (mode === 'set' ? n >= 0 : n > 0) && n <= OWNER_MAX;
   const go = async () => {
     if (!ok || busy) return;
     setBusy(true);
@@ -376,13 +381,13 @@ function AdjustCoins({ name, balance, history = [], onCheck, onAdjust }) {
         ))}
       </div>
       <div className="cv-adjust-row">
-        <input className="input mono" type="number" inputMode="numeric" min={0} value={amount} onChange={(e) => setAmount(e.target.value)} placeholder={mode === 'set' ? String(balance) : '0'} aria-label="Coins" />
+        <input className="input mono" type="text" inputMode="text" autoCapitalize="off" autoCorrect="off" spellCheck={false} maxLength={60} value={amount} onChange={(e) => setAmount(e.target.value)} placeholder={mode === 'set' ? coinStyled(balance) : '0'} aria-label="Coins" />
         <input className="input grow" maxLength={140} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Note (they see it in their history)" aria-label="Note" />
         <button className="btn primary" disabled={!ok || busy} onClick={go}>
           {busy ? '…' : 'Save'}
         </button>
       </div>
-      {amount !== '' && n > OWNER_MAX && <p className="muted tiny">Nobody can hold more than a googol coins.</p>}
+      {tip ? <p className="muted tiny">{tip}</p> : ok && /[^\d,]/.test(word) && <p className="muted tiny">{`= ${exactCoins(n)} coins`}</p>}
       {msg && <p className="muted tiny">{msg}</p>}
     </div>
   );
