@@ -18,7 +18,7 @@ import { dayOf, logFields, taskArea } from '../labLog.js';
 import * as arcade from '../../functions/shared/arcade.js';
 import * as challenge from '../../functions/shared/challenge.js';
 import * as dispute from '../../functions/shared/disputes.js';
-import { blocked, isOff, serverGroup } from '../../functions/shared/commandRules.js';
+import { ARCADE, ARCADE_NOTE, blocked, isOff, serverGroup } from '../../functions/shared/commandRules.js';
 import * as coinAsk from '../../functions/shared/coinRequests.js';
 import { AWARD_CAPS, breakdown, capWin, ceilingNote, giftEntry, overCeiling, sumCoins, groupGiftEntries, prizeEntry, teamDay, teamMidnight } from '../../functions/shared/coins.js';
 import { BOT, groupLabel, resolveTargets } from '../../functions/shared/groups.js';
@@ -1729,7 +1729,8 @@ export const demoStore = {
     if (action === 'create' && req.group != null) {
       // A group: the same steps as the server's createGroup.
       const conv = String(req.conv || '');
-      if (!conv || conv === 'announcements') return note('Not here.', 'Ask in a channel.');
+      // Coins and games only in #arcade (3.2), like the server.
+      if (conv !== ARCADE) return { note: { ...ARCADE_NOTE } };
       if (conv.startsWith('dm:')) return note('Groups work in channels.', 'In a DM, ask people one by one.');
       const off = switchedOff(conv);
       if (off) return off;
@@ -1782,7 +1783,7 @@ export const demoStore = {
     }
     if (action === 'create') {
       const conv = String(req.conv || '');
-      if (!conv || conv === 'announcements') return note('Not here.', 'Ask in a channel or a DM.');
+      if (conv !== ARCADE) return { note: { ...ARCADE_NOTE } };
       const off = switchedOff(conv);
       if (off) return off;
       const to = String(req.to || '');
@@ -2093,8 +2094,8 @@ export const demoStore = {
       return done({ ok: true, serverNow: now, ...(localStorage.getItem('demo-no-card') ? {} : { card }) });
     }
 
-    if (conv.startsWith('dm:') || conv === 'announcements')
-      return note('Not here.', 'Use #arcade for the casino, or any channel for the rest.');
+    // Coins and games only in #arcade (3.2), like the server.
+    if (conv !== ARCADE) return { note: { ...ARCADE_NOTE } };
     const isCasino = casino.CASINO.includes(game);
     const stop = blocked(game, serverGroup(game), conv, state.settings?.commands);
     if (stop) return { note: stop };
@@ -2595,6 +2596,7 @@ export const demoStore = {
       return { ok: true, result: r, bot, won, coins, paid };
     }
     if (req.action === 'share') {
+      if (req.conv !== ARCADE) return { note: { ...ARCADE_NOTE } };
       if (!s || s.person !== me || !s.done || s.problem) return note('That game can’t be shared.');
       if (s.shared) return note('Already posted.');
       const line = fun.resultLine(s.game, s.mode, s.result);
@@ -3013,6 +3015,8 @@ export const demoStore = {
     return [...((state.chat || {})[conv] || [])].sort((a, b) => b.at - a.at).slice(0, count);
   },
   async sendMessage(conv, data, actor, photoFiles) {
+    // Like the rules (3.2): the app's own coin cards only in #arcade.
+    if (conv !== ARCADE && ['give', 'balance', 'leaderboard'].includes(data?.cmd?.name)) throw Object.assign(new Error('Coins and games are in #arcade'), { code: 'permission-denied' });
     let photo = null;
     if (photoFiles) {
       const url = await dataUrl(photoFiles.thumb);

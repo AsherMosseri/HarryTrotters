@@ -1063,6 +1063,7 @@ export default function ChatView({
             onManageStickers={() => setDialog({ type: 'stickers' })}
             onTyping={() => api.typing(conv.key)}
             useCommand={useCmd}
+            onGoArcade={() => setCurrent('arcade')}
             onNote={(n) => {
               setNotes((all) => ({
                 ...all,

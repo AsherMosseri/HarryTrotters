@@ -7,10 +7,10 @@
 // line (casino, economy, arcade games) roll on the server instead.
 
 import { overdueTasks, parseMatch, parseTask, seasonRecord, todayISO } from './teamCommands.js';
-import { blocked, isOff } from '../functions/shared/commandRules.js';
+import { arcadeOnly, blocked, isOff } from '../functions/shared/commandRules.js';
 import { gameArgs } from './components/games/launch.js';
 import { GROUP_ROWS, MORE_COMMANDS, runMore } from './moreCommands.js';
-import { runRequest } from './requestCommand.js';
+import { isCoinAsk, runRequest } from './requestCommand.js';
 import { groupNotify, groupTargets } from './groups.js';
 import { GIFT_MAX } from '../functions/shared/coins.js';
 import { amountTip, looksLikeAmount, parseAmount } from '../functions/shared/amount.js';
@@ -23,7 +23,7 @@ export const GROUPS = [
   ['random', 'Random'],
   ['actions', 'Actions'],
   ['learn', 'Robotics help'],
-  ['economy', 'Jackson coins'],
+  ['economy', 'Jackson coins (in #arcade)'],
   ['casino', 'Casino (in #arcade)'],
   ['arcade', 'Games (in #arcade)'],
   ['team', 'Team'],
@@ -107,6 +107,15 @@ export const COMMANDS = [
   ...MORE_COMMANDS,
 ];
 export const commandByName = Object.fromEntries(COMMANDS.map((c) => [c.name, c]));
+
+// Coins and games only in #arcade (3.2): the note for this command typed in
+// conv (anywhere else, DMs included), or null. The composer shows it instead of
+// sending, with a button that takes the command to #arcade's draft.
+export function arcadeNote(parsed, conv, roster = []) {
+  if (!parsed?.cmd) return null;
+  const coinAsk = parsed.cmd.name === 'request' && isCoinAsk(parsed.args, roster);
+  return arcadeOnly(parsed.cmd.name, conv, { coinAsk });
+}
 
 // "/8ball will it work" → { cmd, args: 'will it work' }; null if it isn't one.
 export function parseCommand(text) {
@@ -470,6 +479,9 @@ export async function runCommand({ cmd, args }, ctx) {
     const off = loanOff(args, ctx);
     if (off) return { note: off };
   }
+  // Coins and games: #arcade only (the composer stops these first).
+  const arcade = arcadeNote({ cmd, args }, ctx.conv, ctx.roster);
+  if (arcade) return { note: arcade };
   // Turned off, or not in this channel (Asher's Commands page). loansOff:
   // /loan is only off because loans are (controls.js commandCfgFor).
   const cfg = ctx.commandCfg;

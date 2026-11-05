@@ -67,7 +67,7 @@ import { logger } from 'firebase-functions';
 import { SUBTEAMS, cleanName, memberOk, nameKey, onTeam } from './shared/team.js';
 import { GROUP_MAX, groupLabel, resolveTargets } from './shared/groups.js';
 import { groupTeam } from './groups.js';
-import { blocked, isOff } from './shared/commandRules.js';
+import { ARCADE, ARCADE_NOTE, blocked, isOff } from './shared/commandRules.js';
 import * as ask from './shared/coinRequests.js';
 
 const OPEN = { maxInstances: 5, invoker: 'public' };
@@ -140,6 +140,8 @@ export function coinRequestFunctions({ db, coinData, freshCoins, bankRef, notify
     if (body.group != null) return createGroup(who, body);
     const { uid, me, data } = who;
     const conv = body.conv;
+    // Coins and games only in #arcade (3.2).
+    if (conv !== ARCADE) return { note: { ...ARCADE_NOTE } };
     const place = messagesOf(conv);
     if (!place) return note('Not here.', 'Ask in a channel or a DM.');
     const off = await switchedOff(me, { conv, creating: true });
@@ -209,6 +211,7 @@ export function coinRequestFunctions({ db, coinData, freshCoins, bankRef, notify
   // A request to a group: one request per person, under one card.
   async function createGroup({ uid, me, data, admin }, body) {
     const conv = body.conv;
+    if (conv !== ARCADE) return { note: { ...ARCADE_NOTE } };
     const place = messagesOf(conv);
     if (!place) return note('Not here.', 'Ask in a channel.');
     if (place.dm) return note('Groups work in channels.', 'In a DM, ask people one by one.');

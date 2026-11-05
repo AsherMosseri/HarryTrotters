@@ -35,6 +35,18 @@ function looksLikeCoins(text, roster) {
   return before > 0 && before <= 3;
 }
 
+// Is this /request (what comes after it) a request for coins? Those live in
+// #arcade with the other coin commands (3.2).
+export function isCoinAsk(args, roster = []) {
+  const text = String(args || '').trim();
+  if (!text) return false;
+  const [word, ...more] = text.split(/\s+/);
+  const form = FORMS[word.toLowerCase()];
+  if (form === 'coins') return true;
+  if (form) return false;
+  return looksLikeCoins(text, roster);
+}
+
 // What a /request turns into (the same shapes as runCommand's answers, plus
 // { ask: { form, text } } to open one of the forms).
 export async function runRequest(args, ctx, { card }) {

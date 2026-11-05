@@ -2942,6 +2942,16 @@ html.kb-bar .sc-table { padding-bottom: calc(max(20px, env(safe-area-inset-botto
 .cmd-opt-desc { font-weight: 500; }
 .cmd-hint { display: flex; align-items: center; gap: 8px; padding: 2px 4px; font-size: 13px; }
 .cmd-hint code { font-weight: 800; color: var(--accent); }
+/* Coins and games are in #arcade (3.2): a coin command typed anywhere else. */
+.arcade-redirect {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 2px 0 6px; padding: 8px 8px 8px 12px; border-radius: 12px;
+  font-size: 14px; background: color-mix(in srgb, var(--accent) 12%, var(--surface-2)); border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+}
+.arcade-redirect b { min-width: 0; }
+.arcade-redirect .btn { flex: none; }
+.arcade-redirect.nudge { animation: arcade-nudge 0.35s ease; }
+@keyframes arcade-nudge { 20%, 60% { transform: translateX(-4px); } 40%, 80% { transform: translateX(4px); } }
+@media (prefers-reduced-motion: reduce) { .arcade-redirect.nudge { animation: none; } }
 
 .cmd-card, .cmd-note {
   margin: 4px 0 2px; max-width: 460px; padding: 10px 12px 12px; border-radius: 12px; display: flex; flex-direction: column; gap: 8px;

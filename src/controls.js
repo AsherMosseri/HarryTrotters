@@ -1,5 +1,6 @@
 import { createContext, useContext } from 'react';
 import { COMMANDS } from './commands.js';
+import { COIN_GROUPS } from '../functions/shared/commandRules.js';
 
 // Asher's switches (settings/controls): tabs, channels, and features that are
 // off for everyone but him. Off means hidden everywhere in the app, old posts
@@ -98,7 +99,7 @@ export const offCount = (d = {}) =>
 
 // Commands that belong to a switched-off feature count as off too (the
 // Commands page's own switches stay as they are). Same rule as the play function.
-export const COIN_GROUPS = ['economy', 'casino', 'arcade'];
+export { COIN_GROUPS };
 // loansOn: Controls, Loans is on (or it's the owner); off hides /loan, and
 // loansOff says that's the only reason, so /loan pay still runs (commands.js).
 export function commandCfgFor(cfg = {}, controls, { loansOn = true } = {}) {

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Avatar, CloseIcon, Overlay } from './common.jsx';
 import { Row, Switch } from './Ads.jsx';
 import { COMMANDS, GROUPS } from '../commands.js';
-import { ALWAYS_ON, whereFor } from '../../functions/shared/commandRules.js';
+import { ALWAYS_ON, COIN_GROUPS, whereFor } from '../../functions/shared/commandRules.js';
 import { ICON as ARCADE_ICON, LABEL as ARCADE_LABEL } from '../../functions/shared/arcade.js';
 import { useEscape } from '../util.js';
 import { useCoinFormat } from './CoinNum.jsx';
@@ -151,6 +151,13 @@ export default function CommandsPage({ cfg = {}, channels, bank, lottery, onSave
                 <p className="muted small">Pick the channels each kind of command works in. Anywhere includes DMs.</p>
                 {GROUPS.map(([g, label]) => {
                   const w = where(g);
+                  // Coins and games: #arcade only, always (3.2).
+                  if (COIN_GROUPS.includes(g))
+                    return (
+                      <section key={g} className="cmd-admin-group">
+                        <Row title={label} hint="#arcade only. Coins and games always live there." />
+                      </section>
+                    );
                   return (
                     <section key={g} className="cmd-admin-group">
                       <Row title={label} hint={w ? (w.length ? w.map((c) => `#${c}`).join(', ') : 'Nowhere') : 'Anywhere'}>

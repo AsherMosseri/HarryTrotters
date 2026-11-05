@@ -30,7 +30,7 @@ import { GROUP_MAX, groupLabel, groupsIn, resolveTargets } from './shared/groups
 import { groupTeam } from './groups.js';
 import * as casino from './shared/casino.js';
 import * as arcade from './shared/arcade.js';
-import { blocked, isOff, serverGroup } from './shared/commandRules.js';
+import { ARCADE, ARCADE_NOTE, blocked, isOff, serverGroup } from './shared/commandRules.js';
 import { awardCoins, prepareAward } from './award.js';
 import * as arcadeBank from './banks/arcade.js';
 import * as fun from './shared/funGames.js';
@@ -1724,8 +1724,8 @@ export const play = onCall({ maxInstances: 5, invoker: 'public' }, withBalance(a
   }
 
   // A new command.
-  if (!/^[\w-]{1,40}$/.test(conv) || conv === 'announcements')
-    return note('Not here.', 'Use #arcade for the casino, or any channel for the rest.');
+  // Coins and games only in #arcade (3.2): not another channel, not a DM.
+  if (conv !== ARCADE) return { note: { ...ARCADE_NOTE } };
   const isCasino = casino.CASINO.includes(game);
   const isArcade = arcade.MULTI.includes(game);
   if (!isCasino && !isArcade && !casino.ECONOMY.includes(game)) throw new HttpsError('invalid-argument', 'Unknown command.');
@@ -2144,6 +2144,8 @@ export const funGame = onCall({ maxInstances: 5, invoker: 'public' }, async (req
   // Post a finished game to chat (the card shows what the server checked).
   if (body.action === 'share') {
     if (!validId(body.id) || !validId(body.conv) || body.conv === 'announcements') throw new HttpsError('invalid-argument', 'Where?');
+    // Game cards go in #arcade (3.2), like every coins-and-games card.
+    if (body.conv !== ARCADE) return { note: { ...ARCADE_NOTE } };
     const ref = funRef(body.id);
     const s = (await ref.get()).data();
     if (!s || s.person !== me || !s.done || s.problem) return note('That game can’t be shared.');
