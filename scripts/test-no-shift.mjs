@@ -3,10 +3,10 @@
 // in demo mode, while teammates keep posting, reacting and playing their own
 // cards above and below yours.
 //
-//   npx vite build && npx vite preview --port 5440 --strictPort &
+//   npx vite build && npx vite preview --port 5444 --strictPort &
 //   node scripts/test-no-shift.mjs [options]
 //
-//   --port 5440          the preview (demo mode, ?demo)
+//   --port 5444          the preview (demo mode, ?demo)
 //   --vp phone,ipad,land phone 390x844, iPad upright 820x1180, iPad on its side 1180x820
 //   --engine safari      Chromium with scroll anchoring off (* { overflow-anchor: none
 //                        !important }): Safari has none (the default)
@@ -18,7 +18,8 @@
 //                        Cancel, Report), rps, tictactoe, connect4 (card and game view),
 //                        duel, heist (Join), trivia, hangman, typerace, battleship (card
 //                        and game view), launch (Tetris/Minesweeper Play), economy
-//                        (/daily, /balance, /leaderboard), request (Pay, Decline), learn
+//                        (/daily, /balance, /leaderboard), owner (Refund, Undo gift and
+//                        their confirms), request (Pay, Decline), learn
 //                        (the daily question in #general)
 //   --rounds 2           rounds per game (one trivia, hangman, type race or request runs at
 //                        a time: list a viewport twice, --vp phone,phone, for more of those)
@@ -59,7 +60,7 @@ const opt = (name, def) => {
   const i = argv.indexOf(`--${name}`);
   return i >= 0 ? argv[i + 1] : def;
 };
-const PORT = Number(opt('port', 5440));
+const PORT = Number(opt('port', 5444));
 const BASE = `http://localhost:${PORT}`;
 const VPS = opt('vp', 'phone,ipad,land').split(',');
 const ENGINE = opt('engine', 'safari');
@@ -400,7 +401,10 @@ async function goChannel(p, name) {
     const chat = p.locator('.bottom-nav button:has-text("Chat")');
     if (await chat.count()) await chat.click({ force: true });
     await p.waitForTimeout(300);
-    await p.locator('select.channel-select').selectOption({ label: `#${name}` });
+    // (Its label can carry an unread count: "#arcade (3)".)
+    const sel = p.locator('select.channel-select');
+    const value = await sel.locator('option').evaluateAll((os, n) => os.find((o) => o.textContent.trim().split(/\s/)[0] === `#${n}`)?.value, name);
+    await sel.selectOption(value);
   } else await p.click(`.sidebar .sb-row:has-text("${name}")`);
   await p.waitForSelector('.composer textarea');
   await p.waitForTimeout(400);
@@ -852,6 +856,27 @@ const GAMES = {
       // (Its middle can be a name: any spot on the card is the card.)
       await tap(p, card(p, id).locator('.cz-econ, .cz-leaderboard, .cmd-whois').first(), `${g}: the card`, { loose: true });
     }
+  },
+  // The owner's buttons on cards (Asher is the owner in demo): Refund / Take
+  // back on a finished game card, Undo on a /give card, each with its confirm.
+  async owner(p, r) {
+    const g = r % 2 ? 'dice' : 'coinflip';
+    const id = await start(p, g, g === 'dice' ? '/dice 5' : '/coinflip 5 heads', 2400);
+    const fix = card(p, id).locator('.card-fix').filter({ visible: true });
+    if (await fix.count()) {
+      await tap(p, fix.first(), 'Refund / Take back', { think: true, ambush: true });
+      const ok = p.locator('.dialog.ask button', { hasText: /^(Refund|Take back)/ });
+      if (await ok.count()) await tap(p, ok, 'Refund / Take back (confirm)', { watch: LAG + 2000 });
+    } else problems.push(`${current.vp} owner: no Refund / Take back on the ${g} card`);
+    await closeDialogs(p);
+    const gid = await start(p, 'give', '/give @Cooper 5', 800);
+    const undo = btn(p, gid, /Undo gift/);
+    if (await undo.count()) {
+      await tap(p, undo, 'Undo gift', { ambush: true });
+      const ok = p.locator('.dialog.ask button', { hasText: /^Undo gift/ });
+      if (await ok.count()) await tap(p, ok, 'Undo gift (confirm)', { watch: LAG + 2000 });
+    } else problems.push(`${current.vp} owner: no Undo gift on the /give card`);
+    await closeDialogs(p);
   },
   async learn(p) {
     await goChannel(p, 'general');
