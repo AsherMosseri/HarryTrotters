@@ -40,7 +40,7 @@ import { coinsText } from './shared/coinText.js';
 
 const OPEN = { maxInstances: 5, invoker: 'public' };
 
-export function disputeFunctions({ db, coinData, freshCoins, notify, bankRef, owner }) {
+export function disputeFunctions({ db, coinData, freshCoins, notify, bankRef, owner, personId }) {
   const note = (title, body = '') => ({ note: { title, body } });
   const first = (n) => (n || 'Someone').split(' ')[0];
   const validId = (id) => typeof id === 'string' && /^[\w-]{1,60}$/.test(id);
@@ -137,6 +137,7 @@ export function disputeFunctions({ db, coinData, freshCoins, notify, bankRef, ow
               title: `${first(me)} reported a ${d.GAME_LABEL[res.snapshot.game]} result`,
               body: d.REASONS[reason],
               open: 'disputes:',
+              report: res.id,
               by: me,
             },
           ],
@@ -155,6 +156,34 @@ export function disputeFunctions({ db, coinData, freshCoins, notify, bankRef, ow
   }
 
   const isOwner = ({ me, admin, data }) => admin && me === data.rename(owner);
+
+  // Handled reports: the owner's "X reported a … result" notifications go
+  // away. Matched by report id (from 3.1.6 on), or for older ones by who sent
+  // it and when (within two minutes of the report). Never fails the caller.
+  async function clearReportNotes(reports, data) {
+    try {
+      const col = db.collection(`inbox/${personId(data.rename(owner))}/items`);
+      const byWho = new Map();
+      for (const r of reports) if (r?.by) byWho.set(r.by, [...(byWho.get(r.by) || []), r]);
+      for (const [by, list] of byWho) {
+        const names = data.rename.aliases(by).slice(0, 30);
+        const snap = await col.where('by', 'in', names.length ? names : [by]).limit(500).get();
+        const gone = snap.docs.filter((n) => {
+          if (n.get('type') !== 'dispute') return false;
+          const rid = n.get('report');
+          if (rid) return list.some((r) => r.id === rid);
+          return /reported a/.test(n.get('title') || '') && list.some((r) => Math.abs((n.get('at') || 0) - (r.at || 0)) < 120000);
+        });
+        for (let i = 0; i < gone.length; i += 400) {
+          const b = db.batch();
+          for (const n of gone.slice(i, i + 400)) b.delete(n.ref);
+          await b.commit();
+        }
+      }
+    } catch (e) {
+      logger.warn('clearReportNotes', e.message);
+    }
+  }
   const resolutionOf = (text) =>
     String(text || '')
       .trim()
@@ -232,6 +261,7 @@ export function disputeFunctions({ db, coinData, freshCoins, notify, bankRef, ow
     const resolution = resolutionOf(text);
     const out = await decideOne(id, decision, resolution, me, data);
     if (!out.ok) return out;
+    await clearReportNotes([{ id, by: out.x.by, at: out.x.at }], data);
     await notify([
       {
         to: out.x.by,
@@ -270,6 +300,7 @@ export function disputeFunctions({ db, coinData, freshCoins, notify, bankRef, ow
     const skipped = [];
     let coins = 0;
     let closed = 0;
+    const handled = [];
     for (const x of open) {
       let out;
       try {
@@ -278,6 +309,7 @@ export function disputeFunctions({ db, coinData, freshCoins, notify, bankRef, ow
         logger.warn('disputeRefundAll', x.id, e.message);
         out = note('That didn’t go through.');
       }
+      if (out?.ok) handled.push({ id: x.id, by: x.get('by'), at: x.get('at') });
       if (out?.ok && out.status === 'refunded') {
         const p = data.rename(out.x.by);
         const row = paid.get(p) || { to: out.x.by, count: 0, coins: 0, game: out.x.cmd };
@@ -288,7 +320,10 @@ export function disputeFunctions({ db, coinData, freshCoins, notify, bankRef, ow
       } else if (/already (refunded|taken back)/.test(out?.note?.title || '')) {
         // Already put right from its card: close the report, nothing more is paid.
         const done = await decideOne(x.id, 'dismiss', 'Already put right from the card.', me, data).catch(() => null);
-        if (done?.ok) closed += 1;
+        if (done?.ok) {
+          closed += 1;
+          handled.push({ id: x.id, by: x.get('by'), at: x.get('at') });
+        }
         else skipped.push({ id: x.id, by: x.get('by'), game: x.get('cmd') || '', why: out.note.title });
       } else skipped.push({ id: x.id, by: x.get('by'), game: x.get('cmd') || '', why: out?.note?.title || 'Skipped.' });
     }
@@ -306,6 +341,7 @@ export function disputeFunctions({ db, coinData, freshCoins, notify, bankRef, ow
         by: me,
       })),
     ).catch((e) => logger.warn('disputeRefundAll notify', e.message));
+    await clearReportNotes(handled, data);
     const refunded = [...paid.values()].reduce((n, r) => n + r.count, 0);
     return { ok: true, refunded, coins, people: paid.size, skipped, closed };
   });
@@ -425,9 +461,11 @@ export function disputeFunctions({ db, coinData, freshCoins, notify, bankRef, ow
             ? { status: 'refunded', handledBy: me, handledAt: now, refund: amount, resolutionNote: 'Refunded from the card in chat.', via: 'card' }
             : { status: 'dismissed', handledBy: me, handledAt: now, refund: 0, resolutionNote: 'The win was taken back.', via: 'card' },
         );
-      return { ok: true, mode, amount, person: who, game: check.game };
+      const report = rep.exists && rep.get('status') === 'open' ? { id: rep.id, by: rep.get('by'), at: rep.get('at') } : null;
+      return { ok: true, mode, amount, person: who, game: check.game, report };
     });
     if (!out.ok) return out;
+    if (out.report) await clearReportNotes([out.report], data);
     if (out.person !== me)
       await notify([{ to: out.person, type: 'dispute', ...d.fixNote({ ...out, by: me }), open: `chat:${conv}`, by: me }]).catch((e) =>
         logger.warn('ownerRefund notify', e.message),

@@ -972,6 +972,13 @@ function demoLine({ who, conv, msgId, game, net, cardAt }) {
     return { problem: note('Already reversed in their coin history.', 'That line was put right from Coins. Nothing more to do.') };
   return { reverses: key };
 }
+// A handled casino report: the owner's "X reported a … result" notification
+// goes away (by its report id; older ones by who sent it and when).
+function clearReportNote(x) {
+  state.inbox = (state.inbox || []).filter(
+    (n) => !(n.type === 'dispute' && (n.report === x.id || (!n.report && /reported a/.test(n.title || '') && Math.abs((n.at || 0) - (x.at || 0)) < 120000 && n.title.startsWith(x.by.split(' ')[0])))),
+  );
+}
 function demoTag(conv, msgId, tag) {
   const list = (state.chat || {})[conv] || [];
   const k = personId(tag.name);
@@ -2285,6 +2292,7 @@ export const demoStore = {
         title: `${first} reported a ${dispute.GAME_LABEL[snapshot.game]} result`,
         body: dispute.REASONS[reason],
         open: 'disputes:',
+        report: id,
         at: now,
         read: false,
         to,
@@ -2331,6 +2339,7 @@ export const demoStore = {
       if (m?.cmd) demoTag(x.conv, x.msgId, dispute.adjustTag({ person: x.by, mode: 'refund', amount: refund, by: actor.name, now, via: 'report' }));
     }
     Object.assign(x, { status: decision === 'refund' ? 'refunded' : 'dismissed', handledBy: actor.name, handledAt: now, refund, resolutionNote: resolution });
+    clearReportNote(x);
     if (req.quiet) {
       commit();
       return { ok: true, status: x.status, refund, x };
@@ -2459,6 +2468,7 @@ export const demoStore = {
           ? { status: 'refunded', handledBy: actor.name, handledAt: now, refund: amount, resolutionNote: 'Refunded from the card in chat.', via: 'card' }
           : { status: 'dismissed', handledBy: actor.name, handledAt: now, refund: 0, resolutionNote: 'The win was taken back.', via: 'card' },
       );
+    if (rep) clearReportNote(rep);
     if (who !== actor.name)
       state.inbox = [
         { id: uid(), type: 'dispute', ...dispute.fixNote({ mode, amount, game: check.game, by: actor.name }), open: `chat:${conv}`, at: now, read: false, to: who },
