@@ -561,8 +561,24 @@ async function tap(p, loc, label, { think = false, ambush = false, watch = LAG +
     document.querySelectorAll('[data-ns-aim]').forEach((x) => x.removeAttribute('data-ns-aim'));
     el.setAttribute('data-ns-aim', '1');
   });
-  const box = await loc.evaluate((el) => (el.isConnected && el.getClientRects().length ? window.__ns.box(el) : null));
-  if (!box) return null;
+  // Aimed where it's painted, and only if a finger there would hit it (not
+  // under the header or the composer after the list moved on its own).
+  let box = null;
+  for (let k = 0; k < 3; k++) {
+    box = await loc.evaluate((el) => (el.isConnected && el.getClientRects().length ? window.__ns.box(el) : null));
+    if (!box) return null;
+    const hits = await loc.evaluate((el, b) => {
+      const at = document.elementFromPoint(b.x + b.width / 2, b.y + b.height / 2);
+      return !!at && (el === at || el.contains(at) || at.contains(el));
+    }, box);
+    if (hits) break;
+    if (k === 2) {
+      problems.push(`${current.vp} ${current.game} ${label}: covered, not tapped`);
+      return null;
+    }
+    await loc.evaluate((el) => el.scrollIntoView({ block: 'center' }));
+    await sleep(500);
+  }
   const jx = Math.min(6, box.width * 0.2);
   const jy = Math.min(6, box.height * 0.2);
   const x = at ? at.x : box.x + box.width / 2 + rand(-jx, jx);
@@ -616,8 +632,15 @@ const btn = (p, id, re) => card(p, id).locator('button', { hasText: re }).filter
 const live = async (p, id) => (await card(p, id).locator('.cz-done').count()) === 0;
 const closeDialogs = async (p) => {
   for (let k = 0; k < 3; k++) {
-    if (!(await p.locator('.panel-backdrop, .fun-dialog, [role="dialog"]').count())) return;
+    if (!(await p.locator('.panel-backdrop, .fun-dialog, [role="dialog"]').count())) break;
     await p.keyboard.press('Escape');
+    await sleep(300);
+  }
+  // A side panel (search, pins, people) a stray tap opened.
+  const side = p.locator('.chat-side .chat-side-head button[aria-label="Close"]');
+  if (await side.count()) {
+    problems.push(`${current.vp} ${current.game}: a side panel was open (closed it)`);
+    await side.first().click({ force: true }).catch(() => {});
     await sleep(300);
   }
 };
