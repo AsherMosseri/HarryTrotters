@@ -196,7 +196,7 @@
 .pr-pedal.on { transform: translateY(4px); box-shadow: 0 1px 0 rgba(0, 0, 0, 0.28); filter: brightness(1.12); }
 .pr-pedal-icon { display: grid; place-items: center; opacity: 0.85; }
 @media (max-height: 500px) {
-  .pr-pedal { height: 74px; }
+  .pr-pedal { height: 72px; width: min(24%, 170px); border-radius: 20px; font-size: 18px; }
   .pr-hint { bottom: calc(96px + env(safe-area-inset-bottom)); }
   .pg-score b { font-size: 38px; }
 }

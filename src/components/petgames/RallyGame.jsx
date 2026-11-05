@@ -338,7 +338,8 @@ function camera(cam, c, w, h, dt) {
   cam.x = c.x + cam.lead;
   cam.y += (c.y - cam.y) * (1 - Math.exp(-dt * 5));
   const ox = w * 0.42;
-  const oy = h * (h > w ? 0.56 : 0.6);
+  // Above the pedals: they take the bottom corners.
+  const oy = h > w ? h * 0.56 : h < 500 ? h * 0.5 : h * 0.6;
   return {
     ppm,
     sx: (x) => ox + (x - cam.x) * ppm,
