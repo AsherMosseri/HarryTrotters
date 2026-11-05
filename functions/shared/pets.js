@@ -119,14 +119,21 @@ export function petXp(person, shifts = [], adoptedAt = 0, now = Date.now()) {
   }
   return xp;
 }
-// Level 2 at 6 xp (about an hour and a half), 3 at 24, 5 at 96, 10 at 486,
-// 30 at 5,046, 50 at 14,406 and 100 at 58,806. One curve all the way up (it
-// went to 30 until 3.2): each level takes 12 xp more than the one before, so
-// any xp has the same level it always had below 30, and nobody drops.
+// Level 2 at 6 xp (about an hour and a half), 3 at 24, 5 at 96 and 10 at 486,
+// the curve it always had. Past level 10 (3.2), every level costs the same 60
+// xp, about four 3-hour lab days (16 xp a day): level 30 at 1,686 (~105 lab
+// days), the level 50 Royal crown at 2,886 (~180, about a school year) and the
+// level 100 jersey at 5,886 (~370). Any xp is the same level or higher than
+// before 3.2, never lower.
 export const MAX_LEVEL = 100;
-export const xpFor = (level) => 6 * (level - 1) ** 2;
+export const CURVE_BEND = 10;
+export const XP_PER_LEVEL = 60;
+export const xpFor = (level) => (level <= CURVE_BEND ? 6 * (level - 1) ** 2 : xpFor(CURVE_BEND) + (level - CURVE_BEND) * XP_PER_LEVEL);
 export function levelOf(xp) {
-  const level = Math.min(MAX_LEVEL, 1 + Math.floor(Math.sqrt(Math.max(0, xp) / 6)));
+  const x = Math.max(0, Number(xp) || 0);
+  const bend = xpFor(CURVE_BEND);
+  const raw = x < bend + XP_PER_LEVEL ? 1 + Math.floor(Math.sqrt(x / 6)) : CURVE_BEND + Math.floor((x - bend) / XP_PER_LEVEL);
+  const level = Math.min(MAX_LEVEL, raw);
   const from = xpFor(level);
   const to = level >= MAX_LEVEL ? from : xpFor(level + 1);
   return { level, xp, from, to, progress: to > from ? (xp - from) / (to - from) : 1 };

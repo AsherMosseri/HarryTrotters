@@ -25,25 +25,22 @@ const check = (ok, label) => {
 // The 3.1 code, pinned: level from xp with the top at 30.
 const oldLevel = (xp) => Math.min(30, 1 + Math.floor(Math.sqrt(Math.max(0, xp) / 6)));
 check(P.MAX_LEVEL === 100, 'MAX_LEVEL is 100');
-for (let xp = 0; xp <= 6000; xp++) {
+for (let xp = 0; xp <= 60000; xp++) {
   const now = P.levelOf(xp).level;
   if (now < oldLevel(xp)) check(false, `xp ${xp} dropped from ${oldLevel(xp)} to ${now}`);
-  if (oldLevel(xp) < 30 && now !== oldLevel(xp)) check(false, `xp ${xp} changed level under 30: ${oldLevel(xp)} → ${now}`);
+  if (oldLevel(xp) < 10 && now !== oldLevel(xp)) check(false, `xp ${xp} changed level under 10: ${oldLevel(xp)} → ${now}`);
+  const L = P.levelOf(xp);
+  if (!(L.from <= xp && (L.level === 100 || xp < L.to))) check(false, `xp ${xp} outside its level ${L.level} (${L.from}-${L.to})`);
 }
-check(P.levelOf(P.xpFor(30)).level === 30, 'level 30 at its xp');
-check(P.levelOf(P.xpFor(31)).level === 31, 'level 31 reachable');
-check(P.levelOf(P.xpFor(50)).level === 50, 'level 50 at its xp');
+for (let l = 1; l <= 100; l++) if (P.levelOf(P.xpFor(l)).level !== l || (l > 1 && P.levelOf(P.xpFor(l) - 1).level !== l - 1)) check(false, `level ${l} starts at its xp`);
+check(P.xpFor(30) === 1686 && P.xpFor(50) === 2886 && P.xpFor(100) === 5886, `3.2 curve: 30 at ${P.xpFor(30)}, 50 at ${P.xpFor(50)}, 100 at ${P.xpFor(100)}`);
 check(P.levelOf(P.xpFor(100)).level === 100 && P.levelOf(1e12).level === 100, 'level 100 is the top');
 check(P.levelOf(1e12).progress === 1, 'top level: full bar');
-let prev = 0;
-for (let l = 2; l <= 100; l++) {
-  const step = P.xpFor(l) - P.xpFor(l - 1);
-  if (l > 2 && step <= prev) check(false, `level ${l} isn't longer than ${l - 1}`);
-  prev = step;
-}
-check(P.xpFor(31) - P.xpFor(30) > P.xpFor(30) - P.xpFor(29), 'level 31 takes longer than 30');
+for (let l = 12; l <= 100; l++) if (P.xpFor(l) - P.xpFor(l - 1) !== 60) check(false, `level ${l} costs 60`);
+check(P.xpFor(11) - P.xpFor(10) === 60 && P.xpFor(10) - P.xpFor(9) === 102, 'the bend at 10');
 const mid = P.levelOf(P.xpFor(60) + 10);
 check(mid.from === P.xpFor(60) && mid.to === P.xpFor(61) && mid.progress > 0 && mid.progress < 1, 'progress inside level 60');
+check(true, 'every xp from 0 to 60,000 has a level at least as high as before');
 
 // ---- titles, rings, gear, unlocks ----
 check(P.titleOf(30) === 'Hall of Famer' && P.titleOf(49) === 'Icon' && P.titleOf(50) === 'Royalty' && P.titleOf(100) === 'All-Star', 'titles past 30');
