@@ -14,7 +14,7 @@
 
 import { mergedMs } from './hours.js';
 import { nameKey } from './team.js';
-import { BOT, GROUP_MAX } from './groups.js';
+import { BOT } from './groups.js';
 import { secureRandom } from './rng.js';
 import { parseAmount } from './amount.js';
 import { coinsText } from './coinText.js';
@@ -635,7 +635,8 @@ export function giftEntry(from, { to, amount, note }, { roster, balance, toBalan
 }
 
 // A gift to a group (/give @Programming 10): the same checks as one /give
-// to each person, then the whole total against the balance. All or nothing:
+// to each person, then the whole total against the balance. Any size, up to
+// the whole team (no group cap since 3.1.5). All or nothing:
 // { entries } (one gift entry per person, sharing a batch id, so the giver's
 // history shows one line) or { error, body } saying who and why.
 // people: who it goes to (already worked out from the server's own team).
@@ -643,7 +644,6 @@ export function giftEntry(from, { to, amount, note }, { roster, balance, toBalan
 // (MAX_BALANCE); anyone left out isn't checked.
 export function groupGiftEntries(from, { people = [], amount, note, batch, group }, { roster, balance, balances = {}, now = Date.now() }) {
   if (!people.length) return { error: 'Nobody to give to.', body: `${group || 'That group'} has nobody in it besides you.` };
-  if (people.length > GROUP_MAX) return { error: 'That’s too many people at once.', body: `Up to ${GROUP_MAX}.` };
   const entries = [];
   for (const to of people) {
     if (!roster.includes(to) || to === BOT)
@@ -652,7 +652,7 @@ export function groupGiftEntries(from, { people = [], amount, note, batch, group
     if (e.error) return { error: e.error, body: [e.body, people.length > 1 ? 'Nothing was sent.' : ''].filter(Boolean).join(' ') };
     entries.push({ ...e, batch: String(batch || ''), group: String(group || '').slice(0, 80) });
   }
-  const total = entries.reduce((t, e) => t + e.amount, 0);
+  const total = sumCoins(entries);
   if (total > balance)
     return {
       error: `That’s ${coinsText(total)} coins (${coinsText(entries[0].amount)} each for ${entries.length} ${entries.length === 1 ? 'person' : 'people'}).`,

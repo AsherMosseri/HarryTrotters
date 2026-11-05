@@ -1598,7 +1598,10 @@ async function giveMany(me, body, data, now) {
     return note('Which group?', `Groups: @everyone, ${SUBTEAMS.map((x) => `@${x}`).join(', ')}.`);
   const everyone = !!g?.everyone;
   // Everyone named by hand, each one checked against the server's roster.
-  const named = (g ? (Array.isArray(g.people) ? g.people : []) : [body.to]).slice(0, GROUP_MAX).map((n) => data.rename(cleanName(String(n || ''))));
+  // As many as the team has (no group cap since 3.1.5); each one checked.
+  const named = (g ? (Array.isArray(g.people) ? g.people : []) : [body.to])
+    .slice(0, Math.max(GROUP_MAX, team.roster.length + 1))
+    .map((n) => data.rename(cleanName(String(n || ''))));
   for (const n of named) {
     if (n === me && !g) return note('That’s you.', 'Your coins are already yours.');
     if (n !== me && !team.roster.includes(n)) return note(`Who’s ${n || 'that'}?`, g ? 'They aren’t on the team. Nothing was sent.' : '');

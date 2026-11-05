@@ -21,7 +21,7 @@ import * as dispute from '../../functions/shared/disputes.js';
 import { blocked, isOff, serverGroup } from '../../functions/shared/commandRules.js';
 import * as coinAsk from '../../functions/shared/coinRequests.js';
 import { AWARD_CAPS, breakdown, capWin, ceilingNote, giftEntry, overCeiling, groupGiftEntries, prizeEntry, teamDay, teamMidnight } from '../../functions/shared/coins.js';
-import { BOT, GROUP_MAX, groupLabel, resolveTargets } from '../../functions/shared/groups.js';
+import { BOT, groupLabel, resolveTargets } from '../../functions/shared/groups.js';
 import * as fun from '../../functions/shared/funGames.js';
 import * as mines from '../../functions/shared/minesweeper.js';
 const MINE_LEVELS = mines.LEVELS;
@@ -1716,17 +1716,8 @@ export const demoStore = {
     const setCard = (conv, id, fn) => {
       state.chat = { ...state.chat, [conv]: msgs(conv).map((x) => (x.id === id ? { ...x, cmd: fn(x.cmd) } : x)) };
     };
-    // My requests still waiting: one-person ones, and groups (each counts once).
-    const openOf = (who) => [
-      ...Object.values(asks).filter((r) => r.from === who && !r.group && r.status === 'open' && r.expiresAt > now),
-      ...Object.values(groups)
-        .filter((g) => g.from === who && g.expiresAt > now)
-        .map((g) => ({ id: g.id, people: g.rows.filter((x) => asks[x.id]?.status === 'open').map((x) => x.to), expiresAt: g.expiresAt }))
-        .filter((g) => g.people.length),
-    ];
-    const madeToday = (who) =>
-      Object.values(asks).filter((r) => r.from === who && !r.group && teamDay(r.at) === teamDay(now)).length +
-      Object.values(groups).filter((g) => g.from === who && teamDay(g.at) === teamDay(now)).length;
+    // No count limits since 3.1.5 (like the server): any number waiting or
+    // made in a day, the same person again, and groups as big as the team.
     // The switches /give has, where a request is made.
     const switchedOff = (conv) => {
       if (coinsOff) return note('🪙 Jackson coins are off right now.');
@@ -1753,14 +1744,12 @@ export const demoStore = {
       const label = groupLabel({ groups: gs, everyone });
       const people = resolveTargets({ groups: gs, everyone, people: named }, { roster: team, subteamsOf, me });
       if (!people.length) return note(`Nobody in ${label} to ask.`, `${label} has nobody in it besides you.`);
-      if (people.length > GROUP_MAX) return note(`That’s ${people.length} people.`, `Up to ${GROUP_MAX} at a time.`);
       const id = `g-${req.key || uid()}-${personId(me)}`;
       const was = groups[id];
       if (was) return { ok: true, id, repeat: true, asked: was.rows.length, skipped: was.skipped, reply: coinAsk.groupReply({ asked: was.rows.map((x) => x.to), skipped: was.skipped, amount: was.amount }) };
-      const open = openOf(me);
-      const { ask, skipped } = coinAsk.skipAsked(people, open, now);
-      if (!ask.length) return note(`You already asked ${skipped.length === 1 ? first(skipped[0]) : `everyone in ${label}`}.`, 'Wait for their answers, or cancel those first.');
-      const r = coinAsk.startGroupAsk({ me, people: ask, label, amount: req.amount, reason: req.reason, open, sentToday: madeToday(me), now });
+      const ask = people;
+      const skipped = [];
+      const r = coinAsk.startGroupAsk({ me, people: ask, label, amount: req.amount, reason: req.reason, now });
       if (r.error) return note(r.error, r.body);
       const pub = r.pub;
       const rows = ask.map((to, i) => ({ id: `${id}-${i}`, to, row: `r${i}` }));
@@ -1796,9 +1785,8 @@ export const demoStore = {
       if (!conv || conv === 'announcements') return note('Not here.', 'Ask in a channel or a DM.');
       const off = switchedOff(conv);
       if (off) return off;
-      const open = openOf(me);
       const to = String(req.to || '');
-      const r = coinAsk.startAsk({ me, to, amount: req.amount, reason: req.reason, roster, active: roster.includes(to), open, sentToday: madeToday(me), now });
+      const r = coinAsk.startAsk({ me, to, amount: req.amount, reason: req.reason, roster, active: roster.includes(to), now });
       if (r.error) return note(r.error, r.body);
       const dm = conv.startsWith('dm:') ? (state.dms || []).find((d) => `dm:${d.id}` === conv) : null;
       if (dm && !dm.people.includes(to)) return note(`${first(to)} isn’t in this conversation.`, 'Ask in a channel they can see, or in a DM with them.');

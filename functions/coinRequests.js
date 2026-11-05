@@ -1,8 +1,10 @@
 // Coin requests (/request @person amount [reason]) on the server. Asking only
 // posts a card; the person asked pays with one tap, and the coins move the
-// way /give moves them (the play function's 'gift': giftEntry, the same cap,
-// the same balance check, the same switches), as a gift from them to the
-// person asking with the reason as its note.
+// way /give moves them (the play function's 'gift': giftEntry, the same
+// balance check and googol ceiling, the same switches), as a gift from them
+// to the person asking with the reason as its note. No count limits since
+// 3.1.5: any number waiting, any number a day, the same person again, and a
+// group as big as the team.
 //
 // Callable coinRequest({ action, … }):
 //   create  { conv, to, amount, reason, replyTo }   ask someone (posts the card)
@@ -16,9 +18,8 @@
 //   coinRequests/{msgId}       the request: from, to, amount, reason, conv,
 //                              at, expiresAt, status (open, paid, declined,
 //                              cancelled, expired), decidedAt, paidAt, entry
-//   coinRequestsOpen/{person}  the asker's waiting request ids and how many
-//                              they made today (the lock the "3 waiting at
-//                              once" and "20 a day" limits are counted under)
+//   (coinRequestsOpen/{person}, the old "3 waiting / 20 a day" counter, is
+//   no longer written or read.)
 //   the card: the message with the same id, cmd { name: 'request',
 //   kind: 'coins', ask, status }, a copy for showing. Pay reads the request
 //   doc, never the card or anything the app sends.
@@ -35,8 +36,8 @@
 // The server works out who's in the group from its own data (functions/
 // groups.js; the app's list of people is never used) and makes one request
 // per person, each with its own doc, paid or declined on its own exactly
-// like a one-person request, under ONE card. Anyone already waiting on a
-// request from the asker is skipped (and named in the answer). Not in DMs.
+// like a one-person request, under ONE card. Someone already waiting on a
+// request from the asker is asked again. Not in DMs.
 //   coinRequestGroups/{g-key-asker}  the group: from, conv, amount, reason,
 //                              label, rows [{ id, to, row }], openTo (who
 //                              hasn't answered yet; each answer takes its
@@ -47,9 +48,7 @@
 //   the card: the message with the group's id, cmd { …, group: { label },
 //   rows: { r0: { to, status, paidAt? }, … } }; each answer writes only its
 //   own row's fields, so members paying at the same moment don't collide.
-// A group counts as ONE open request toward the 3-waiting limit (the lock's
-// `groups`; open while someone in openTo hasn't answered) and one toward 20
-// a day. Its id comes from the app's key, so a double send makes one group.
+// Its id comes from the app's key, so a double send makes one group.
 // Taps on a group card send the card's id: Pay and Decline act on the
 // caller's own row (found by their name here, so nobody can pay or decline
 // for someone else); Cancel (the asker) and a peek after 24 hours close
@@ -70,7 +69,6 @@ import { GROUP_MAX, groupLabel, resolveTargets } from './shared/groups.js';
 import { groupTeam } from './groups.js';
 import { blocked, isOff } from './shared/commandRules.js';
 import * as ask from './shared/coinRequests.js';
-import { teamDay } from './shared/coins.js';
 
 const OPEN = { maxInstances: 5, invoker: 'public' };
 const first = (n) => (n || 'Someone').split(' ')[0];
@@ -91,7 +89,6 @@ export function messagesOf(conv) {
 export function coinRequestFunctions({ db, coinData, freshCoins, bankRef, notify, owner, timeZone, loanLock = async () => null }) {
   const reqRef = (id) => db.doc(`coinRequests/${id}`);
   const groupRef = (id) => db.doc(`coinRequestGroups/${id}`);
-  const lockRef = (name) => db.doc(`coinRequestsOpen/${nameKey(name)}`);
 
   async function caller(req) {
     const uid = req.auth?.uid;
@@ -139,26 +136,6 @@ export function coinRequestFunctions({ db, coinData, freshCoins, bankRef, notify
     return onTeam(name, { rename, roles: roles.docs.map((d) => d.data()), people: people.docs.map((d) => d.data()) });
   }
 
-  // My requests still waiting, read in a create's transaction: one-person
-  // ones ({ id, to }) and groups ({ id, people: who hasn't answered }).
-  async function openOf(tx, me, rename, now) {
-    const lock = (await tx.get(lockRef(me))).data() || {};
-    const ids = (Array.isArray(lock.ids) ? lock.ids : []).filter(validId).slice(-20);
-    const gids = (Array.isArray(lock.groups) ? lock.groups : []).filter(validId).slice(-20);
-    const [olds, groups] = await Promise.all([
-      ids.length ? Promise.all(ids.map((x) => tx.get(reqRef(x)))) : [],
-      gids.length ? Promise.all(gids.map((x) => tx.get(groupRef(x)))) : [],
-    ]);
-    const singles = olds
-      .filter((d) => d.exists && d.get('status') === 'open' && (d.get('expiresAt') || 0) > now)
-      .map((d) => ({ id: d.id, to: rename(d.get('to') || ''), expiresAt: d.get('expiresAt') }));
-    const many = groups
-      .filter((d) => d.exists && (d.get('openTo') || []).length && (d.get('expiresAt') || 0) > now)
-      .map((d) => ({ id: d.id, people: (d.get('openTo') || []).map(rename), expiresAt: d.get('expiresAt') }));
-    const day = teamDay(now);
-    return { singles, many, open: [...singles, ...many], day, sentToday: lock.day === day ? lock.n || 0 : 0 };
-  }
-
   async function create(who, body) {
     if (body.group != null) return createGroup(who, body);
     const { uid, me, data } = who;
@@ -194,12 +171,10 @@ export function coinRequestFunctions({ db, coinData, freshCoins, bankRef, notify
     const replyTo = body.replyTo && typeof body.replyTo === 'object' ? body.replyTo : null;
     const res = await db.runTransaction(async (tx) => {
       const now = Date.now();
-      const { singles, many, open, day, sentToday } = await openOf(tx, me, rename, now);
-      const r = ask.startAsk({ me, to, amount: body.amount, reason: body.reason, roster, active: true, open, sentToday, now });
+      const r = ask.startAsk({ me, to, amount: body.amount, reason: body.reason, roster, active: true, now });
       if (r.error) return note(r.error, r.body);
       const pub = r.pub;
       tx.set(reqRef(id), { ...pub, id, conv, by: uid });
-      tx.set(lockRef(me), { name: me, ids: [...singles.map((x) => x.id), id], groups: many.map((x) => x.id), day, n: sentToday + 1, at: now });
       const text = `/request @${to} ${pub.amount}${pub.reason ? ` ${pub.reason}` : ''}`.slice(0, 300);
       tx.set(msgRef, {
         text,
@@ -250,12 +225,12 @@ export function coinRequestFunctions({ db, coinData, freshCoins, bankRef, notify
     const everyone = g.everyone === true;
     if (!groups.length && !everyone) return note('Which group?', 'Try: /request @Programming 5 for pizza');
     const team = await groupTeam(db, rename);
-    const named = (Array.isArray(g.people) ? g.people : []).slice(0, GROUP_MAX).map((n) => rename(cleanName(String(n || ''))));
+    // As many as the team has (no group cap since 3.1.5); each one checked.
+    const named = (Array.isArray(g.people) ? g.people : []).slice(0, Math.max(GROUP_MAX, team.roster.length + 1)).map((n) => rename(cleanName(String(n || ''))));
     for (const n of named) if (n !== me && !team.roster.includes(n)) return note(`Who’s ${n || 'that'}?`, 'They aren’t on the team. Nobody was asked.');
     const label = groupLabel({ groups, everyone });
     let people = resolveTargets({ groups, everyone, people: named }, { ...team, me });
     if (!people.length) return note(`Nobody in ${label} to ask.`, `${label} has nobody in it besides you.`);
-    if (people.length > GROUP_MAX) return note(`That’s ${people.length} people.`, `Up to ${GROUP_MAX} at a time.`);
     // A private channel: only its members can see the card, so only they're asked.
     let unseen = [];
     const priv = await db.doc(`privateChannels/${place.channel}`).get();
@@ -279,14 +254,10 @@ export function coinRequestFunctions({ db, coinData, freshCoins, bankRef, notify
         if (rename(was.get('from') || '') !== me) return note('That didn’t go through.', 'Try again.');
         return { ok: true, repeat: true, asked: was.get('people') || [], skipped: was.get('skipped') || [], unseen: was.get('unseen') || [], amount: was.get('amount') };
       }
-      const { singles, many, open, day, sentToday } = await openOf(tx, me, rename, now);
-      const { ask: asking, skipped } = ask.skipAsked(people, open, now);
-      if (!asking.length)
-        return note(
-          `You already asked ${skipped.length === 1 ? skipped[0].split(' ')[0] : `everyone in ${label}`}.`,
-          'Wait for their answers, or cancel those first.',
-        );
-      const r = ask.startGroupAsk({ me, people: asking, label, amount: body.amount, reason: body.reason, open, sentToday, now });
+      // Everyone in it is asked, even someone already waiting on one from me.
+      const asking = people;
+      const skipped = [];
+      const r = ask.startGroupAsk({ me, people: asking, label, amount: body.amount, reason: body.reason, now });
       if (r.error) return note(r.error, r.body);
       const pub = r.pub;
       const rows = asking.map((to, i) => ({ id: `${id}-${i}`, to, row: `r${i}` }));
@@ -325,7 +296,6 @@ export function coinRequestFunctions({ db, coinData, freshCoins, bankRef, notify
           row: x.row,
           everyone,
         });
-      tx.set(lockRef(me), { name: me, ids: singles.map((x) => x.id), groups: [...many.map((x) => x.id), id], day, n: sentToday + 1, at: now });
       tx.set(msgRef, {
         text: `/request ${label} ${pub.amount}${pub.reason ? ` ${pub.reason}` : ''}`.slice(0, 300),
         by: me,
@@ -405,7 +375,7 @@ export function coinRequestFunctions({ db, coinData, freshCoins, bankRef, notify
       const place = messagesOf(saved.conv);
       const group = saved.group || '';
       const msgRef = place && !group ? db.doc(`${place.col}/${id}`) : null;
-      const [msg, lock] = group ? [null, null] : await Promise.all([msgRef ? tx.get(msgRef) : null, tx.get(lockRef(pub.from))]);
+      const msg = group || !msgRef ? null : await tx.get(msgRef);
       // Only the person asked pays, and only from their own bank (read in the
       // transaction, like a gift, so it takes turns with their bets and gifts).
       let bank = null;
@@ -438,8 +408,6 @@ export function coinRequestFunctions({ db, coinData, freshCoins, bankRef, notify
       }
       if (msg?.exists && msg.get('cmd')?.name === 'request')
         tx.update(msgRef, { 'cmd.status': status, 'cmd.decidedAt': decidedAt, ...(paidAt && { 'cmd.paidAt': paidAt }) });
-      const ids = (lock.get('ids') || []).filter((x) => x !== id);
-      if (lock.exists) tx.update(lockRef(pub.from), { ids });
       return { ok: true, status, pub, ...(r.error && { note: { title: r.error, body: '' } }) };
     });
     if (res.ok && res.group && close) await closeCard(res.group, res.pub.conv);

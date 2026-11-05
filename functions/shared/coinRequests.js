@@ -3,20 +3,20 @@
 // (functions/coinRequests.js) and demo mode both run these.
 //
 // A request only asks. Nothing moves until the person asked taps Pay, and
-// then it moves exactly the way /give does: giftEntry (the same cap, the same
-// balance check), written as a gift from them to you with your reason as the
-// note, so both coin histories show it like a /give. The amount is the one
-// saved when the request was made; Pay sends nothing but "pay". Declined,
-// cancelled and expired requests move nothing.
+// then it moves exactly the way /give does: giftEntry (the same balance
+// check and the googol ceiling), written as a gift from them to you with your
+// reason as the note, so both coin histories show it like a /give. The amount
+// is the one saved when the request was made; Pay sends nothing but "pay".
+// Declined, cancelled and expired requests move nothing.
+// No count limits since 3.1.5: ask as many people, as many times, as often
+// as you like (the same person twice too); a group can be the whole team.
 
 import { GIFT_MAX, giftEntry } from './coins.js';
 import { looksLikeAmount, parseAmount } from './amount.js';
-import { GROUP_MAX, namesShort } from './groups.js';
+import { namesShort } from './groups.js';
 import { coinsText } from './coinText.js';
 
 export const EXPIRES = 24 * 3600000; // a request is open for a day
-export const MAX_OPEN = 3; // requests one person can have waiting at once
-export const DAY_LIMIT = 20; // requests one person can make in a team day (cancelled ones count)
 export const REASON_MAX = 140; // the same as a gift's note
 export const MOVES = ['pay', 'decline', 'cancel', 'peek'];
 export const BOT = 'Trotbot';
@@ -67,10 +67,9 @@ export function parseAsk(text, roster = []) {
 //   me, to: names (current spellings); amount: must be a number (not a string)
 //   roster: the team's current names; active: `to` is a signed-in member, not
 //   waiting to be let in or removed (the server looks it up, not the app)
-//   open: my requests still waiting ({ to, expiresAt })
-//   sentToday: how many I've made this team day
+// No limit on how many are waiting or made in a day (3.1.5).
 // Returns { error, body? } or { pub }: what the card and the request doc hold.
-export function startAsk({ me, to, amount, reason = '', roster = [], active = false, open = [], sentToday = 0, now = Date.now() }) {
+export function startAsk({ me, to, amount, reason = '', roster = [], active = false, now = Date.now() }) {
   const usage = 'Try: /request @Cooper 25 for pizza';
   if (!to) return { error: 'Ask who?', body: usage };
   if (String(to).toLowerCase() === BOT.toLowerCase()) return { error: 'Trotbot doesn’t carry coins.', body: 'Ask a teammate.' };
@@ -80,14 +79,6 @@ export function startAsk({ me, to, amount, reason = '', roster = [], active = fa
     return { error: 'Ask for a whole number of coins, at least 1.', body: usage };
   if (amount > GIFT_MAX) return { error: 'That’s more than a googol.', body: 'Nobody can hold more than that.' };
   if (!active) return { error: `${first(to)} isn’t on the team.` };
-  // open: one-person requests ({ to }) and group requests ({ people: the
-  // ones still waiting on }), each counting as one toward MAX_OPEN.
-  const waiting = open.filter((r) => (r.expiresAt || 0) > now);
-  if (waiting.some((r) => r.to === to || (r.people || []).includes(to)))
-    return { error: `You already asked ${first(to)}.`, body: 'Cancel that one first, or wait for an answer.' };
-  if (waiting.length >= MAX_OPEN)
-    return { error: `You have ${MAX_OPEN} requests waiting.`, body: 'Cancel one, or wait for answers.' };
-  if (sentToday >= DAY_LIMIT) return { error: `That’s ${DAY_LIMIT} requests today.`, body: 'Try again tomorrow.' };
   return {
     pub: { from: me, to, amount, reason: cleanReason(reason), at: now, expiresAt: now + EXPIRES, status: 'open' },
   };
@@ -124,37 +115,24 @@ export function askMove({ pub, me, move, balance = 0, toBalance, roster = [], no
 
 // ---------- group requests (/request @Programming 5 for pizza) ----------
 // One request per person, each paid or declined on its own (the same askMove
-// as above, for that person's own row), under one card. The group as a whole
-// counts as ONE request toward MAX_OPEN and DAY_LIMIT. The server works out
-// who's in the group (functions/groups.js); the app only says which groups
-// and people were typed.
+// as above, for that person's own row), under one card. Any size, up to the
+// whole team. The server works out who's in the group (functions/groups.js);
+// the app only says which groups and people were typed.
 
 // "asks @Programming for 5 🪙 each: for pizza".
 export const groupAskLine = (p) => `asks ${p.label} for ${coinText(p.amount)} each${p.reason ? `: ${p.reason}` : ''}`;
 
-// Who to ask: the group's people, minus the ones I already have a request
-// waiting with (open: as in startAsk). Returns { ask, skipped }.
-export function skipAsked(people, open = [], now = Date.now()) {
-  const waiting = open.filter((r) => (r.expiresAt || 0) > now);
-  const asked = new Set(waiting.flatMap((r) => (r.people ? r.people : [r.to])));
-  return { ask: people.filter((n) => !asked.has(n)), skipped: people.filter((n) => asked.has(n)) };
-}
-
 // A new group request. people: who it asks (the server's list, already
-// without me, Trotbot, anyone off the team, and anyone skipped); label:
-// "@Programming"; open, sentToday: as in startAsk.
+// without me, Trotbot and anyone off the team; someone already waiting on
+// one from me is asked again); label: "@Programming".
 // Returns { error, body? } or { pub }.
-export function startGroupAsk({ me, people = [], label = '', amount, reason = '', open = [], sentToday = 0, now = Date.now() }) {
+export function startGroupAsk({ me, people = [], label = '', amount, reason = '', now = Date.now() }) {
   const usage = `Try: /request ${label || '@Programming'} 5 for pizza`;
   if (typeof amount !== 'number' || !Number.isInteger(amount) || amount < 1)
     return { error: 'Ask for a whole number of coins each, at least 1.', body: usage };
   if (amount > GIFT_MAX) return { error: 'That’s more than a googol.', body: 'Nobody can hold more than that.' };
   if (people.some((n) => n === me || !n)) return { error: 'That’s you.', body: 'Your coins are already yours.' };
   if (!people.length) return { error: `Nobody in ${label || 'that group'} to ask.` };
-  if (people.length > GROUP_MAX) return { error: `That’s ${people.length} people.`, body: `Up to ${GROUP_MAX} at a time.` };
-  const waiting = open.filter((r) => (r.expiresAt || 0) > now);
-  if (waiting.length >= MAX_OPEN) return { error: `You have ${MAX_OPEN} requests waiting.`, body: 'A group counts as one. Cancel one, or wait for answers.' };
-  if (sentToday >= DAY_LIMIT) return { error: `That’s ${DAY_LIMIT} requests today.`, body: 'Try again tomorrow.' };
   return {
     pub: { from: me, amount, reason: cleanReason(reason), label, people: [...people], at: now, expiresAt: now + EXPIRES, status: 'open' },
   };
