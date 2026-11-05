@@ -25,6 +25,8 @@ import {
   groupGiftEntries,
   ledgerItems,
   bankItems,
+  historyGroup,
+  historyKey,
   oldBankIds,
   wallet,
 } from '../functions/shared/coins.js';
@@ -169,6 +171,18 @@ function makeWorld(seed) {
       const amount = int(1, 30);
       mk({ type: 'refund', person: nameAt(p, at), amount, label: 'Refund: a perk', at }, { type: 'refund', person: p.current, amount, label: 'Refund: a perk', at });
     }
+    // 3.1.1: the owner's Refund (positive) or Take back (negative) on a game
+    // card, and a report's refund: 'refund' entries with a game and the
+    // casino line they undo.
+    for (let i = chance(0.5) ? int(1, 3) : 0; i > 0; i--) {
+      const at = t0();
+      const back = chance(0.4);
+      const amount = back ? -int(1, 5000) : int(1, 5000);
+      const game = pick(['slots', 'mines', 'challenge', 'rps', 'heist']);
+      const label = back ? `Taken back: ${game} win (Asher)` : `Refund: ${game} (Asher refunded)`;
+      const extra = { item: `card:m${i}`, game, by: 'Asher Mosseri', ...(chance(0.6) && { reverses: `casino|${at - 1000}|${-amount}|${game}: x` }) };
+      mk({ type: 'refund', person: nameAt(p, at), amount, label, ...extra, at }, { type: 'refund', person: p.current, amount, label, ...extra, at });
+    }
     for (let i = int(0, 3); i > 0; i--) {
       const at = t0();
       const amount = int(1, 20);
@@ -266,8 +280,10 @@ function makeWorld(seed) {
         const id = `g${i}-${int(1, 1e9)}`;
         let delta;
         let entry = null;
-        if (kind === 'win') (delta = int(1, 80)), (entry = { game: 'slots', icon: '🎰', label: `Slots: won ${delta}` });
-        else if (kind === 'loss') (delta = -int(1, 60)), (entry = { game: 'slots', icon: '🎰', label: `Slots: lost ${-delta}` });
+        // 3.1.1: results name their card ('conv/msgId') half the time (older lines don't).
+        const card = chance(0.5) ? { card: `arcade/${id}` } : {};
+        if (kind === 'win') (delta = int(1, 80)), (entry = { game: 'slots', icon: '🎰', label: `Slots: won ${delta}`, ...card });
+        else if (kind === 'loss') (delta = -int(1, 60)), (entry = { game: 'slots', icon: '🎰', label: `Slots: lost ${-delta}`, ...card });
         else if (kind === 'escrow') delta = -int(1, 30); // a bet held for a running game
         else if (kind === 'escrow-then-end') {
           const bet = int(1, 30);
@@ -315,7 +331,7 @@ function makeWorld(seed) {
                 ? { name, delta: 0, entry: { game: 'challenge', icon: 'C', label: 'lost', shown: -bet } }
                 : { name, delta: bet, entry: { game: 'challenge', icon: 'C', label: 'tie', shown: 0 } };
           delta = x.delta;
-          entry = moneyLine(x, 'challenge', id);
+          entry = moneyLine(x, 'challenge', id, card.card ? 'arcade' : '');
         } else if (kind === 'daily') (delta = int(1, 12)), (entry = { icon: '📅', label: 'Daily' });
         else delta = 0;
         b = bankAfter(b, name, delta, entry, {}, at);
@@ -600,6 +616,41 @@ console.log(`${CASES} random teams checked; ${bankSharedCases} people had a capi
   const m = appView(w, 'Mia Teammate');
   ok(m.balance === 80 + 30 - 33 && serverView(w, 'Mia Teammate').balance === m.balance, `Mia: ${m.balance}`);
   }
+}
+
+{
+  // 3.1.1: Asher refunds Cooper's lost Mines bet from its card (+429,149, a
+  // 'refund' with the game and the casino line it undoes) and takes back a
+  // Slots win (−1,200, a negative 'refund'). Old apps count both already;
+  // the line names its card; history adds up; app and server agree.
+  const at = NOW - 3 * HOUR;
+  let b = bankAfter({}, 'Cooper Mlezcko', -429149, { game: 'mines', icon: '💣', label: 'Mines: lost 429149', shown: -429149, card: 'arcade/m1' }, {}, at);
+  b = bankAfter(b, 'Cooper Mlezcko', 1200, { game: 'slots', icon: '🎰', label: 'Slots: won 1200', card: 'arcade/s1' }, {}, at + HOUR);
+  const line = b.recent.find((x) => x.card === 'arcade/m1');
+  const key = `casino|${line.at}|${line.amount}|${line.label}`;
+  const w = {
+    rename: (n) => n,
+    aliasesOf: (n) => [n],
+    people: [{ current: 'Cooper Mlezcko' }],
+    cfg: coinSettings({}),
+    shifts: [],
+    tasks: [],
+    ledger: [
+      { type: 'grant', to: 'Cooper Mlezcko', amount: 430000, note: 'Bonus', at: NOW - DAY },
+      { type: 'refund', person: 'Cooper Mlezcko', amount: 429149, item: 'card:m1', label: 'Refund: Mines (Asher refunded)', game: 'mines', by: 'Asher Mosseri', reverses: key, at: NOW - HOUR },
+      { type: 'refund', person: 'Cooper Mlezcko', amount: -1200, item: 'card:s1', label: 'Taken back: Slots win (Asher)', game: 'slots', by: 'Asher Mosseri', at: NOW - HOUR + 1 },
+    ],
+    bank: new Map([['cooper-mlezcko', { ...b, name: 'Cooper Mlezcko' }]]),
+  };
+  const a = appView(w, 'Cooper Mlezcko');
+  const sv = serverView(w, 'Cooper Mlezcko');
+  ok(a.balance === 430000 && sv.balance === a.balance, `owner refund case: app ${a.balance}, server ${sv.balance}`);
+  ok(a.history.reduce((t, x) => t + x.amount, 0) === a.balance, 'owner refund case: history adds up');
+  const casinoLine = a.history.find((x) => x.kind === 'casino' && x.card === 'arcade/m1');
+  ok(casinoLine && historyKey(casinoLine) === key, 'the casino line carries its card and the key the refund names');
+  ok(a.history.filter((x) => x.kind === 'refund').every((x) => historyGroup(x) === 'casino'), 'card refunds are under Casino');
+  ok(a.history.find((x) => x.amount === 429149)?.reverses === key, 'the refund names the line it undoes');
+  console.log(`owner refund case: Cooper ${a.balance} (server ${sv.balance})`);
 }
 
 console.log(failures ? `${failures} FAILURES` : 'ALL OK');

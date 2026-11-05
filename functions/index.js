@@ -1328,7 +1328,8 @@ export const { buy, joinTournament, marketManage, pet, payTournaments } = market
 export const { coinCheck } = coinCheckFunctions({ db, coinData, freshCoins, bankRef, cacheAge: () => Date.now() - coinCache.at });
 // Casino reports (functions/disputes.js): a teammate reports a result, team
 // management refunds by hand or dismisses it.
-export const { dispute, disputeDecide } = disputeFunctions({ db, coinData, notify, bankRef, owner: REQUESTS_TO });
+// The owner's Refund / Take back on a game card in chat (ownerRefund) shares their refund key.
+export const { dispute, disputeDecide, ownerRefund } = disputeFunctions({ db, coinData, notify, bankRef, owner: REQUESTS_TO });
 
 // Team events: the team's lab time fills a meter, tiers give pet gear.
 export const { petEvent, petEventTick } = petEventFunctions({
@@ -1382,7 +1383,7 @@ async function payOut(tx, money, banks, now, card) {
   const names = [...new Set(money.map((x) => x.name))];
   for (const n of names) if (!banks[n]) banks[n] = (await tx.get(bankRef(n))).data() || {};
   for (const x of money)
-    banks[x.name] = casino.bankAfter(banks[x.name], x.name, x.delta, arcade.moneyLine(x, card.game, card.id), x.extra || {}, now);
+    banks[x.name] = casino.bankAfter(banks[x.name], x.name, x.delta, arcade.moneyLine(x, card.game, card.id, card.conv), x.extra || {}, now);
   for (const n of names) tx.set(bankRef(n), banks[n]);
 }
 
@@ -1452,7 +1453,7 @@ async function runMove({ conv, msgId, me, move, data, now, house = false, verifi
       });
       if (r.error) return note(r.error);
       if (!r.write) return { ok: true, serverNow: now };
-      await payOut(tx, r.money, house ? {} : { [me]: myBank }, now, { game: c.name, id: msgId });
+      await payOut(tx, r.money, house ? {} : { [me]: myBank }, now, { game: c.name, id: msgId, conv });
       const { status, ...game } = r.pub;
       if (arcade.isLive(status)) tx.set(secretRef, secretWith(r.secret, conv, now, playersOf(r.pub)));
       else tx.delete(secretRef);
@@ -1486,6 +1487,7 @@ async function runMove({ conv, msgId, me, move, data, now, house = false, verifi
         label: `${LABEL[c.name]}: ${net > 0 ? `won ${net}` : net < 0 ? `lost ${-net}` : 'bet back'}`,
         shown: net,
         settles: msgId,
+        card: `${conv}/${msgId}`,
       };
       tx.set(bankRef(player), casino.bankAfter(bank, player, r.payout - (r.extraBet || 0), entry, {}, now));
       Object.assign(update, { 'cmd.payout': r.payout, 'cmd.net': net });
@@ -1755,7 +1757,7 @@ export const play = onCall({ maxInstances: 5, invoker: 'public' }, withBalance(a
       if (r.error) return note(r.error);
       // Where this card is, so "one challenge waiting at a time" can be checked later.
       if (r.open) r.money[0].extra = { ...r.money[0].extra, chOpen: { conv, id: msgRef.id } };
-      await payOut(tx, r.money, { [me]: myBank }, now, { game, id: msgRef.id });
+      await payOut(tx, r.money, { [me]: myBank }, now, { game, id: msgRef.id, conv });
       tx.set(db.doc(`gameSecrets/${msgRef.id}`), secretWith(r.secret, conv, now, [me, ...playersOf(r.pub)]));
       const { status, ...g } = r.pub;
       post(tx, { game: g, status, bet: g.bet || 0 }, r.mentions);
@@ -1777,7 +1779,7 @@ export const play = onCall({ maxInstances: 5, invoker: 'public' }, withBalance(a
             myBank,
             me,
             net,
-            { game, icon: ICON[game], label: `${LABEL[game]}: ${net >= 0 ? `won ${net}` : `lost ${-net}`}` },
+            { game, icon: ICON[game], label: `${LABEL[game]}: ${net >= 0 ? `won ${net}` : `lost ${-net}`}`, card: `${conv}/${msgRef.id}` },
             {},
             now,
           ),
@@ -2495,6 +2497,7 @@ export const api = apiFunction({
   coinRequest,
   dispute,
   disputeDecide,
+  ownerRefund,
   coinCheck,
   buy,
   joinTournament,

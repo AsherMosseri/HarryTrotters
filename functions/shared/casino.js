@@ -464,7 +464,10 @@ export function bankAfter(bank, name, delta, entry, extra = {}, now = Date.now()
   if (held) recent = recent.filter((x) => x.hold !== entry.settles);
   const amount = entry?.hold ? delta : shown;
   if (entry && (amount || held))
-    recent = keepRecent([{ at: now, amount, icon: entry.icon, label: entry.label, ...(entry.hold && { hold: entry.hold }) }, ...recent]);
+    recent = keepRecent([
+      { at: now, amount, icon: entry.icon, label: entry.label, ...(entry.hold && { hold: entry.hold }), ...(entry.card && { card: entry.card }) },
+      ...recent,
+    ]);
   return { ...bank, ...extra, name, net: (bank.net || 0) + delta, stats, recent, since: bank.since || now };
 }
 

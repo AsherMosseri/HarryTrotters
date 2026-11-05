@@ -958,6 +958,26 @@ events.seedSamples();
 // Loans (demoLoans.js): the same checks as functions/loans.js.
 const loans = demoLoans({ get: () => state, commit: () => commit(), uid });
 
+// Refunds on game cards (ownerRefund, disputeDecide): the person's history
+// line for the card, and the card's "Refunded by Asher" tag, like the server.
+function demoLine({ who, conv, msgId, game, net, cardAt }) {
+  const recent = (state.bank || {})[who]?.recent || [];
+  const note = (title, body = '') => ({ note: { title, body } });
+  if (recent.some((x) => x.hold === msgId)) return { problem: note('Their bet in that game is still held.', 'Finish or cancel the game first.') };
+  const { line } = dispute.cardLine(recent, { conv, msgId, game, net, cardAt });
+  if (line?.card && line.amount !== net) return { problem: note('The card and their coin history don’t match.', 'Nothing was changed. Check it by hand.') };
+  if (!line) return { reverses: '' };
+  const key = dispute.lineKey(line);
+  if ((state.coins || []).some((x) => x.reverses === key && (x.to === who || x.person === who)))
+    return { problem: note('Already reversed in their coin history.', 'That line was put right from Coins. Nothing more to do.') };
+  return { reverses: key };
+}
+function demoTag(conv, msgId, tag) {
+  const list = (state.chat || {})[conv] || [];
+  const k = personId(tag.name);
+  state.chat = { ...state.chat, [conv]: list.map((x) => (x.id === msgId ? { ...x, cmd: { ...x.cmd, adjust: { ...(x.cmd.adjust || {}), [k]: tag } } } : x)) };
+}
+
 function commit() {
   try {
     localStorage.setItem(KEY, JSON.stringify(state));
@@ -1967,7 +1987,7 @@ export const demoStore = {
     // card: the game and its card's id, so a held bet and its result share a history line.
     const payOut = (money, card) => {
       for (const x of money)
-        setBank(x.name, casino.bankAfter(bank(x.name), x.name, x.delta, arcade.moneyLine(x, card.game, card.id), x.extra || {}, now));
+        setBank(x.name, casino.bankAfter(bank(x.name), x.name, x.delta, arcade.moneyLine(x, card.game, card.id, conv), x.extra || {}, now));
     };
 
     // A group gift (/give @Programming 10): the same rules as the server's
@@ -2058,7 +2078,7 @@ export const demoStore = {
       const cmd = { ...c, game: g, status, bet };
       if (r.done) {
         const net = r.payout - bet;
-        setBank(m.by, casino.bankAfter(bank(m.by), m.by, r.payout - (r.extraBet || 0), { ...result(net, c.name), shown: net, settles: msgId }, {}, now));
+        setBank(m.by, casino.bankAfter(bank(m.by), m.by, r.payout - (r.extraBet || 0), { ...result(net, c.name), shown: net, settles: msgId, card: `${conv}/${msgId}` }, {}, now));
         Object.assign(cmd, { payout: r.payout, net });
         delete state.gameSecrets[msgId];
       } else state.gameSecrets = { ...state.gameSecrets, [msgId]: r.secret };
@@ -2138,8 +2158,8 @@ export const demoStore = {
       const { status = 'done', ...g } = r.pub;
       if (r.done) {
         const net = r.payout - bet;
-        setBank(me, casino.bankAfter(mine, me, net, result(net, game), {}, now));
-        post({ game: g, status, bet, payout: r.payout, net });
+        const m = post({ game: g, status, bet, payout: r.payout, net });
+        setBank(me, casino.bankAfter(mine, me, net, { ...result(net, game), card: `${conv}/${m.id}` }, {}, now));
       } else {
         const m = post({ game: g, status, bet });
         setBank(me, casino.bankAfter(mine, me, -bet, casino.holdEntry(ICON[game], LABEL[game], bet, m.id), {}, now));
@@ -2274,8 +2294,9 @@ export const demoStore = {
     if (decision === 'refund') {
       const m = ((state.chat || {})[x.conv] || []).find((y) => y.id === x.msgId);
       const keys = (state.refundKeys ||= {});
-      const key = `${x.msgId}-${x.by}`;
-      if (keys[key]) return note('That result was already refunded.');
+      // Shared with Refund / Take back on the card (ownerRefund).
+      const key = dispute.refundKeyId(x.msgId, x.by);
+      if (keys[key]) return note(keys[key].mode === 'takeback' ? 'That win was already taken back.' : 'That result was already refunded.');
       const live = m?.cmd ? dispute.cardLoss(m.cmd, x.by) : null;
       const kept = x.snapshot || {};
       refund = live ? (kept.final ? Math.min(live.loss, kept.loss || 0) : live.loss) : kept.loss || 0;
@@ -2283,8 +2304,11 @@ export const demoStore = {
         return note('There’s no loss to refund.', live && !live.final ? 'The game isn’t finished yet. Wait for it to settle, or dismiss.' : 'That card doesn’t show them losing coins.');
       const seen = dispute.historyCheck(state.bank?.[x.by]?.recent || [], x.cmd, refund, kept.cardAt || x.at);
       if (seen === 'missing') return note('I can’t find that loss in their coin history.', 'Dismiss it, or add the coins yourself as a bonus.');
-      keys[key] = now;
-      state.coins = [...(state.coins || []), { id: `dispute-${id}`, ...dispute.refundEntry(x.by, refund, x.cmd, id, now) }];
+      const link = demoLine({ who: x.by, conv: x.conv, msgId: x.msgId, game: x.cmd, net: -refund, cardAt: kept.cardAt || x.at });
+      if (link.problem) return link.problem;
+      keys[key] = { mode: 'refund', via: 'report', at: now };
+      state.coins = [...(state.coins || []), { id: `dispute-${id}`, ...dispute.refundEntry(x.by, refund, x.cmd, id, now, link.reverses) }];
+      if (m?.cmd) demoTag(x.conv, x.msgId, dispute.adjustTag({ person: x.by, mode: 'refund', amount: refund, by: actor.name, now, via: 'report' }));
     }
     Object.assign(x, { status: decision === 'refund' ? 'refunded' : 'dismissed', handledBy: actor.name, handledAt: now, refund, resolutionNote: resolution });
     state.inbox = [
@@ -2305,6 +2329,47 @@ export const demoStore = {
     ];
     commit();
     return { ok: true, status: x.status, refund };
+  },
+  // The owner's Refund / Take back on a game card, checked the way the
+  // ownerRefund function checks it (shared/disputes.js): the card's own
+  // result, once per card and person (the key reports use too).
+  async ownerRefund(req, actor) {
+    const now = Date.now();
+    const note = (title, body = '') => ({ note: { title, body } });
+    if (!actor.admin || actor.name !== REQUESTS_TO) return note(`Only ${REQUESTS_TO.split(' ')[0]} can do that.`);
+    const { conv, msgId, person, mode } = req || {};
+    const m = ((state.chat || {})[conv] || []).find((y) => y.id === msgId);
+    if (!m?.cmd) return note('That game is gone.');
+    const who = String(person || '').trim();
+    const check = dispute.fixCheck(m, who, mode);
+    if (check.problem) return note(check.problem, check.body);
+    const keys = (state.refundKeys ||= {});
+    const key = dispute.refundKeyId(msgId, who);
+    if (keys[key]) return note(keys[key].mode === 'takeback' ? 'That win was already taken back.' : 'That result was already refunded.', 'Each result is put right once.');
+    const link = demoLine({ who, conv, msgId, game: check.game, net: check.net, cardAt: m.at || 0 });
+    if (link.problem) return link.problem;
+    const amount = check.amount;
+    keys[key] = { mode, via: 'card', at: now };
+    state.coins = [
+      ...(state.coins || []),
+      { id: `card-${msgId}-${personId(who)}`, ...dispute.fixEntry({ person: who, mode, amount, game: check.game, msgId, by: actor.name, now, reverses: link.reverses }) },
+    ];
+    demoTag(conv, msgId, dispute.adjustTag({ person: who, mode, amount, by: actor.name, now }));
+    const rep = (state.disputes || []).find((y) => y.id === dispute.reportId(msgId, who) && y.status === 'open');
+    if (rep)
+      Object.assign(
+        rep,
+        mode === 'refund'
+          ? { status: 'refunded', handledBy: actor.name, handledAt: now, refund: amount, resolutionNote: 'Refunded from the card in chat.', via: 'card' }
+          : { status: 'dismissed', handledBy: actor.name, handledAt: now, refund: 0, resolutionNote: 'The win was taken back.', via: 'card' },
+      );
+    if (who !== actor.name)
+      state.inbox = [
+        { id: uid(), type: 'dispute', ...dispute.fixNote({ mode, amount, game: check.game, by: actor.name }), open: `chat:${conv}`, at: now, read: false, to: who },
+        ...(state.inbox || []),
+      ];
+    commit();
+    return { ok: true, mode, amount, person: who, game: check.game };
   },
   // Tetris and Minesweeper, run here the way the funGame function runs them
   // (functions/shared/funGames.js): a game gets its seed here and its moves

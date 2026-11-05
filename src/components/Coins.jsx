@@ -29,12 +29,12 @@ const WHO = (n) => n.split(' ')[0];
 // The exact day and time of a history line (casino lines come in quick runs).
 const whenAt = (at) => new Date(at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
-export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onMarket, onClose, isManager = false, onCheck, stale, onRefresh, disputes = [], initialTab = 'wallet', onAdjust, loans = null, loanFocus = null, onToast }) {
+export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onMarket, onClose, isManager = false, onCheck, stale, onRefresh, disputes = [], initialTab = 'wallet', onAdjust, onFix, loans = null, loanFocus = null, onToast }) {
   useEscape(onClose);
   const f = useCoinFormat();
   const [tab, setTab] = useState(initialTab);
   // The owner can reverse a line of their own history (CoinsEveryone.jsx useReverse).
-  const rev = useReverse(actor.name, wallet.history, onAdjust);
+  const rev = useReverse(actor.name, wallet.history, onAdjust, onFix);
   // Opened again from a notification while it's already open.
   useEffect(() => setTab(initialTab), [initialTab]);
   const [range, setRange] = useState('week');
@@ -123,7 +123,7 @@ export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onMarket
           </div>
           <StaleBanner stale={stale} onRefresh={onRefresh} />
           <div className="coins-body">
-            {tab === 'everyone' && isManager && onCheck && <EveryoneCoins roster={roster} data={data} cfg={cfg} onCheck={onCheck} onAdjust={onAdjust} />}
+            {tab === 'everyone' && isManager && onCheck && <EveryoneCoins roster={roster} data={data} cfg={cfg} onCheck={onCheck} onAdjust={onAdjust} onFix={onFix} />}
             {tab === 'wallet' && onAdjust && wallet.history.length > 0 && (
               <p className="muted tiny cv-rev-hint">Tap a line to reverse it: a loss is refunded, a gain is taken away.</p>
             )}

@@ -4,9 +4,13 @@ import { useMemo, useState } from 'react';
 import { breakdown, breakdownGaps, historyGroup, historyKey, wallet as walletOf } from '../coins.js';
 import { Avatar } from './common.jsx';
 import { Icon } from './shell/icons.jsx';
-import { confirmDialog } from './Dialogs.jsx';
+import { alertDialog, confirmDialog } from './Dialogs.jsx';
 import { useCoinFormat } from './CoinNum.jsx';
 import { coinLabel, exactCoins } from '../coinFormat.js';
+import { FIXABLE, gameLabel } from '../../functions/shared/disputes.js';
+import { REQUESTS_TO } from '../config.js';
+
+const OWNER = REQUESTS_TO.split(' ')[0];
 
 const KIND = {
   task: 'Finished tasks',
@@ -141,7 +145,7 @@ const CHIPS = [
 ];
 
 // Team management: everyone's coins. A list of people, then one person's full history.
-export function EveryoneCoins({ roster, data, cfg, onCheck, onAdjust }) {
+export function EveryoneCoins({ roster, data, cfg, onCheck, onAdjust, onFix }) {
   const f = useCoinFormat();
   const [who, setWho] = useState(null);
   const [q, setQ] = useState('');
@@ -154,7 +158,8 @@ export function EveryoneCoins({ roster, data, cfg, onCheck, onAdjust }) {
         .sort((a, b) => b.w.balance - a.w.balance || a.name.localeCompare(b.name)),
     [roster, wallets, data, q],
   );
-  if (who && wallets[who]) return <Person name={who} w={wallets[who]} casino={data.bank[who]?.net || 0} cfg={cfg} onCheck={onCheck} onAdjust={onAdjust} onBack={() => setWho(null)} />;
+  if (who && wallets[who])
+    return <Person name={who} w={wallets[who]} casino={data.bank[who]?.net || 0} cfg={cfg} onCheck={onCheck} onAdjust={onAdjust} onFix={onFix} onBack={() => setWho(null)} />;
   return (
     <>
       <label className="cv-search">
@@ -186,7 +191,7 @@ export function EveryoneCoins({ roster, data, cfg, onCheck, onAdjust }) {
   );
 }
 
-function Person({ name, w, casino, cfg, onCheck, onAdjust, onBack }) {
+function Person({ name, w, casino, cfg, onCheck, onAdjust, onFix, onBack }) {
   const f = useCoinFormat();
   const [chip, setChip] = useState('all');
   // The balance after each entry: start from today's and walk back.
@@ -199,7 +204,7 @@ function Person({ name, w, casino, cfg, onCheck, onAdjust, onBack }) {
     });
   }, [w]);
   const shown = chip === 'all' ? all : all.filter((x) => historyGroup(x) === chip);
-  const rev = useReverse(name, w.history, onAdjust);
+  const rev = useReverse(name, w.history, onAdjust, onFix);
   const total = shown.reduce((t, x) => t + x.amount, 0);
   return (
     <>
@@ -343,29 +348,46 @@ function AdjustCoins({ name, balance, onCheck, onAdjust }) {
   );
 }
 
+// A casino line from a game card, by its label ("Mines: lost 50", "Heist: caught…").
+const GAME_LINE = new RegExp(`^(${[...new Set(FIXABLE.map((g) => (g === 'heist' ? 'Heist' : gameLabel(g))))].join('|')}):`);
+
 // The owner only: tap a history line to reverse it. A loss is refunded, a
 // gain is taken away, as a grant that names the line (historyKey), so the
 // balance and the history still add up, the line shows "Reversed", and it
 // can't be reversed twice. onAdjust is null for everyone else.
-export function useReverse(name, history, onAdjust) {
+// A game's line (3.1.1 on) names its card: that goes through the card instead
+// (onFix: the ownerRefund function), so the card and coin history share one
+// refund key and can't both pay. A bet still held in a live game can't be
+// reversed (the game's end pays it).
+export function useReverse(name, history, onAdjust, onFix) {
   const reversed = useMemo(() => new Set(history.filter((x) => x.reverses).map((x) => x.reverses)), [history]);
   const [busy, setBusy] = useState('');
-  const can = (x) => !!onAdjust && x.amount !== 0 && !x.reverses && !reversed.has(historyKey(x));
+  const can = (x) => !!onAdjust && x.amount !== 0 && !x.reverses && !x.held && !reversed.has(historyKey(x));
   const reverse = async (x) => {
     if (!can(x) || busy) return;
     const key = historyKey(x);
     const refund = x.amount < 0;
     const n = exactCoins(Math.abs(x.amount));
     const first = name.split(' ')[0];
+    const viaCard = !!(x.card && onFix);
+    const [conv, msgId] = viaCard ? String(x.card).split('/') : [];
+    const older = !viaCard && x.kind === 'casino' && GAME_LINE.test(x.label || '');
     const ok = await confirmDialog({
       title: refund ? `Refund ${n} coins to ${first}?` : `Take ${n} coins away from ${first}?`,
-      body: `“${coinLabel(x.label)}” (${when(x.at)}). ${first}’s history keeps the line, marked Reversed, with a “Reversed” line for the ${refund ? 'refund' : 'take-away'}.`,
+      body: viaCard
+        ? `“${coinLabel(x.label)}” (${when(x.at)}). This goes through the game’s card: ${first} is told, the card says “${refund ? 'Refunded' : 'Taken back'} by ${OWNER}”, and the line shows Reversed. It can’t also be done from the card.`
+        : `“${coinLabel(x.label)}” (${when(x.at)}). ${first}’s history keeps the line, marked Reversed, with a “Reversed” line for the ${refund ? 'refund' : 'take-away'}.${
+            older ? ' This line is from before 3.1.1, so it isn’t linked to its card: if the card says “Refunded” or “Taken back”, don’t do this too.' : ''
+          }`,
       okLabel: refund ? 'Refund' : 'Take away',
       danger: !refund,
     });
     if (!ok) return;
     setBusy(key);
-    await onAdjust({ to: name, amount: -x.amount, note: `Reversed: ${x.label}`.slice(0, 140), reverses: key, at: Date.now() });
+    if (viaCard) {
+      const r = await onFix({ conv, msgId, person: name, mode: refund ? 'refund' : 'takeback' });
+      if (!r?.ok) await alertDialog({ title: r?.note?.title || 'That didn’t go through.', body: r?.note?.body || '' });
+    } else await onAdjust({ to: name, amount: -x.amount, note: `Reversed: ${x.label}`.slice(0, 140), reverses: key, at: Date.now() });
     setBusy('');
   };
   return { can, reverse, isReversed: (x) => reversed.has(historyKey(x)), busy: (x) => busy === historyKey(x) };

@@ -5,7 +5,7 @@ import { COMMANDS, GROUPS } from '../../commands.js';
 import { CASINO_CARDS, CasinoBody, ECONOMY_CARDS } from './Casino.jsx';
 import { ARCADE_CARDS, ArcadeBody } from './Arcade.jsx';
 import { CardActions } from './CardActions.jsx';
-import { DISPUTABLE } from '../../../functions/shared/disputes.js';
+import { FIXABLE } from '../../../functions/shared/disputes.js';
 import { Die } from './Die.jsx';
 import { GroupFaces, MoreBody } from './MoreCards.jsx';
 import { AskBody } from './AskCard.jsx';
@@ -449,7 +449,7 @@ function useLinger(value, ms) {
   return value || last;
 }
 
-export function CommandCard({ m, onPerson, me, onMove, onBuy, onChallenge, onReport, onAsk, onRun, conv }) {
+export function CommandCard({ m, onPerson, me, onMove, onBuy, onChallenge, onReport, onFix, onAsk, onRun, conv }) {
   const n = m.cmd.name;
   const kind = ARCADE_CARDS.includes(n)
     ? 'arcade'
@@ -486,7 +486,7 @@ export function CommandCard({ m, onPerson, me, onMove, onBuy, onChallenge, onRep
       ) : (
         <Body c={m.cmd} by={m.by} onPerson={onPerson} fresh={fresh} />
       )}
-      {DISPUTABLE.includes(n) && <CardActions m={m} me={me} onChallenge={onChallenge} onReport={onReport} />}
+      {FIXABLE.includes(n) && <CardActions m={m} me={me} onChallenge={onChallenge} onReport={onReport} onFix={onFix} />}
     </div>
   );
 }

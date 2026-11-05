@@ -135,11 +135,13 @@ const refund = (name, amount) => (amount && name !== BOT ? [{ name, delta: amoun
 // The history line for one of a game's coin moves (casino.bankAfter): a bet
 // taken is held under the game's card id until the game's end replaces it
 // with the result; a bet given back (declined, cancelled, nobody came) ends
-// it at 0. A move with no coins (a cooldown) has no line.
-export function moneyLine(x, game, id) {
-  if (x.entry) return { ...x.entry, settles: id };
+// it at 0. A move with no coins (a cooldown) has no line. conv: the result's
+// line names its card ('conv/id'), for the owner's Reverse in coin history.
+export function moneyLine(x, game, id, conv = '') {
+  const card = conv ? { card: `${conv}/${id}` } : {};
+  if (x.entry) return { ...x.entry, settles: id, ...card };
   if (x.delta < 0) return holdEntry(ICON[game] || '🎲', LABEL[game] || 'Game', -x.delta, id);
-  if (x.delta > 0) return { icon: ICON[game] || '🎲', label: `${LABEL[game] || 'Game'}: bet back`, shown: 0, settles: id };
+  if (x.delta > 0) return { icon: ICON[game] || '🎲', label: `${LABEL[game] || 'Game'}: bet back`, shown: 0, settles: id, ...card };
   return null;
 }
 

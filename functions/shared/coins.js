@@ -240,9 +240,20 @@ export function ledgerItems(name, ledger = []) {
     if (x.type === 'spend' && x.person === name)
       out.push({ kind: 'spend', at: x.at, amount: -x.amount, icon: SPEND_ICON[x.what] || '🚫', label: x.label || 'Spent', what: x.what || '' });
     // Coins back from the market (functions/market.js): a declined perk, a
-    // cancelled tournament. Only the server writes these.
+    // cancelled tournament. Only the server writes these. Also a game result
+    // put right by the owner (functions/disputes.js: a report's refund, or
+    // Refund / Take back on the card, which is negative): `game` files it
+    // under Casino, `reverses` marks the casino line it undoes.
     else if (x.type === 'refund' && x.person === name)
-      out.push({ kind: 'refund', at: x.at, amount: x.amount, icon: '↩️', label: x.label || 'Refund' });
+      out.push({
+        kind: 'refund',
+        at: x.at,
+        amount: x.amount,
+        icon: '↩️',
+        label: x.label || 'Refund',
+        ...(x.game ? { game: String(x.game) } : {}),
+        ...(x.reverses ? { reverses: String(x.reverses) } : {}),
+      });
     else if (x.type === 'gift' && x.from === name)
       out.push({ kind: 'gift-out', at: x.at, amount: -x.amount, icon: '🎁', label: `To ${x.to}${x.note ? `: “${x.note}”` : ''}` });
     else if (x.type === 'gift' && x.to === name)
@@ -344,6 +355,9 @@ const bankRecent = (b) =>
     icon: x.icon || '🎰',
     label: x.label || 'Casino',
     ...(x.hold && { held: true }),
+    // The game card it came from ('conv/msgId', 3.1.1 on): the owner's
+    // Reverse on this line goes through the card (functions/disputes.js).
+    ...(x.card && { card: x.card }),
   }));
 
 export function wallet(name, data) {
@@ -356,7 +370,7 @@ export function wallet(name, data) {
 
 // Which part of the history an entry belongs to (the Everyone view's chips).
 export function historyGroup(x) {
-  if (x.kind === 'casino') return 'casino';
+  if (x.kind === 'casino' || (x.kind === 'refund' && x.game)) return 'casino';
   if (x.kind === 'gift-in' || x.kind === 'gift-out') return 'gifts';
   if (x.kind === 'prize') return 'prizes';
   if (x.kind === 'loan') return 'loans';
