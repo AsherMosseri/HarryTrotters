@@ -5208,3 +5208,5 @@ button.bs-cell:focus-visible { outline: 2px solid var(--accent); outline-offset:
 /* ---------- 3.1.4: no game card moves under a tap (all games) ---------- */
 /* A finished trivia keeps its timer's space, so the answers stay put. */
 .arc-timer.over { visibility: hidden; }
+/* The players line is as tall when nobody's turn is lit (the game over) as during it. */
+.arc-vs > span:not(.arc-betpill) { padding-top: 1px; padding-bottom: 1px; }

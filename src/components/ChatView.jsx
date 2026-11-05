@@ -345,7 +345,7 @@ export default function ChatView({
       const r = c.getBoundingClientRect();
       return r.bottom > box.top + 24 && r.top < box.bottom - 24;
     };
-    const canTap = (c) => !!c.querySelector('button:not(:disabled), input:not(:disabled), select:not(:disabled)');
+    const canTap = (c) => !!c.querySelector('button:not(:disabled), input:not(:disabled), textarea:not(:disabled), select:not(:disabled)');
     for (const c of el.querySelectorAll('.cmd-card[data-live]')) {
       const live = c.dataset.live;
       if (live === 'all' && !t.msg?.contains(c)) continue;
@@ -492,7 +492,10 @@ export default function ChatView({
       atBottom.current = distance(el) < BOTTOM_PX;
       const added = (was >= 0 ? all.slice(was + 1) : [newest]).filter((m) => !sentByMe(m, actor)).length;
       if (!atBottom.current && added) {
-        if (!newBelow) setPillDocked(holding());
+        // In the line under the chat while it's held (never over a card you
+        // play), including when the hold starts after the button showed up.
+        if (holding()) setPillDocked(true);
+        else if (!newBelow) setPillDocked(false);
         setNewBelow((n) => n + added);
       }
     }
@@ -563,6 +566,7 @@ export default function ChatView({
     // for CARD_HOLD: a game that ends with the tap (a duel's shot, a request
     // paid) doesn't pull what's under it up under your finger.
     if (cardEl.matches('.cmd-arcade, .cmd-money, .cmd-card-request, .cmd-card-dailyq') && !e.target.closest('.card-actions')) keepHeight(cardEl, CARD_HOLD);
+    setPillDocked(true);
     takeAnchor();
   };
 

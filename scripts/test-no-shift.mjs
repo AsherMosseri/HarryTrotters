@@ -156,6 +156,9 @@ function inPage({ engine, busy }) {
         const t = e.touches?.[0] ? document.elementFromPoint(e.touches[0].clientX, e.touches[0].clientY) : e.target;
         rec.hit = keyOf(t);
         rec.hitTag = t ? `${t.tagName.toLowerCase()}.${String(t.className || '').split(' ')[0]}` : '';
+        // The control was gone by then, its card where it was (the game ended
+        // on its own: Trotbot shot first): nothing moved, there was nothing to hit.
+        rec.gone = !(aimEl && aimEl.isConnected && !aimEl.disabled);
         const el = aimEl && aimEl.isConnected ? aimEl : find(want);
         const r = el ? spot(el) : null;
         const b0 = el?.getBoundingClientRect();
@@ -522,9 +525,11 @@ async function tap(p, loc, label, { think = false, ambush = false, watch = LAG +
     scroll: Math.round(rec.scroll.list || 0),
     page: Math.round(Math.max(rec.scroll.page || 0, rec.scroll.root || 0, rec.scroll.vv || 0)),
     view: Math.round(rec.scroll.view || 0),
-    wrong: loose ? rec.hit.split("|")[0] !== rec.want.split("|")[0] : rec.hit !== rec.want,
-    next: !loose && !rec.next,
+    wrong: loose || (rec.gone && rec.pre <= 2) ? rec.hit.split('|')[0] !== rec.want.split('|')[0] : rec.hit !== rec.want,
+    next: !loose && !rec.gone && !rec.next,
+    gone: rec.gone,
     hit: rec.hit,
+    hitTag: rec.hitTag,
     want: rec.want,
     nextKey: rec.nextKey,
   };
@@ -532,8 +537,11 @@ async function tap(p, loc, label, { think = false, ambush = false, watch = LAG +
   taps.push(r);
   if (VERBOSE || r.shift || r.wrong || r.next)
     console.log(
-      `${r.shift || r.wrong || r.next ? 'BAD ' : '    '}${r.vp} ${r.game} ${label}${think ? ' (after a pause)' : ''}${ambush ? ' (+msg)' : ''}: moved ${r.moved}/${r.movedCard}px${r.movedAt != null ? ` at ${r.movedAt}ms` : ''} pre ${r.pre} scroll ${r.scroll} page ${r.page}${r.wrong ? ` WRONG hit ${r.hit} want ${r.want}` : ''}${r.next ? ` NEXT ${r.nextKey}` : ''}`,
+      `${r.shift || r.wrong || r.next ? 'BAD ' : '    '}${r.vp} ${r.game} ${label}${think ? ' (after a pause)' : ''}${ambush ? ' (+msg)' : ''}: moved ${r.moved}/${r.movedCard}px${r.movedAt != null ? ` at ${r.movedAt}ms` : ''} pre ${r.pre} scroll ${r.scroll} page ${r.page}${r.gone ? ' (control gone)' : ''}${r.wrong ? ` WRONG hit ${r.hit} (${r.hitTag}) want ${r.want}` : ''}${r.next ? ` NEXT ${r.nextKey}` : ''}`,
     );
+  // DEBUG_SCROLL: a picture of the screen right after a bad tap.
+  if (process.env.DEBUG_SCROLL && (r.shift || r.wrong || r.next))
+    await p.screenshot({ path: `${process.env.DEBUG_SCROLL_DIR || '.'}/bad-${r.vp}-${r.game}-${taps.length}.png` }).catch(() => {});
   if (process.env.DEBUG_SCROLL && (r.shift || r.wrong || r.next))
     console.log((await p.evaluate((t0) => window.__scrolls.filter((x) => +x.split(' ')[0] >= t0 - 1500), rec.t0)).join('\n'));
   await sleep(rand(120, 300));
