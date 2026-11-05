@@ -27,6 +27,10 @@ const CARD_HOLD = 4000;
 // And while that card is on screen and has something to tap, this long (ms):
 // the next tap on it (a Report after a spin, a second Buy) lands where it was.
 const TAP_HOLD = 20000;
+// After a tap, how long the control you tapped stays the one held still
+// before a newer card waiting for you takes over (ms): the tap's answer
+// (a server round trip) shows well within it.
+const NEXT_AFTER = 1200;
 const NONE = [];
 
 // Messages by id, newest copy winning, oldest first.
@@ -334,10 +338,12 @@ export default function ChatView({
   // you've tapped; yours or one that invites a tap, for a while after it
   // showed up ('fresh', with something to tap); or any card you tapped in the
   // last TAP_HOLD. Not in its first moment, so a game you just started still
-  // shows in full as it fills in; but for someone else's new message (young)
-  // one already in full view holds from the start, so a quick tap on it
-  // (Cancel on a challenge you just sent) isn't beaten by the chat moving.
-  const liveCard = (young = false) => {
+  // shows in full as it fills in; but one already in full view (young: for
+  // someone else's message, a picture above loading) holds from the start, so
+  // a quick tap on it (Cancel on a challenge you just sent) isn't beaten by
+  // the chat moving.
+  // after: only one that showed up since then.
+  const liveCard = (young = false, after = 0) => {
     const el = list.current;
     if (!el) return null;
     const box = el.getBoundingClientRect();
@@ -350,6 +356,7 @@ export default function ChatView({
     const canTap = (c) => !!c.querySelector('button:not(:disabled), input:not(:disabled), textarea:not(:disabled), select:not(:disabled)');
     for (const c of el.querySelectorAll('.cmd-card[data-live]')) {
       const live = c.dataset.live;
+      if (after && !(Number(c.dataset.since || 0) > after)) continue;
       if (live === 'all' && !t.msg?.contains(c)) continue;
       if (now - Number(c.dataset.since || 0) < 600) {
         const r = c.getBoundingClientRect();
@@ -358,6 +365,7 @@ export default function ChatView({
       if (live === 'fresh' && !canTap(c)) continue;
       if (onScreen(c)) return c;
     }
+    if (after) return null;
     const last = t.msg?.isConnected && el.contains(t.msg) && now - t.at < TAP_HOLD ? t.msg.querySelector('.cmd-card') : null;
     return last && canTap(last) && onScreen(last) ? last : null;
   };
@@ -392,11 +400,19 @@ export default function ChatView({
     const t = tapped.current;
     // (top: the list's scroll then, see keepAnchor.)
     const scrolled = el.scrollTop;
+    // A card waiting for you that showed up after your last tap (the next one
+    // you'll tap) comes before the card you tapped, once that tap's answer
+    // has had time to show (NEXT_AFTER).
+    const next = t.msg && performance.now() - t.at > NEXT_AFTER ? liveCard(true, t.at) : null;
+    if (next) {
+      anchor.current = { ...at(next), top: scrolled };
+      return;
+    }
     if (performance.now() < hold.current.until && t.msg?.isConnected && el.contains(t.msg)) {
       anchor.current = { ...at(t.node?.isConnected && t.msg.contains(t.node) ? t.node : t.msg), back: at(t.msg), top: scrolled };
       return;
     }
-    const game = liveCard();
+    const game = liveCard(true);
     if (game) {
       anchor.current = { ...at(game), top: scrolled };
       return;

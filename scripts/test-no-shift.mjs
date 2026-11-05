@@ -542,14 +542,20 @@ async function tap(p, loc, label, { think = false, ambush = false, watch = LAG +
   });
   if (cover) problems.push(`${current.vp} ${current.game}: "${cover}" open before "${label}" (the tap before: ${taps.at(-1)?.label} hit ${taps.at(-1)?.hit})`);
   // Off screen (or under the composer): scroll it in first, then aim.
-  const inView = await loc.evaluate((el) => {
-    const r = el.getBoundingClientRect();
-    const box = (el.closest('.gv-body, .game-sheet, .msg-list, [role="dialog"]') || document.documentElement).getBoundingClientRect();
-    return r.top >= box.top + 4 && r.bottom <= Math.min(box.bottom, innerHeight) - 4;
-  });
-  if (!inView) {
+  const seen = () =>
+    loc.evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      const box = (el.closest('.gv-body, .game-sheet, .msg-list, [role="dialog"]') || document.documentElement).getBoundingClientRect();
+      return r.top >= box.top + 4 && r.bottom <= Math.min(box.bottom, innerHeight) - 4;
+    });
+  // (WebKit can leave it short of the screen in a long list: once more.)
+  for (let k = 0; k < 3 && !(await seen()); k++) {
     await loc.evaluate((el) => el.scrollIntoView({ block: 'center' }));
     await sleep(500);
+  }
+  if (!(await seen())) {
+    problems.push(`${current.vp} ${current.game} ${label}: not on screen to tap`);
+    return null;
   }
   await loc.evaluate((el) => {
     document.querySelectorAll('[data-ns-aim]').forEach((x) => x.removeAttribute('data-ns-aim'));
