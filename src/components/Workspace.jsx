@@ -80,6 +80,7 @@ import CommandsPage from './CommandsPage.jsx';
 import GameHost from './games/GameHost.jsx';
 import { ShutdownPage, shutdownUnread } from './Shutdown.jsx';
 import ControlsPage from './ControlsPage.jsx';
+import HiddenCoin from './HiddenCoin.jsx';
 import { PreviewBar } from './Preview.jsx';
 import { ControlsContext, commandCfgFor, makeControls, profileView } from '../controls.js';
 import { CoinsDialog, Coins } from './Coins.jsx';
@@ -96,6 +97,7 @@ import { OrderTracker, OrdersDialog, orderActive } from './AdOrders.jsx';
 import { setServerSkew } from '../serverTime.js';
 import { AdBlockWall, GameDialog, PrizeWheel, VideoAd } from './AdGames.jsx';
 import { coinInput, coinSettings, wallet } from '../coins.js';
+import { buddyView, setBuddyLock } from '../buddy.js';
 import { useCoinSync } from '../coinSync.js';
 import { hoursOf, mergedMs } from '../../functions/shared/hours.js';
 import { teamDay } from '../../functions/shared/coins.js';
@@ -1283,7 +1285,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
     const myRoles = peopleInfo.get(actor.name)?.subteams || [];
     for (const c of [...convs.channels, ...convs.dms]) {
       const since = chatRead?.[c.key] ?? Date.now();
-      const fresh = (chat[c.key] || []).filter((m) => m.at > since && !sentByMe(m, actor, rename) && !m.deleted);
+      const fresh = (chat[c.key] || []).filter((m) => m.at > since && !sentByMe(m, actor, rename) && !m.deleted && !m.moved);
       // Announcements and DMs always count as important (red), like a mention.
       const important =
         c.announce || c.kind === 'dm'
@@ -1517,6 +1519,11 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
       disputeRefundAll: (req) => store.disputeRefundAll(req, actor, { balanceOf: (n) => cmdData.current.wallet(n).balance }).catch((e) => ({ note: noteFor(e, 'That didn’t go through') })),
       // The owner's Refund / Take back on a game card (CardActions.jsx, and coin history's Reverse).
       ownerRefund: (req) => store.ownerRefund(req, actor, { balanceOf: (n) => cmdData.current.wallet(n).balance }).catch((e) => ({ note: noteFor(e, 'That didn’t go through') })),
+      // Gambling buddy (CoinStats.jsx, functions/buddy.js).
+      buddy: (req) =>
+        store.buddy
+          ? store.buddy(req, actor, { roster: cmdData.current.roster }).catch((e) => ({ note: noteFor(e, 'That didn’t go through') }))
+          : Promise.resolve({ note: { title: 'Not available yet.', body: '' } }),
       // Loans (Loans.jsx, functions/loans.js): fn is loanRequest, loanRespond, loanRepay or loanManage.
       loan: (fn, req) =>
         store
@@ -1985,6 +1992,9 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
         setLoanFocus(id || null);
         setCoinsTab('loans');
         setCoinsOpen(true);
+      } else if (kind === 'coins') {
+        setCoinsTab(id || 'wallet');
+        setCoinsOpen(true);
       } else if (kind === 'disputes') {
         if (liveOwner.current) setDisputesOpen(true);
         else {
@@ -2251,8 +2261,32 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
   const myWallet = useMemo(() => walletOf(actor.name), [walletOf, actor.name]);
   const sync = useCoinSync(myWallet);
   coinSync.current = { noteServer: sync.noteServer, walletOf };
+  // Hidden coins (3.2): on unless Controls turns them (or coins) off.
+  const hiddenCoinsOn = !!store.hiddenCoin && controls.isOn('coins') && controls.isOn('hiddenCoins');
+  const askHiddenCoin = useCallback((req) => store.hiddenCoin(req, actor), [store, actor]);
+  // Demo mode runs the server's top-ups for a big balance (3.2, functions/earn.js) here.
+  const walletRef = useRef(walletOf);
+  walletRef.current = walletOf;
+  useEffect(() => {
+    if (!store.scaleTick) return undefined;
+    store.useWallets?.((n) => walletRef.current(n));
+    const t = setTimeout(() => store.scaleTick(actor.name), 1500);
+    return () => clearTimeout(t);
+  }, [store, actor.name, myWallet.balance]);
   // Loans (Loans.jsx): mine, either side, and every bank loan for the owner.
   const loans = useLoans({ store, actor, call: api.loan, balance: myWallet.balance, walletOf });
+  // Gambling buddy (functions/buddy.js): the locks I'm in (every one for the
+  // owner). My own lock goes to src/buddy.js, for the casino cards and commands.
+  const [buddyLocks, setBuddyLocks] = useState([]);
+  useEffect(() => (store.subscribeBuddy ? store.subscribeBuddy(actor, setBuddyLocks) : undefined), [store, actor.name, actor.admin]);
+  const buddy = useMemo(() => {
+    const v = buddyView(buddyLocks, actor.name, rename);
+    return { ...v, all: buddyLocks, isOwner: !!isOwner, call: api.buddy };
+  }, [buddyLocks, actor.name, rename, isOwner, api]);
+  useEffect(() => {
+    setBuddyLock(buddy.mine);
+    return () => setBuddyLock(null);
+  }, [buddy.mine]);
   const openLoans = useCallback((id) => {
     setLoanFocus(id || null);
     setCoinsTab('loans');
@@ -3371,6 +3405,11 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
                     onSkip={skipInPreview?.(`checkin:${pendingCheckin.id}`)}
                   />
                 )}
+                {hiddenCoinsOn && (
+                  <Overlay>
+                    <HiddenCoin ask={askHiddenCoin} demo={store.mode === 'demo'} />
+                  </Overlay>
+                )}
                 {toast && (
                   <Overlay>
                     <div className="toast" role="alert" onClick={() => setToast(null)}>
@@ -3542,6 +3581,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
               disputes={myDisputes}
               loans={controls.isOn('coins') ? { ...loans, everyone: ledgerAll } : null}
               everyone={ledgerAll}
+              buddy={controls.isOn('coins') ? buddy : null}
               loanFocus={loanFocus}
               onToast={(text) => setToast({ text })}
               initialTab={coinsTab}
@@ -3668,6 +3708,8 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
               onShutdown={() => setShutdownPage(true)}
               onCommands={() => setCommandsPage(true)}
               onAds={() => setAdsPage(true)}
+              moveToArcade={store.moveToArcade ? (req) => store.moveToArcade(req, actor) : null}
+              watchMoveToArcade={store.watchMoveToArcade ? (cb) => store.watchMoveToArcade(cb) : null}
               account={(data) => store.account(data)}
               loanSettings={<LoanSettings cfg={loans.cfg} call={api.loan} />}
               me={actor.name}

@@ -237,6 +237,12 @@ service cloud.firestore {
       allow read: if isMember();
       allow write: if false;
     }
+    // Best scores in the pet games (functions/petgames.js): the team
+    // boards, read by everyone, written by the server.
+    match /petGames/{id} {
+      allow read: if isMember();
+      allow write: if false;
+    }
     // Photos of real pets (functions/petphotos.js): petPhotos holds the
     // approved ones everyone sees; petPhotoRequests holds each person's latest
     // photo and where it stands (read by them and team management only). The
@@ -324,6 +330,16 @@ service cloud.firestore {
       allow read: if isMember() && (isMe(resource.data.borrower) || isMe(resource.data.get('lender', ''))
         || (resource.data.get('bank', false) == true && isOwner()));
       allow write: if false;
+    }
+    // Gambling buddy (functions/buddy.js): the lock is read by the person, their
+    // buddy and the owner (Asher); the password hash is read by nobody. Only
+    // the buddy function writes either, so nobody can turn a lock off by hand.
+    match /buddyLocks/{id} {
+      allow read: if isMember() && (isMe(resource.data.person) || isMe(resource.data.buddy) || isOwner());
+      allow write: if false;
+    }
+    match /buddySecrets/{id} {
+      allow read, write: if false;
     }
     // Coin requests (/request @person amount; functions/coinRequests.js): the
     // request (who, how much, its status) and each person's waiting list are
@@ -572,6 +588,12 @@ service cloud.firestore {
          'battleship', 'tetris', 'minesweep']
         || (m.cmd.get('name', '') == 'request' && m.cmd.get('kind', '') != 'idea'));
     }
+    // Coins and games only in #arcade (3.2): the coin cards the app posts
+    // itself (/give, /balance, /leaderboard) go nowhere else, DMs included.
+    // (The server's cards come from functions that check the channel.)
+    function appCoinCard(m) {
+      return 'cmd' in m && m.cmd is map && m.cmd.get('name', '') in ['give', 'balance', 'leaderboard'];
+    }
     // A coin request card's state (open, paid, declined…) is the server's,
     // team management included: nobody changes its cmd.
     function coinCard(c) { return c is map && c.get('name', '') == 'request' && c.get('kind', '') != 'idea'; }
@@ -632,7 +654,8 @@ service cloud.firestore {
     // leaves a placeholder); managers can change or remove any message.
     match /channels/{channelId}/messages/{msgId} {
       allow read: if isMember() && canReadIn(channelId);
-      allow create: if isMember() && validMessage() && (channelId != 'announcements' || isManager()) && !channelOff(channelId) && canPostIn(channelId);
+      allow create: if isMember() && validMessage() && (channelId != 'announcements' || isManager()) && !channelOff(channelId) && canPostIn(channelId)
+        && (channelId == 'arcade' || !appCoinCard(request.resource.data));
       allow update: if isMember() && !channelOff(channelId) && changeAllowed()
         && (isManager() || (canPostIn(channelId) && (isAuthor() || sharedChange()) && keepsCmd()))
         && keepsCoinCard() && keepsServerCard();
@@ -661,7 +684,7 @@ service cloud.firestore {
       function dmPeople() { return get(/databases/$(database)/documents/dms/$(dmId)).data.people; }
       match /messages/{msgId} {
         allow read: if isMember() && (isManager() || inPeople(dmPeople()));
-        allow create: if isMember() && !featureOff('dms') && validMessage() && inPeople(dmPeople());
+        allow create: if isMember() && !featureOff('dms') && validMessage() && inPeople(dmPeople()) && !appCoinCard(request.resource.data);
         allow update: if isMember() && !featureOff('dms') && changeAllowed() && (isManager() || (inPeople(dmPeople())
           && (isAuthor() || sharedChange()) && keepsCmd()))
           && keepsCoinCard() && keepsServerCard();

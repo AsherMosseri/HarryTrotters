@@ -170,7 +170,7 @@ export function DisputesDialog({ list, api, wallet, onToast, onClose }) {
     const unsure = open.some((x) => !x.snapshot?.final);
     const ok = await confirmDialog({
       title: `Refund ${n === 1 ? 'this report' : `all ${n} reports`}${person ? ` from ${first(person)}` : ''}?`,
-      body: withExact(`${unsure ? 'At least' : 'About'} ${coinStyled(known)} coins: each one pays back what its result shows they lost, once, checked like its own Refund button. Any that can’t be refunded stay waiting. It can’t be undone.`, known),
+      body: withExact(`${unsure ? 'At least' : 'About'} ${coinStyled(known)} coins: each one pays back what its result shows they lost, once, checked like its own Refund button. Any already put right from their card are closed; any that can’t be refunded stay waiting. It can’t be undone.`, known),
       okLabel: n === 1 ? 'Refund' : `Refund ${n}`,
     });
     if (!ok) return;
@@ -181,7 +181,11 @@ export function DisputesDialog({ list, api, wallet, onToast, onClose }) {
       await alertDialog({ title: r?.note?.title || 'That didn’t go through.', body: r?.note?.body || '' });
       return;
     }
-    if (r.refunded) onToast?.(`Refunded ${r.refunded} report${r.refunded === 1 ? '' : 's'}: ${coinStyled(r.coins)} coins.`);
+    const parts = [
+      r.refunded && `Refunded ${r.refunded} report${r.refunded === 1 ? '' : 's'}: ${coinStyled(r.coins)} coins.`,
+      r.closed && `Closed ${r.closed} already put right.`,
+    ].filter(Boolean);
+    if (parts.length) onToast?.(parts.join(' '));
     if (r.skipped?.length)
       await alertDialog({
         title: `${r.skipped.length} stayed waiting`,

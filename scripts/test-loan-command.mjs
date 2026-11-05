@@ -120,7 +120,7 @@ eq(loanCmd?.group, 'economy', '/loan is with the coin commands');
 eq(COMMANDS.length, 112, '112 commands');
 eq(matchCommands('loa', {})[0]?.name, 'loan', '/loa suggests /loan');
 const run = (text, extra = {}) =>
-  runCommand(parseCommand(text), { conv: 'general', commandCfg: {}, ...ctx(), ...extra });
+  runCommand(parseCommand(text), { conv: 'arcade', commandCfg: {}, ...ctx(), ...extra });
 eq(await run('/loan'), { loan: { open: true } }, 'runCommand: /loan');
 eq((await run('/loan @Programming 50')).note?.title, '/loan is one person at a time.', 'runCommand: a group is refused');
 eq((await run('/loan @everyone 50')).note?.title, '/loan is one person at a time.', 'runCommand: @everyone is refused');

@@ -147,20 +147,24 @@ export function useMarketData(store, { actor, rename, renames, shifts, balanceOf
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [unseenKey]);
 
-  // Your pet grew a level since this device last saw it: a celebration.
-  const mine = petOf(actor.name);
-  const level = mine?.st.level || 0;
-  const petKey = mine ? `pet-level-${mine.pet.adoptedAt}` : '';
+  // One of your pets grew a level since this device last saw it: a celebration.
+  const minePets = petsOf(actor.name);
+  const levelKey = minePets.map((e) => `${e.pet.adoptedAt}:${e.st.level}`).join();
   useEffect(() => {
-    if (!petKey || !level || actor.preview) return;
-    const seen = readNum(petKey);
-    if (seen && level > seen) {
-      celebrate();
-      toast.current?.(`${mine.pet.name} grew to level ${level}!`);
+    if (!levelKey || actor.preview) return;
+    const grew = [];
+    for (const { pet, st } of minePets) {
+      const key = `pet-level-${pet.adoptedAt}`;
+      const seen = readNum(key);
+      if (seen && st.level > seen) grew.push(`${pet.name} grew to level ${st.level}!`);
+      if (st.level !== seen) saveNum(key, st.level);
     }
-    if (level !== seen) saveNum(petKey, level);
+    if (grew.length) {
+      celebrate();
+      toast.current?.(grew.join(' '));
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [petKey, level]);
+  }, [levelKey]);
 
   const balanceRef = useRef(balanceOf);
   balanceRef.current = balanceOf;
@@ -195,12 +199,16 @@ export function useMarketData(store, { actor, rename, renames, shifts, balanceOf
   // Photos of real pets beside their drawn ones (petPhotos.js).
   const photos = usePetPhotos(store, { actor, rename, renames, on: photosOn, run });
 
+  // The pet games' team boards (functions/petgames.js): read only while the
+  // games are open, so the listener isn't on all the time.
+  const watchGames = useCallback((cb) => store.subscribePetGames?.(cb) || (() => {}), [store]);
+
   // Perks: team management writes them directly (the rules check who).
   const savePerk = useCallback((id, data) => store.savePerk(id, data, actor), [store, actor]);
   const deletePerk = useCallback((id) => store.deletePerk(id), [store]);
 
   return useMemo(
-    () => ({ perks, purchases, pets, tournaments, extras, petOf, petsOf, gifts, run, now, coinsOn, savePerk, deletePerk, events, allEvents: rawEvents, unlocks, askEvents: ask, petEvent, photos, me: actor.name, rename }),
-    [perks, purchases, pets, tournaments, extras, petOf, petsOf, gifts, run, now, coinsOn, savePerk, deletePerk, events, rawEvents, unlocks, ask, petEvent, photos, actor.name, rename],
+    () => ({ perks, purchases, pets, tournaments, extras, petOf, petsOf, gifts, run, now, coinsOn, savePerk, deletePerk, events, allEvents: rawEvents, unlocks, askEvents: ask, petEvent, photos, watchGames, me: actor.name, rename }),
+    [perks, purchases, pets, tournaments, extras, petOf, petsOf, gifts, run, now, coinsOn, savePerk, deletePerk, events, rawEvents, unlocks, ask, petEvent, photos, watchGames, actor.name, rename],
   );
 }

@@ -2086,7 +2086,7 @@ button.pm-row:hover { background: color-mix(in srgb, var(--text) 4%, transparent
 .adopt-tile.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
 .adopt-row { display: flex; gap: 10px; }
 .adopt-grid > .adopt-tile { min-width: 0; }
-/* How the species tiles are laid out: see "Pets: the gem" at the end. */
+/* How the species tiles are laid out: see "Adopt a pet: 17 species" at the end. */
 
 /* The team robot on Today. */
 .mascot-energy { font-size: 13px; font-weight: 700; }
@@ -3521,6 +3521,13 @@ button.pm-row:hover { background: color-mix(in srgb, var(--text) 4%, transparent
    things" on (transform only, fixed keyframes, for iPads). */
 .pet-geared { position: relative; display: inline-block; flex: none; line-height: 0; }
 .pet-geared > .pet-gear { position: absolute; left: 0; top: 0; pointer-events: none; }
+/* A pet in an outfit is drawn in layers (PetGear.jsx): body, outfit, head, all in the same box. */
+.pet-geared > .pet-layer { position: absolute; left: 0; top: 0; }
+/* Star-nosed mole: its star wiggles now and then. */
+.pet-art .pet-star { transform-box: fill-box; transform-origin: 50% 50%; }
+:root[data-anim~='move'] .pet-art.anim .pet-star { animation: pet-star 3.8s ease-in-out infinite; }
+@keyframes pet-star { 0%, 82%, 100% { transform: scale(1) rotate(0deg); } 86% { transform: scale(1.1) rotate(-6deg); } 90% { transform: scale(0.96) rotate(5deg); } 94% { transform: scale(1.05) rotate(-2deg); } }
+:root[data-anim~='move'] .park .pet-art.anim .pet-star { animation-delay: var(--pd, 0s) !important; }
 :root[data-anim~='move'] .gear-halo { animation: gear-halo 3.4s ease-in-out infinite; }
 @keyframes gear-halo { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-1.4px); } }
 /* Fur tints: a soft color filter on the pet art only (never on the gear). */
@@ -3539,6 +3546,23 @@ button.pm-row:hover { background: color-mix(in srgb, var(--text) 4%, transparent
 .pf-ring-chip.ring-bronze { --ring: #c9803a; }
 .pf-ring-chip.ring-silver { --ring: #aeb7c4; }
 .pf-ring-chip.ring-gold { --ring: #f2b82e; }
+/* Rings past 30 (3.2): platinum at 50, diamond at 75, and red, white and blue at 100. */
+.pet-badge.ring-platinum, .pet-badge.ring-diamond, .pet-badge.ring-allstar { padding: 1px; border-radius: 50%; margin-left: 4px; }
+.pet-badge.ring-platinum { box-shadow: 0 0 0 1.5px #c7d2de, 0 0 0 3px color-mix(in srgb, #8fa3b8 45%, transparent); }
+.pet-badge.ring-diamond { box-shadow: 0 0 0 1.5px #7fdcf5, 0 0 0 3px color-mix(in srgb, #c4b5fd 55%, transparent); }
+.pet-badge.ring-allstar { margin-left: 5px; box-shadow: 0 0 0 1.3px #d62839, 0 0 0 2.4px #ffffff, 0 0 0 3.6px #1f3f99; }
+.pf-ring-chip.ring-platinum { --ring: #9fb0c2; }
+.pf-ring-chip.ring-diamond { --ring: #5ccfee; }
+.pf-ring-chip.ring-allstar { box-shadow: inset 0 0 0 1.5px #d62839, inset 0 0 0 2.6px #ffffff, inset 0 0 0 3.8px #1f3f99; padding: 2px 10px; }
+.pf-food { margin-top: -2px !important; }
+.pf-room { margin-top: 14px; }
+p.pf-room { align-items: flex-start; }
+p.pf-room .icon { margin-top: 1px; }
+.pf-adopt-more { padding-top: 12px; border-top: 1px solid var(--border); }
+.pf-adopt-more .sec-head { margin-bottom: 10px; }
+.pf-adopt-more h3 { margin: 0; font-size: 16px; }
+.pf-minis { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; margin-top: 8px; }
+.pf-minis .pf-mini { margin-top: 0; }
 .pf-pets { display: flex; flex-direction: column; gap: 14px; }
 .pf-next { display: flex; align-items: center; gap: 6px; color: var(--muted); }
 .pf-next .icon { flex: none; }
@@ -4785,6 +4809,12 @@ html.kb-open .report-note { min-height: 56px; }
 .loan-repay .input { width: 110px; flex: 0 1 110px; }
 .loan-have { flex-basis: 100%; }
 .loan-weeks button { min-width: 48px; }
+.loan-change { display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: 10px; background: var(--surface-2); }
+.loan-change p { margin: 0; }
+.loan-change .loan-weeks { flex-wrap: wrap; }
+.loan-change .loan-weeks button { min-width: 40px; }
+.loan-date { width: auto; flex: 1 1 150px; min-width: 0; }
+.loan-change-btn { align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; }
 .loan-thread-btn { align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; }
 .loan-thread { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; border-left: 2px solid var(--border); }
 .loan-thread li { display: flex; align-items: baseline; gap: 8px; padding: 4px 0 4px 10px; font-size: 14px; min-width: 0; }
@@ -4840,25 +4870,29 @@ html.kb-open .report-note { min-height: 56px; }
 :root[data-anim~='move'] .park .pet-art.anim .pet-glint.g3 { animation-delay: calc(var(--pd, 0s) - 1.1s) !important; }
 :root[data-anim~='move'] .park .pet-art.anim .pet-glint.g4 { animation-delay: calc(var(--pd, 0s) - 2.6s) !important; }
 
-/* Adopt a pet: 13 species in balanced rows, by the room the list really has
-   (the sidebar takes part of an iPad): 7 + 6 on a wide iPad, 4 + 5 + 4 on a
-   narrow one, and 3 + 2 + 3 + 2 + 3 on a phone. Each tile spans two half
-   columns, so a shorter row can start half a tile in and sit centered. */
+/* Adopt a pet: 17 species in balanced rows, by the room the list really has
+   (the sidebar takes part of an iPad): 6 + 5 + 6 on a wide iPad, 4 + 5 + 4 + 4
+   on a narrow one, and five rows of 3 and a centered 2 on a phone. Each tile
+   spans two half columns, so a shorter row can start half a tile in and sit
+   centered. */
 .adopt { container-type: inline-size; }
 .adopt-grid { grid-template-columns: repeat(6, 1fr); }
-.adopt-grid > .adopt-tile { grid-column: span 2; }
-.adopt-grid > .adopt-tile:nth-child(5n + 4) { grid-column: 2 / span 2; }
+.adopt-grid > .adopt-tile { grid-column: span 2; text-align: center; line-height: 1.2; }
+.adopt-grid > .adopt-tile:nth-child(16) { grid-column: 2 / span 2; }
 @container (min-width: 460px) {
   .adopt-grid { grid-template-columns: repeat(10, 1fr); }
-  .adopt-grid > .adopt-tile:nth-child(5n + 4) { grid-column: span 2; }
+  .adopt-grid > .adopt-tile:nth-child(16) { grid-column: span 2; }
   .adopt-grid > .adopt-tile:nth-child(1),
-  .adopt-grid > .adopt-tile:nth-child(10) { grid-column: 2 / span 2; }
+  .adopt-grid > .adopt-tile:nth-child(10),
+  .adopt-grid > .adopt-tile:nth-child(14) { grid-column: 2 / span 2; }
 }
 @container (min-width: 690px) {
   .adopt-grid { grid-template-columns: repeat(14, 1fr); }
+  .adopt-grid > .adopt-tile:nth-child(10),
+  .adopt-grid > .adopt-tile:nth-child(14) { grid-column: span 2; }
   .adopt-grid > .adopt-tile:nth-child(1),
-  .adopt-grid > .adopt-tile:nth-child(10) { grid-column: span 2; }
-  .adopt-grid > .adopt-tile:nth-child(8) { grid-column: 2 / span 2; }
+  .adopt-grid > .adopt-tile:nth-child(12) { grid-column: 2 / span 2; }
+  .adopt-grid > .adopt-tile:nth-child(7) { grid-column: 3 / span 2; }
 }
 
 /* ===================================================================
@@ -5285,6 +5319,110 @@ button.bs-cell:focus-visible { outline: 2px solid var(--accent); outline-offset:
 }
 :root[data-theme='dark'] .card-fixed-tag.refund, :root[data-theme='dark'] .card-actions .card-fix.refund { color: #4ade80; }
 :root[data-theme='dark'] .card-fixed-tag.takeback, :root[data-theme='dark'] .card-actions .card-fix.takeback { color: #f87171; }
+
+/* ---------- Coins: Stats and the gambling buddy (3.2) ----------
+   CoinStats.jsx: tiles, plain-SVG charts (balance over time, gambling each
+   day), the by-game table, bars for earned coins, the buddy cards, and the
+   lock line on casino cards (Casino.jsx). Nothing here animates. */
+:root { --cs-up: #15803d; --cs-down: #dc2626; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme='light']) { --cs-up: #4ade80; --cs-down: #f87171; } }
+:root[data-theme='dark'] { --cs-up: #4ade80; --cs-down: #f87171; }
+.cs { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+.cs-sec { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.cs-head { display: flex; align-items: baseline; gap: 8px; margin: 0; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); }
+.cs-head-sub { font-weight: 500; text-transform: none; letter-spacing: 0; font-size: 12px; }
+.cs-head-num { margin-left: auto; font-size: 13px; color: var(--text); letter-spacing: 0; font-variant-numeric: tabular-nums; }
+.cs-note { margin: 0; line-height: 1.45; }
+.cs-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.cs-tiles.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.cs-tile { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
+.cs-tile-k { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cs-tile-v { font-size: 20px; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cs-tile.plus .cs-tile-v { color: var(--cs-up); }
+.cs-tile.minus .cs-tile-v { color: var(--cs-down); }
+.cs-chart { display: flex; flex-direction: column; gap: 4px; min-width: 0; padding: 10px 10px 4px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
+.cs-chart svg { display: block; max-width: 100%; touch-action: pan-y; user-select: none; -webkit-user-select: none; }
+.cs-readout { display: flex; align-items: baseline; gap: 8px; min-height: 22px; padding-left: 4px; font-variant-numeric: tabular-nums; flex-wrap: wrap; }
+.cs-readout b { font-size: 16px; }
+.cs-scale { margin-left: auto; font-size: 11px; color: var(--muted); padding: 1px 7px; border: 1px solid var(--border); border-radius: 999px; }
+.cs-axis text, .cs-x { font-size: 11px; fill: var(--muted); font-variant-numeric: tabular-nums; }
+.cs-grid { stroke: var(--border); stroke-width: 1; }
+.cs-zero { stroke: color-mix(in srgb, var(--muted) 70%, transparent); stroke-width: 1; }
+.cs-line { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.cs-area { fill: color-mix(in srgb, var(--accent) 12%, transparent); stroke: none; }
+.cs-dot { fill: var(--accent); stroke: var(--surface); stroke-width: 2; }
+.cs-cross line { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 3; }
+.cs-cross circle { fill: var(--accent); stroke: var(--surface); stroke-width: 2; }
+.cs-up { fill: var(--cs-up); }
+.cs-down { fill: var(--cs-down); }
+.cs-band { fill: color-mix(in srgb, var(--text) 6%, transparent); }
+.cs-table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
+.cs-table { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
+.cs-table th, .cs-table td { padding: 7px 10px; text-align: right; white-space: nowrap; border-top: 1px solid var(--border); }
+.cs-table thead th { border-top: 0; font-size: 12px; font-weight: 600; color: var(--muted); }
+.cs-table th:first-child { text-align: left; font-weight: 500; white-space: normal; }
+.cs-game { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.cs-game-name { display: flex; flex-direction: column; min-width: 0; }
+.cs-bars { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 9px; }
+.cs-bars li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3px 10px; align-items: baseline; }
+.cs-bar-label { min-width: 0; font-size: 14px; }
+.cs-bar-num { font-weight: 700; font-variant-numeric: tabular-nums; }
+.cs-bar-track { grid-column: 1 / -1; height: 6px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
+.cs-bar-fill { display: block; height: 100%; border-radius: inherit; background: var(--accent); }
+.cs-bar-fill.neg { background: var(--cs-down); }
+.cs-list { margin: 0; display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
+.cs-row { display: flex; align-items: baseline; gap: 10px; padding: 8px 12px; }
+.cs-row + .cs-row { border-top: 1px solid var(--border); }
+.cs-row dt { flex: 1; min-width: 0; font-size: 14px; }
+.cs-row dd { margin: 0; font-weight: 700; font-variant-numeric: tabular-nums; }
+.cs-foot { margin: 0; text-align: center; }
+.cs-buddy { display: flex; flex-direction: column; gap: 10px; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-2); min-width: 0; }
+.cs-buddy.on { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); background: color-mix(in srgb, var(--accent) 7%, var(--surface)); }
+.cs-buddy.ask { border-color: color-mix(in srgb, var(--accent) 55%, var(--border)); background: var(--surface); }
+.cs-buddy-head { display: flex; align-items: flex-start; gap: 10px; min-width: 0; }
+.cs-buddy-head .grow { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cs-buddy-head .btn { flex: none; }
+.cs-buddy-ic { flex: none; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); }
+.cs-buddy-form { display: flex; flex-direction: column; gap: 8px; }
+.cs-buddy-form p { margin: 0; }
+.cs-buddy .btn { min-height: 40px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.cs-buddy-form .row .btn { flex: 1; }
+.cs-pw { display: flex; align-items: center; gap: 8px; }
+.cs-pw .input { flex: 1; min-width: 0; }
+.cs-msg { margin: 0; }
+.cs-msg.bad b { color: var(--danger); }
+.cs-msg.good b { color: var(--cs-up); }
+.cs-lock-banner { display: flex; align-items: center; gap: 8px; width: 100%; margin: 8px 0 0; padding: 8px 12px; border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--border)); border-radius: 10px; background: color-mix(in srgb, var(--accent) 8%, var(--surface)); color: var(--text); font-size: 14px; text-align: left; }
+.cs-lock-banner > svg { flex: none; color: var(--accent); }
+.cs-admin { margin-bottom: 12px; }
+.cs-admin-list { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.cs-admin-list li { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.cs-admin-list .grow { display: flex; flex-direction: column; min-width: 0; }
+.cz-buddy-lock { display: flex; align-items: center; gap: 6px; margin: 8px 0 0; padding: 7px 10px; border-radius: 9px; background: color-mix(in srgb, var(--accent) 9%, var(--surface)); color: var(--text); font-size: 13px; line-height: 1.35; }
+.cz-buddy-lock > svg { flex: none; color: var(--accent); }
+@media (max-width: 520px) {
+  .cs-tile { padding: 8px 10px; }
+  .cs-tile-v { font-size: 17px; }
+  .cs-table th, .cs-table td { padding: 7px 6px; font-size: 13px; }
+  .cs-table th:first-child { padding-left: 10px; }
+}
+/* With Stats in, the tabs stay one line each (the dot beside the word). */
+.coins-tabs button { white-space: nowrap; }
+/* Controls, Channels: old coin cards to #arcade (3.2, owner only). */
+.move-arcade { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.move-arcade p { margin: 0; }
+.move-arcade-counts { display: flex; flex-wrap: wrap; gap: 6px; }
+.move-arcade-skips { margin: 0; padding-left: 18px; }
+.move-live { width: 100%; display: flex; flex-direction: column; gap: 6px; }
+.move-live p { margin: 0; }
+.move-live-bar { height: 8px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
+.move-live-bar span { display: block; height: 100%; border-radius: inherit; background: var(--accent); transition: width 0.25s ease; }
+.move-kinds { width: 100%; overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
+.move-kinds-table { width: 100%; border-collapse: collapse; }
+.move-kinds-table th, .move-kinds-table td { padding: 6px 10px; text-align: left; border-top: 1px solid var(--border); vertical-align: top; }
+.move-kinds-table thead th { border-top: 0; font-size: 12px; font-weight: 600; color: var(--muted); }
+.move-kinds-table .num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; width: 1%; }
+.move-kinds-group th, .move-kinds-group td { background: var(--surface-2); font-weight: 700; }
 
 /* ---------- 3.1.7: no game card moves under a tap (all games) ---------- */
 /* A finished trivia keeps its timer's space, so the answers stay put. */

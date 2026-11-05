@@ -811,6 +811,15 @@ export const firebaseStore = {
   async petEvent(req) {
     return (await callable('petEvent')(req)).data;
   },
+  // Best scores in the pet games (functions/petgames.js), for the team
+  // boards. Read-only here; market('pet', { action: 'gameScore' }) sends one.
+  subscribePetGames(cb) {
+    return onSnapshot(
+      collection(db, 'petGames'),
+      (snap) => cb(snap.docs.map(readDoc)),
+      (e) => console.warn('petGames', e),
+    );
+  },
   // Photos of real pets (functions/petphotos.js). The approved ones everyone
   // sees; the waiting and answered ones are yours (or all of them, for team
   // management). The device uploads its own small PNG sticker; the pet
@@ -1507,6 +1516,22 @@ export const firebaseStore = {
   async ownerRefund(req) {
     return (await callable('ownerRefund')(req)).data;
   },
+  // Hidden coins (3.2, functions/earn.js): { action: 'spawn' } or { action: 'claim', token }.
+  async hiddenCoin(req) {
+    return (await callable('hiddenCoin')(req)).data;
+  },
+  // 3.2, the owner once: past coin cards into #arcade ({ dry } first).
+  async moveToArcade(req) {
+    return (await callable('moveToArcade', { timeout: 540000 })(req)).data;
+  },
+  // Its live progress while it runs: { run, moved, left }.
+  watchMoveToArcade(cb) {
+    return onSnapshot(
+      doc(db, 'settings', 'moveToArcadeRun'),
+      (snap) => cb(snap.data() || null),
+      () => {},
+    );
+  },
   // Coin requests (/request @person amount; functions/coinRequests.js):
   // create, pay, decline, cancel, peek. Returns { ok } or { note }.
   async coinRequest(req) {
@@ -1548,6 +1573,35 @@ export const firebaseStore = {
     const col = collection(db, 'loans');
     const offs = [watch('borrower', query(col, where('borrower', '==', actor.name))), watch('lender', query(col, where('lender', '==', actor.name)))];
     if (owner) offs.push(watch('bank', query(col, where('bank', '==', true))));
+    return () => offs.forEach((off) => off());
+  },
+  // Gambling buddy (functions/buddy.js): { action, buddy?, person?, password? };
+  // returns { ok, done, lock } or { note }. The person and the buddy read
+  // their lock; the owner (Asher) reads every one (the rules allow nothing more).
+  async buddy(req) {
+    return (await callable('buddy')(req)).data;
+  },
+  subscribeBuddy(actor, cb) {
+    const owner = actor.admin && actor.name === REQUESTS_TO;
+    const parts = {};
+    const send = () => {
+      const all = new Map();
+      for (const list of Object.values(parts)) for (const l of list) all.set(l.id, l);
+      cb([...all.values()]);
+    };
+    const watch = (key, q) =>
+      onSnapshot(
+        q,
+        (snap) => {
+          parts[key] = snap.docs.map(readDoc);
+          send();
+        },
+        (e) => console.warn('buddy', key, e),
+      );
+    const col = collection(db, 'buddyLocks');
+    const offs = owner
+      ? [watch('all', col)]
+      : [watch('person', query(col, where('person', '==', actor.name))), watch('buddy', query(col, where('buddy', '==', actor.name)))];
     return () => offs.forEach((off) => off());
   },
   subscribeLoanSettings(cb) {

@@ -51,7 +51,71 @@ export const AWARD_CAPS = {
   predict: 20, // score predictions
   streak: 20, // streak milestones
   game: 20, // fun games (Tetris, Minesweeper, Battleship…), free #arcade prizes and /daily, together
+  find: 40, // hidden coins (3.2): 5 a day at most, 3 to 6 each (the tokens limit them first)
 };
+
+// Earnings that grow with your balance (3.2): "4 an hour means nothing if
+// you have 18 quintillion". Every earning pays its normal amount or a share
+// of the person's balance, whichever is bigger: about 0.01% of the balance for
+// one ordinary earning of each kind. The numbers live here, in one place:
+//   per: the normal amount that pays pct percent of the balance (an amount
+//        twice that pays twice the share, so the daily limits, counted in
+//        normal coins, still cap a day's share);
+//   pct: that share, in percent.
+// The balance is the lowest it's been in the last 24 hours (earnBalance), so
+// coins passed around or borrowed for a moment don't earn more. Below zero:
+// the normal amount. Never past the ceiling (MAX_BALANCE). The server works it
+// out and pays it (awards: functions/award.js; tasks and lab time: 'scale'
+// entries, functions/index.js; /work: the play function); the app only shows it.
+// Most a rich person can earn in a day from everything together is about 0.5%.
+export const EARN_SCALE = {
+  task: { per: 15, pct: 0.01 }, // a finished task: 0.01% (5 a day: 0.05%)
+  hours: { per: 4, pct: 0.01 }, // an hour at the lab: 0.01% (10 hours: 0.1%)
+  work: { per: 20, pct: 0.01 }, // /work (10 to 30, once an hour on shift)
+  quiz: { per: 3, pct: 0.01 }, // learning games (30 a day: 0.1%)
+  daily: { per: 5, pct: 0.01 }, // the daily question (10 a day: 0.02%)
+  bingo: { per: 5, pct: 0.01 }, // lab bingo (25 a day: 0.05%)
+  predict: { per: 5, pct: 0.01 }, // score predictions (20 a day: 0.04%)
+  streak: { per: 10, pct: 0.01 }, // streak milestones (20 a day: 0.02%)
+  game: { per: 5, pct: 0.01 }, // game prizes and /daily (20 a day: 0.04%)
+  find: { per: 4, pct: 0.01 }, // a hidden coin (3 to 6; 5 a day: about 0.06%)
+};
+// What one earning pays: its normal amount (base) or its share of balance.
+export function scaledPay(source, base, balance) {
+  const s = EARN_SCALE[source];
+  const b = Math.max(0, Math.floor(Number(base) || 0));
+  if (!s || !b || !(balance > 0) || !Number.isFinite(balance)) return b;
+  const share = Math.floor(balance * (s.pct / 100) * (b / s.per));
+  if (!(share > b)) return b;
+  return Math.max(b, Math.min(share, Math.floor(ceilingRoom(balance))));
+}
+// The balance earnings grow with: the lowest it's been in the last 24 hours
+// (history: a wallet's lines, newest or any order).
+export const EARN_WINDOW = 86400000;
+export function earnBalance(history = [], now = Date.now()) {
+  let bal = sumCoins(history);
+  let low = bal;
+  const recent = history.filter((x) => (x.at || 0) > now - EARN_WINDOW).sort((a, b) => (b.at || 0) - (a.at || 0));
+  for (const x of recent) {
+    bal -= x.amount || 0;
+    if (bal < low) low = bal;
+  }
+  return low;
+}
+// The ledger doc that tops up a task's or a lab day's pay (written once by
+// the server; it counts only while that task or day still pays).
+export const scaleId = (kind, ref, name) => `scale-${kind}-${String(ref).replace(/[^\w-]/g, '_').slice(0, 120)}-${nameKey(name)}`;
+// Lab time is paid per day; the 'scale' entry for a day is `hours:<day>`.
+function withBoosts(name, earned, ledger = []) {
+  const tops = new Map();
+  for (const x of ledger) if (x.type === 'scale' && x.person === name && typeof x.ref === 'string') tops.set(x.ref, x);
+  if (!tops.size) return earned;
+  return earned.map((x) => {
+    if (!(x.amount > 0)) return x;
+    const top = tops.get(x.kind === 'task' ? `task:${x.id}` : x.kind === 'hours' ? `hours:${x.day}` : '');
+    return top && top.amount > 0 ? { ...x, amount: x.amount + top.amount, boost: top.amount, base: x.amount } : x;
+  });
+}
 
 export function coinSettings(raw) {
   // Old settings that no longer do anything (the hourly rate and ad money).
@@ -137,7 +201,7 @@ export function earnedItems(name, { tasks = [], shifts = [], cfg, now = Date.now
   for (const { t, at } of done) {
     // Before the switch every finished task paid (2.75).
     if (at < switchAt) {
-      items.push({ kind: 'task', at, amount: cfg.perTask, icon: '✅', label: t.title || 'A task' });
+      items.push({ kind: 'task', id: t.id, at, amount: cfg.perTask, icon: '✅', label: t.title || 'A task' });
       continue;
     }
     const day = teamDay(at);
@@ -147,6 +211,7 @@ export function earnedItems(name, { tasks = [], shifts = [], cfg, now = Date.now
     const over = n > cap;
     items.push({
       kind: 'task',
+      id: t.id,
       at,
       amount: over ? 0 : cfg.perTask,
       icon: '✅',
@@ -367,7 +432,8 @@ const bankRecent = (b) =>
   }));
 
 export function wallet(name, data) {
-  const earned = earnedItems(name, data);
+  // Tasks and lab days with a top-up for a big balance (3.2) count it in.
+  const earned = withBoosts(name, earnedItems(name, data), data.ledger);
   const ledger = [...ledgerItems(name, data.ledger), ...bankItems(name, data.bank)];
   const history = [...earned, ...ledger].sort((a, b) => b.at - a.at);
   // sumCoins: the same total whatever order the entries came in.
@@ -409,7 +475,7 @@ export function breakdownGaps(app, server) {
 export function leaderboard(roster, data, since = 0) {
   return roster
     .map((name) => {
-      const items = [...earnedItems(name, data), ...ledgerItems(name, data.ledger).filter((x) => x.kind === 'grant')];
+      const items = [...withBoosts(name, earnedItems(name, data), data.ledger), ...ledgerItems(name, data.ledger).filter((x) => x.kind === 'grant')];
       return { name, coins: items.filter((x) => x.at >= since).reduce((t, x) => t + x.amount, 0) };
     })
     .sort((a, b) => b.coins - a.coins);

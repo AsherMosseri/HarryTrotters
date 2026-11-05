@@ -520,8 +520,9 @@ function Result({ game, session, pick, result, conv, api, onAgain, onPicker, onC
               : 'Game over';
   const share = conv && (mode === 'solo' || mode === 'marathon' || mode === 'sprint' || mode === 'ultra' || mode === 'bot');
   const post = async () => {
-    const out = await api.funGame({ action: 'share', id: session.id, conv });
-    setPosted(out?.note ? out.note.title : `Posted to #${conv}`);
+    // Game cards go in #arcade (3.2), wherever the game was opened.
+    const out = await api.funGame({ action: 'share', id: session.id, conv: 'arcade' });
+    setPosted(out?.note ? out.note.title : 'Posted to #arcade');
   };
   return (
     <div className="fun-result">
@@ -569,7 +570,7 @@ function Result({ game, session, pick, result, conv, api, onAgain, onPicker, onC
         )}
         {share && !posted && (
           <button className="btn" onClick={post}>
-            Post to #{conv}
+            Post to #arcade
           </button>
         )}
         {posted && <span className="small muted">{posted}</span>}

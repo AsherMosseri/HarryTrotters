@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { GIFT_MAX, MAX_BALANCE, ceilingNote, leaderboard, overCeiling, perHourOf, teamDay, teamMidnight, wallet as walletOf } from '../coins.js';
+import { GIFT_MAX, MAX_BALANCE, ceilingNote, earnBalance, leaderboard, overCeiling, perHourOf, scaledPay, teamDay, teamMidnight, wallet as walletOf } from '../coins.js';
 import { mondayOf } from '../milestones.js';
 import { relTime, useEscape } from '../util.js';
 import { Avatar, CloseIcon, Overlay } from './common.jsx';
@@ -9,6 +9,7 @@ import { MyReports } from './Disputes.jsx';
 import { LoansPanel } from './Loans.jsx';
 import { CoinNum, useCoinFormat } from './CoinNum.jsx';
 import { coinStyled } from '../coinFormat.js';
+import { BuddyLocksAdmin, CoinStats } from './CoinStats.jsx';
 
 // A Jackson coin: a little gold coin with a J.
 export const Coin = ({ size = 16 }) => (
@@ -29,9 +30,15 @@ const WHO = (n) => n.split(' ')[0];
 // The exact day and time of a history line (casino lines come in quick runs).
 const whenAt = (at) => new Date(at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
-export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onMarket, onClose, isManager = false, onCheck, stale, onRefresh, disputes = [], initialTab = 'wallet', onAdjust, onFix, loans = null, loanFocus = null, onToast, everyone = true }) {
+export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onMarket, onClose, isManager = false, onCheck, stale, onRefresh, disputes = [], initialTab = 'wallet', onAdjust, onFix, loans = null, loanFocus = null, onToast, everyone = true, buddy = null }) {
   useEscape(onClose);
   const f = useCoinFormat();
+  // What one task and one lab hour pay this person now (3.2: the bigger of
+  // the normal pay and a share of their lowest balance in the last day).
+  const pay = useMemo(() => {
+    const low = earnBalance(wallet.history, Date.now());
+    return { task: scaledPay('task', cfg.perTask, low), hour: scaledPay('hours', perHourOf(cfg), low) };
+  }, [wallet, cfg]);
   const [tab, setTab] = useState(initialTab);
   // The owner can reverse a line of their own history (CoinsEveryone.jsx useReverse).
   const rev = useReverse(actor.name, wallet.history, onAdjust, onFix);
@@ -81,8 +88,9 @@ export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onMarket
               <Coins n={wallet.balance} size={30} max={13} />
             </b>
             <span className="muted small">
-              {f.n(cfg.perTask)} for each task you finish (up to {cfg.tasksPerDay} a day) · {f.n(perHourOf(cfg))} an hour at the lab, paid per
-              15 minutes
+              {/* 3.2: pay grows with the balance (EARN_SCALE); the server pays it. */}
+              {f.n(pay.task)} for each task you finish (up to {cfg.tasksPerDay} a day) · {f.n(pay.hour)} an hour at the lab, paid per 15 minutes
+              {pay.task > cfg.perTask ? ` (${f.n(cfg.perTask)} and ${f.n(perHourOf(cfg))} normally: pay grows with your balance)` : ' (more when you’re rich)'}
             </span>
             {onMarket && (
               <button className="btn small coins-market" onClick={onMarket}>
@@ -93,6 +101,13 @@ export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onMarket
           <div className="segmented coins-tabs" role="tablist">
             {[
               ['wallet', 'History'],
+              // The numbers (and graphs) from your history, and the gambling buddy (CoinStats.jsx).
+              [
+                'stats',
+                <>
+                  Stats{buddy?.waiting?.length > 0 && <span className="tab-dot" aria-label="(needs you)" />}
+                </>,
+              ],
               ['send', 'Send'],
               // Borrowing and lending (Loans.jsx), while coins are on.
               ...(loans
@@ -123,12 +138,22 @@ export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onMarket
             ))}
           </div>
           <StaleBanner stale={stale} onRefresh={onRefresh} />
+          {/* Locked by a gambling buddy: said on every tab, plainly. */}
+          {buddy?.mine?.state === 'on' && tab !== 'stats' && (
+            <button className="cs-lock-banner" onClick={() => setTab('stats')}>
+              <Icon name="lock" size={15} />
+              <span className="grow">Gambling is locked by your buddy, {buddy.mine.buddy.split(' ')[0]}.</span>
+              <span className="muted small">Stats</span>
+            </button>
+          )}
           <div className="coins-body">
             {/* everyone: everyone's coins have loaded (only yours load until this screen opens). */}
             {tab === 'everyone' &&
               isManager &&
               onCheck &&
               (everyone ? <EveryoneCoins roster={roster} data={data} cfg={cfg} onCheck={onCheck} onAdjust={onAdjust} onFix={onFix} /> : <p className="empty">Loading everyone’s coins…</p>)}
+            {tab === 'stats' && <CoinStats wallet={wallet} buddy={buddy} roster={roster} me={actor.name} />}
+            {tab === 'everyone' && isManager && onCheck && buddy?.isOwner && <BuddyLocksAdmin locks={buddy.all} call={buddy.call} />}
             {tab === 'wallet' && onAdjust && wallet.history.length > 0 && (
               <p className="muted tiny cv-rev-hint">Tap a line to reverse it: a loss is refunded, a gain is taken away.</p>
             )}
@@ -152,6 +177,7 @@ export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onMarket
                           {relTime(x.at)} · <span className="mono">{whenAt(x.at)}</span>
                           {x.capped ? ` · counted ${cfg.dayCap} h max a day` : ''}
                           {x.note ? ` · ${x.note}` : ''}
+                          {x.boost ? ` · ${f.n(x.base)} + ${f.n(x.boost)} for a big balance` : ''}
                         </span>
                       </span>
                       <CoinNum as="b" signed n={x.amount} className={x.amount < 0 ? 'coins-minus' : x.amount > 0 ? 'coins-plus' : 'muted'} />

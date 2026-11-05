@@ -4,6 +4,7 @@ import { CloseIcon, Overlay } from './common.jsx';
 import { Switch } from './Ads.jsx';
 import { FEATURE_GROUPS, LAB_LOG_MODES, offCount } from '../controls.js';
 import { useEscape } from '../util.js';
+import { confirmDialog } from './Dialogs.jsx';
 
 // Asher's Controls (controls.js): turn tabs, channels, and features off for
 // everyone but him, preview what they see, and get to Shutdown and Commands.
@@ -24,6 +25,9 @@ export default function ControlsPage({
   me,
   // The bank's loan settings (Loans.jsx LoanSettings).
   loanSettings = null,
+  // 3.2, once: move past coin and game cards into #arcade (functions/moveArcade.js).
+  moveToArcade = null,
+  watchMoveToArcade = null,
   onClose,
 }) {
   // Shutdown or Commands open on top: Escape closes that one, not this.
@@ -174,12 +178,231 @@ export default function ControlsPage({
                   channels.map((c) => [c.id, `#${c.name}`]),
                 )}
                 {group('off', 'Direct messages', [['dms', 'All DMs', 'Sending and reading DMs']])}
+                {moveToArcade && <MoveToArcade run={moveToArcade} watch={watchMoveToArcade} channels={channels} />}
               </>
             )}
           </div>
         </div>
       </div>
     </Overlay>
+  );
+}
+
+// 3.2: coins and games live in #arcade, so the old cards from other channels
+// move there once (DMs stay). Check shows what would move and what waits
+// (games still going, open requests, pinned cards); Move asks first, then
+// runs in batches until it's done. Running it again only moves what's left.
+const KIND_LABEL = { request: '/request coins', give: '/give', balance: '/balance', leaderboard: '/leaderboard' };
+// Every kind of card the move covers: its group, name and what it is.
+const KIND_INFO = {
+  slots: ['Casino', 'Slots', 'Spin three reels for a payout'],
+  dice: ['Casino', 'Dice', 'Bet on a dice roll'],
+  coinflip: ['Casino', 'Coin flip', 'Heads or tails bet'],
+  roulette: ['Casino', 'Roulette', 'Bet on a number or color'],
+  blackjack: ['Casino', 'Blackjack', 'Card game against the dealer'],
+  crash: ['Casino', 'Crash', 'Cash out before the rocket crashes'],
+  mines: ['Casino', 'Mines', 'Reveal tiles without hitting a mine'],
+  highlow: ['Casino', 'High-low', 'Guess if the next card is higher or lower'],
+  lottery: ['Casino', 'Lottery', 'Tickets for the team draw'],
+  daily: ['Economy', '/daily', 'Daily coin bonus'],
+  work: ['Economy', '/work', 'Coins for working a shift'],
+  beg: ['Economy', '/beg', 'Ask for a few coins'],
+  rob: ['Economy', '/rob', 'Try to steal from a teammate'],
+  rps: ['Arcade', 'Rock paper scissors', 'Two-player match'],
+  tictactoe: ['Arcade', 'Tic-tac-toe', 'Two-player match'],
+  connect4: ['Arcade', 'Connect 4', 'Two-player match'],
+  duel: ['Arcade', 'Duel', 'Quick-draw match between two people'],
+  trivia: ['Arcade', 'Trivia', 'Answer questions for coins'],
+  hangman: ['Arcade', 'Hangman', 'Guess the word'],
+  typerace: ['Arcade', 'Type race', 'Fastest typer wins'],
+  heist: ['Arcade', 'Heist', 'Team up to rob the bank'],
+  battleship: ['Arcade', 'Battleship', 'Sink the other fleet'],
+  tetris: ['Arcade', 'Tetris', 'Falling blocks, solo or vs Trotbot'],
+  minesweep: ['Arcade', 'Minesweeper', 'Clear the board, solo or vs Trotbot'],
+  challenge: ['Arcade', 'Challenge', 'Head-to-head coin flip or dice bet'],
+  give: ['Coins', '/give', 'Coins sent to a teammate or group'],
+  balance: ['Coins', '/balance', 'Someone’s coin balance'],
+  leaderboard: ['Coins', '/leaderboard', 'The coin leaderboard'],
+  request: ['Coins', '/request coins', 'Asking a teammate for coins'],
+};
+const GROUP_ORDER = ['Casino', 'Economy', 'Arcade', 'Coins'];
+// Every kind of card: how many move now, how many wait, and what it is,
+// grouped (Casino, Economy, Arcade, Coins) with a subtotal per group.
+function KindTable({ plan }) {
+  const kinds = [...new Set([...Object.keys(plan.byKind || {}), ...Object.keys(plan.waitByKind || {})])];
+  const row = (k) => ({ k, info: KIND_INFO[k] || ['Other', KIND_LABEL[k] || `/${k}`, ''], move: plan.byKind?.[k] || 0, wait: plan.waitByKind?.[k] || 0 });
+  const rows = kinds.map(row);
+  const groups = [...GROUP_ORDER, 'Other'].map((g) => ({ g, rows: rows.filter((r) => r.info[0] === g).sort((a, b) => b.move + b.wait - (a.move + a.wait)) })).filter((x) => x.rows.length);
+  const hasWait = rows.some((r) => r.wait);
+  return (
+    <div className="move-kinds">
+      <table className="move-kinds-table small">
+        <thead>
+          <tr>
+            <th>Card</th>
+            <th className="num">Move</th>
+            {hasWait && <th className="num">Wait</th>}
+          </tr>
+        </thead>
+        {groups.map(({ g, rows: list }) => (
+          <tbody key={g}>
+            <tr className="move-kinds-group">
+              <th>{g}</th>
+              <td className="num">{list.reduce((t, r) => t + r.move, 0)}</td>
+              {hasWait && <td className="num">{list.reduce((t, r) => t + r.wait, 0) || ''}</td>}
+            </tr>
+            {list.map((r) => (
+              <tr key={r.k}>
+                <td>
+                  <b>{r.info[1]}</b>
+                  {r.info[2] && <span className="muted"> · {r.info[2]}</span>}
+                </td>
+                <td className="num">{r.move || ''}</td>
+                {hasWait && <td className="num">{r.wait || ''}</td>}
+              </tr>
+            ))}
+          </tbody>
+        ))}
+      </table>
+    </div>
+  );
+}
+
+function MoveToArcade({ run, watch, channels }) {
+  const [plan, setPlan] = useState(null);
+  const [busy, setBusy] = useState('');
+  const [done, setDone] = useState(null);
+  const [err, setErr] = useState('');
+  // Live while moving: { moved, left } from the server, card by card.
+  const [live, setLive] = useState(null);
+  const nameOf = (id) => `#${channels.find((c) => c.id === id)?.name || id}`;
+  const check = async () => {
+    setBusy('check');
+    setErr('');
+    try {
+      const r = await run({ dry: true });
+      if (r?.note) setErr(r.note.title);
+      else setPlan(r);
+    } catch (e) {
+      setErr(e?.message || String(e));
+    }
+    setBusy('');
+  };
+  const move = async () => {
+    const ok = await confirmDialog({
+      title: `Move ${plan.total} card${plan.total === 1 ? '' : 's'} to #arcade?`,
+      body: 'They leave their channels and show in #arcade at their original times. Refunds, reports and Undo keep working. Anything still going stays for a later run.',
+      okLabel: 'Move them',
+    });
+    if (!ok) return;
+    setBusy('move');
+    setErr('');
+    let moved = 0;
+    const runId = `m${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+    setLive({ moved: 0, left: plan.total });
+    const stop = watch ? watch((p) => p?.run === runId && setLive({ moved: p.moved || 0, left: p.left || 0 })) : null;
+    try {
+      for (let i = 0; i < 40; i++) {
+        const r = await run({ run: runId, base: moved });
+        if (r?.note) throw new Error(r.note.title);
+        moved += r.moved || 0;
+        setDone({ moved, skippedCount: r.skippedCount, skipped: r.skipped || [] });
+        if (!r.more) break;
+      }
+      setPlan(null);
+    } catch (e) {
+      setErr(e?.message || String(e));
+    }
+    stop?.();
+    setLive(null);
+    setBusy('');
+  };
+  const skipList = (list) =>
+    list.length > 0 && (
+      <ul className="move-arcade-skips small">
+        {list.slice(0, 12).map((x) => (
+          <li key={x.id}>
+            {KIND_LABEL[x.kind] || `/${x.kind}`} in {nameOf(x.conv)}: <span className="muted">{x.why}</span>
+          </li>
+        ))}
+        {list.length > 12 && <li className="muted">and {list.length - 12} more</li>}
+      </ul>
+    );
+  return (
+    <section className="cmd-admin-group move-arcade">
+      <div className="cmd-admin-head">
+        <h4>Old coin cards to #arcade</h4>
+      </div>
+      <p className="muted small">Casino, game and coin cards from other channels move to #arcade, at their original times. DMs stay as they are.</p>
+      {!plan && !done && (
+        <button className="btn" disabled={!!busy} onClick={check}>
+          {busy === 'check' ? 'Checking…' : 'Check what would move'}
+        </button>
+      )}
+      {plan && (
+        <>
+          {plan.total ? (
+            <>
+              <p className="small">
+                <b>{plan.total + (plan.skippedCount || 0)}</b> coin and game card{plan.total + (plan.skippedCount || 0) === 1 ? '' : 's'} outside #arcade:{' '}
+                <b>{plan.total}</b> to move{plan.skippedCount ? <>, <b>{plan.skippedCount}</b> waiting</> : ''}. By channel:
+              </p>
+              <div className="move-arcade-counts small">
+                {Object.entries(plan.byChannel).map(([c, n]) => (
+                  <span key={c} className="chip">
+                    {nameOf(c)} {n}
+                  </span>
+                ))}
+              </div>
+              <KindTable plan={plan} />
+            </>
+          ) : (
+            <>
+              <p className="small">Nothing to move{plan.skippedCount ? ` (${plan.skippedCount} waiting)` : ''}.</p>
+              {plan.skippedCount > 0 && <KindTable plan={plan} />}
+            </>
+          )}
+          {busy === 'move' && live && (
+            <div className="move-live" role="status" aria-live="polite">
+              <p className="small">
+                Moved <b className="mono">{live.moved}</b> of <b className="mono">{live.moved + live.left}</b> ·{' '}
+                <b className="mono">{live.left}</b> left
+              </p>
+              <div className="move-live-bar">
+                <span style={{ width: `${live.moved + live.left ? Math.round((100 * live.moved) / (live.moved + live.left)) : 100}%` }} />
+              </div>
+            </div>
+          )}
+          {plan.skippedCount > 0 && <p className="small">Waiting for a later run ({plan.skippedCount}):</p>}
+          {skipList(plan.skipped || [])}
+          <div className="row gap">
+            <button className="btn" disabled={!!busy} onClick={() => setPlan(null)}>
+              Back
+            </button>
+            {plan.total > 0 && (
+              <button className="btn primary" disabled={!!busy} onClick={move}>
+                {busy === 'move' ? 'Moving…' : `Move ${plan.total}`}
+              </button>
+            )}
+          </div>
+        </>
+      )}
+      {done && (
+        <>
+          <p className="small">
+            Moved <b>{done.moved}</b> card{done.moved === 1 ? '' : 's'} to #arcade.{busy ? ' Still going…' : ''}
+            {done.skippedCount ? ` ${done.skippedCount} waiting for a later run.` : ''}
+          </p>
+          {skipList(done.skipped)}
+          {!busy && (
+            <button className="btn" onClick={() => (setDone(null), check())}>
+              Check again
+            </button>
+          )}
+        </>
+      )}
+      {err && <div className="casino-error">{err}</div>}
+    </section>
   );
 }
 

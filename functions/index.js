@@ -17,6 +17,8 @@ import {
   AWARD_CAPS,
   capWin,
   coinSettings,
+  earnBalance,
+  scaledPay,
   coinsByName,
   coinTasks,
   freshWallet,
@@ -30,8 +32,9 @@ import { GROUP_MAX, groupLabel, groupsIn, resolveTargets } from './shared/groups
 import { groupTeam } from './groups.js';
 import * as casino from './shared/casino.js';
 import * as arcade from './shared/arcade.js';
-import { blocked, isOff, serverGroup } from './shared/commandRules.js';
-import { awardCoins, prepareAward } from './award.js';
+import { ARCADE, ARCADE_NOTE, blocked, isOff, serverGroup } from './shared/commandRules.js';
+import { awardCoins, prepareAward, setEarnBalance } from './award.js';
+import { earnFunctions } from './earn.js';
 import * as arcadeBank from './banks/arcade.js';
 import * as fun from './shared/funGames.js';
 import * as mines from './shared/minesweeper.js';
@@ -61,6 +64,9 @@ import { learnFunctions } from './learn.js';
 import { channelFunctions } from './channels.js';
 import { loanFunctions } from './loans.js';
 import { coinRequestFunctions } from './coinRequests.js';
+import { buddyFunctions } from './buddy.js';
+import { buddyBlocks, lockNote } from './shared/buddy.js';
+import { moveArcadeFunctions } from './moveArcade.js';
 import { apiFunction } from './api.js';
 import { coinsText } from './shared/coinText.js';
 
@@ -226,7 +232,8 @@ async function notifyLevels(rename) {
 // people mentioned; "All messages" channels to everyone who chose that.
 export const onChatMessage = onDocumentCreated('channels/{channelId}/messages/{messageId}', async (event) => {
   const m = event.data?.data();
-  if (!m || m.deleted) return;
+  // A card moved into #arcade (moveToArcade) is old news: nobody is told again.
+  if (!m || m.deleted || m.moved) return;
   const { channelId } = event.params;
   const rename = await renamer();
   const level = await notifyLevels(rename);
@@ -321,6 +328,7 @@ async function previewFor(event) {
   const after = event.data?.after?.data();
   if (!after || after.deleted || after.preview === false) return;
   const before = event.data?.before?.data();
+  if (after.moved && !before) return;
   if (before && before.text === after.text) return;
   const url = firstLink(after.text);
   if (!url) {
@@ -1324,6 +1332,11 @@ function withBalance(handler) {
 const loans = loanFunctions({ db, coinData, freshCoins, bankRef, notify, owner: REQUESTS_TO, timeZone: TIME_ZONE });
 export const { loanRequest, loanRespond, loanRepay, loanManage, loanTick, loanRenames } = loans;
 
+// Gambling buddy (functions/buddy.js): a teammate's password locks someone's
+// casino games. buddies.lockOf(name) is the lock play checks.
+const buddies = buddyFunctions({ db, coinData, notify, owner: REQUESTS_TO });
+export const { buddy } = buddies;
+
 // The market and pets (functions/market.js): buying, tournaments, pet care.
 export const { buy, joinTournament, marketManage, pet, payTournaments } = marketFunctions({
   db,
@@ -1337,12 +1350,17 @@ export const { buy, joinTournament, marketManage, pet, payTournaments } = market
   loanLock: (name) => loans.lockOf(name),
 });
 
+// Earnings that grow with the balance, and hidden coins (functions/earn.js, 3.2).
+const earn = earnFunctions({ db, coinData, freshCoins, bankRef, renamer, owner: REQUESTS_TO });
+setEarnBalance(earn.balanceFor);
+export const { onTaskEarn, onShiftEarn, hiddenCoin } = earn;
+
 // Compare my balance with the server's (Coins screen).
 export const { coinCheck } = coinCheckFunctions({ db, coinData, freshCoins, bankRef, cacheAge: () => Date.now() - coinCache.at });
 // Casino reports (functions/disputes.js): a teammate reports a result, team
 // management refunds by hand or dismisses it.
 // The owner's Refund / Take back on a game card in chat (ownerRefund) shares their refund key.
-export const { dispute, disputeDecide, disputeRefundAll, ownerRefund } = disputeFunctions({ db, coinData, freshCoins, notify, bankRef, owner: REQUESTS_TO });
+export const { dispute, disputeDecide, disputeRefundAll, ownerRefund } = disputeFunctions({ db, coinData, freshCoins, notify, bankRef, owner: REQUESTS_TO, personId });
 
 // Team events: the team's lab time fills a meter, tiers give pet gear.
 export const { petEvent, petEventTick } = petEventFunctions({
@@ -1675,6 +1693,13 @@ export const play = onCall({ maxInstances: 5, invoker: 'public' }, withBalance(a
       : action !== 'prize' && (casino.CASINO.includes(game) || (arcade.MULTI.includes(game) && !['trivia', 'hangman', 'typerace'].includes(game))));
   const lock = betting ? await loans.lockOf(me) : null;
   if (lock) return note(lock.title, lock.body);
+  // Gambling buddy (functions/buddy.js): a lock that's on refuses every new
+  // casino bet (casino games, lottery tickets, doubling down). Games already
+  // going can be finished; arcade games, gifts and prizes aren't touched.
+  if (buddyBlocks({ action, game, move, args: words })) {
+    const b = await buddies.lockOf(me);
+    if (b) return note(lockNote(b).title, lockNote(b).body);
+  }
 
   // A gift to a teammate, or a prize from an ad game or the prize wheel. The
   // bank doc is read and touched so two at once (or one during a bet) take
@@ -1720,12 +1745,21 @@ export const play = onCall({ maxInstances: 5, invoker: 'public' }, withBalance(a
           return note(...casino.SHIFT_NOTE);
       }
     }
+    // Gambling buddy: accepting a challenge is a bet too (starting one is
+    // refused above, as a locked game).
+    if (String(move) === 'accept') {
+      const card = await db.doc(`channels/${conv}/messages/${msgId}`).get();
+      if (card.get('cmd')?.name === 'challenge') {
+        const b = await buddies.lockOf(me);
+        if (b) return note(lockNote(b).title, lockNote(b).body);
+      }
+    }
     return runMove({ conv, msgId, me, move: String(move), data, now });
   }
 
   // A new command.
-  if (!/^[\w-]{1,40}$/.test(conv) || conv === 'announcements')
-    return note('Not here.', 'Use #arcade for the casino, or any channel for the rest.');
+  // Coins and games only in #arcade (3.2): not another channel, not a DM.
+  if (conv !== ARCADE) return { note: { ...ARCADE_NOTE } };
   const isCasino = casino.CASINO.includes(game);
   const isArcade = arcade.MULTI.includes(game);
   if (!isCasino && !isArcade && !casino.ECONOMY.includes(game)) throw new HttpsError('invalid-argument', 'Unknown command.');
@@ -1896,6 +1930,14 @@ export const play = onCall({ maxInstances: 5, invoker: 'public' }, withBalance(a
           ? casino.work(myBank, now, secureRandom, await workContext(me, data))
           : casino.beg(myBank, now);
     if (r.error) return note(r.error);
+    // /work grows with the balance (3.2, EARN_SCALE.work): its lowest in the last day.
+    if (game === 'work' && r.amount > 0) {
+      const scaled = scaledPay('work', r.amount, earnBalance((await freshCoins(me, myBank, data)).history, now));
+      if (scaled > r.amount) {
+        r.amount = scaled;
+        r.card = { ...r.card, amount: scaled, scaled: true };
+      }
+    }
     // /work and /beg pay up to the ceiling (MAX_BALANCE) at most.
     if (game !== 'daily' && capWin(r.amount, balance) < r.amount) {
       r.amount = capWin(r.amount, balance);
@@ -2144,6 +2186,8 @@ export const funGame = onCall({ maxInstances: 5, invoker: 'public' }, async (req
   // Post a finished game to chat (the card shows what the server checked).
   if (body.action === 'share') {
     if (!validId(body.id) || !validId(body.conv) || body.conv === 'announcements') throw new HttpsError('invalid-argument', 'Where?');
+    // Game cards go in #arcade (3.2), like every coins-and-games card.
+    if (body.conv !== ARCADE) return { note: { ...ARCADE_NOTE } };
     const ref = funRef(body.id);
     const s = (await ref.get()).data();
     if (!s || s.person !== me || !s.done || s.problem) return note('That game can’t be shared.');
@@ -2528,6 +2572,9 @@ export const { channelRequest, channelRenames } = channelFunctions({ db, renamer
 // Coin requests (/request @person amount, functions/coinRequests.js): the
 // person asked pays with one tap, through the same checks as a gift (and its
 // overdue-loan lock). Groups (/request @Programming 5) too.
+// 3.2, once: past coin and game cards from other channels into #arcade (the owner only).
+export const { moveToArcade } = moveArcadeFunctions({ db, owner: REQUESTS_TO, renamer });
+
 export const { coinRequest, expireCoinRequests } = coinRequestFunctions({
   db,
   coinData,
@@ -2564,6 +2611,7 @@ export const api = apiFunction({
   disputeRefundAll,
   ownerRefund,
   coinCheck,
+  buddy,
   buy,
   joinTournament,
   marketManage,

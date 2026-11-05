@@ -18,9 +18,11 @@ import { dayOf, logFields, taskArea } from '../labLog.js';
 import * as arcade from '../../functions/shared/arcade.js';
 import * as challenge from '../../functions/shared/challenge.js';
 import * as dispute from '../../functions/shared/disputes.js';
-import { blocked, isOff, serverGroup } from '../../functions/shared/commandRules.js';
+import { ARCADE, ARCADE_NOTE, blocked, isOff, serverGroup } from '../../functions/shared/commandRules.js';
+import { skipReason as moveSkip } from '../../functions/shared/moveArcade.js';
+import { FIND } from '../../functions/shared/hiddenCoins.js';
 import * as coinAsk from '../../functions/shared/coinRequests.js';
-import { AWARD_CAPS, breakdown, capWin, ceilingNote, giftEntry, overCeiling, sumCoins, groupGiftEntries, prizeEntry, teamDay, teamMidnight } from '../../functions/shared/coins.js';
+import { AWARD_CAPS, breakdown, capWin, ceilingNote, earnBalance, giftEntry, overCeiling, scaleId, scaledPay, sumCoins, groupGiftEntries, prizeEntry, teamDay, teamMidnight } from '../../functions/shared/coins.js';
 import { BOT, groupLabel, resolveTargets } from '../../functions/shared/groups.js';
 import * as fun from '../../functions/shared/funGames.js';
 import * as mines from '../../functions/shared/minesweeper.js';
@@ -29,7 +31,8 @@ import { attemptSeed, newSeed, secureRandom } from '../../functions/shared/rng.j
 import { asksOn } from '../../functions/shared/checkin.js';
 import * as market from '../../functions/shared/market.js';
 import { PERK_IDEAS } from '../../functions/shared/market.js';
-import { giftAccept, giftEnd, giftOffer, petEdit, petsIn } from '../../functions/shared/pets.js';
+import { giftAccept, giftEnd, giftOffer, petEdit, petsIn, withPet } from '../../functions/shared/pets.js';
+import { cleanScore, scoreAfter } from '../../functions/shared/petgames.js';
 import { ROSTER, SUBTEAMS, cleanName, sameName } from '../../functions/shared/team.js';
 import * as chan from '../../functions/shared/channels.js';
 import { checkPicks, myPicks, personOptionId, usesVoteButton } from '../../functions/shared/polls.js';
@@ -38,6 +41,8 @@ import { demoLearn } from './demoLearn.js';
 import { demoEvents } from './demoEvents.js';
 import { demoPetPhotos } from './demoPetPhotos.js';
 import { demoLoans } from './demoLoans.js';
+import { demoBuddy } from './demoBuddy.js';
+import { buddyBlocks, lockNote } from '../../functions/shared/buddy.js';
 import { PHOTO_ACTIONS } from '../../functions/shared/petphotos.js';
 import { earnedIds } from '../../functions/shared/events.js';
 import { coinsText } from '../../functions/shared/coinText.js';
@@ -795,6 +800,13 @@ function seedMarket() {
       cared: 3,
     },
   ];
+  // Pet games' best scores (functions/petgames.js), for the team boards.
+  const lap = (ms, ago) => ({ ms, at: now - ago });
+  state.petGames = [
+    { id: 'jackson-lucks', person: 'Jackson Lucks', hop: { best: 23, at: now - day }, rally: { 1: lap(8420, 2 * day), 2: lap(12950, 2 * day), 3: lap(19310, day) } },
+    { id: 'sophia-bermudez', person: 'Sophia Bermudez', hop: { best: 31, at: now - 5 * 3600000 }, rally: { 1: lap(7990, day) } },
+    { id: 'cooper-mlezcko', person: 'Cooper Mlezcko', hop: { best: 12, at: now - 2 * day }, rally: {} },
+  ];
   const players = {
     'Jackson Lucks': { joinedAt: now - day, best: 4200, at: now - 20 * 3600000 },
     'Sophia Bermudez': { joinedAt: now - 20 * 3600000, best: 3100, at: now - 10 * 3600000 },
@@ -955,8 +967,34 @@ life.seedSamples();
 const events = demoEvents({ get: () => state, commit: () => commit(), uid });
 const petPhotos = demoPetPhotos({ get: () => state, commit: () => commit(), uid });
 events.seedSamples();
+// 3.2: one of the new pets in the park (Cooper had none). The food values are
+// stored as of a day ago, like the other sample pets.
+if (!state.pets32Seeded) {
+  const at = Date.now() - 9 * 86400000;
+  const fed = Date.now() - 86400000;
+  if (!(state.pets || []).some((p) => p.person === 'Cooper Mlezcko'))
+    state.pets = [
+      ...(state.pets || []),
+      {
+        id: 'cooper-mlezcko',
+        person: 'Cooper Mlezcko',
+        species: 'goldendoodle',
+        name: 'Waffles',
+        adoptedAt: at,
+        food: { v: 85, at: fed },
+        fun: { v: 90, at: fed },
+        inChat: true,
+        cared: 1,
+        gear: { head: '', face: '', neck: 'bandana', body: '', extra: '', palette: '' },
+        babyBorn: false,
+      },
+    ];
+  state.pets32Seeded = 1;
+}
 // Loans (demoLoans.js): the same checks as functions/loans.js.
 const loans = demoLoans({ get: () => state, commit: () => commit(), uid });
+// Gambling buddy (demoBuddy.js): the same decisions as functions/buddy.js.
+const buddies = demoBuddy({ get: () => state, commit: () => commit(), uid });
 
 // Refunds on game cards (ownerRefund, disputeDecide): the person's history
 // line for the card, and the card's "Refunded by Asher" tag, like the server.
@@ -972,6 +1010,15 @@ function demoLine({ who, conv, msgId, game, net, cardAt }) {
     return { problem: note('Already reversed in their coin history.', 'That line was put right from Coins. Nothing more to do.') };
   return { reverses: key };
 }
+// A handled casino report: the owner's "X reported a … result" notification
+// goes away (by its report id; older ones by who sent it and when).
+function clearReportNote(x) {
+  state.inbox = (state.inbox || []).filter(
+    (n) => !(n.type === 'dispute' && (n.report === x.id || (!n.report && /reported a/.test(n.title || '') && Math.abs((n.at || 0) - (x.at || 0)) < 120000 && n.title.startsWith(x.by.split(' ')[0])))),
+  );
+}
+// Who's watching the move to #arcade (the owner's Controls screen).
+const moveWatchers = new Set();
 function demoTag(conv, msgId, tag) {
   const list = (state.chat || {})[conv] || [];
   const k = personId(tag.name);
@@ -1053,6 +1100,18 @@ function nextFridayLocal(now) {
   return d.getTime();
 }
 // Change fields on a command card's cmd (the open lottery card).
+// Earnings that grow with the balance (3.2, shared/coins.js EARN_SCALE): the
+// app's own wallets (Workspace hands them over with useWallets), the lowest
+// balance in the last day, as on the server.
+let demoWallet = null;
+const demoLow = (name, now = Date.now()) => {
+  try {
+    return demoWallet ? earnBalance(demoWallet(name).history, now) : 0;
+  } catch {
+    return 0;
+  }
+};
+
 // Coins from games and quizzes, the way functions/award.js pays them: each
 // source capped per person per team day, and a key pays only once.
 function demoAward({ person, amount, source, label = '', key = '' }, now = Date.now()) {
@@ -1062,12 +1121,17 @@ function demoAward({ person, amount, source, label = '', key = '' }, now = Date.
   const keys = state.awardKeys || {};
   if (key && keys[key]) return 0;
   const day = teamDay(now);
+  // The cap counts normal coins; a big balance pays more for them (3.2).
   const sofar = (state.coins || [])
     .filter((x) => x.type === 'award' && x.person === person && x.source === source && x.day === day)
-    .reduce((t, x) => t + (x.amount || 0), 0);
-  const pay = Math.min(want, Math.max(0, cap - sofar));
-  if (!pay) return 0;
-  state.coins = [...(state.coins || []), { id: uid(), type: 'award', person, amount: pay, source, label: String(label).slice(0, 80), day, at: now }];
+    .reduce((t, x) => t + (x.base ?? x.amount ?? 0), 0);
+  const base = Math.min(want, Math.max(0, cap - sofar));
+  if (!base) return 0;
+  const pay = scaledPay(source, base, demoLow(person, now));
+  state.coins = [
+    ...(state.coins || []),
+    { id: uid(), type: 'award', person, amount: pay, ...(pay !== base && { base }), source, label: String(label).slice(0, 80), day, at: now },
+  ];
   if (key) state.awardKeys = { ...keys, [key]: { person, source, day, at: now } };
   return pay;
 }
@@ -1483,6 +1547,10 @@ export const demoStore = {
   async petEvent(req, actor) {
     return events.petEvent(req, actor);
   },
+  // Best scores in the pet games (functions/petgames.js does the same).
+  subscribePetGames(cb) {
+    return listen(() => cb((state.petGames || []).map((d) => ({ ...d }))));
+  },
   // Photos of real pets (demoPetPhotos.js).
   subscribePetPhotos(cb) {
     return petPhotos.subscribeLive(listen, cb);
@@ -1553,10 +1621,9 @@ export const demoStore = {
       if (r.pet)
         state.pets = state.pets.map((p) => {
           if (p.person !== me) return p;
-          const second = data.born != null && p.extra && p.extra.adoptedAt === Number(data.born);
-          return second
-            ? { ...p, extra: { ...p.extra, ...r.pet, cared: (p.extra.cared || 0) + 1, caredAt: now } }
-            : { ...p, ...r.pet, cared: (p.cared || 0) + 1, caredAt: now };
+          const list = petsIn(p);
+          const at = data.born == null ? 0 : list.findIndex((x) => x.adoptedAt === Number(data.born));
+          return { ...withPet(p, at, { ...r.pet, cared: (list[at].cared || 0) + 1, caredAt: now }), id: p.id };
         });
       return done({ ok: true, price: r.price, purchase, pet: r.pet || null });
     }
@@ -1630,15 +1697,26 @@ export const demoStore = {
 
     if (fn === 'pet' && PHOTO_ACTIONS.includes(data.action)) return petPhotos.run(data, actor);
 
+    // A best score in the pet games: the same checks as functions/petgames.js.
+    if (fn === 'pet' && data.action === 'gameScore') {
+      const score = cleanScore(data);
+      if (score.note) return score;
+      const list = state.petGames || (state.petGames = []);
+      const had = list.find((d) => d.person === me) || null;
+      const r = scoreAfter(had, score, { me, now });
+      if (r.note) return r;
+      if (r.better) state.petGames = [...list.filter((d) => d.person !== me), { id: personId(me), ...r.doc }];
+      return done({ ok: true, better: r.better });
+    }
+
     if (fn === 'pet') {
       // The same moves as functions/petfamily.js, on the demo's own docs.
       const docOfName = (n) => (state.pets || []).find((p) => p.person === n) || null;
       const putDoc = (n, doc) => {
         state.pets = (state.pets || []).filter((p) => p.person !== n);
         if (!doc) return;
-        const { id: _a, extra, ...rest } = doc;
-        const { id: _b, ...second } = extra || {};
-        state.pets.push({ ...rest, id: personId(n), ...(extra && { extra: second }) });
+        // docOf already leaves ids off the pets after the first.
+        state.pets.push({ ...doc, id: personId(n) });
       };
       const tell = (to, title, body) => {
         state.inbox = [{ id: uid(), type: 'market', icon: '🐾', title, body, open: 'view:market', at: now, read: false, to }, ...(state.inbox || [])];
@@ -1682,7 +1760,7 @@ export const demoStore = {
           return done({ ok: true });
         }
         if (!gift || gift.to !== me) return note('That offer is gone.');
-        const r = giftAccept(gift, { me, doc: docOfName(me), giverDoc: docOfName(gift.from), giver: gift.from, now });
+        const r = giftAccept(gift, { me, doc: docOfName(me), giverDoc: docOfName(gift.from), giver: gift.from, shifts: state.shifts || [], now });
         if (r.status && r.status !== 'accepted') Object.assign(gift, { status: r.status, decidedAt: now });
         if (r.note) return done(r);
         putDoc(me, r.doc);
@@ -1729,7 +1807,8 @@ export const demoStore = {
     if (action === 'create' && req.group != null) {
       // A group: the same steps as the server's createGroup.
       const conv = String(req.conv || '');
-      if (!conv || conv === 'announcements') return note('Not here.', 'Ask in a channel.');
+      // Coins and games only in #arcade (3.2), like the server.
+      if (conv !== ARCADE) return { note: { ...ARCADE_NOTE } };
       if (conv.startsWith('dm:')) return note('Groups work in channels.', 'In a DM, ask people one by one.');
       const off = switchedOff(conv);
       if (off) return off;
@@ -1782,7 +1861,7 @@ export const demoStore = {
     }
     if (action === 'create') {
       const conv = String(req.conv || '');
-      if (!conv || conv === 'announcements') return note('Not here.', 'Ask in a channel or a DM.');
+      if (conv !== ARCADE) return { note: { ...ARCADE_NOTE } };
       const off = switchedOff(conv);
       if (off) return off;
       const to = String(req.to || '');
@@ -1976,6 +2055,9 @@ export const demoStore = {
         : action !== 'prize' && (casino.CASINO.includes(game) || (arcade.MULTI.includes(game) && !['trivia', 'hangman', 'typerace'].includes(game))));
     const lock = betting ? loans.lockFor(me, balanceOf) : null;
     if (lock) return note(lock.title, lock.body);
+    // A gambling buddy's lock refuses new casino bets, like the server's play.
+    const buddyLock = buddyBlocks({ action, game, move, args: words }) ? buddies.lockFor(me) : null;
+    if (buddyLock) return note(lockNote(buddyLock).title, lockNote(buddyLock).body);
     // Several people's coins at once (multiplayer games).
     // card: the game and its card's id, so a held bet and its result share a history line.
     // A win past a googol is cut (arcade.capMoney, like the server's payOut);
@@ -2036,6 +2118,11 @@ export const demoStore = {
       const secret = (state.gameSecrets || {})[msgId];
       if (!m?.cmd || !secret) return note('That game is gone.');
       const c = m.cmd;
+      // Gambling buddy: accepting a challenge is a bet too, like the server.
+      if (String(move) === 'accept' && c.name === 'challenge') {
+        const bl = buddies.lockFor(me);
+        if (bl) return note(lockNote(bl).title, lockNote(bl).body);
+      }
       // Controls: Casino and games during shifts off: no accepting or joining while clocked in.
       if (
         (move === 'accept' || move === 'join') &&
@@ -2093,8 +2180,8 @@ export const demoStore = {
       return done({ ok: true, serverNow: now, ...(localStorage.getItem('demo-no-card') ? {} : { card }) });
     }
 
-    if (conv.startsWith('dm:') || conv === 'announcements')
-      return note('Not here.', 'Use #arcade for the casino, or any channel for the rest.');
+    // Coins and games only in #arcade (3.2), like the server.
+    if (conv !== ARCADE) return { note: { ...ARCADE_NOTE } };
     const isCasino = casino.CASINO.includes(game);
     const stop = blocked(game, serverGroup(game), conv, state.settings?.commands);
     if (stop) return { note: stop };
@@ -2229,6 +2316,14 @@ export const demoStore = {
             })
           : casino.beg(mine, now);
     if (r.error) return note(r.error);
+    // /work grows with the balance (3.2), like the server.
+    if (game === 'work' && r.amount > 0) {
+      const scaled = scaledPay('work', r.amount, demoLow(me, now));
+      if (scaled > r.amount) {
+        r.amount = scaled;
+        r.card = { ...r.card, amount: scaled, scaled: true };
+      }
+    }
     // /work and /beg pay up to a googol at most (like the server).
     if (game !== 'daily' && capWin(r.amount, balance) < r.amount) {
       r.amount = capWin(r.amount, balance);
@@ -2285,6 +2380,7 @@ export const demoStore = {
         title: `${first} reported a ${dispute.GAME_LABEL[snapshot.game]} result`,
         body: dispute.REASONS[reason],
         open: 'disputes:',
+        report: id,
         at: now,
         read: false,
         to,
@@ -2331,6 +2427,7 @@ export const demoStore = {
       if (m?.cmd) demoTag(x.conv, x.msgId, dispute.adjustTag({ person: x.by, mode: 'refund', amount: refund, by: actor.name, now, via: 'report' }));
     }
     Object.assign(x, { status: decision === 'refund' ? 'refunded' : 'dismissed', handledBy: actor.name, handledAt: now, refund, resolutionNote: resolution });
+    clearReportNote(x);
     if (req.quiet) {
       commit();
       return { ok: true, status: x.status, refund, x };
@@ -2365,6 +2462,7 @@ export const demoStore = {
     const paid = new Map();
     const skipped = [];
     let coins = 0;
+    let closed = 0;
     for (const x of open) {
       // What this run already paid each person counts toward their ceiling.
       const sofar = Object.fromEntries([...paid].map(([n, r]) => [n, r.coins]));
@@ -2375,6 +2473,10 @@ export const demoStore = {
         row.coins += out.refund;
         paid.set(x.by, row);
         coins += out.refund;
+      } else if (/already (refunded|taken back)/.test(out?.note?.title || '')) {
+        const done = await this.disputeDecide({ id: x.id, decision: 'dismiss', note: 'Already put right from the card.', quiet: true }, actor, ctx);
+        if (done?.ok) closed += 1;
+        else skipped.push({ id: x.id, by: x.by, game: x.cmd || '', why: out.note.title });
       } else skipped.push({ id: x.id, by: x.by, game: x.cmd || '', why: out?.note?.title || 'Skipped.' });
     }
     const now = Date.now();
@@ -2394,7 +2496,153 @@ export const demoStore = {
       ...(state.inbox || []),
     ];
     commit();
-    return { ok: true, refunded: [...paid.values()].reduce((n, r) => n + r.count, 0), coins, people: paid.size, skipped };
+    return { ok: true, refunded: [...paid.values()].reduce((n, r) => n + r.count, 0), coins, people: paid.size, skipped, closed };
+  },
+  // 3.2: the app's wallets, for earnings that grow with the balance.
+  useWallets(fn) {
+    demoWallet = fn;
+  },
+  // What the server's onTaskEarn and onShiftEarn do (functions/earn.js), run
+  // while the app is open: a task's top-up once, a lab day's top-up up to
+  // what the day pays now. name: whose (the demo's signed-in person).
+  scaleTick(name, now = Date.now()) {
+    if (!demoWallet || (state.controls?.off || []).includes('coins')) return;
+    const w = demoWallet(name);
+    let changed = false;
+    for (const item of w.history) {
+      if (!(item.amount > 0) || (item.kind !== 'task' && item.kind !== 'hours') || item.note) continue;
+      if (item.kind === 'hours' && item.day === teamDay(now) && (state.shifts || []).some((x) => !x.end && x.person === name)) continue;
+      const base = item.base ?? item.amount;
+      const kind = item.kind;
+      const ref = kind === 'task' ? item.id : item.day;
+      const id = scaleId(kind, ref, name);
+      const had = (state.coins || []).find((x) => x.id === id);
+      if (kind === 'task' && (had || item.boost)) continue;
+      const extra = scaledPay(kind, base, earnBalance(w.history.filter((x) => x !== item), now)) - base;
+      if (!(extra > 0) || (had && had.amount >= extra)) continue;
+      const entry = { id, type: 'scale', person: name, ref: `${kind}:${ref}`, source: kind, amount: extra, base, label: item.label, at: had?.at || now };
+      state.coins = [...(state.coins || []).filter((x) => x.id !== id), entry];
+      changed = true;
+    }
+    if (changed) commit();
+  },
+  // Hidden coins (3.2), the way the hiddenCoin function hands them out and
+  // pays them (functions/earn.js FIND): a token now and then, at most 5 a
+  // day, each paid once.
+  async hiddenCoin(req, actor) {
+    await demoLag();
+    const now = Date.now();
+    const me = actor.name;
+    const off = state.controls?.off || [];
+    if (me !== REQUESTS_TO && (off.includes('coins') || off.includes('hiddenCoins'))) return { ok: true, none: true, off: true };
+    const day = teamDay(now);
+    const finds = (state.coinFinds ||= {});
+    const tokens = (state.coinTokens ||= {});
+    const key = `${personId(me)}-${day}`;
+    const d = finds[key] || {};
+    if (req?.action === 'spawn') {
+      const issued = d.issued || 0;
+      if (issued >= FIND.perDay) return { ok: true, none: true, left: 0 };
+      // Demo mode: a shorter wait, so a coin shows up while someone looks around.
+      if (now - (d.lastAt || 0) < FIND.demoGap) return { ok: true, none: true, left: FIND.perDay - issued };
+      if (d.lastAt && Math.random() >= FIND.chance) {
+        finds[key] = { ...d, lastAt: now };
+        commit();
+        return { ok: true, none: true, left: FIND.perDay - issued };
+      }
+      const token = Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, '0')).join('');
+      tokens[token] = { person: me, day, at: now, exp: now + FIND.ttl, base: FIND.min + Math.floor(Math.random() * (FIND.max - FIND.min + 1)), claimed: false };
+      finds[key] = { ...d, issued: issued + 1, lastAt: now };
+      commit();
+      return { ok: true, token, exp: now + FIND.ttl, left: FIND.perDay - issued - 1 };
+    }
+    if (req?.action === 'claim') {
+      const t = tokens[req.token];
+      const note = (title) => ({ note: { title, body: '' } });
+      if (!t || t.person !== me) return note('That coin isn’t yours.');
+      if (t.claimed) return note('Already picked up.');
+      if (now > t.exp) return note('Too late: it rolled away.');
+      const paid = demoAward({ person: me, amount: t.base, source: 'find', label: 'Found a hidden coin', key: `find-${req.token}` }, now);
+      tokens[req.token] = { ...t, claimed: true, claimedAt: now, paid };
+      commit();
+      return { ok: true, paid };
+    }
+    return { note: { title: 'Unknown.', body: '' } };
+  },
+  // 3.2, once: past coin and game cards from other channels into #arcade,
+  // the way the moveToArcade function does it (functions/moveArcade.js): same
+  // id and time, marked moved, everything that names the channel follows,
+  // live games, open requests and pinned cards wait. DMs stay.
+  watchMoveToArcade(cb) {
+    moveWatchers.add(cb);
+    return () => moveWatchers.delete(cb);
+  },
+  async moveToArcade(req, actor) {
+    await demoLag();
+    const note = (title, body = '') => ({ note: { title, body } });
+    if (!actor.admin || actor.name !== REQUESTS_TO) return note(`Only ${REQUESTS_TO.split(' ')[0]} can do that.`);
+    const now = Date.now();
+    const chat = state.chat || {};
+    const ctx = { lotteryOpenId: state.lottery?.open?.id || '' };
+    const byChannel = {};
+    const byKind = {};
+    const skipped = [];
+    const todo = [];
+    for (const [conv, list] of Object.entries(chat)) {
+      if (conv === ARCADE || conv.startsWith('dm:')) continue;
+      for (const m of list) {
+        const why = moveSkip(m, { ...ctx, secretExists: !!(state.gameSecrets || {})[m.id] }, m.id);
+        if (why === 'not coins') continue;
+        if (why) {
+          skipped.push({ conv, id: m.id, kind: m.cmd.name, why, at: m.at || 0 });
+          continue;
+        }
+        byChannel[conv] = (byChannel[conv] || 0) + 1;
+        byKind[m.cmd.name] = (byKind[m.cmd.name] || 0) + 1;
+        todo.push({ conv, m });
+      }
+    }
+    // Waiting cards by kind, so the owner sees the whole split (moving + waiting).
+    const waitByKind = {};
+    for (const x of skipped) waitByKind[x.kind] = (waitByKind[x.kind] || 0) + 1;
+    const report = { byChannel, byKind, waitByKind, total: todo.length, skipped: skipped.slice(0, 100), skippedCount: skipped.length };
+    if (req?.dry) return { ok: true, dry: true, ...report };
+    // Live progress, card by card, like the server's settings/moveToArcadeRun.
+    const base = Math.max(0, Number(req?.base) || 0);
+    for (let i = 0; i <= todo.length; i++) {
+      for (const f of moveWatchers) f({ run: req?.run || '', moved: base + i, left: todo.length - i });
+      if (i < todo.length) await new Promise((r) => setTimeout(r, 120));
+    }
+    const ids = new Set(todo.map((x) => x.m.id));
+    const from = Object.fromEntries(todo.map((x) => [x.m.id, x.conv]));
+    const next = { ...chat };
+    for (const conv of new Set(todo.map((x) => x.conv))) next[conv] = (next[conv] || []).filter((m) => !ids.has(m.id));
+    next[ARCADE] = [...(next[ARCADE] || []), ...todo.map(({ conv, m }) => ({ ...m, moved: { from: conv, at: now } }))].sort((a, b) => (a.at || 0) - (b.at || 0));
+    state.chat = next;
+    const to = (x, idKey = 'msgId') => (ids.has(x?.[idKey]) && x.conv === from[x[idKey]] ? { ...x, conv: ARCADE } : x);
+    state.disputes = (state.disputes || []).map((x) => to(x));
+    for (const k of Object.keys(state.refundKeys || {})) state.refundKeys[k] = to(state.refundKeys[k]);
+    for (const k of Object.keys(state.coinRequests || {})) {
+      const r = state.coinRequests[k];
+      if ((ids.has(k) || ids.has(r.group)) && r.conv !== ARCADE) state.coinRequests[k] = { ...r, conv: ARCADE };
+    }
+    for (const k of Object.keys(state.coinRequestGroups || {})) if (ids.has(k)) state.coinRequestGroups[k] = { ...state.coinRequestGroups[k], conv: ARCADE };
+    for (const g of Object.values(state.funGames || {})) if (g?.race && ids.has(g.race.msgId)) g.race = { ...g.race, conv: ARCADE };
+    let history = 0;
+    for (const [name, b] of Object.entries(state.bank || {})) {
+      const recent = (b.recent || []).map((x) => {
+        const [conv, id] = typeof x.card === 'string' ? x.card.split('/') : [];
+        if (conv && conv !== ARCADE && ids.has(id)) {
+          history++;
+          return { ...x, card: `${ARCADE}/${id}` };
+        }
+        return x;
+      });
+      const chOpen = b.chOpen && ids.has(b.chOpen.id) ? { ...b.chOpen, conv: ARCADE } : b.chOpen;
+      state.bank[name] = { ...b, recent, ...(chOpen && { chOpen }) };
+    }
+    commit();
+    return { ok: true, moved: todo.length, more: false, history, ...report };
   },
   // The owner's Refund / Take back on a game card, checked the way the
   // ownerRefund function checks it (shared/disputes.js): the card's own
@@ -2454,6 +2702,7 @@ export const demoStore = {
           ? { status: 'refunded', handledBy: actor.name, handledAt: now, refund: amount, resolutionNote: 'Refunded from the card in chat.', via: 'card' }
           : { status: 'dismissed', handledBy: actor.name, handledAt: now, refund: 0, resolutionNote: 'The win was taken back.', via: 'card' },
       );
+    if (rep) clearReportNote(rep);
     if (who !== actor.name)
       state.inbox = [
         { id: uid(), type: 'dispute', ...dispute.fixNote({ mode, amount, game: check.game, by: actor.name }), open: `chat:${conv}`, at: now, read: false, to: who },
@@ -2590,6 +2839,7 @@ export const demoStore = {
       return { ok: true, result: r, bot, won, coins, paid };
     }
     if (req.action === 'share') {
+      if (req.conv !== ARCADE) return { note: { ...ARCADE_NOTE } };
       if (!s || s.person !== me || !s.done || s.problem) return note('That game can’t be shared.');
       if (s.shared) return note('Already posted.');
       const line = fun.resultLine(s.game, s.mode, s.result);
@@ -2659,6 +2909,15 @@ export const demoStore = {
   },
   subscribeLoanSettings(cb) {
     return listen(() => cb(state.loanSettings || {}));
+  },
+  // Gambling buddy (functions/buddy.js; demoBuddy.js here): { ok, done, lock } or { note }.
+  async buddy(req, actor, ctx) {
+    await demoLag();
+    return buddies.call(req, actor, ctx);
+  },
+  // The locks this person is in (theirs, or as someone's buddy); every lock for the owner.
+  subscribeBuddy(actor, cb) {
+    return listen(() => cb(buddies.visible(actor).map((l) => ({ ...l }))));
   },
   // The server's loanTick (due dates, reminders), run while the app is open.
   loanTick(ctx) {
@@ -3008,6 +3267,8 @@ export const demoStore = {
     return [...((state.chat || {})[conv] || [])].sort((a, b) => b.at - a.at).slice(0, count);
   },
   async sendMessage(conv, data, actor, photoFiles) {
+    // Like the rules (3.2): the app's own coin cards only in #arcade.
+    if (conv !== ARCADE && ['give', 'balance', 'leaderboard'].includes(data?.cmd?.name)) throw Object.assign(new Error('Coins and games are in #arcade'), { code: 'permission-denied' });
     let photo = null;
     if (photoFiles) {
       const url = await dataUrl(photoFiles.thumb);

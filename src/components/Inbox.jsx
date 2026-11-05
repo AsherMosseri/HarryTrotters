@@ -21,6 +21,8 @@ const ICONS = {
   // Ads and coupons get a tag, not the product's emoji.
   ad: 'tag',
   loan: 'bank',
+  // Gambling buddy (CoinStats.jsx).
+  buddy: 'lock',
 };
 
 function BellIcon() {
