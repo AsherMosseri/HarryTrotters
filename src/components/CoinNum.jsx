@@ -25,12 +25,17 @@ export function useCoinFormat() {
 }
 
 // A coin amount as text (a <span>, or `as="b"`): in Short, a long-press or
-// hover shows the exact number.
-export function CoinNum({ n, signed = false, as: Tag = 'span', className, ...rest }) {
+// hover shows the exact number. max: the most characters it may take (a big
+// balance header); longer (commas past a trillion or so, coins go up to a
+// googol) is written short instead, with the exact number on hover.
+export function CoinNum({ n, signed = false, max = 0, as: Tag = 'span', className, ...rest }) {
   const style = useCoinStyle();
+  const fmt = (st) => (signed ? signedCoins(n, st) : formatCoins(n, st));
+  const long = max > 0 && fmt(style).length > max;
+  const st = long ? 'short' : style;
   return (
-    <Tag className={className} title={coinTitle(n, style)} {...rest}>
-      {signed ? signedCoins(n, style) : formatCoins(n, style)}
+    <Tag className={className} title={coinTitle(n, st)} {...rest}>
+      {fmt(st)}
     </Tag>
   );
 }

@@ -40,6 +40,7 @@ import {
   ceilingRoom,
   coinsAgree,
   overCeiling,
+  setParts,
   sumCoins,
 } from '../functions/shared/coins.js';
 import { bankAfter, closeHold, holdEntry } from '../functions/shared/casino.js';
@@ -776,6 +777,21 @@ console.log(`${CASES} random teams checked; ${bankSharedCases} people had a capi
     ok(breakdownGaps(breakdown(app.history), breakdown(srv.history)).length === 0, `${tag}: no breakdown gaps`);
     console.log(`big case ${tag}: Asher ${app.balance} (server ${srv.balance}, exact ${truth})`);
   }
+
+  // The owner's Set to, past 2^53: exact, even far below a huge balance.
+  for (const [lines, target] of [
+    [[3e45, 1.1e16, 844, -5e15, 1e15], 2e16],
+    [[1.1e16, 844], 0],
+    [[1e100, 12345, -7], 5],
+    [[2.5e40, 3e18, 11], 1.1e16],
+    [[100, 20], 50],
+  ]) {
+    const list = lines.map((amount) => ({ amount }));
+    const parts = setParts(target, list);
+    const after = sumCoins([...list, ...parts.map((amount) => ({ amount }))]);
+    ok(after === target && parts.length <= 6 && parts.every((x) => Number.isInteger(x) && x !== 0), `Set ${target} from ${lines.join(' + ')}: ${parts.length} grant(s) [${parts.join(', ')}] → ${after}`);
+  }
+  ok(setParts(120, [{ amount: 100 }, { amount: 20 }]).length === 0, 'Set to what they have: no grant');
 
   // At and over the ceiling: a win pays 0, a credit is refused, a loss works.
   ok(MAX_BALANCE === 1e100, 'the ceiling is a googol');

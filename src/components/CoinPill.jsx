@@ -1,7 +1,7 @@
 import { Coin } from './Coins.jsx';
 import CountUp from './CountUp.jsx';
 import { useCoinFormat } from './CoinNum.jsx';
-import { formatCoins } from '../coinFormat.js';
+import { coinTitle, formatCoins } from '../coinFormat.js';
 
 // The most characters the pill shows ("9,999,999,999" is 13). With commas or
 // no commas a bigger balance (coins go up to a googol: 11 quadrillion is
@@ -29,7 +29,7 @@ export default function CoinPill({ balance, ready, onOpen, className = '' }) {
       type="button"
       className={`coin-pill ${className}`}
       onClick={onOpen}
-      title={f.title(n) || (text(n) !== f.n(n) ? f.exact(n) : undefined)}
+      title={f.title(n) || (text(n) !== f.n(n) ? coinTitle(n, 'short') : undefined)}
       data-chars={text(n).length}
       aria-label={`${f.exact(n)} Jackson coins, open coins`}
     >

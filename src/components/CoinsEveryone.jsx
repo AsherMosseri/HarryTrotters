@@ -1,7 +1,7 @@
 // Coins screen extras: comparing the app's balance with the server's, and
 // (team management only) everyone's coin history.
 import { useMemo, useState } from 'react';
-import { MAX_BALANCE, breakdown, breakdownGaps, ceilingNote, coinsAgree, historyGroup, historyKey, overCeiling, sumCoins, wallet as walletOf } from '../coins.js';
+import { EXACT_LIMIT, MAX_BALANCE, breakdown, breakdownGaps, ceilingNote, coinsAgree, historyGroup, historyKey, overCeiling, setParts, sumCoins, wallet as walletOf } from '../coins.js';
 import { Avatar } from './common.jsx';
 import { Icon } from './shell/icons.jsx';
 import { alertDialog, confirmDialog } from './Dialogs.jsx';
@@ -195,18 +195,35 @@ export function EveryoneCoins({ roster, data, cfg, onCheck, onAdjust, onFix }) {
 function Person({ name, w, casino, cfg, onCheck, onAdjust, onFix, onBack }) {
   const f = useCoinFormat();
   const [chip, setChip] = useState('all');
-  // The balance after each entry: start from today's and walk back.
+  // The balance after each entry: start from today's and walk back. Past
+  // 2^53 a subtraction can lose the small lines (3e45 − 3e45 + 11Qa would say
+  // 0), so then each one is the exact sum of it and everything older,
+  // rounded once (the same sum as the balance, sumCoins).
   const all = useMemo(() => {
-    let run = w.balance;
-    return w.history.map((x) => {
-      const row = { ...x, after: run };
-      run -= x.amount;
-      return row;
-    });
+    const big = w.history.some((x) => Math.abs(x.amount) >= EXACT_LIMIT) || Math.abs(w.balance) >= EXACT_LIMIT;
+    if (!big) {
+      let run = w.balance;
+      return w.history.map((x) => {
+        const row = { ...x, after: run };
+        run -= x.amount;
+        return row;
+      });
+    }
+    const out = new Array(w.history.length);
+    let whole = 0n;
+    let rest = 0;
+    for (let i = w.history.length - 1; i >= 0; i--) {
+      const x = w.history[i];
+      const v = Number.isFinite(x.amount) ? x.amount : 0;
+      whole += BigInt(Math.trunc(v));
+      rest += v - Math.trunc(v);
+      out[i] = { ...x, after: Number(whole) + rest };
+    }
+    return out;
   }, [w]);
   const shown = chip === 'all' ? all : all.filter((x) => historyGroup(x) === chip);
   const rev = useReverse(name, w.history, onAdjust, onFix);
-  const total = shown.reduce((t, x) => t + x.amount, 0);
+  const total = sumCoins(shown);
   return (
     <>
       <div className="cv-who">
@@ -223,7 +240,7 @@ function Person({ name, w, casino, cfg, onCheck, onAdjust, onFix, onBack }) {
           </span>
         </span>
       </div>
-      {onAdjust && <AdjustCoins key={name} name={name} balance={w.balance} onCheck={onCheck} onAdjust={onAdjust} />}
+      {onAdjust && <AdjustCoins key={name} name={name} balance={w.balance} history={w.history} onCheck={onCheck} onAdjust={onAdjust} />}
       {onAdjust && <p className="muted tiny cv-rev-hint">Tap a line to reverse it: a loss is refunded, a gain is taken away.</p>}
       <div className="cv-chips" role="group" aria-label="Show">
         {CHIPS.map(([id, label]) => (
@@ -283,7 +300,7 @@ function Person({ name, w, casino, cfg, onCheck, onAdjust, onFix, onBack }) {
 // balance when it answers (the rules allow any finite amount from the owner).
 // Past 2^53 (about 9 quadrillion) amounts are rounded, like every big balance.
 const OWNER_MAX = MAX_BALANCE;
-function AdjustCoins({ name, balance, onCheck, onAdjust }) {
+function AdjustCoins({ name, balance, history = [], onCheck, onAdjust }) {
   const [mode, setMode] = useState('add');
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
@@ -316,7 +333,8 @@ function AdjustCoins({ name, balance, onCheck, onAdjust }) {
         setMsg('That’s a change of more than a googol.');
         return;
       }
-      const after = now + delta;
+      // Set: they end at the number asked for (past 2^53, about it).
+      const after = mode === 'set' ? n : now + delta;
       const yes = await confirmDialog({
         title: mode === 'set' ? `Set ${name.split(' ')[0]} to ${coinStyled(n)}?` : `${delta > 0 ? 'Give' : 'Take'} ${coinStyled(Math.abs(delta))} coins?`,
         body: withExact(`${name} goes from ${coinStyled(now)} to ${coinStyled(after)} coins.${after < 0 ? ' That’s below zero.' : ''}`, mode === 'set' ? n : delta),
@@ -325,7 +343,16 @@ function AdjustCoins({ name, balance, onCheck, onAdjust }) {
       });
       if (!yes) return;
       const label = note.trim() || (mode === 'set' ? `Balance set to ${exactCoins(n)}` : delta > 0 ? 'Bonus' : 'Taken away');
-      const done = await onAdjust({ to: name, amount: delta, note: label.slice(0, 140), at: Date.now() });
+      // Set past 2^53: the exact gap from this history (when the server
+      // counts the same balance), as one grant or a few that add up exactly.
+      const big = Math.max(Math.abs(now), Math.abs(n)) >= EXACT_LIMIT;
+      const parts = mode === 'set' && big && coinsAgree(sumCoins(history), now) ? setParts(n, history) : [delta];
+      let done;
+      for (const [i, amount] of parts.entries()) {
+        const line = i ? `${label.slice(0, 120)} (part ${i + 1})` : label.slice(0, 140);
+        done = await onAdjust({ to: name, amount, note: line, at: Date.now() });
+        if (done === false) break;
+      }
       if (done !== false) {
         setMsg(`Done: ${name.split(' ')[0]} has ${coinStyled(after)} now.`);
         setAmount('');

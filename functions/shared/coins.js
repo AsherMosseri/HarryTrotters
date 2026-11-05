@@ -595,6 +595,27 @@ export function sumCoins(list, amount = (x) => x.amount) {
   }
   return Number(whole) + rest;
 }
+// The owner's Set to (3.1.5): the grants that bring someone with these
+// history lines to exactly `target`. One grant of target − balance is enough
+// below 2^53; past it the balance is rounded (3e45 hides a few quadrillion),
+// so the gap is worked out exactly (BigInt) and written as the fewest doubles
+// that add up to it exactly (one, or a few: a big one and its rounding).
+// [] when they're already there.
+export function setParts(target, list, amount = (x) => x.amount) {
+  let have = 0n;
+  for (const x of list) {
+    const v = amount(x);
+    if (typeof v === 'number' && Number.isFinite(v)) have += BigInt(Math.trunc(v));
+  }
+  let gap = BigInt(Math.trunc(target)) - have;
+  const parts = [];
+  while (gap !== 0n && parts.length < 8) {
+    const d = Number(gap);
+    parts.push(d);
+    gap -= BigInt(d);
+  }
+  return parts;
+}
 // A game's result for someone whose balance before it was `before`: a win
 // is cut so they end at MAX_BALANCE at most (never below 0); a loss or a
 // push is unchanged.

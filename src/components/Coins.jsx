@@ -18,10 +18,10 @@ export const Coin = ({ size = 16 }) => (
 );
 // The number follows Appearance → Coin numbers (coinFormat.js); `exact`
 // always writes it in full with commas (what was just sent or paid).
-export const Coins = ({ n, size, exact = false }) => (
+export const Coins = ({ n, size, exact = false, max = 0 }) => (
   <span className="jcoins">
     <Coin size={size} />
-    {exact ? coinStyled(n) : <CoinNum n={n} />}
+    {exact ? coinStyled(n) : <CoinNum n={n} max={max} />}
   </span>
 );
 
@@ -77,7 +77,8 @@ export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onMarket
           <div className="coins-balance">
             <span className="muted small">Your balance</span>
             <b>
-              <Coins n={wallet.balance} size={30} />
+              {/* Up to 13 characters (9,999,999,999,999): a bigger balance is written short. */}
+              <Coins n={wallet.balance} size={30} max={13} />
             </b>
             <span className="muted small">
               {f.n(cfg.perTask)} for each task you finish (up to {cfg.tasksPerDay} a day) · {f.n(perHourOf(cfg))} an hour at the lab, paid per
