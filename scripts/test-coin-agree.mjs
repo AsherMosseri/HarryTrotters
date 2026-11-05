@@ -14,6 +14,9 @@
 // capitals, spaces or punctuation points the old name at the same bank doc as
 // the new one, and the server counted that doc twice.
 //
+// 3.1.5: balances past 2^53 (1.1e16, 3e18, 1e40, near a googol) give the
+// same number on both sides in any order, within a billionth of the exact sum.
+//
 // Run: node scripts/test-coin-agree.mjs [cases]
 import {
   COIN_DEFAULTS,
@@ -30,6 +33,14 @@ import {
   historyKey,
   oldBankIds,
   wallet,
+  MAX_BALANCE,
+  breakdown,
+  breakdownGaps,
+  capWin,
+  ceilingRoom,
+  coinsAgree,
+  overCeiling,
+  sumCoins,
 } from '../functions/shared/coins.js';
 import { bankAfter, closeHold, holdEntry } from '../functions/shared/casino.js';
 import { moneyLine } from '../functions/shared/arcade.js';
@@ -665,6 +676,116 @@ console.log(`${CASES} random teams checked; ${bankSharedCases} people had a capi
   ok(a.history.filter((x) => x.kind === 'refund').every((x) => historyGroup(x) === 'casino'), 'card refunds are under Casino');
   ok(a.history.find((x) => x.amount === 429149)?.reverses === key, 'the refund names the line it undoes');
   console.log(`owner refund case: Cooper ${a.balance} (server ${sv.balance})`);
+}
+
+// ---------- 3.1.5: balances past 2^53, up to a googol ----------
+// Past 2^53 amounts are doubles and a plain left-to-right sum depends on the
+// order the entries come in (the app reads the whole ledger, the server one
+// query per field). wallet() adds them exactly (sumCoins), so both land on the
+// same number whatever the order; coinsAgree allows a billionth past 2^53.
+{
+  const EXACT = 2 ** 53;
+  ok(coinsAgree(5, 5) && !coinsAgree(5, 6), 'coinsAgree: exact below 2^53');
+  ok(!coinsAgree(1e15, 1e15 + 1), 'coinsAgree: 1e15 and 1e15 + 1 differ (below 2^53)');
+  ok(!coinsAgree(EXACT - 2, EXACT - 1), 'coinsAgree: just below 2^53 stays exact');
+  ok(coinsAgree(1.1e16, 1.1e16 + 8), 'coinsAgree: 1.1e16 and 1.1e16 + 8 agree');
+  ok(!coinsAgree(1.1e16, 1.1e16 * (1 + 1e-6)), 'coinsAgree: a millionth apart is a real difference');
+  ok(coinsAgree(1e40, 1e40 * (1 + 5e-10)) && !coinsAgree(1e40, 1e40 * (1 + 2e-9)), 'coinsAgree: 1e40 within a billionth');
+  ok(!coinsAgree(NaN, NaN) && !coinsAgree(Infinity, 1e300), 'coinsAgree: NaN and Infinity never agree');
+  ok(sumCoins([{ amount: 1 }, { amount: 2 }]) === 3 && sumCoins([]) === 0, 'sumCoins: small sums');
+  // The order problem a plain sum has, and that sumCoins doesn't.
+  const xs = [1e16, 1, 1, 1, 1, -1e16].map((amount) => ({ amount }));
+  const plain = (list) => list.reduce((t, x) => t + x.amount, 0);
+  const ys = [1, 1, 1, 1, 1e16, -1e16].map((amount) => ({ amount }));
+  ok(plain(xs) !== plain(ys), `a plain sum depends on order past 2^53 (${plain(xs)} vs ${plain(ys)})`);
+  ok(sumCoins(xs) === 4 && sumCoins(ys) === 4 && sumCoins([...xs].reverse()) === 4, `sumCoins doesn't: ${sumCoins(xs)}`);
+
+  const rand = rngOf(31415);
+  const shuffle = (list) => {
+    const a = [...list];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(rand() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  };
+  // One world per scale: a grant to the scale, gifts both ways, bets won and
+  // lost (a bank doc built by bankAfter, which adds one result at a time),
+  // a refund, a bank loan. truth: the same numbers added as BigInt.
+  for (const [scale, tag] of [
+    [1.1e16, '1.1e16'],
+    [3e18, '3e18'],
+    [1e40, '1e40'],
+    [7e99, 'near a googol'],
+  ]) {
+    const A = 'Asher Mosseri';
+    const C = 'Cooper Mlezcko';
+    const amounts = [];
+    const ledger = [{ type: 'grant', to: A, amount: scale, note: 'Bonus', at: NOW - 9 * DAY }];
+    amounts.push(scale);
+    for (let i = 0; i < 40; i++) {
+      const at = NOW - 8 * DAY + i * HOUR;
+      const big = Math.round(scale * (0.0001 + rand() * 0.001));
+      const small = 1 + Math.floor(rand() * 999);
+      if (i % 4 === 0) (ledger.push({ type: 'gift', from: A, to: C, amount: big, note: '', at }), amounts.push(-big));
+      else if (i % 4 === 1) (ledger.push({ type: 'gift', from: C, to: A, amount: small, note: '', at }), amounts.push(small));
+      else if (i % 4 === 2) (ledger.push({ type: 'grant', to: A, amount: small, note: 'Bonus', at }), amounts.push(small));
+      else (ledger.push({ type: 'refund', person: A, amount: big, label: 'Refund', at }), amounts.push(big));
+    }
+    // Same time on purpose (ties keep their order in the history sort).
+    ledger.push({ type: 'grant', to: A, amount: 7, note: 'Tie', at: NOW - DAY }, { type: 'grant', to: A, amount: -3, note: 'Tie', at: NOW - DAY });
+    amounts.push(7, -3);
+    let b = {};
+    for (let i = 0; i < 30; i++) {
+      const bet = Math.round(scale * (0.001 + rand() * 0.01));
+      const won = rand() < 0.5;
+      const d = won ? bet : -bet;
+      b = bankAfter(b, A, d, { game: 'coinflip', icon: '🪙', label: `Coin flip: ${won ? `won ${bet}` : `lost ${bet}`}`, shown: d }, {}, NOW - 2 * DAY + i * MIN);
+      amounts.push(d);
+    }
+    const truth = amounts.reduce((t, x) => t + BigInt(x), 0n);
+    const world = (led) => ({
+      rename: (n) => n,
+      aliasesOf: (n) => [n],
+      people: [{ current: A }, { current: C }],
+      cfg: coinSettings({}),
+      shifts: [],
+      tasks: [],
+      ledger: led,
+      bank: new Map([['asher-mosseri', { ...b, name: A }]]),
+    });
+    const w = world(ledger);
+    const app = appView(w, A);
+    const srv = serverView(w, A);
+    ok(app.balance === srv.balance, `${tag}: app ${app.balance} = server ${srv.balance}`);
+    ok(coinsAgree(app.balance, srv.balance), `${tag}: coinsAgree`);
+    ok(sumCoins(app.history) === app.balance, `${tag}: the history adds up (exactly, in any order)`);
+    const off = Math.abs(app.balance - Number(truth));
+    ok(off <= 1e-9 * Math.abs(Number(truth)), `${tag}: within a billionth of the exact sum (off by ${off})`);
+    ok(!app.history.some((x) => /Earlier/.test(x.label)), `${tag}: no "Earlier" line from rounding alone`);
+    // Shuffled ledgers (the order Firestore hands them back in can differ).
+    const seen = new Set([app.balance]);
+    for (let k = 0; k < 12; k++) {
+      const s = shuffle(ledger);
+      seen.add(appView(world(s), A).balance);
+      seen.add(serverView(world(s), A).balance);
+    }
+    ok(seen.size === 1, `${tag}: the same balance in every order (${[...seen].join(', ')})`);
+    const cooper = appView(w, C);
+    ok(cooper.balance === serverView(w, C).balance, `${tag}: Cooper app ${cooper.balance} = server`);
+    ok(breakdownGaps(breakdown(app.history), breakdown(srv.history)).length === 0, `${tag}: no breakdown gaps`);
+    console.log(`big case ${tag}: Asher ${app.balance} (server ${srv.balance}, exact ${truth})`);
+  }
+
+  // At and over the ceiling: a win pays 0, a credit is refused, a loss works.
+  ok(MAX_BALANCE === 1e100, 'the ceiling is a googol');
+  ok(capWin(500, 1e100) === 0 && capWin(500, 2e100) === 0, 'a win at (or over) a googol pays 0');
+  ok(capWin(-500, 1e100) === -500, 'a loss at a googol still costs');
+  ok(capWin(1e95, 1e100 - 1e90) <= 1e90 * 1.00001 && capWin(1e95, 1e100 - 1e90) > 0, 'a win near a googol pays up to it (rounded)');
+  ok(1e100 - 1e90 + capWin(1e95, 1e100 - 1e90) <= MAX_BALANCE, 'and ends at a googol at most');
+  ok(overCeiling(1e100, 1) && overCeiling(2e100, 1) && !overCeiling(1e100, 0) && !overCeiling(1e100, -5), 'a credit at a googol is refused; nothing or a loss is fine');
+  ok(!overCeiling(1.1e16, 5e15) && !overCeiling(1e40, 2.5e40), 'big credits well under a googol are fine');
+  ok(ceilingRoom(-5) >= MAX_BALANCE && ceilingRoom(3e100) === 0, 'room never below 0');
 }
 
 console.log(failures ? `${failures} FAILURES` : 'ALL OK');

@@ -1,8 +1,9 @@
 // The Jackson coin number formatter (src/coinFormat.js): commas, no commas,
 // and short (1k, 1.1k, 82.2k, 2.3m, 1.5b), signs, rounding, and the exact
-// hover text.
+// hover text. 3.1.5: up to a googol (Qa … Dc, scientific, "1 googol").
 // Run: node scripts/test-coin-format.mjs
-import { coinLabel, coinTitle, exactCoins, formatCoins, signedCoins } from '../src/coinFormat.js';
+import { coinLabel, coinTitle, exactCoins, exactNote, formatCoins, signedCoins } from '../src/coinFormat.js';
+import { coinsText } from '../functions/shared/coinText.js';
 
 let failures = 0;
 let passes = 0;
@@ -125,6 +126,66 @@ for (const [raw, c, s] of LABELS) {
   eq(coinLabel(raw, 'short'), s, `label short “${raw}”`);
 }
 eq(coinLabel(undefined), '', 'label of nothing');
+
+// 3.1.5: up to a googol. Short names every -illion to Dc, then scientific,
+// then "1 googol"; commas and plain write every digit below 1e21.
+const BIG = [
+  // [n, commas, plain, short]
+  [1e12, '1,000,000,000,000', '1000000000000', '1t'],
+  [999950e9, '999,950,000,000,000', '999950000000000', '1Qa'],
+  [1e15, '1,000,000,000,000,000', '1000000000000000', '1Qa'],
+  [1.1e16, '11,000,000,000,000,000', '11000000000000000', '11Qa'],
+  [999949e12, '999,949,000,000,000,000', '999949000000000000', '999.9Qa'],
+  [999950e12, '999,950,000,000,000,000', '999950000000000000', '1Qi'],
+  [3e18, '3,000,000,000,000,000,000', '3000000000000000000', '3Qi'],
+  [1e21, '1e21', '1e21', '1Sx'],
+  [2.5e24, '2.5e24', '2.5e24', '2.5Sp'],
+  [1e27, '1e27', '1e27', '1Oc'],
+  [4.2e30, '4.2e30', '4.2e30', '4.2No'],
+  [1.5e33, '1.5e33', '1.5e33', '1.5Dc'],
+  [999.94e33, '1e36', '1e36', '999.9Dc'],
+  [999.95e33, '1e36', '1e36', '1e36'],
+  [1.23e36, '1.2e36', '1.2e36', '1.2e36'],
+  [2.5e40, '2.5e40', '2.5e40', '2.5e40'],
+  [9.96e40, '1e41', '1e41', '1e41'],
+  [3e45, '3e45', '3e45', '3e45'],
+  [1e100, '1 googol', '1 googol', '1 googol'],
+  [2e100, '1 googol', '1 googol', '1 googol'],
+  [-1.1e16, '−11,000,000,000,000,000', '−11000000000000000', '−11Qa'],
+  [-3e45, '−3e45', '−3e45', '−3e45'],
+];
+for (const [n, c, p, sh] of BIG) {
+  eq(formatCoins(n, 'commas'), c, `commas ${n}`);
+  eq(formatCoins(n, 'plain'), p, `plain ${n}`);
+  eq(formatCoins(n, 'short'), sh, `short ${n}`);
+}
+// Short is never "1000" of any unit, all the way up.
+for (let e = 3; e <= 36; e += 3)
+  for (const m of [999.94, 999.95, 999.99, 1000]) {
+    const sh = formatCoins(m * 10 ** e, 'short');
+    if (/^1000/.test(sh)) eq(sh, 'rolls over', `short ${m}e${e}`);
+    if (sh.length > 7) eq(sh, 'at most 7 characters', `short ${m}e${e}`);
+  }
+for (let e = 36; e <= 100; e++) if (formatCoins(1.234 * 10 ** e, 'short').length > 8) eq(formatCoins(1.234 * 10 ** e, 'short'), 'short', `1.234e${e}`);
+eq(coinTitle(1.1e16, 'short'), 'About 11,000,000,000,000,000', 'title past 2^53 says About');
+eq(coinTitle(1e15, 'short'), '1,000,000,000,000,000', 'title below 2^53 is exact');
+eq(coinTitle(2.5e40, 'short'), undefined, 'no title when short is all there is');
+eq(signedCoins(2.5e40, 'short'), '+2.5e40', 'signed 2.5e40');
+eq(signedCoins(-1.1e16, 'commas'), '−11,000,000,000,000,000', 'signed −1.1e16');
+eq(coinLabel('Slots: won 11000000000000000', 'short'), 'Slots: won 11Qa', 'label 1.1e16');
+eq(coinLabel('Coin flip: won 2.5e+40 (capped at a googol)', 'short'), 'Coin flip: won 2.5e40 (capped at a googol)', 'label 2.5e+40, capped');
+eq(coinLabel('Gave 1e+21 each to @Programming (4 people)', 'commas'), 'Gave 1e21 each to @Programming (4 people)', 'label 1e+21 each');
+eq(coinLabel('Bet held: Mines 3e+45 (playing)', 'short'), 'Bet held: Mines 3e45 (playing)', 'label held 3e+45');
+eq(coinsText(1.1e16), '11,000,000,000,000,000', 'server text 1.1e16');
+eq(coinsText(2.5e40), '2.5e40', 'server text 2.5e40');
+eq(coinsText(1e100), '1 googol', 'server text a googol');
+eq(coinsText(-3e45), '-3e45', 'server text −3e45');
+eq(coinsText(1234), '1,234', 'server text 1,234');
+// The line under a confirm (Node has no localStorage: the style is Short).
+eq(exactNote(1.1e16), 'About 11,000,000,000,000,000 coins.', 'exact note past 2^53 says About');
+eq(exactNote(1e15), 'Exactly 1,000,000,000,000,000 coins.', 'exact note below 2^53');
+eq(exactNote(3e21), 'About 3e21 coins.', 'exact note under 3Sx: About 3e21');
+eq(exactNote(2.5e40), '', 'no note when short is scientific too');
 
 console.log(failures ? `${failures} FAILED, ${passes} passed` : `ALL PASSED (${passes})`);
 process.exit(failures ? 1 : 0);
