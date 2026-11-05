@@ -2005,7 +2005,7 @@ export const demoStore = {
       const batch = `${personId(me)}-${req.key}`;
       const before = (state.coins || []).filter((x) => x.type === 'gift' && x.batch === batch);
       const total = before.reduce((t, x) => t + x.amount, 0);
-      if (before.length) return { ok: true, repeat: true, people: before.map((x) => x.to), amount: before[0].amount, total, group: label };
+      if (before.length) return { ok: true, repeat: true, people: before.map((x) => x.to), amount: before[0].amount, total, group: label, batch };
       const made = groupGiftEntries(
         me,
         { people, amount: req.amount, note: req.note, batch, group: label },
@@ -2013,7 +2013,7 @@ export const demoStore = {
       );
       if (made.error) return note(made.error, made.body);
       for (const e of made.entries) await demoStore.addCoinTx(e);
-      return { ok: true, people, amount: made.entries[0].amount, total: made.total, group: label };
+      return { ok: true, people, amount: made.entries[0].amount, total: made.total, group: label, batch };
     }
     // Gifts and ad prizes, checked the way the server checks them.
     if (action === 'gift' || action === 'prize') {
@@ -2022,8 +2022,11 @@ export const demoStore = {
           ? giftEntry(me, req, { roster, balance: balanceOf(me), now })
           : prizeEntry(me, req, { ledger: state.coins || [], gameCap: state.settings?.ads?.games?.cap ?? 10, now });
       if (entry.error) return note(entry.error, entry.body);
-      await demoStore.addCoinTx(entry);
-      return { ok: true, entry };
+      // A /give with a key: the card keeps it, for the owner's Undo (key, not
+      // batch: batch makes a group line in the giver's history).
+      const batch = action === 'gift' && req.key ? `${personId(me)}-${req.key}` : '';
+      await demoStore.addCoinTx(batch ? { ...entry, key: batch } : entry);
+      return { ok: true, entry, ...(batch && { batch }) };
     }
 
     if (action === 'move') {
@@ -2384,6 +2387,25 @@ export const demoStore = {
     const { conv, msgId, person, mode } = req || {};
     const m = ((state.chat || {})[conv] || []).find((y) => y.id === msgId);
     if (!m?.cmd) return note('That game is gone.');
+    // Undo on a /give card, the way the ownerRefund function does it.
+    if (mode === 'undogift') {
+      const c = m.cmd;
+      if (c.name !== 'give') return note('That gift is gone.');
+      if (!c.batch) return note('This gift can’t be undone from its card.', 'It was sent before Undo existed. Reverse it from their coin history instead.');
+      if (c.undone) return note('That gift was already undone.');
+      const boss = REQUESTS_TO.split(' ')[0];
+      const list = (state.coins || []).filter((x) => x.type === 'gift' && (x.batch === c.batch || x.key === c.batch) && x.from === m.by);
+      if (!list.length) return note('I can’t find that gift in the coin history.', 'Nothing was changed.');
+      const total = list.reduce((t, x) => t + x.amount, 0);
+      state.coins = [
+        ...(state.coins || []),
+        ...list.map((x) => ({ id: `undo-${c.batch}-${personId(x.to)}`, type: 'refund', person: x.to, amount: -x.amount, label: `Gift undone by ${boss}: from ${x.from}`, at: now })),
+        { id: `undo-${c.batch}-from`, type: 'refund', person: m.by, amount: total, label: `Gift undone by ${boss}: to ${c.group || list[0].to}`, at: now },
+      ];
+      state.chat = { ...state.chat, [conv]: state.chat[conv].map((x) => (x.id === msgId ? { ...x, cmd: { ...x.cmd, undone: { by: actor.name, at: now, total, n: list.length } } } : x)) };
+      commit();
+      return { ok: true, mode: 'undogift', total, n: list.length };
+    }
     const who = String(person || '').trim();
     const check = dispute.fixCheck(m, who, mode);
     if (check.problem) return note(check.problem, check.body);

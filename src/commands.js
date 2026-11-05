@@ -535,6 +535,7 @@ export async function runCommand({ cmd, args }, ctx) {
             count: paid.length,
             amount: r.amount,
             total: r.total,
+            ...(r.batch && { batch: r.batch }),
             line: `sent you ${coinsText(r.amount)} Jackson coins`,
           },
           groupNotify({ ...group, people: paid }, 'gift', ctx),
@@ -553,7 +554,7 @@ export async function runCommand({ cmd, args }, ctx) {
       if (amount > GIFT_MAX) return { note: { title: 'That’s a lot.', body: `Up to ${coinsText(GIFT_MAX)} at a time.` } };
       const r = await ctx.gift(to, amount, '', ctx.key);
       if (!r?.ok) return { note: r?.note || { title: 'That didn’t go through.' } };
-      return card({ to, amount, line: `sent you ${coinsText(amount)} Jackson coins` }, { mentions: [to] });
+      return card({ to, amount, ...(r.batch && { batch: r.batch }), line: `sent you ${coinsText(amount)} Jackson coins` }, { mentions: [to] });
     }
     case 'help':
       return { note: { title: 'Commands', help: true, off: ctx.commandCfg?.off || [] } };
