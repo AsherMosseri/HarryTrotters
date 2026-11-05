@@ -4,6 +4,16 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '3.1.5',
+    date: '2026-11-05',
+    title: 'Coins up to a googol',
+    items: [
+      'Coins now go all the way up to a googol. Past about 9 quadrillion the biggest numbers are rounded, and short numbers name every -illion (Qa, Qi, Sx … Dc) before switching to 1.2e36.',
+      'Type amounts like 5qa, 2.5e40 or googol.',
+      'Ask or give as often as you like: no more request or group limits.',
+    ],
+  },
+  {
     version: '3.1.4',
     date: '2026-11-05',
     title: 'Faster app, commas and Trotbot levels',
