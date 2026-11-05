@@ -8,7 +8,10 @@ import { StyleRequest } from './People.jsx';
 import { ASK_KEYWORDS, IDEA_MAX } from '../requestCommand.js';
 import { GIFT_MAX } from '../../functions/shared/coins.js';
 import { coinsText } from '../../functions/shared/coinText.js';
-import { EXPIRES, REASON_MAX, coinText } from '../../functions/shared/coinRequests.js';
+import { EXPIRES, REASON_MAX } from '../../functions/shared/coinRequests.js';
+import { coinStyled } from '../coinFormat.js';
+// The Ask button's amount follows Appearance, Coin numbers.
+const coinText = (n) => `${coinStyled(n)} 🪙`;
 import { REQUESTS_TO } from '../config.js';
 import { firstName, useEscape } from '../util.js';
 

@@ -6,7 +6,7 @@ import { alertDialog, confirmDialog } from './Dialogs.jsx';
 import { Icon } from './shell/icons.jsx';
 import { REQUESTS_TO } from '../config.js';
 import { CoinNum, useCoinFormat } from './CoinNum.jsx';
-import { exactCoins } from '../coinFormat.js';
+import { coinStyled, withExact } from '../coinFormat.js';
 
 // Casino reports. Someone says a result looks wrong; the owner (Asher, the
 // same person feature requests go to) looks at it and refunds by hand, or
@@ -170,7 +170,7 @@ export function DisputesDialog({ list, api, wallet, onToast, onClose }) {
     const unsure = open.some((x) => !x.snapshot?.final);
     const ok = await confirmDialog({
       title: `Refund ${n === 1 ? 'this report' : `all ${n} reports`}${person ? ` from ${first(person)}` : ''}?`,
-      body: `${unsure ? 'At least' : 'About'} ${exactCoins(known)} coins: each one pays back what its result shows they lost, once, checked like its own Refund button. Any that can’t be refunded stay waiting. It can’t be undone.`,
+      body: withExact(`${unsure ? 'At least' : 'About'} ${coinStyled(known)} coins: each one pays back what its result shows they lost, once, checked like its own Refund button. Any that can’t be refunded stay waiting. It can’t be undone.`, known),
       okLabel: n === 1 ? 'Refund' : `Refund ${n}`,
     });
     if (!ok) return;
@@ -181,7 +181,7 @@ export function DisputesDialog({ list, api, wallet, onToast, onClose }) {
       await alertDialog({ title: r?.note?.title || 'That didn’t go through.', body: r?.note?.body || '' });
       return;
     }
-    if (r.refunded) onToast?.(`Refunded ${r.refunded} report${r.refunded === 1 ? '' : 's'}: ${exactCoins(r.coins)} coins.`);
+    if (r.refunded) onToast?.(`Refunded ${r.refunded} report${r.refunded === 1 ? '' : 's'}: ${coinStyled(r.coins)} coins.`);
     if (r.skipped?.length)
       await alertDialog({
         title: `${r.skipped.length} stayed waiting`,
@@ -265,8 +265,8 @@ function Report({ x, api, wallet, onToast }) {
   const decide = async (decision) => {
     if (decision === 'refund') {
       const ok = await confirmDialog({
-        title: `Refund ${s.final ? exactCoins(s.loss) : 'the loss'} coins to ${first(x.by)}?`,
-        body: 'It pays back what the result shows they lost, once. It can’t be undone.',
+        title: `Refund ${s.final ? coinStyled(s.loss) : 'the loss'} coins to ${first(x.by)}?`,
+        body: withExact('It pays back what the result shows they lost, once. It can’t be undone.', s.final ? s.loss : 0),
         okLabel: 'Refund',
       });
       if (!ok) return;
@@ -275,7 +275,7 @@ function Report({ x, api, wallet, onToast }) {
     setError('');
     const r = await api.disputeDecide({ id: x.id, decision, note: text.trim() });
     setBusy(false);
-    if (r?.ok) onToast?.(decision === 'refund' ? `Refunded ${exactCoins(r.refund)} coins to ${first(x.by)}.` : 'Kept as it was.');
+    if (r?.ok) onToast?.(decision === 'refund' ? `Refunded ${coinStyled(r.refund)} coins to ${first(x.by)}.` : 'Kept as it was.');
     else setError(r?.note ? [r.note.title, r.note.body].filter(Boolean).join(' ') : 'That didn’t go through.');
   };
   return (
@@ -338,7 +338,7 @@ function Report({ x, api, wallet, onToast }) {
           {error && <div className="casino-error">{error}</div>}
           <div className="row gap wrap report-buttons">
             <button className="btn primary" disabled={busy} onClick={() => decide('refund')}>
-              Refund the bet{s.final && s.loss ? ` (${exactCoins(s.loss)})` : ''}
+              Refund the bet{s.final && s.loss ? ` (${coinStyled(s.loss)})` : ''}
             </button>
             <button className="btn" disabled={busy} onClick={() => decide('dismiss')}>
               Dismiss

@@ -121,3 +121,13 @@ if (typeof window !== 'undefined')
 // For text built outside React components (toasts, card lines): the number
 // in this device's style right now.
 export const coinStyled = (n) => formatCoins(n, current);
+// Confirm dialogs show the number in this device's style; with Short, the
+// exact amount goes on a line under it so nobody misreads 135.9b for 13.59b.
+export const exactNote = (n) => {
+  const a = Math.abs(Number(n) || 0);
+  return current === 'short' && formatCoins(a, 'short') !== exactCoins(a) ? `Exactly ${exactCoins(a)} coins.` : '';
+};
+export const withExact = (text, n) => {
+  const e = exactNote(n);
+  return e ? `${text}\n${e}` : text;
+};

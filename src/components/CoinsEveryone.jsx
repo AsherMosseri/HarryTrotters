@@ -6,7 +6,7 @@ import { Avatar } from './common.jsx';
 import { Icon } from './shell/icons.jsx';
 import { alertDialog, confirmDialog } from './Dialogs.jsx';
 import { useCoinFormat } from './CoinNum.jsx';
-import { coinLabel, exactCoins } from '../coinFormat.js';
+import { coinLabel, exactCoins, coinStyled, withExact } from '../coinFormat.js';
 import { FIXABLE, gameLabel } from '../../functions/shared/disputes.js';
 import { REQUESTS_TO } from '../config.js';
 
@@ -297,7 +297,7 @@ function AdjustCoins({ name, balance, onCheck, onAdjust }) {
       }
       const delta = mode === 'add' ? n : mode === 'remove' ? -n : n - now;
       if (!delta) {
-        setMsg(`${name.split(' ')[0]} already has ${exactCoins(now)}.`);
+        setMsg(`${name.split(' ')[0]} already has ${coinStyled(now)}.`);
         return;
       }
       if (Math.abs(delta) > OWNER_MAX) {
@@ -306,8 +306,8 @@ function AdjustCoins({ name, balance, onCheck, onAdjust }) {
       }
       const after = now + delta;
       const yes = await confirmDialog({
-        title: mode === 'set' ? `Set ${name.split(' ')[0]} to ${exactCoins(n)}?` : `${delta > 0 ? 'Give' : 'Take'} ${exactCoins(Math.abs(delta))} coins?`,
-        body: `${name} goes from ${exactCoins(now)} to ${exactCoins(after)} coins.${after < 0 ? ' That’s below zero.' : ''}`,
+        title: mode === 'set' ? `Set ${name.split(' ')[0]} to ${coinStyled(n)}?` : `${delta > 0 ? 'Give' : 'Take'} ${coinStyled(Math.abs(delta))} coins?`,
+        body: withExact(`${name} goes from ${coinStyled(now)} to ${coinStyled(after)} coins.${after < 0 ? ' That’s below zero.' : ''}`, mode === 'set' ? n : delta),
         okLabel: delta > 0 ? 'Give' : 'Take',
         danger: delta < 0,
       });
@@ -315,7 +315,7 @@ function AdjustCoins({ name, balance, onCheck, onAdjust }) {
       const label = note.trim() || (mode === 'set' ? `Balance set to ${exactCoins(n)}` : delta > 0 ? 'Bonus' : 'Taken away');
       const done = await onAdjust({ to: name, amount: delta, note: label.slice(0, 140), at: Date.now() });
       if (done !== false) {
-        setMsg(`Done: ${name.split(' ')[0]} has ${exactCoins(after)} now.`);
+        setMsg(`Done: ${name.split(' ')[0]} has ${coinStyled(after)} now.`);
         setAmount('');
         setNote('');
       }
@@ -367,18 +367,18 @@ export function useReverse(name, history, onAdjust, onFix) {
     if (!can(x) || busy) return;
     const key = historyKey(x);
     const refund = x.amount < 0;
-    const n = exactCoins(Math.abs(x.amount));
+    const n = coinStyled(Math.abs(x.amount));
     const first = name.split(' ')[0];
     const viaCard = !!(x.card && onFix);
     const [conv, msgId] = viaCard ? String(x.card).split('/') : [];
     const older = !viaCard && x.kind === 'casino' && GAME_LINE.test(x.label || '');
     const ok = await confirmDialog({
       title: refund ? `Refund ${n} coins to ${first}?` : `Take ${n} coins away from ${first}?`,
-      body: viaCard
+      body: withExact(viaCard
         ? `“${coinLabel(x.label)}” (${when(x.at)}). This goes through the game’s card: ${first} is told, the card says “${refund ? 'Refunded' : 'Taken back'} by ${OWNER}”, and the line shows Reversed. It can’t also be done from the card.`
         : `“${coinLabel(x.label)}” (${when(x.at)}). ${first}’s history keeps the line, marked Reversed, with a “Reversed” line for the ${refund ? 'refund' : 'take-away'}.${
             older ? ' This line is from before 3.1.1, so it isn’t linked to its card: if the card says “Refunded” or “Taken back”, don’t do this too.' : ''
-          }`,
+          }`, x.amount),
       okLabel: refund ? 'Refund' : 'Take away',
       danger: !refund,
     });
