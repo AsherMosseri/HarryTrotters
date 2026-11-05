@@ -35,7 +35,7 @@ export function CoinNum({ n, signed = false, as: Tag = 'span', className, ...res
   );
 }
 
-// Appearance → Coin numbers: 1,234 (the default) · 1234 · 1.2k, for this device.
+// Appearance → Coin numbers: 1,234 · 1234 · 1.2k (the default), for this device.
 export function CoinFormatSetting() {
   const style = useCoinStyle();
   return (

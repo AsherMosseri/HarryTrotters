@@ -10,7 +10,7 @@ export const CHANGELOG = [
     items: [
       'The app opens faster: your coins and chat show sooner, and it downloads only what you need. A message you send shows the moment you tap Send, and chat stays smooth while lots of messages come in.',
       'Casino taps, games, loans and requests answer faster: the server no longer has to wake up first.',
-      'Coin numbers have commas (1,234,567). Change it in Appearance, Coin numbers: commas, no commas, or short (1.2k, 82.2k, 2.3m).',
+      'Big coin numbers are short now (1.2k, 82.2k, 2.3m); hold or hover one for the exact amount. Prefer them in full? Appearance, Coin numbers: with commas (1,234,567) or no commas.',
       'Type amounts any way you like: /give @Cooper 2k, /request @Mia 200,000, bets of 1.5m, 1b or 1t.',
       'New /loan: /loan 100 asks the bank, /loan @Cooper 50 asks a teammate, and /loan pay opens your loans. You check the form and send it.',
       'Race Trotbot in Tetris or Minesweeper at five levels, from Beginner (slow and sloppy) to Insane (near perfect and very fast). Beating it pays 1, 1, 2, 4 or 6 coins by level, and /tetris bot insane or /minesweep bot beginner starts one from chat.',
