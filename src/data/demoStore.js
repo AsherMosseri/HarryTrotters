@@ -19,6 +19,7 @@ import * as arcade from '../../functions/shared/arcade.js';
 import * as challenge from '../../functions/shared/challenge.js';
 import * as dispute from '../../functions/shared/disputes.js';
 import { ARCADE, ARCADE_NOTE, blocked, isOff, serverGroup } from '../../functions/shared/commandRules.js';
+import { skipReason as moveSkip } from '../../functions/shared/moveArcade.js';
 import * as coinAsk from '../../functions/shared/coinRequests.js';
 import { AWARD_CAPS, breakdown, capWin, ceilingNote, giftEntry, overCeiling, sumCoins, groupGiftEntries, prizeEntry, teamDay, teamMidnight } from '../../functions/shared/coins.js';
 import { BOT, groupLabel, resolveTargets } from '../../functions/shared/groups.js';
@@ -2401,6 +2402,68 @@ export const demoStore = {
     ];
     commit();
     return { ok: true, refunded: [...paid.values()].reduce((n, r) => n + r.count, 0), coins, people: paid.size, skipped, closed };
+  },
+  // 3.2, once: past coin and game cards from other channels into #arcade,
+  // the way the moveToArcade function does it (functions/moveArcade.js): same
+  // id and time, marked moved, everything that names the channel follows,
+  // live games, open requests and pinned cards wait. DMs stay.
+  async moveToArcade(req, actor) {
+    await demoLag();
+    const note = (title, body = '') => ({ note: { title, body } });
+    if (!actor.admin || actor.name !== REQUESTS_TO) return note(`Only ${REQUESTS_TO.split(' ')[0]} can do that.`);
+    const now = Date.now();
+    const chat = state.chat || {};
+    const ctx = { lotteryOpenId: state.lottery?.open?.id || '' };
+    const byChannel = {};
+    const byKind = {};
+    const skipped = [];
+    const todo = [];
+    for (const [conv, list] of Object.entries(chat)) {
+      if (conv === ARCADE || conv.startsWith('dm:')) continue;
+      for (const m of list) {
+        const why = moveSkip(m, { ...ctx, secretExists: !!(state.gameSecrets || {})[m.id] }, m.id);
+        if (why === 'not coins') continue;
+        if (why) {
+          skipped.push({ conv, id: m.id, kind: m.cmd.name, why, at: m.at || 0 });
+          continue;
+        }
+        byChannel[conv] = (byChannel[conv] || 0) + 1;
+        byKind[m.cmd.name] = (byKind[m.cmd.name] || 0) + 1;
+        todo.push({ conv, m });
+      }
+    }
+    const report = { byChannel, byKind, total: todo.length, skipped: skipped.slice(0, 100), skippedCount: skipped.length };
+    if (req?.dry) return { ok: true, dry: true, ...report };
+    const ids = new Set(todo.map((x) => x.m.id));
+    const from = Object.fromEntries(todo.map((x) => [x.m.id, x.conv]));
+    const next = { ...chat };
+    for (const conv of new Set(todo.map((x) => x.conv))) next[conv] = (next[conv] || []).filter((m) => !ids.has(m.id));
+    next[ARCADE] = [...(next[ARCADE] || []), ...todo.map(({ conv, m }) => ({ ...m, moved: { from: conv, at: now } }))].sort((a, b) => (a.at || 0) - (b.at || 0));
+    state.chat = next;
+    const to = (x, idKey = 'msgId') => (ids.has(x?.[idKey]) && x.conv === from[x[idKey]] ? { ...x, conv: ARCADE } : x);
+    state.disputes = (state.disputes || []).map((x) => to(x));
+    for (const k of Object.keys(state.refundKeys || {})) state.refundKeys[k] = to(state.refundKeys[k]);
+    for (const k of Object.keys(state.coinRequests || {})) {
+      const r = state.coinRequests[k];
+      if ((ids.has(k) || ids.has(r.group)) && r.conv !== ARCADE) state.coinRequests[k] = { ...r, conv: ARCADE };
+    }
+    for (const k of Object.keys(state.coinRequestGroups || {})) if (ids.has(k)) state.coinRequestGroups[k] = { ...state.coinRequestGroups[k], conv: ARCADE };
+    for (const g of Object.values(state.funGames || {})) if (g?.race && ids.has(g.race.msgId)) g.race = { ...g.race, conv: ARCADE };
+    let history = 0;
+    for (const [name, b] of Object.entries(state.bank || {})) {
+      const recent = (b.recent || []).map((x) => {
+        const [conv, id] = typeof x.card === 'string' ? x.card.split('/') : [];
+        if (conv && conv !== ARCADE && ids.has(id)) {
+          history++;
+          return { ...x, card: `${ARCADE}/${id}` };
+        }
+        return x;
+      });
+      const chOpen = b.chOpen && ids.has(b.chOpen.id) ? { ...b.chOpen, conv: ARCADE } : b.chOpen;
+      state.bank[name] = { ...b, recent, ...(chOpen && { chOpen }) };
+    }
+    commit();
+    return { ok: true, moved: todo.length, more: false, history, ...report };
   },
   // The owner's Refund / Take back on a game card, checked the way the
   // ownerRefund function checks it (shared/disputes.js): the card's own

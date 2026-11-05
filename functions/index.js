@@ -61,6 +61,7 @@ import { learnFunctions } from './learn.js';
 import { channelFunctions } from './channels.js';
 import { loanFunctions } from './loans.js';
 import { coinRequestFunctions } from './coinRequests.js';
+import { moveArcadeFunctions } from './moveArcade.js';
 import { apiFunction } from './api.js';
 import { coinsText } from './shared/coinText.js';
 
@@ -226,7 +227,8 @@ async function notifyLevels(rename) {
 // people mentioned; "All messages" channels to everyone who chose that.
 export const onChatMessage = onDocumentCreated('channels/{channelId}/messages/{messageId}', async (event) => {
   const m = event.data?.data();
-  if (!m || m.deleted) return;
+  // A card moved into #arcade (moveToArcade) is old news: nobody is told again.
+  if (!m || m.deleted || m.moved) return;
   const { channelId } = event.params;
   const rename = await renamer();
   const level = await notifyLevels(rename);
@@ -321,6 +323,7 @@ async function previewFor(event) {
   const after = event.data?.after?.data();
   if (!after || after.deleted || after.preview === false) return;
   const before = event.data?.before?.data();
+  if (after.moved && !before) return;
   if (before && before.text === after.text) return;
   const url = firstLink(after.text);
   if (!url) {
@@ -2530,6 +2533,9 @@ export const { channelRequest, channelRenames } = channelFunctions({ db, renamer
 // Coin requests (/request @person amount, functions/coinRequests.js): the
 // person asked pays with one tap, through the same checks as a gift (and its
 // overdue-loan lock). Groups (/request @Programming 5) too.
+// 3.2, once: past coin and game cards from other channels into #arcade (the owner only).
+export const { moveToArcade } = moveArcadeFunctions({ db, owner: REQUESTS_TO, renamer });
+
 export const { coinRequest, expireCoinRequests } = coinRequestFunctions({
   db,
   coinData,

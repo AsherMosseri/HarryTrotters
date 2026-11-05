@@ -1283,7 +1283,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
     const myRoles = peopleInfo.get(actor.name)?.subteams || [];
     for (const c of [...convs.channels, ...convs.dms]) {
       const since = chatRead?.[c.key] ?? Date.now();
-      const fresh = (chat[c.key] || []).filter((m) => m.at > since && !sentByMe(m, actor, rename) && !m.deleted);
+      const fresh = (chat[c.key] || []).filter((m) => m.at > since && !sentByMe(m, actor, rename) && !m.deleted && !m.moved);
       // Announcements and DMs always count as important (red), like a mention.
       const important =
         c.announce || c.kind === 'dm'
@@ -3668,6 +3668,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
               onShutdown={() => setShutdownPage(true)}
               onCommands={() => setCommandsPage(true)}
               onAds={() => setAdsPage(true)}
+              moveToArcade={store.moveToArcade ? (req) => store.moveToArcade(req, actor) : null}
               account={(data) => store.account(data)}
               loanSettings={<LoanSettings cfg={loans.cfg} call={api.loan} />}
               me={actor.name}

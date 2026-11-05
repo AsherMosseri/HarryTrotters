@@ -4,6 +4,7 @@ import { CloseIcon, Overlay } from './common.jsx';
 import { Switch } from './Ads.jsx';
 import { FEATURE_GROUPS, LAB_LOG_MODES, offCount } from '../controls.js';
 import { useEscape } from '../util.js';
+import { confirmDialog } from './Dialogs.jsx';
 
 // Asher's Controls (controls.js): turn tabs, channels, and features off for
 // everyone but him, preview what they see, and get to Shutdown and Commands.
@@ -24,6 +25,8 @@ export default function ControlsPage({
   me,
   // The bank's loan settings (Loans.jsx LoanSettings).
   loanSettings = null,
+  // 3.2, once: move past coin and game cards into #arcade (functions/moveArcade.js).
+  moveToArcade = null,
   onClose,
 }) {
   // Shutdown or Commands open on top: Escape closes that one, not this.
@@ -174,12 +177,139 @@ export default function ControlsPage({
                   channels.map((c) => [c.id, `#${c.name}`]),
                 )}
                 {group('off', 'Direct messages', [['dms', 'All DMs', 'Sending and reading DMs']])}
+                {moveToArcade && <MoveToArcade run={moveToArcade} channels={channels} />}
               </>
             )}
           </div>
         </div>
       </div>
     </Overlay>
+  );
+}
+
+// 3.2: coins and games live in #arcade, so the old cards from other channels
+// move there once (DMs stay). Check shows what would move and what waits
+// (games still going, open requests, pinned cards); Move asks first, then
+// runs in batches until it's done. Running it again only moves what's left.
+const KIND_LABEL = { request: '/request coins', give: '/give', balance: '/balance', leaderboard: '/leaderboard' };
+function MoveToArcade({ run, channels }) {
+  const [plan, setPlan] = useState(null);
+  const [busy, setBusy] = useState('');
+  const [done, setDone] = useState(null);
+  const [err, setErr] = useState('');
+  const nameOf = (id) => `#${channels.find((c) => c.id === id)?.name || id}`;
+  const check = async () => {
+    setBusy('check');
+    setErr('');
+    try {
+      const r = await run({ dry: true });
+      if (r?.note) setErr(r.note.title);
+      else setPlan(r);
+    } catch (e) {
+      setErr(e?.message || String(e));
+    }
+    setBusy('');
+  };
+  const move = async () => {
+    const ok = await confirmDialog({
+      title: `Move ${plan.total} card${plan.total === 1 ? '' : 's'} to #arcade?`,
+      body: 'They leave their channels and show in #arcade at their original times. Refunds, reports and Undo keep working. Anything still going stays for a later run.',
+      okLabel: 'Move them',
+    });
+    if (!ok) return;
+    setBusy('move');
+    setErr('');
+    let moved = 0;
+    try {
+      for (let i = 0; i < 40; i++) {
+        const r = await run({});
+        if (r?.note) throw new Error(r.note.title);
+        moved += r.moved || 0;
+        setDone({ moved, skippedCount: r.skippedCount, skipped: r.skipped || [] });
+        if (!r.more) break;
+      }
+      setPlan(null);
+    } catch (e) {
+      setErr(e?.message || String(e));
+    }
+    setBusy('');
+  };
+  const skipList = (list) =>
+    list.length > 0 && (
+      <ul className="move-arcade-skips small">
+        {list.slice(0, 12).map((x) => (
+          <li key={x.id}>
+            {KIND_LABEL[x.kind] || `/${x.kind}`} in {nameOf(x.conv)}: <span className="muted">{x.why}</span>
+          </li>
+        ))}
+        {list.length > 12 && <li className="muted">and {list.length - 12} more</li>}
+      </ul>
+    );
+  return (
+    <section className="cmd-admin-group move-arcade">
+      <div className="cmd-admin-head">
+        <h4>Old coin cards to #arcade</h4>
+      </div>
+      <p className="muted small">Casino, game and coin cards from other channels move to #arcade, at their original times. DMs stay as they are.</p>
+      {!plan && !done && (
+        <button className="btn" disabled={!!busy} onClick={check}>
+          {busy === 'check' ? 'Checking…' : 'Check what would move'}
+        </button>
+      )}
+      {plan && (
+        <>
+          {plan.total ? (
+            <>
+              <p className="small">
+                <b>{plan.total}</b> card{plan.total === 1 ? '' : 's'} to move:
+              </p>
+              <div className="move-arcade-counts small">
+                {Object.entries(plan.byChannel).map(([c, n]) => (
+                  <span key={c} className="chip">
+                    {nameOf(c)} {n}
+                  </span>
+                ))}
+              </div>
+              <div className="move-arcade-counts small muted">
+                {Object.entries(plan.byKind)
+                  .sort((a, b) => b[1] - a[1])
+                  .map(([k, n]) => `${KIND_LABEL[k] || `/${k}`} ${n}`)
+                  .join(' · ')}
+              </div>
+            </>
+          ) : (
+            <p className="small">Nothing to move.</p>
+          )}
+          {plan.skippedCount > 0 && <p className="small">Waiting for a later run ({plan.skippedCount}):</p>}
+          {skipList(plan.skipped || [])}
+          <div className="row gap">
+            <button className="btn" disabled={!!busy} onClick={() => setPlan(null)}>
+              Back
+            </button>
+            {plan.total > 0 && (
+              <button className="btn primary" disabled={!!busy} onClick={move}>
+                {busy === 'move' ? 'Moving…' : `Move ${plan.total}`}
+              </button>
+            )}
+          </div>
+        </>
+      )}
+      {done && (
+        <>
+          <p className="small">
+            Moved <b>{done.moved}</b> card{done.moved === 1 ? '' : 's'} to #arcade.{busy ? ' Still going…' : ''}
+            {done.skippedCount ? ` ${done.skippedCount} waiting for a later run.` : ''}
+          </p>
+          {skipList(done.skipped)}
+          {!busy && (
+            <button className="btn" onClick={() => (setDone(null), check())}>
+              Check again
+            </button>
+          )}
+        </>
+      )}
+      {err && <div className="casino-error">{err}</div>}
+    </section>
   );
 }
 

@@ -5291,3 +5291,9 @@ button.bs-cell:focus-visible { outline: 2px solid var(--accent); outline-offset:
 }
 :root[data-theme='dark'] .card-fixed-tag.refund, :root[data-theme='dark'] .card-actions .card-fix.refund { color: #4ade80; }
 :root[data-theme='dark'] .card-fixed-tag.takeback, :root[data-theme='dark'] .card-actions .card-fix.takeback { color: #f87171; }
+
+/* Controls, Channels: old coin cards to #arcade (3.2, owner only). */
+.move-arcade { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.move-arcade p { margin: 0; }
+.move-arcade-counts { display: flex; flex-wrap: wrap; gap: 6px; }
+.move-arcade-skips { margin: 0; padding-left: 18px; }
