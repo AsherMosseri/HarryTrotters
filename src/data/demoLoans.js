@@ -158,6 +158,7 @@ export function demoLoans({ get, commit, uid }) {
     const loan = find(req.id);
     const role = L.roleOf(loan, actor.name, { owner: isOwner(actor) ? actor.name : REQUESTS_TO });
     if (!role) return note(loan ? 'That isn’t your loan.' : 'That loan is gone.');
+    if (req.action === 'change') return changeLength(loan, role, req, actor, now);
     const r = L.manageCheck(loan, { role, action: req.action, weeks: req.weeks, balance: balanceOf(loan.borrower), note: req.note, now });
     if (r.error) return note(r.error);
     let patch = r.patch;
@@ -182,6 +183,25 @@ export function demoLoans({ get, commit, uid }) {
     );
     commit();
     return { ok: true, status: next.status, give: r.give };
+  }
+
+  // A length change (3.2), the same steps as the server's changeLength.
+  function changeLength(loan, role, req, actor, now) {
+    const r = L.changeCheck(loan, { role, action: req.step, weeks: req.weeks, dueAt: req.dueAt, note: req.note, now });
+    if (r.error) return note(r.error, r.body);
+    const next = { ...loan, ...r.patch, history: L.withLine(loan.history, r.history), updatedAt: now };
+    save(next);
+    const to = role === 'borrower' ? (loan.bank ? REQUESTS_TO : loan.lender) : loan.borrower;
+    const who = role === 'borrower' ? first(loan.borrower) : loan.bank ? 'The bank' : first(loan.lender);
+    const msg = {
+      change: [`${who} asked to change your loan’s due date`, `To ${L.dueText(r.history.dueAt)} (now ${L.dueText(loan.dueAt)}). Accept or say no in Loans.`],
+      changeAccept: [`${who} agreed to the new due date`, `Your loan is now due ${L.dueText(next.dueAt)}.`],
+      changeDecline: [`${who} said no to the new due date`, `It’s still due ${L.dueText(next.dueAt)}.`],
+      changeCancel: [`${who} took back their due date change`, `It’s still due ${L.dueText(next.dueAt)}.`],
+    }[r.history.act];
+    if (msg) tell(to, msg[0], msg[1], loan.id);
+    commit();
+    return { ok: true, status: next.status, dueAt: next.dueAt, change: next.change || null };
   }
 
   // The scheduled step (loanTick on the server), run while the app is open.
@@ -272,6 +292,10 @@ export function demoLoans({ get, commit, uid }) {
       moves: 1,
       updatedAt: now - D,
     });
+    // ...and asked the bank for one more week (3.2: a length change waiting on Asher).
+    const more = c.dueAt + L.WEEK;
+    c.history.push({ act: 'change', by: 'borrower', at: now - 3 * H, dueAt: more, was: c.dueAt, note: 'Paying the rest after the competition' });
+    Object.assign(c, { change: { by: 'borrower', dueAt: more, at: now - 3 * H, note: 'Paying the rest after the competition' }, changes: 1, updatedAt: now - 3 * H });
     entry(c, 'lend', 100, c.startAt);
     entry(c, 'repay', 20, now - D, 0);
     // Jackson: waiting on the bank.

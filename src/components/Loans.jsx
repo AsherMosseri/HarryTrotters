@@ -96,6 +96,13 @@ export function loanLines(loans, open) {
       go: () => open(l.id),
     });
   }
+  // A length change someone asked of you (3.2).
+  for (const l of loans.list.filter((x) => x.status === 'active' && x.change && loans.roleOf(x) && x.change.by !== (loans.roleOf(x) === 'borrower' ? 'borrower' : 'lender')).slice(0, 2))
+    out.push({
+      tone: 'warn',
+      text: `${l.change.by === 'borrower' ? first(l.borrower) : l.bank ? 'The bank' : first(l.lender)} asked for a new due date: ${L.dueText(l.change.dueAt)}`,
+      go: () => open(l.id),
+    });
   const soon = loans.borrowing.find((l) => l.status === 'active' && l.dueAt > loans.now && l.dueAt - loans.now <= L.LIMITS.remind);
   if (soon && !loans.lock)
     out.push({
@@ -149,9 +156,11 @@ export function LoansPanel({ loans, actor, roster, focus, onToast }) {
     el?.scrollIntoView?.({ block: 'center' });
   }, [focus]);
   const card = (l) => <LoanCard key={l.id} loan={l} loans={loans} focus={focus === l.id} onToast={onToast} />;
+  // Waiting on the bank: new requests, and running loans whose borrower asked for a new due date (3.2).
+  const bankWaits = (l) => l.status === 'pending' || (l.status === 'active' && l.change?.by === 'borrower');
   const bankShown =
     bankTab === 'waiting'
-      ? bankLoans.filter((l) => l.status === 'pending')
+      ? bankLoans.filter(bankWaits)
       : bankTab === 'running'
         ? bankLoans.filter((l) => L.LIVE.includes(l.status))
         : bankLoans.filter((l) => !open(l));
@@ -174,7 +183,7 @@ export function LoansPanel({ loans, actor, roster, focus, onToast }) {
           </h3>
           <div className="segmented loan-tabs" role="tablist" aria-label="Bank loans">
             {[
-              ['waiting', `Waiting (${bankLoans.filter((l) => l.status === 'pending').length})`],
+              ['waiting', `Waiting (${bankLoans.filter(bankWaits).length})`],
               ['running', `Running (${bankLoans.filter((l) => L.LIVE.includes(l.status)).length})`],
               ['done', 'Closed'],
             ].map(([id, label]) => (
@@ -510,6 +519,7 @@ function LoanCard({ loan, loans, focus, onToast }) {
   const [text, setText] = useState('');
   const [thread, setThread] = useState(false);
   const [weeks, setWeeks] = useState(1);
+  const [shorten, setShorten] = useState(false);
   const left = L.leftOf(loan, now);
   const [pay, setPay] = useState('');
   const owed = loan.status === 'active' ? L.owedOf(loan, now) : 0;
@@ -724,6 +734,11 @@ function LoanCard({ loan, loans, focus, onToast }) {
         </div>
       )}
 
+      {/* A new length (3.2): either side asks, the other side answers. */}
+      {loan.status === 'active' && (
+        <ChangeLength loan={loan} side={asBorrower ? 'borrower' : 'lender'} busy={busy} run={run} now={now} open={shorten} setOpen={setShorten} />
+      )}
+
       {/* The lender (the owner for the bank): more time, or forgive. */}
       {live && !asBorrower && (
         <div className="row gap wrap loan-buttons">
@@ -747,6 +762,12 @@ function LoanCard({ loan, loans, focus, onToast }) {
           >
             Extend
           </button>
+          {/* Less time needs the borrower's OK (3.2): an ask, answered on their card. */}
+          {loan.status === 'active' && !loan.change && !shorten && (
+            <button className="btn" disabled={busy} onClick={() => setShorten(true)}>
+              Shorten…
+            </button>
+          )}
           <button className="btn danger-text" disabled={busy} onClick={forgive}>
             Forgive
           </button>
@@ -771,6 +792,122 @@ function LoanCard({ loan, loans, focus, onToast }) {
         </ol>
       )}
     </article>
+  );
+}
+
+// A different due date for a running loan (shared/loans.js changeCheck):
+// more or fewer weeks, or a date. It only changes when the other side
+// accepts; the one who asked can take it back.
+const dayStart = (ms) => {
+  const d = new Date(ms);
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
+};
+const dateValue = (ms) => {
+  const d = new Date(ms);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+function ChangeLength({ loan, side, busy, run, now, open: lenderOpen, setOpen: setLenderOpen }) {
+  const [borrowerOpen, setBorrowerOpen] = useState(false);
+  // The borrower opens it here; the lender from Shorten… beside Extend.
+  const lender = side === 'lender';
+  const open = lender ? lenderOpen : borrowerOpen;
+  const setOpen = lender ? setLenderOpen : setBorrowerOpen;
+  const [due, setDue] = useState(loan.dueAt);
+  useEffect(() => {
+    if (open) setDue(loan.dueAt);
+  }, [open, loan.dueAt]);
+  const [text, setText] = useState('');
+  const waiting = loan.change;
+  const other = side === 'borrower' ? (loan.bank ? 'the bank' : first(loan.lender)) : first(loan.borrower);
+  const weeks = L.weeksTo(loan, due);
+  // Weeks from the start (the loan's whole length), as quick picks.
+  const pickWeeks = (w) => setDue((loan.startAt ?? now) + w * L.WEEK);
+  // A date keeps the due date's time of day.
+  const pickDate = (v) => {
+    if (!v) return;
+    const [y, m, d] = v.split('-').map(Number);
+    const days = Math.round((new Date(y, m - 1, d).getTime() - dayStart(loan.dueAt)) / L.DAY);
+    setDue(loan.dueAt + days * L.DAY);
+  };
+  const check = L.changeTarget(loan, { dueAt: due }, now);
+  if (waiting) {
+    const mine = waiting.by === side;
+    return (
+      <div className="loan-change">
+        <p className="small">
+          <b>{mine ? 'You asked' : `${side === 'borrower' ? (loan.bank ? 'The bank' : first(loan.lender)) : first(loan.borrower)} asked`}</b> to move the due date to{' '}
+          <b>{L.dueText(waiting.dueAt)}</b> (now {L.dueText(loan.dueAt)}).
+          {mine ? ` Waiting for ${other}.` : ''}
+        </p>
+        {waiting.note && <blockquote className="loan-note">“{waiting.note}”</blockquote>}
+        <div className="row gap wrap loan-buttons">
+          {mine ? (
+            <button className="btn" disabled={busy} onClick={() => run('loanManage', { action: 'change', step: 'cancel' }, 'Took it back.')}>
+              Take it back
+            </button>
+          ) : (
+            <>
+              <button className="btn primary" disabled={busy} onClick={() => run('loanManage', { action: 'change', step: 'accept' }, `Now due ${L.dueText(waiting.dueAt)}.`)}>
+                Accept new date
+              </button>
+              <button className="btn" disabled={busy} onClick={() => run('loanManage', { action: 'change', step: 'decline' }, 'Said no. The due date stays.')}>
+                Say no
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
+  if (!open)
+    return lender ? null : (
+      <button className="link-btn small loan-change-btn" onClick={() => (setDue(loan.dueAt), setOpen(true))}>
+        <Icon name="clock" size={14} /> Ask for more time or a different due date
+      </button>
+    );
+  // The lender's quick picks are shorter than now (Extend gives more).
+  const picks = [1, 2, 3, 4, 6, 8].filter((w) => !lender || (loan.startAt ?? now) + w * L.WEEK < loan.dueAt);
+  const later = lender && due > loan.dueAt;
+  return (
+    <div className="loan-change">
+      <div className="row gap wrap">
+        <div className="segmented loan-weeks" role="radiogroup" aria-label="Loan length">
+          {picks.map((w) => (
+            <button key={w} role="radio" aria-checked={weeks === w && check.dueAt === due} className={`plain-seg${weeks === w ? ' on' : ''}`} onClick={() => pickWeeks(w)}>
+              {w}w
+            </button>
+          ))}
+        </div>
+        <input className="input loan-date" type="date" aria-label="New due date" value={dateValue(due)} onChange={(e) => pickDate(e.target.value)} />
+      </div>
+      <p className={`small${check.error && due !== loan.dueAt ? ' casino-error' : ' muted'}`}>
+        {due === loan.dueAt
+          ? lender
+            ? 'Pick an earlier due date. More time is Extend.'
+            : 'Pick a new length or date.'
+          : later
+            ? 'That’s more time: use Extend.'
+            : check.error || `Due ${L.dueText(due)} (${weeks} week${weeks > 1 ? 's' : ''} in all). ${other[0].toUpperCase()}${other.slice(1)} has to agree.`}
+      </p>
+      <input className="input" maxLength={L.LIMITS.note} value={text} placeholder="Why (optional)" aria-label="Note" onChange={(e) => setText(e.target.value)} />
+      <div className="row gap loan-buttons">
+        <span className="spacer" />
+        <button className="btn" onClick={() => setOpen(false)}>
+          Back
+        </button>
+        <button
+          className="btn primary"
+          disabled={busy || !!check.error || later}
+          onClick={async () => {
+            await run('loanManage', { action: 'change', step: 'ask', dueAt: due, note: text.trim() }, `Asked ${other}.`);
+            setOpen(false);
+          }}
+        >
+          Ask
+        </button>
+      </div>
+    </div>
   );
 }
 

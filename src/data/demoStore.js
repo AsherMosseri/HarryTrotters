@@ -18,9 +18,11 @@ import { dayOf, logFields, taskArea } from '../labLog.js';
 import * as arcade from '../../functions/shared/arcade.js';
 import * as challenge from '../../functions/shared/challenge.js';
 import * as dispute from '../../functions/shared/disputes.js';
-import { blocked, isOff, serverGroup } from '../../functions/shared/commandRules.js';
+import { ARCADE, ARCADE_NOTE, blocked, isOff, serverGroup } from '../../functions/shared/commandRules.js';
+import { skipReason as moveSkip } from '../../functions/shared/moveArcade.js';
+import { FIND } from '../../functions/shared/hiddenCoins.js';
 import * as coinAsk from '../../functions/shared/coinRequests.js';
-import { AWARD_CAPS, breakdown, capWin, ceilingNote, giftEntry, overCeiling, sumCoins, groupGiftEntries, prizeEntry, teamDay, teamMidnight } from '../../functions/shared/coins.js';
+import { AWARD_CAPS, breakdown, capWin, ceilingNote, earnBalance, giftEntry, overCeiling, scaleId, scaledPay, sumCoins, groupGiftEntries, prizeEntry, teamDay, teamMidnight } from '../../functions/shared/coins.js';
 import { BOT, groupLabel, resolveTargets } from '../../functions/shared/groups.js';
 import * as fun from '../../functions/shared/funGames.js';
 import * as mines from '../../functions/shared/minesweeper.js';
@@ -1096,6 +1098,18 @@ function nextFridayLocal(now) {
   return d.getTime();
 }
 // Change fields on a command card's cmd (the open lottery card).
+// Earnings that grow with the balance (3.2, shared/coins.js EARN_SCALE): the
+// app's own wallets (Workspace hands them over with useWallets), the lowest
+// balance in the last day, as on the server.
+let demoWallet = null;
+const demoLow = (name, now = Date.now()) => {
+  try {
+    return demoWallet ? earnBalance(demoWallet(name).history, now) : 0;
+  } catch {
+    return 0;
+  }
+};
+
 // Coins from games and quizzes, the way functions/award.js pays them: each
 // source capped per person per team day, and a key pays only once.
 function demoAward({ person, amount, source, label = '', key = '' }, now = Date.now()) {
@@ -1105,12 +1119,17 @@ function demoAward({ person, amount, source, label = '', key = '' }, now = Date.
   const keys = state.awardKeys || {};
   if (key && keys[key]) return 0;
   const day = teamDay(now);
+  // The cap counts normal coins; a big balance pays more for them (3.2).
   const sofar = (state.coins || [])
     .filter((x) => x.type === 'award' && x.person === person && x.source === source && x.day === day)
-    .reduce((t, x) => t + (x.amount || 0), 0);
-  const pay = Math.min(want, Math.max(0, cap - sofar));
-  if (!pay) return 0;
-  state.coins = [...(state.coins || []), { id: uid(), type: 'award', person, amount: pay, source, label: String(label).slice(0, 80), day, at: now }];
+    .reduce((t, x) => t + (x.base ?? x.amount ?? 0), 0);
+  const base = Math.min(want, Math.max(0, cap - sofar));
+  if (!base) return 0;
+  const pay = scaledPay(source, base, demoLow(person, now));
+  state.coins = [
+    ...(state.coins || []),
+    { id: uid(), type: 'award', person, amount: pay, ...(pay !== base && { base }), source, label: String(label).slice(0, 80), day, at: now },
+  ];
   if (key) state.awardKeys = { ...keys, [key]: { person, source, day, at: now } };
   return pay;
 }
@@ -1786,7 +1805,8 @@ export const demoStore = {
     if (action === 'create' && req.group != null) {
       // A group: the same steps as the server's createGroup.
       const conv = String(req.conv || '');
-      if (!conv || conv === 'announcements') return note('Not here.', 'Ask in a channel.');
+      // Coins and games only in #arcade (3.2), like the server.
+      if (conv !== ARCADE) return { note: { ...ARCADE_NOTE } };
       if (conv.startsWith('dm:')) return note('Groups work in channels.', 'In a DM, ask people one by one.');
       const off = switchedOff(conv);
       if (off) return off;
@@ -1839,7 +1859,7 @@ export const demoStore = {
     }
     if (action === 'create') {
       const conv = String(req.conv || '');
-      if (!conv || conv === 'announcements') return note('Not here.', 'Ask in a channel or a DM.');
+      if (conv !== ARCADE) return { note: { ...ARCADE_NOTE } };
       const off = switchedOff(conv);
       if (off) return off;
       const to = String(req.to || '');
@@ -2153,8 +2173,8 @@ export const demoStore = {
       return done({ ok: true, serverNow: now, ...(localStorage.getItem('demo-no-card') ? {} : { card }) });
     }
 
-    if (conv.startsWith('dm:') || conv === 'announcements')
-      return note('Not here.', 'Use #arcade for the casino, or any channel for the rest.');
+    // Coins and games only in #arcade (3.2), like the server.
+    if (conv !== ARCADE) return { note: { ...ARCADE_NOTE } };
     const isCasino = casino.CASINO.includes(game);
     const stop = blocked(game, serverGroup(game), conv, state.settings?.commands);
     if (stop) return { note: stop };
@@ -2289,6 +2309,14 @@ export const demoStore = {
             })
           : casino.beg(mine, now);
     if (r.error) return note(r.error);
+    // /work grows with the balance (3.2), like the server.
+    if (game === 'work' && r.amount > 0) {
+      const scaled = scaledPay('work', r.amount, demoLow(me, now));
+      if (scaled > r.amount) {
+        r.amount = scaled;
+        r.card = { ...r.card, amount: scaled, scaled: true };
+      }
+    }
     // /work and /beg pay up to a googol at most (like the server).
     if (game !== 'daily' && capWin(r.amount, balance) < r.amount) {
       r.amount = capWin(r.amount, balance);
@@ -2462,6 +2490,139 @@ export const demoStore = {
     ];
     commit();
     return { ok: true, refunded: [...paid.values()].reduce((n, r) => n + r.count, 0), coins, people: paid.size, skipped, closed };
+  },
+  // 3.2: the app's wallets, for earnings that grow with the balance.
+  useWallets(fn) {
+    demoWallet = fn;
+  },
+  // What the server's onTaskEarn and onShiftEarn do (functions/earn.js), run
+  // while the app is open: a task's top-up once, a lab day's top-up up to
+  // what the day pays now. name: whose (the demo's signed-in person).
+  scaleTick(name, now = Date.now()) {
+    if (!demoWallet || (state.controls?.off || []).includes('coins')) return;
+    const w = demoWallet(name);
+    let changed = false;
+    for (const item of w.history) {
+      if (!(item.amount > 0) || (item.kind !== 'task' && item.kind !== 'hours') || item.note) continue;
+      if (item.kind === 'hours' && item.day === teamDay(now) && (state.shifts || []).some((x) => !x.end && x.person === name)) continue;
+      const base = item.base ?? item.amount;
+      const kind = item.kind;
+      const ref = kind === 'task' ? item.id : item.day;
+      const id = scaleId(kind, ref, name);
+      const had = (state.coins || []).find((x) => x.id === id);
+      if (kind === 'task' && (had || item.boost)) continue;
+      const extra = scaledPay(kind, base, earnBalance(w.history.filter((x) => x !== item), now)) - base;
+      if (!(extra > 0) || (had && had.amount >= extra)) continue;
+      const entry = { id, type: 'scale', person: name, ref: `${kind}:${ref}`, source: kind, amount: extra, base, label: item.label, at: had?.at || now };
+      state.coins = [...(state.coins || []).filter((x) => x.id !== id), entry];
+      changed = true;
+    }
+    if (changed) commit();
+  },
+  // Hidden coins (3.2), the way the hiddenCoin function hands them out and
+  // pays them (functions/earn.js FIND): a token now and then, at most 5 a
+  // day, each paid once.
+  async hiddenCoin(req, actor) {
+    await demoLag();
+    const now = Date.now();
+    const me = actor.name;
+    const off = state.controls?.off || [];
+    if (me !== REQUESTS_TO && (off.includes('coins') || off.includes('hiddenCoins'))) return { ok: true, none: true, off: true };
+    const day = teamDay(now);
+    const finds = (state.coinFinds ||= {});
+    const tokens = (state.coinTokens ||= {});
+    const key = `${personId(me)}-${day}`;
+    const d = finds[key] || {};
+    if (req?.action === 'spawn') {
+      const issued = d.issued || 0;
+      if (issued >= FIND.perDay) return { ok: true, none: true, left: 0 };
+      // Demo mode: a shorter wait, so a coin shows up while someone looks around.
+      if (now - (d.lastAt || 0) < FIND.demoGap) return { ok: true, none: true, left: FIND.perDay - issued };
+      if (d.lastAt && Math.random() >= FIND.chance) {
+        finds[key] = { ...d, lastAt: now };
+        commit();
+        return { ok: true, none: true, left: FIND.perDay - issued };
+      }
+      const token = Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, '0')).join('');
+      tokens[token] = { person: me, day, at: now, exp: now + FIND.ttl, base: FIND.min + Math.floor(Math.random() * (FIND.max - FIND.min + 1)), claimed: false };
+      finds[key] = { ...d, issued: issued + 1, lastAt: now };
+      commit();
+      return { ok: true, token, exp: now + FIND.ttl, left: FIND.perDay - issued - 1 };
+    }
+    if (req?.action === 'claim') {
+      const t = tokens[req.token];
+      const note = (title) => ({ note: { title, body: '' } });
+      if (!t || t.person !== me) return note('That coin isn’t yours.');
+      if (t.claimed) return note('Already picked up.');
+      if (now > t.exp) return note('Too late: it rolled away.');
+      const paid = demoAward({ person: me, amount: t.base, source: 'find', label: 'Found a hidden coin', key: `find-${req.token}` }, now);
+      tokens[req.token] = { ...t, claimed: true, claimedAt: now, paid };
+      commit();
+      return { ok: true, paid };
+    }
+    return { note: { title: 'Unknown.', body: '' } };
+  },
+  // 3.2, once: past coin and game cards from other channels into #arcade,
+  // the way the moveToArcade function does it (functions/moveArcade.js): same
+  // id and time, marked moved, everything that names the channel follows,
+  // live games, open requests and pinned cards wait. DMs stay.
+  async moveToArcade(req, actor) {
+    await demoLag();
+    const note = (title, body = '') => ({ note: { title, body } });
+    if (!actor.admin || actor.name !== REQUESTS_TO) return note(`Only ${REQUESTS_TO.split(' ')[0]} can do that.`);
+    const now = Date.now();
+    const chat = state.chat || {};
+    const ctx = { lotteryOpenId: state.lottery?.open?.id || '' };
+    const byChannel = {};
+    const byKind = {};
+    const skipped = [];
+    const todo = [];
+    for (const [conv, list] of Object.entries(chat)) {
+      if (conv === ARCADE || conv.startsWith('dm:')) continue;
+      for (const m of list) {
+        const why = moveSkip(m, { ...ctx, secretExists: !!(state.gameSecrets || {})[m.id] }, m.id);
+        if (why === 'not coins') continue;
+        if (why) {
+          skipped.push({ conv, id: m.id, kind: m.cmd.name, why, at: m.at || 0 });
+          continue;
+        }
+        byChannel[conv] = (byChannel[conv] || 0) + 1;
+        byKind[m.cmd.name] = (byKind[m.cmd.name] || 0) + 1;
+        todo.push({ conv, m });
+      }
+    }
+    const report = { byChannel, byKind, total: todo.length, skipped: skipped.slice(0, 100), skippedCount: skipped.length };
+    if (req?.dry) return { ok: true, dry: true, ...report };
+    const ids = new Set(todo.map((x) => x.m.id));
+    const from = Object.fromEntries(todo.map((x) => [x.m.id, x.conv]));
+    const next = { ...chat };
+    for (const conv of new Set(todo.map((x) => x.conv))) next[conv] = (next[conv] || []).filter((m) => !ids.has(m.id));
+    next[ARCADE] = [...(next[ARCADE] || []), ...todo.map(({ conv, m }) => ({ ...m, moved: { from: conv, at: now } }))].sort((a, b) => (a.at || 0) - (b.at || 0));
+    state.chat = next;
+    const to = (x, idKey = 'msgId') => (ids.has(x?.[idKey]) && x.conv === from[x[idKey]] ? { ...x, conv: ARCADE } : x);
+    state.disputes = (state.disputes || []).map((x) => to(x));
+    for (const k of Object.keys(state.refundKeys || {})) state.refundKeys[k] = to(state.refundKeys[k]);
+    for (const k of Object.keys(state.coinRequests || {})) {
+      const r = state.coinRequests[k];
+      if ((ids.has(k) || ids.has(r.group)) && r.conv !== ARCADE) state.coinRequests[k] = { ...r, conv: ARCADE };
+    }
+    for (const k of Object.keys(state.coinRequestGroups || {})) if (ids.has(k)) state.coinRequestGroups[k] = { ...state.coinRequestGroups[k], conv: ARCADE };
+    for (const g of Object.values(state.funGames || {})) if (g?.race && ids.has(g.race.msgId)) g.race = { ...g.race, conv: ARCADE };
+    let history = 0;
+    for (const [name, b] of Object.entries(state.bank || {})) {
+      const recent = (b.recent || []).map((x) => {
+        const [conv, id] = typeof x.card === 'string' ? x.card.split('/') : [];
+        if (conv && conv !== ARCADE && ids.has(id)) {
+          history++;
+          return { ...x, card: `${ARCADE}/${id}` };
+        }
+        return x;
+      });
+      const chOpen = b.chOpen && ids.has(b.chOpen.id) ? { ...b.chOpen, conv: ARCADE } : b.chOpen;
+      state.bank[name] = { ...b, recent, ...(chOpen && { chOpen }) };
+    }
+    commit();
+    return { ok: true, moved: todo.length, more: false, history, ...report };
   },
   // The owner's Refund / Take back on a game card, checked the way the
   // ownerRefund function checks it (shared/disputes.js): the card's own
@@ -2658,6 +2819,7 @@ export const demoStore = {
       return { ok: true, result: r, bot, won, coins, paid };
     }
     if (req.action === 'share') {
+      if (req.conv !== ARCADE) return { note: { ...ARCADE_NOTE } };
       if (!s || s.person !== me || !s.done || s.problem) return note('That game can’t be shared.');
       if (s.shared) return note('Already posted.');
       const line = fun.resultLine(s.game, s.mode, s.result);
@@ -3085,6 +3247,8 @@ export const demoStore = {
     return [...((state.chat || {})[conv] || [])].sort((a, b) => b.at - a.at).slice(0, count);
   },
   async sendMessage(conv, data, actor, photoFiles) {
+    // Like the rules (3.2): the app's own coin cards only in #arcade.
+    if (conv !== ARCADE && ['give', 'balance', 'leaderboard'].includes(data?.cmd?.name)) throw Object.assign(new Error('Coins and games are in #arcade'), { code: 'permission-denied' });
     let photo = null;
     if (photoFiles) {
       const url = await dataUrl(photoFiles.thumb);

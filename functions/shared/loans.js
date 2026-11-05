@@ -53,6 +53,10 @@ export const LIMITS = {
   expire: 7 * DAY,
   // The borrower hears this long before the due date.
   remind: 2 * DAY,
+  // Length changes asked on one loan (each ask counts), and how far out a
+  // due date can go: this many weeks from when the coins moved.
+  changes: 10,
+  maxWeeks: 12,
 };
 // Asher's loan settings (settings/loans; Controls, Loans). Bank loans only,
 // except `on`, which stops new loan requests of every kind.
@@ -141,6 +145,9 @@ export function roleOf(loan, me, { owner = '', rename = (n) => n } = {}) {
   return '';
 }
 const sideOf = (role) => (role === 'borrower' ? 'borrower' : 'lender');
+const first = (n) => String(n || 'Someone').split(' ')[0];
+// A due date as words, on the team's clock ("Fri, Nov 20").
+export const dueText = (ms) => new Date(ms).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'America/New_York' });
 
 // Is this person locked by a loan: an active loan past its due date (the
 // collection hasn't run yet), or one already collected that left them below
@@ -282,7 +289,7 @@ export function manageCheck(loan, { role, action, weeks, balance, note, now }) {
   if (action === 'forgive')
     return {
       give,
-      patch: { status: 'forgiven', closedAt: now, forgiven: loan.status === 'active' ? leftOf(loan, now) : give },
+      patch: { status: 'forgiven', closedAt: now, forgiven: loan.status === 'active' ? leftOf(loan, now) : give, change: null },
       history: line('forgive', { amount: loan.status === 'active' ? leftOf(loan, now) : give }),
     };
   if (action === 'extend') {
@@ -295,12 +302,89 @@ export function manageCheck(loan, { role, action, weeks, balance, note, now }) {
         status: 'active',
         dueAt,
         remindedAt: null,
+        change: null,
         ...(give && { paid: Math.max(0, (loan.paid || 0) - give), short: (loan.short || 0) - give }),
       },
       history: line('extend', { weeks: w, dueAt }),
     };
   }
   return { error: 'Forgive or extend?' };
+}
+
+// Changing a running loan's length (3.2), on top of the lender's Extend
+// (more time, right away) and Forgive. The borrower asks for a new due date
+// (more or fewer weeks, or a date); the lender asks only for less time (more
+// is Extend). The other side accepts or says no,
+// and the one who asked can take it back. Nothing changes until the other
+// side agrees, so a borrower can't get out of a due date (or an overdue lock)
+// alone. Only a loan that's still running (active) can change: once the due
+// date has taken what was left (overdue), only the lender's Extend or Forgive
+// helps. The new due date is at least a day away and at most maxWeeks from
+// when the coins moved.
+// loan.change: { by: 'borrower' | 'lender', dueAt, at, note? } while it waits.
+export const changeBy = (loan) => loan?.change?.by || '';
+// Whole weeks from the start to a due date (at least 1), for the terms line.
+export const weeksTo = (loan, dueAt) => Math.max(1, Math.ceil((dueAt - (loan.startAt ?? dueAt)) / WEEK - 0.05));
+// The new due date asked for: { dueAt } (weeks: the loan's whole length in
+// weeks from the start; dueAt: a time) or { error }.
+export function changeTarget(loan, { weeks, dueAt }, now) {
+  let at;
+  if (weeks !== undefined && weeks !== null && weeks !== '') {
+    const w = int(weeks);
+    if (!(w >= 1 && w <= LIMITS.maxWeeks)) return { error: `Pick 1 to ${LIMITS.maxWeeks} weeks.` };
+    at = (loan.startAt ?? now) + w * WEEK;
+  } else {
+    at = int(dueAt);
+    if (Number.isNaN(at)) return { error: 'Pick a new due date.' };
+  }
+  if (Math.abs(at - (loan.dueAt || 0)) < 3600000) return { error: 'That’s the due date it has now.' };
+  if (at < now + DAY) return { error: 'The new due date has to be at least a day away.' };
+  if (at > (loan.startAt ?? now) + LIMITS.maxWeeks * WEEK) return { error: `A loan can run ${LIMITS.maxWeeks} weeks at most.` };
+  return { dueAt: at };
+}
+// Ask, accept, decline or cancel a length change: { error } or { patch, history }.
+export function changeCheck(loan, { role, action, weeks, dueAt, note, now }) {
+  if (!loan) return { error: 'That loan is gone.' };
+  if (!role) return { error: 'That isn’t your loan.' };
+  const side = sideOf(role);
+  const text = cleanNote(note);
+  const line = (act, extra = {}) => ({ act, by: side, at: now, ...(text && { note: text }), ...extra });
+  if (loan.status !== 'active')
+    return {
+      error: loan.status === 'overdue' ? 'The due date already took what was left.' : 'That loan isn’t running.',
+      ...(loan.status === 'overdue' && { body: side === 'lender' ? 'Extend gives more time.' : `Only ${loan.bank ? 'the bank' : first(loan.lender)} can give more time now.` }),
+    };
+  const waiting = loan.change;
+  if (action === 'ask') {
+    if (waiting?.by === side) return { error: 'You already asked. Take that one back first.' };
+    if ((loan.changes || 0) >= LIMITS.changes) return { error: 'That’s a lot of asks on one loan.', body: 'Pay it back, or ask the other side to talk it over.' };
+    const t = changeTarget(loan, { weeks, dueAt }, now);
+    if (t.error) return t;
+    // The lender gives more time with Extend, which needs no answer; an ask
+    // from the lender is for less time.
+    if (side === 'lender' && t.dueAt > loan.dueAt) return { error: 'More time doesn’t need an answer: use Extend.' };
+    // Asking back while the other side's ask waits replaces theirs (a counter).
+    return {
+      patch: { change: { by: side, dueAt: t.dueAt, at: now, ...(text && { note: text }) }, changes: (loan.changes || 0) + 1 },
+      history: line('change', { dueAt: t.dueAt, was: loan.dueAt }),
+    };
+  }
+  if (!waiting) return { error: 'Nobody asked to change it.' };
+  if (action === 'cancel') {
+    if (waiting.by !== side) return { error: 'Only the one who asked can take it back.' };
+    return { patch: { change: null }, history: line('changeCancel') };
+  }
+  if (waiting.by === side) return { error: 'Waiting for the other side to answer.' };
+  if (action === 'decline') return { patch: { change: null }, history: line('changeDecline', { dueAt: waiting.dueAt }) };
+  if (action === 'accept') {
+    // Checked again now: a date that's too close (or passed) by now doesn't go.
+    if (waiting.dueAt < now + 3600000) return { error: 'That date is too close now.', body: 'Say no, and ask for a new one.' };
+    return {
+      patch: { dueAt: waiting.dueAt, terms: { ...loan.terms, term: weeksTo(loan, waiting.dueAt) }, remindedAt: null, change: null },
+      history: line('changeAccept', { dueAt: waiting.dueAt, was: loan.dueAt }),
+    };
+  }
+  return { error: 'Ask, accept, or say no?' };
 }
 
 // The due date: take whatever is left, even past zero. balance: the
@@ -316,6 +400,7 @@ export function collectOf(loan, { balance, now }) {
       paid: (loan.paid || 0) + take,
       short,
       collectedAt: now,
+      change: null,
       ...(after >= 0 && { closedAt: now }),
     },
     history: { act: 'collect', by: 'bank', at: now, amount: take, ...(short && { short }) },
@@ -393,6 +478,14 @@ export function lineText(line, loan) {
       return `${who} gave ${line.weeks} more week${line.weeks > 1 ? 's' : ''}`;
     case 'settled':
       return 'Back above zero. Paid off.';
+    case 'change':
+      return `${who} asked to move the due date to ${dueText(line.dueAt)}`;
+    case 'changeAccept':
+      return `${who} agreed: now due ${dueText(line.dueAt)}`;
+    case 'changeDecline':
+      return `${who} said no to the new due date`;
+    case 'changeCancel':
+      return `${who} took back the due date change`;
     default:
       return '';
   }

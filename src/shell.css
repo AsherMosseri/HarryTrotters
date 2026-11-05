@@ -4809,6 +4809,12 @@ html.kb-open .report-note { min-height: 56px; }
 .loan-repay .input { width: 110px; flex: 0 1 110px; }
 .loan-have { flex-basis: 100%; }
 .loan-weeks button { min-width: 48px; }
+.loan-change { display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: 10px; background: var(--surface-2); }
+.loan-change p { margin: 0; }
+.loan-change .loan-weeks { flex-wrap: wrap; }
+.loan-change .loan-weeks button { min-width: 40px; }
+.loan-date { width: auto; flex: 1 1 150px; min-width: 0; }
+.loan-change-btn { align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; }
 .loan-thread-btn { align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; }
 .loan-thread { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; border-left: 2px solid var(--border); }
 .loan-thread li { display: flex; align-items: baseline; gap: 8px; padding: 4px 0 4px 10px; font-size: 14px; min-width: 0; }
@@ -5402,3 +5408,8 @@ button.bs-cell:focus-visible { outline: 2px solid var(--accent); outline-offset:
 }
 /* With Stats in, the tabs stay one line each (the dot beside the word). */
 .coins-tabs button { white-space: nowrap; }
+/* Controls, Channels: old coin cards to #arcade (3.2, owner only). */
+.move-arcade { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.move-arcade p { margin: 0; }
+.move-arcade-counts { display: flex; flex-wrap: wrap; gap: 6px; }
+.move-arcade-skips { margin: 0; padding-left: 18px; }

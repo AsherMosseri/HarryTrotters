@@ -588,6 +588,12 @@ service cloud.firestore {
          'battleship', 'tetris', 'minesweep']
         || (m.cmd.get('name', '') == 'request' && m.cmd.get('kind', '') != 'idea'));
     }
+    // Coins and games only in #arcade (3.2): the coin cards the app posts
+    // itself (/give, /balance, /leaderboard) go nowhere else, DMs included.
+    // (The server's cards come from functions that check the channel.)
+    function appCoinCard(m) {
+      return 'cmd' in m && m.cmd is map && m.cmd.get('name', '') in ['give', 'balance', 'leaderboard'];
+    }
     // A coin request card's state (open, paid, declined…) is the server's,
     // team management included: nobody changes its cmd.
     function coinCard(c) { return c is map && c.get('name', '') == 'request' && c.get('kind', '') != 'idea'; }
@@ -648,7 +654,8 @@ service cloud.firestore {
     // leaves a placeholder); managers can change or remove any message.
     match /channels/{channelId}/messages/{msgId} {
       allow read: if isMember() && canReadIn(channelId);
-      allow create: if isMember() && validMessage() && (channelId != 'announcements' || isManager()) && !channelOff(channelId) && canPostIn(channelId);
+      allow create: if isMember() && validMessage() && (channelId != 'announcements' || isManager()) && !channelOff(channelId) && canPostIn(channelId)
+        && (channelId == 'arcade' || !appCoinCard(request.resource.data));
       allow update: if isMember() && !channelOff(channelId) && changeAllowed()
         && (isManager() || (canPostIn(channelId) && (isAuthor() || sharedChange()) && keepsCmd()))
         && keepsCoinCard() && keepsServerCard();
@@ -677,7 +684,7 @@ service cloud.firestore {
       function dmPeople() { return get(/databases/$(database)/documents/dms/$(dmId)).data.people; }
       match /messages/{msgId} {
         allow read: if isMember() && (isManager() || inPeople(dmPeople()));
-        allow create: if isMember() && !featureOff('dms') && validMessage() && inPeople(dmPeople());
+        allow create: if isMember() && !featureOff('dms') && validMessage() && inPeople(dmPeople()) && !appCoinCard(request.resource.data);
         allow update: if isMember() && !featureOff('dms') && changeAllowed() && (isManager() || (inPeople(dmPeople())
           && (isAuthor() || sharedChange()) && keepsCmd()))
           && keepsCoinCard() && keepsServerCard();

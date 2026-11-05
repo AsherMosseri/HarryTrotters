@@ -80,6 +80,7 @@ import CommandsPage from './CommandsPage.jsx';
 import GameHost from './games/GameHost.jsx';
 import { ShutdownPage, shutdownUnread } from './Shutdown.jsx';
 import ControlsPage from './ControlsPage.jsx';
+import HiddenCoin from './HiddenCoin.jsx';
 import { PreviewBar } from './Preview.jsx';
 import { ControlsContext, commandCfgFor, makeControls, profileView } from '../controls.js';
 import { CoinsDialog, Coins } from './Coins.jsx';
@@ -1284,7 +1285,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
     const myRoles = peopleInfo.get(actor.name)?.subteams || [];
     for (const c of [...convs.channels, ...convs.dms]) {
       const since = chatRead?.[c.key] ?? Date.now();
-      const fresh = (chat[c.key] || []).filter((m) => m.at > since && !sentByMe(m, actor, rename) && !m.deleted);
+      const fresh = (chat[c.key] || []).filter((m) => m.at > since && !sentByMe(m, actor, rename) && !m.deleted && !m.moved);
       // Announcements and DMs always count as important (red), like a mention.
       const important =
         c.announce || c.kind === 'dm'
@@ -2260,6 +2261,18 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
   const myWallet = useMemo(() => walletOf(actor.name), [walletOf, actor.name]);
   const sync = useCoinSync(myWallet);
   coinSync.current = { noteServer: sync.noteServer, walletOf };
+  // Hidden coins (3.2): on unless Controls turns them (or coins) off.
+  const hiddenCoinsOn = !!store.hiddenCoin && controls.isOn('coins') && controls.isOn('hiddenCoins');
+  const askHiddenCoin = useCallback((req) => store.hiddenCoin(req, actor), [store, actor]);
+  // Demo mode runs the server's top-ups for a big balance (3.2, functions/earn.js) here.
+  const walletRef = useRef(walletOf);
+  walletRef.current = walletOf;
+  useEffect(() => {
+    if (!store.scaleTick) return undefined;
+    store.useWallets?.((n) => walletRef.current(n));
+    const t = setTimeout(() => store.scaleTick(actor.name), 1500);
+    return () => clearTimeout(t);
+  }, [store, actor.name, myWallet.balance]);
   // Loans (Loans.jsx): mine, either side, and every bank loan for the owner.
   const loans = useLoans({ store, actor, call: api.loan, balance: myWallet.balance, walletOf });
   // Gambling buddy (functions/buddy.js): the locks I'm in (every one for the
@@ -3392,6 +3405,11 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
                     onSkip={skipInPreview?.(`checkin:${pendingCheckin.id}`)}
                   />
                 )}
+                {hiddenCoinsOn && (
+                  <Overlay>
+                    <HiddenCoin ask={askHiddenCoin} demo={store.mode === 'demo'} />
+                  </Overlay>
+                )}
                 {toast && (
                   <Overlay>
                     <div className="toast" role="alert" onClick={() => setToast(null)}>
@@ -3690,6 +3708,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
               onShutdown={() => setShutdownPage(true)}
               onCommands={() => setCommandsPage(true)}
               onAds={() => setAdsPage(true)}
+              moveToArcade={store.moveToArcade ? (req) => store.moveToArcade(req, actor) : null}
               account={(data) => store.account(data)}
               loanSettings={<LoanSettings cfg={loans.cfg} call={api.loan} />}
               me={actor.name}

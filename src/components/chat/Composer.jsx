@@ -8,7 +8,7 @@ import { Avatar, CloseIcon, PlusIcon, StatusDot, usePeople } from '../common.jsx
 import { prefixLines, wrapSelection } from './format.jsx';
 import { emojiList, loadEmoji, rememberEmoji, searchEmoji } from './emoji.js';
 import { EmojiPicker, GifPicker, PollDialog, StandupDialog, StickerPicker } from './Pickers.jsx';
-import { matchCommands, parseCommand, runCommand } from '../../commands.js';
+import { arcadeNote, matchCommands, parseCommand, runCommand } from '../../commands.js';
 import { CommandOption } from './Commands.jsx';
 import { whatIs } from './Message.jsx';
 import { relTime } from '../../util.js';
@@ -67,6 +67,8 @@ export default function Composer({
   // fills the box (from /help).
   onNote = () => {},
   useCommand,
+  // Coins and games live in #arcade (3.2): opens it, the command in its draft.
+  onGoArcade,
 }) {
   const people = usePeople();
   // Asher's Controls: features switched off don't show up here at all.
@@ -399,10 +401,24 @@ export default function Composer({
     }
   };
 
+  // Coins and games only in #arcade (3.2): the command doesn't send here. It
+  // moves to #arcade's draft, ready to send there.
+  const [nudge, setNudge] = useState(0);
+  const goArcade = () => {
+    const body = text.trim();
+    setDraft('arcade', body);
+    setDraft(conv, '');
+    setText('');
+    setSuggest(null);
+    if (replyTo) onDone();
+    onGoArcade?.();
+  };
+
   const send = async () => {
     const body = text.trim();
     if ((!body && !photo) || sending) return;
     const parsed = !editing && !photo && parseCommand(body);
+    if (parsed && arcadeNote(parsed, conv, roster)) return setNudge((n) => n + 1);
     if (parsed) return runSlash(parsed, body);
     // @Subteam pings that subteam; @everyone (team management only) pings everyone.
     const everyone = !isDm && isManager && feat('everyone') && /@everyone(?![\w])/.test(body);
@@ -439,6 +455,7 @@ export default function Composer({
   };
 
   const cmdHint = !editing && text.startsWith('/') ? parseCommand(text.split(/\s/)[0])?.cmd : null;
+  const toArcade = cmdHint && conv !== 'arcade' ? arcadeNote(parseCommand(text), conv, roster) : null;
 
   return (
     <div className="composer">
@@ -576,7 +593,18 @@ export default function Composer({
           ))}
         </ul>
       )}
-      {!suggest && cmdHint && (
+      {toArcade && (
+        <div key={nudge} className={`arcade-redirect${nudge ? ' nudge' : ''}`} role="status">
+          <span className="arcade-redirect-ic" aria-hidden="true">
+            🕹️
+          </span>
+          <b className="grow">{toArcade.title}</b>
+          <button className="btn primary" onMouseDown={(e) => e.preventDefault()} onClick={goArcade}>
+            Go to #arcade
+          </button>
+        </div>
+      )}
+      {!suggest && cmdHint && !toArcade && (
         <div className="cmd-hint">
           <code>/{cmdHint.name}</code>
           {cmdHint.args && <span className="cmd-opt-args">{cmdHint.args}</span>}
@@ -789,7 +817,7 @@ export default function Composer({
         >
           <Icon name="smile" />
         </button>
-        <button className="btn primary" onClick={send} disabled={sending || (!text.trim() && !photo)}>
+        <button className="btn primary" onClick={send} disabled={sending || (!text.trim() && !photo) || !!toArcade}>
           {editing ? 'Save' : sending ? '…' : 'Send'}
         </button>
       </div>
