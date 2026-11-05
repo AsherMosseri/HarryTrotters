@@ -4,6 +4,23 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '3.2',
+    date: '2026-11-05',
+    title: 'New pets, pet games, coin stats and #arcade',
+    items: [
+      'Four new pets: a goat, a naked mole rat, a star-nosed mole and a goldendoodle. Every pet has a favorite food now.',
+      'Pets grow all the way to level 100, with new titles and rings along the way. Level 50 unlocks a Royal crown, and level 100 a red, white and blue number 12 jersey. Leveling past 10 is quicker now, so pets past it jump up a few levels.',
+      'More pets: once every pet you have is level 5, you can adopt another one, have a baby or take one from a teammate.',
+      'Pet games! Play Pet Hop and Pet Rally (10 levels) with your own pet, from Market, Pets. Your bests are saved, with a team board for each, just for fun.',
+      'New Stats tab in Jackson coins: what you’ve won and lost gambling, game by game, where your coins came from, and your best and worst days, with graphs. History has its own tab.',
+      'Gambling buddy: ask a teammate to lock your casino games with a password only they know. They can unlock it any time.',
+      'Coins and games now live in #arcade: type a coin or game command anywhere else and one tap takes it there, ready to send.',
+      'Loans: ask for more time or a different due date, and the other side can say yes or no.',
+      'Rich? Your pay grows with your balance now: every task, lab hour and prize pays at least about 0.01% of what you have.',
+      'Keep an eye out: little coins now hide around the app. Tap one to pick it up (up to 5 a day).',
+    ],
+  },
+  {
     version: '3.1.6',
     date: '2026-11-05',
     title: 'Fixes and improvements',
