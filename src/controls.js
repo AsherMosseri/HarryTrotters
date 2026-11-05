@@ -46,6 +46,7 @@ export const FEATURE_GROUPS = [
       ['profileEffects', 'Profile effects', 'Animations that play over profiles'],
       ['profileColors', 'Profile colors', 'Custom colors on profile cards'],
       ['coins', 'Jackson coins', 'Coins, the casino, games, and coin commands'],
+      ['hiddenCoins', 'Hidden coins', 'Little coins that now and then show up around the app to tap'],
       ['casinoOnShift', 'Casino and games during shifts', 'Off: nobody can start, accept or join a casino or arcade game while they’re clocked in'],
       ['ads', 'Ads', 'Every ad in the app'],
       ['themes', 'Themes', 'Color themes (everyone gets the standard look)'],

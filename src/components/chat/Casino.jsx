@@ -908,6 +908,7 @@ function Economy({ c, by, Name }) {
           <div>
             You {c.job}. <span className="muted">{c.joke}</span>
           </div>
+          {c.scaled && <div className="muted small">More for a big balance.</div>}
           <CapNote on={c.capped} />
         </Econ>
       );

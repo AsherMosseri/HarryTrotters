@@ -1507,6 +1507,10 @@ export const firebaseStore = {
   async ownerRefund(req) {
     return (await callable('ownerRefund')(req)).data;
   },
+  // Hidden coins (3.2, functions/earn.js): { action: 'spawn' } or { action: 'claim', token }.
+  async hiddenCoin(req) {
+    return (await callable('hiddenCoin')(req)).data;
+  },
   // 3.2, the owner once: past coin cards into #arcade ({ dry } first).
   async moveToArcade(req) {
     return (await callable('moveToArcade', { timeout: 540000 })(req)).data;

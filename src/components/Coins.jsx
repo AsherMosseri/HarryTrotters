@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { GIFT_MAX, MAX_BALANCE, ceilingNote, leaderboard, overCeiling, perHourOf, teamDay, teamMidnight, wallet as walletOf } from '../coins.js';
+import { GIFT_MAX, MAX_BALANCE, ceilingNote, earnBalance, leaderboard, overCeiling, perHourOf, scaledPay, teamDay, teamMidnight, wallet as walletOf } from '../coins.js';
 import { mondayOf } from '../milestones.js';
 import { relTime, useEscape } from '../util.js';
 import { Avatar, CloseIcon, Overlay } from './common.jsx';
@@ -32,6 +32,12 @@ const whenAt = (at) => new Date(at).toLocaleString(undefined, { month: 'short', 
 export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onMarket, onClose, isManager = false, onCheck, stale, onRefresh, disputes = [], initialTab = 'wallet', onAdjust, onFix, loans = null, loanFocus = null, onToast, everyone = true }) {
   useEscape(onClose);
   const f = useCoinFormat();
+  // What one task and one lab hour pay this person now (3.2: the bigger of
+  // the normal pay and a share of their lowest balance in the last day).
+  const pay = useMemo(() => {
+    const low = earnBalance(wallet.history, Date.now());
+    return { task: scaledPay('task', cfg.perTask, low), hour: scaledPay('hours', perHourOf(cfg), low) };
+  }, [wallet, cfg]);
   const [tab, setTab] = useState(initialTab);
   // The owner can reverse a line of their own history (CoinsEveryone.jsx useReverse).
   const rev = useReverse(actor.name, wallet.history, onAdjust, onFix);
@@ -81,8 +87,9 @@ export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onMarket
               <Coins n={wallet.balance} size={30} max={13} />
             </b>
             <span className="muted small">
-              {f.n(cfg.perTask)} for each task you finish (up to {cfg.tasksPerDay} a day) · {f.n(perHourOf(cfg))} an hour at the lab, paid per
-              15 minutes
+              {/* 3.2: pay grows with the balance (EARN_SCALE); the server pays it. */}
+              {f.n(pay.task)} for each task you finish (up to {cfg.tasksPerDay} a day) · {f.n(pay.hour)} an hour at the lab, paid per 15 minutes
+              {pay.task > cfg.perTask ? ` (${f.n(cfg.perTask)} and ${f.n(perHourOf(cfg))} normally: pay grows with your balance)` : ' (more when you’re rich)'}
             </span>
             {onMarket && (
               <button className="btn small coins-market" onClick={onMarket}>
@@ -152,6 +159,7 @@ export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onMarket
                           {relTime(x.at)} · <span className="mono">{whenAt(x.at)}</span>
                           {x.capped ? ` · counted ${cfg.dayCap} h max a day` : ''}
                           {x.note ? ` · ${x.note}` : ''}
+                          {x.boost ? ` · ${f.n(x.base)} + ${f.n(x.boost)} for a big balance` : ''}
                         </span>
                       </span>
                       <CoinNum as="b" signed n={x.amount} className={x.amount < 0 ? 'coins-minus' : x.amount > 0 ? 'coins-plus' : 'muted'} />

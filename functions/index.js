@@ -17,6 +17,8 @@ import {
   AWARD_CAPS,
   capWin,
   coinSettings,
+  earnBalance,
+  scaledPay,
   coinsByName,
   coinTasks,
   freshWallet,
@@ -31,7 +33,8 @@ import { groupTeam } from './groups.js';
 import * as casino from './shared/casino.js';
 import * as arcade from './shared/arcade.js';
 import { ARCADE, ARCADE_NOTE, blocked, isOff, serverGroup } from './shared/commandRules.js';
-import { awardCoins, prepareAward } from './award.js';
+import { awardCoins, prepareAward, setEarnBalance } from './award.js';
+import { earnFunctions } from './earn.js';
 import * as arcadeBank from './banks/arcade.js';
 import * as fun from './shared/funGames.js';
 import * as mines from './shared/minesweeper.js';
@@ -1340,6 +1343,11 @@ export const { buy, joinTournament, marketManage, pet, payTournaments } = market
   loanLock: (name) => loans.lockOf(name),
 });
 
+// Earnings that grow with the balance, and hidden coins (functions/earn.js, 3.2).
+const earn = earnFunctions({ db, coinData, freshCoins, bankRef, renamer, owner: REQUESTS_TO });
+setEarnBalance(earn.balanceFor);
+export const { onTaskEarn, onShiftEarn, hiddenCoin } = earn;
+
 // Compare my balance with the server's (Coins screen).
 export const { coinCheck } = coinCheckFunctions({ db, coinData, freshCoins, bankRef, cacheAge: () => Date.now() - coinCache.at });
 // Casino reports (functions/disputes.js): a teammate reports a result, team
@@ -1899,6 +1907,14 @@ export const play = onCall({ maxInstances: 5, invoker: 'public' }, withBalance(a
           ? casino.work(myBank, now, secureRandom, await workContext(me, data))
           : casino.beg(myBank, now);
     if (r.error) return note(r.error);
+    // /work grows with the balance (3.2, EARN_SCALE.work): its lowest in the last day.
+    if (game === 'work' && r.amount > 0) {
+      const scaled = scaledPay('work', r.amount, earnBalance((await freshCoins(me, myBank, data)).history, now));
+      if (scaled > r.amount) {
+        r.amount = scaled;
+        r.card = { ...r.card, amount: scaled, scaled: true };
+      }
+    }
     // /work and /beg pay up to the ceiling (MAX_BALANCE) at most.
     if (game !== 'daily' && capWin(r.amount, balance) < r.amount) {
       r.amount = capWin(r.amount, balance);

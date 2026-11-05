@@ -20,8 +20,9 @@ import * as challenge from '../../functions/shared/challenge.js';
 import * as dispute from '../../functions/shared/disputes.js';
 import { ARCADE, ARCADE_NOTE, blocked, isOff, serverGroup } from '../../functions/shared/commandRules.js';
 import { skipReason as moveSkip } from '../../functions/shared/moveArcade.js';
+import { FIND } from '../../functions/shared/hiddenCoins.js';
 import * as coinAsk from '../../functions/shared/coinRequests.js';
-import { AWARD_CAPS, breakdown, capWin, ceilingNote, giftEntry, overCeiling, sumCoins, groupGiftEntries, prizeEntry, teamDay, teamMidnight } from '../../functions/shared/coins.js';
+import { AWARD_CAPS, breakdown, capWin, ceilingNote, earnBalance, giftEntry, overCeiling, scaleId, scaledPay, sumCoins, groupGiftEntries, prizeEntry, teamDay, teamMidnight } from '../../functions/shared/coins.js';
 import { BOT, groupLabel, resolveTargets } from '../../functions/shared/groups.js';
 import * as fun from '../../functions/shared/funGames.js';
 import * as mines from '../../functions/shared/minesweeper.js';
@@ -1061,6 +1062,18 @@ function nextFridayLocal(now) {
   return d.getTime();
 }
 // Change fields on a command card's cmd (the open lottery card).
+// Earnings that grow with the balance (3.2, shared/coins.js EARN_SCALE): the
+// app's own wallets (Workspace hands them over with useWallets), the lowest
+// balance in the last day, as on the server.
+let demoWallet = null;
+const demoLow = (name, now = Date.now()) => {
+  try {
+    return demoWallet ? earnBalance(demoWallet(name).history, now) : 0;
+  } catch {
+    return 0;
+  }
+};
+
 // Coins from games and quizzes, the way functions/award.js pays them: each
 // source capped per person per team day, and a key pays only once.
 function demoAward({ person, amount, source, label = '', key = '' }, now = Date.now()) {
@@ -1070,12 +1083,17 @@ function demoAward({ person, amount, source, label = '', key = '' }, now = Date.
   const keys = state.awardKeys || {};
   if (key && keys[key]) return 0;
   const day = teamDay(now);
+  // The cap counts normal coins; a big balance pays more for them (3.2).
   const sofar = (state.coins || [])
     .filter((x) => x.type === 'award' && x.person === person && x.source === source && x.day === day)
-    .reduce((t, x) => t + (x.amount || 0), 0);
-  const pay = Math.min(want, Math.max(0, cap - sofar));
-  if (!pay) return 0;
-  state.coins = [...(state.coins || []), { id: uid(), type: 'award', person, amount: pay, source, label: String(label).slice(0, 80), day, at: now }];
+    .reduce((t, x) => t + (x.base ?? x.amount ?? 0), 0);
+  const base = Math.min(want, Math.max(0, cap - sofar));
+  if (!base) return 0;
+  const pay = scaledPay(source, base, demoLow(person, now));
+  state.coins = [
+    ...(state.coins || []),
+    { id: uid(), type: 'award', person, amount: pay, ...(pay !== base && { base }), source, label: String(label).slice(0, 80), day, at: now },
+  ];
   if (key) state.awardKeys = { ...keys, [key]: { person, source, day, at: now } };
   return pay;
 }
@@ -2238,6 +2256,14 @@ export const demoStore = {
             })
           : casino.beg(mine, now);
     if (r.error) return note(r.error);
+    // /work grows with the balance (3.2), like the server.
+    if (game === 'work' && r.amount > 0) {
+      const scaled = scaledPay('work', r.amount, demoLow(me, now));
+      if (scaled > r.amount) {
+        r.amount = scaled;
+        r.card = { ...r.card, amount: scaled, scaled: true };
+      }
+    }
     // /work and /beg pay up to a googol at most (like the server).
     if (game !== 'daily' && capWin(r.amount, balance) < r.amount) {
       r.amount = capWin(r.amount, balance);
@@ -2411,6 +2437,77 @@ export const demoStore = {
     ];
     commit();
     return { ok: true, refunded: [...paid.values()].reduce((n, r) => n + r.count, 0), coins, people: paid.size, skipped, closed };
+  },
+  // 3.2: the app's wallets, for earnings that grow with the balance.
+  useWallets(fn) {
+    demoWallet = fn;
+  },
+  // What the server's onTaskEarn and onShiftEarn do (functions/earn.js), run
+  // while the app is open: a task's top-up once, a lab day's top-up up to
+  // what the day pays now. name: whose (the demo's signed-in person).
+  scaleTick(name, now = Date.now()) {
+    if (!demoWallet || (state.controls?.off || []).includes('coins')) return;
+    const w = demoWallet(name);
+    let changed = false;
+    for (const item of w.history) {
+      if (!(item.amount > 0) || (item.kind !== 'task' && item.kind !== 'hours') || item.note) continue;
+      if (item.kind === 'hours' && item.day === teamDay(now) && (state.shifts || []).some((x) => !x.end && x.person === name)) continue;
+      const base = item.base ?? item.amount;
+      const kind = item.kind;
+      const ref = kind === 'task' ? item.id : item.day;
+      const id = scaleId(kind, ref, name);
+      const had = (state.coins || []).find((x) => x.id === id);
+      if (kind === 'task' && (had || item.boost)) continue;
+      const extra = scaledPay(kind, base, earnBalance(w.history.filter((x) => x !== item), now)) - base;
+      if (!(extra > 0) || (had && had.amount >= extra)) continue;
+      const entry = { id, type: 'scale', person: name, ref: `${kind}:${ref}`, source: kind, amount: extra, base, label: item.label, at: had?.at || now };
+      state.coins = [...(state.coins || []).filter((x) => x.id !== id), entry];
+      changed = true;
+    }
+    if (changed) commit();
+  },
+  // Hidden coins (3.2), the way the hiddenCoin function hands them out and
+  // pays them (functions/earn.js FIND): a token now and then, at most 5 a
+  // day, each paid once.
+  async hiddenCoin(req, actor) {
+    await demoLag();
+    const now = Date.now();
+    const me = actor.name;
+    const off = state.controls?.off || [];
+    if (me !== REQUESTS_TO && (off.includes('coins') || off.includes('hiddenCoins'))) return { ok: true, none: true, off: true };
+    const day = teamDay(now);
+    const finds = (state.coinFinds ||= {});
+    const tokens = (state.coinTokens ||= {});
+    const key = `${personId(me)}-${day}`;
+    const d = finds[key] || {};
+    if (req?.action === 'spawn') {
+      const issued = d.issued || 0;
+      if (issued >= FIND.perDay) return { ok: true, none: true, left: 0 };
+      // Demo mode: a shorter wait, so a coin shows up while someone looks around.
+      if (now - (d.lastAt || 0) < FIND.demoGap) return { ok: true, none: true, left: FIND.perDay - issued };
+      if (d.lastAt && Math.random() >= FIND.chance) {
+        finds[key] = { ...d, lastAt: now };
+        commit();
+        return { ok: true, none: true, left: FIND.perDay - issued };
+      }
+      const token = Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, '0')).join('');
+      tokens[token] = { person: me, day, at: now, exp: now + FIND.ttl, base: FIND.min + Math.floor(Math.random() * (FIND.max - FIND.min + 1)), claimed: false };
+      finds[key] = { ...d, issued: issued + 1, lastAt: now };
+      commit();
+      return { ok: true, token, exp: now + FIND.ttl, left: FIND.perDay - issued - 1 };
+    }
+    if (req?.action === 'claim') {
+      const t = tokens[req.token];
+      const note = (title) => ({ note: { title, body: '' } });
+      if (!t || t.person !== me) return note('That coin isn’t yours.');
+      if (t.claimed) return note('Already picked up.');
+      if (now > t.exp) return note('Too late: it rolled away.');
+      const paid = demoAward({ person: me, amount: t.base, source: 'find', label: 'Found a hidden coin', key: `find-${req.token}` }, now);
+      tokens[req.token] = { ...t, claimed: true, claimedAt: now, paid };
+      commit();
+      return { ok: true, paid };
+    }
+    return { note: { title: 'Unknown.', body: '' } };
   },
   // 3.2, once: past coin and game cards from other channels into #arcade,
   // the way the moveToArcade function does it (functions/moveArcade.js): same

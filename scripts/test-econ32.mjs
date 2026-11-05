@@ -94,5 +94,29 @@ eq(L.lockOf([apply(apply(late, r), L.changeCheck(apply(late, r), { role: 'lender
 eq(L.collectOf(l2, { balance: 500, now: l2.dueAt }).patch.change, null, 'collection clears a waiting ask');
 eq(L.lineText({ act: 'change', by: 'borrower', dueAt: now }, loan).startsWith('Mia asked to move the due date to'), true, 'history line');
 
+// ---------- earnings that grow with the balance ----------
+const C = await import('../functions/shared/coins.js');
+eq(C.scaledPay('hours', 4, 18e18), 18e18 * 1e-4, '4 an hour at 18 quintillion: 0.01% an hour');
+eq(C.scaledPay('task', 15, 1e6), 100, 'a task at a million: 100');
+eq(C.scaledPay('task', 15, 1000), 15, 'a small balance: the normal 15');
+eq(C.scaledPay('task', 15, -1e9), 15, 'below zero: the normal 15');
+eq(C.scaledPay('task', 0, 1e9), 0, 'nothing earned stays nothing');
+eq(C.scaledPay('nope', 15, 1e18), 15, 'a source with no scale: the normal pay');
+eq(C.scaledPay('task', 15, C.MAX_BALANCE) , 15, 'at the ceiling: the normal pay');
+eq(C.scaledPay('quiz', 6, 1e9) , 2 * C.scaledPay('quiz', 3, 1e9), 'twice the normal pay, twice the share');
+eq(Object.keys(C.EARN_SCALE).every((k) => C.EARN_SCALE[k].pct <= 0.01), true, 'no source pays more than 0.01% per normal earning');
+const H = (amount, at) => ({ amount, at });
+eq(C.earnBalance([H(100, now - 2 * D), H(1e9, now - 1000)], now), 100, 'a fortune from a minute ago doesn’t count yet');
+eq(C.earnBalance([H(1e9, now - 2 * D), H(-1e9 + 5, now - 3600000), H(1e9, now - 1000)], now), 5, 'given away and back within the day: the low point');
+eq(C.earnBalance([H(1e9, now - 2 * D)], now), 1e9, 'held all day: the balance');
+// The wallet counts a top-up only while its task still pays.
+const cfg = C.coinSettings({ ratesFrom: '2026-01-01', start: '2026-01-01' });
+const t = { id: 't1', title: 'X', status: 'done', assignees: ['Mia Chen'], createdBy: 'Cooper Mlezcko', completedAt: Date.UTC(2026, 10, 5, 15) };
+const top = { type: 'scale', person: 'Mia Chen', ref: 'task:t1', amount: 985, base: 15, at: t.completedAt };
+const w = (tasks) => C.wallet('Mia Chen', C.coinInput({ tasks, shifts: [], ledger: [top], bank: [], rename: (x) => x, cfg, names: ['Mia Chen'], now: Date.UTC(2026, 10, 6) }));
+eq(w([t]).balance, 1000, 'done task with a top-up: 15 + 985');
+eq(w([{ ...t, status: 'doing' }]).balance, 0, 'out of Done: the top-up goes too');
+eq(w([{ ...t, createdBy: 'Mia Chen' }]).balance, 0, 'a task that doesn’t pay: no top-up');
+
 console.log(failures ? `${failures} FAILED, ${passes} passed` : `ALL PASSED (${passes})`);
 process.exit(failures ? 1 : 0);
