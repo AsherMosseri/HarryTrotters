@@ -1550,6 +1550,35 @@ export const firebaseStore = {
     if (owner) offs.push(watch('bank', query(col, where('bank', '==', true))));
     return () => offs.forEach((off) => off());
   },
+  // Gambling buddy (functions/buddy.js): { action, buddy?, person?, password? };
+  // returns { ok, done, lock } or { note }. The person and the buddy read
+  // their lock; the owner (Asher) reads every one (the rules allow nothing more).
+  async buddy(req) {
+    return (await callable('buddy')(req)).data;
+  },
+  subscribeBuddy(actor, cb) {
+    const owner = actor.admin && actor.name === REQUESTS_TO;
+    const parts = {};
+    const send = () => {
+      const all = new Map();
+      for (const list of Object.values(parts)) for (const l of list) all.set(l.id, l);
+      cb([...all.values()]);
+    };
+    const watch = (key, q) =>
+      onSnapshot(
+        q,
+        (snap) => {
+          parts[key] = snap.docs.map(readDoc);
+          send();
+        },
+        (e) => console.warn('buddy', key, e),
+      );
+    const col = collection(db, 'buddyLocks');
+    const offs = owner
+      ? [watch('all', col)]
+      : [watch('person', query(col, where('person', '==', actor.name))), watch('buddy', query(col, where('buddy', '==', actor.name)))];
+    return () => offs.forEach((off) => off());
+  },
   subscribeLoanSettings(cb) {
     return onSnapshot(
       doc(db, 'settings', 'loans'),

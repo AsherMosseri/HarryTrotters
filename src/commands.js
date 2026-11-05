@@ -8,6 +8,7 @@
 
 import { overdueTasks, parseMatch, parseTask, seasonRecord, todayISO } from './teamCommands.js';
 import { blocked, isOff } from '../functions/shared/commandRules.js';
+import { buddyCommandNote } from './buddy.js';
 import { gameArgs } from './components/games/launch.js';
 import { GROUP_ROWS, MORE_COMMANDS, runMore } from './moreCommands.js';
 import { runRequest } from './requestCommand.js';
@@ -489,6 +490,10 @@ export async function runCommand({ cmd, args }, ctx) {
   if ((cmd.name === 'tetris' || cmd.name === 'minesweep') && !namesSomeone(args)) return { game: { ...gameArgs(cmd.name, args), conv: ctx.conv } };
   // Casino and economy: the server rolls and posts the card (functions/index.js play).
   if (cmd.server) {
+    // Locked by a gambling buddy (src/buddy.js): say so right away. The
+    // server refuses it too.
+    const locked = buddyCommandNote(cmd.name);
+    if (locked) return { note: locked };
     const r = await ctx.play(cmd.name, args ? args.split(/\s+/) : []);
     return r?.note ? { note: r.note } : { done: true };
   }

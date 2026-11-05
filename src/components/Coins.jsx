@@ -9,6 +9,7 @@ import { MyReports } from './Disputes.jsx';
 import { LoansPanel } from './Loans.jsx';
 import { CoinNum, useCoinFormat } from './CoinNum.jsx';
 import { coinStyled } from '../coinFormat.js';
+import { BuddyLocksAdmin, CoinStats } from './CoinStats.jsx';
 
 // A Jackson coin: a little gold coin with a J.
 export const Coin = ({ size = 16 }) => (
@@ -29,7 +30,7 @@ const WHO = (n) => n.split(' ')[0];
 // The exact day and time of a history line (casino lines come in quick runs).
 const whenAt = (at) => new Date(at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
-export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onMarket, onClose, isManager = false, onCheck, stale, onRefresh, disputes = [], initialTab = 'wallet', onAdjust, onFix, loans = null, loanFocus = null, onToast, everyone = true }) {
+export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onMarket, onClose, isManager = false, onCheck, stale, onRefresh, disputes = [], initialTab = 'wallet', onAdjust, onFix, loans = null, loanFocus = null, onToast, everyone = true, buddy = null }) {
   useEscape(onClose);
   const f = useCoinFormat();
   const [tab, setTab] = useState(initialTab);
@@ -93,6 +94,13 @@ export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onMarket
           <div className="segmented coins-tabs" role="tablist">
             {[
               ['wallet', 'History'],
+              // The numbers (and graphs) from your history, and the gambling buddy (CoinStats.jsx).
+              [
+                'stats',
+                <>
+                  Stats{buddy?.waiting?.length > 0 && <span className="tab-dot" aria-label="(needs you)" />}
+                </>,
+              ],
               ['send', 'Send'],
               // Borrowing and lending (Loans.jsx), while coins are on.
               ...(loans
@@ -123,12 +131,22 @@ export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onMarket
             ))}
           </div>
           <StaleBanner stale={stale} onRefresh={onRefresh} />
+          {/* Locked by a gambling buddy: said on every tab, plainly. */}
+          {buddy?.mine?.state === 'on' && tab !== 'stats' && (
+            <button className="cs-lock-banner" onClick={() => setTab('stats')}>
+              <Icon name="lock" size={15} />
+              <span className="grow">Gambling is locked by your buddy, {buddy.mine.buddy.split(' ')[0]}.</span>
+              <span className="muted small">Stats</span>
+            </button>
+          )}
           <div className="coins-body">
             {/* everyone: everyone's coins have loaded (only yours load until this screen opens). */}
             {tab === 'everyone' &&
               isManager &&
               onCheck &&
               (everyone ? <EveryoneCoins roster={roster} data={data} cfg={cfg} onCheck={onCheck} onAdjust={onAdjust} onFix={onFix} /> : <p className="empty">Loading everyone’s coins…</p>)}
+            {tab === 'stats' && <CoinStats wallet={wallet} buddy={buddy} roster={roster} me={actor.name} />}
+            {tab === 'everyone' && isManager && onCheck && buddy?.isOwner && <BuddyLocksAdmin locks={buddy.all} call={buddy.call} />}
             {tab === 'wallet' && onAdjust && wallet.history.length > 0 && (
               <p className="muted tiny cv-rev-hint">Tap a line to reverse it: a loss is refunded, a gain is taken away.</p>
             )}

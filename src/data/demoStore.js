@@ -38,6 +38,8 @@ import { demoLearn } from './demoLearn.js';
 import { demoEvents } from './demoEvents.js';
 import { demoPetPhotos } from './demoPetPhotos.js';
 import { demoLoans } from './demoLoans.js';
+import { demoBuddy } from './demoBuddy.js';
+import { buddyBlocks, lockNote } from '../../functions/shared/buddy.js';
 import { PHOTO_ACTIONS } from '../../functions/shared/petphotos.js';
 import { earnedIds } from '../../functions/shared/events.js';
 import { coinsText } from '../../functions/shared/coinText.js';
@@ -957,6 +959,8 @@ const petPhotos = demoPetPhotos({ get: () => state, commit: () => commit(), uid 
 events.seedSamples();
 // Loans (demoLoans.js): the same checks as functions/loans.js.
 const loans = demoLoans({ get: () => state, commit: () => commit(), uid });
+// Gambling buddy (demoBuddy.js): the same decisions as functions/buddy.js.
+const buddies = demoBuddy({ get: () => state, commit: () => commit(), uid });
 
 // Refunds on game cards (ownerRefund, disputeDecide): the person's history
 // line for the card, and the card's "Refunded by Asher" tag, like the server.
@@ -1983,6 +1987,9 @@ export const demoStore = {
         : action !== 'prize' && (casino.CASINO.includes(game) || (arcade.MULTI.includes(game) && !['trivia', 'hangman', 'typerace'].includes(game))));
     const lock = betting ? loans.lockFor(me, balanceOf) : null;
     if (lock) return note(lock.title, lock.body);
+    // A gambling buddy's lock refuses new casino bets, like the server's play.
+    const buddyLock = buddyBlocks({ action, game, move }) ? buddies.lockFor(me) : null;
+    if (buddyLock) return note(lockNote(buddyLock).title, lockNote(buddyLock).body);
     // Several people's coins at once (multiplayer games).
     // card: the game and its card's id, so a held bet and its result share a history line.
     // A win past a googol is cut (arcade.capMoney, like the server's payOut);
@@ -2674,6 +2681,15 @@ export const demoStore = {
   },
   subscribeLoanSettings(cb) {
     return listen(() => cb(state.loanSettings || {}));
+  },
+  // Gambling buddy (functions/buddy.js; demoBuddy.js here): { ok, done, lock } or { note }.
+  async buddy(req, actor, ctx) {
+    await demoLag();
+    return buddies.call(req, actor, ctx);
+  },
+  // The locks this person is in (theirs, or as someone's buddy); every lock for the owner.
+  subscribeBuddy(actor, cb) {
+    return listen(() => cb(buddies.visible(actor).map((l) => ({ ...l }))));
   },
   // The server's loanTick (due dates, reminders), run while the app is open.
   loanTick(ctx) {

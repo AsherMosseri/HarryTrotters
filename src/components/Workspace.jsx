@@ -96,6 +96,7 @@ import { OrderTracker, OrdersDialog, orderActive } from './AdOrders.jsx';
 import { setServerSkew } from '../serverTime.js';
 import { AdBlockWall, GameDialog, PrizeWheel, VideoAd } from './AdGames.jsx';
 import { coinInput, coinSettings, wallet } from '../coins.js';
+import { buddyView, setBuddyLock } from '../buddy.js';
 import { useCoinSync } from '../coinSync.js';
 import { hoursOf, mergedMs } from '../../functions/shared/hours.js';
 import { teamDay } from '../../functions/shared/coins.js';
@@ -1517,6 +1518,11 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
       disputeRefundAll: (req) => store.disputeRefundAll(req, actor, { balanceOf: (n) => cmdData.current.wallet(n).balance }).catch((e) => ({ note: noteFor(e, 'That didn’t go through') })),
       // The owner's Refund / Take back on a game card (CardActions.jsx, and coin history's Reverse).
       ownerRefund: (req) => store.ownerRefund(req, actor, { balanceOf: (n) => cmdData.current.wallet(n).balance }).catch((e) => ({ note: noteFor(e, 'That didn’t go through') })),
+      // Gambling buddy (CoinStats.jsx, functions/buddy.js).
+      buddy: (req) =>
+        store.buddy
+          ? store.buddy(req, actor, { roster: cmdData.current.roster }).catch((e) => ({ note: noteFor(e, 'That didn’t go through') }))
+          : Promise.resolve({ note: { title: 'Not available yet.', body: '' } }),
       // Loans (Loans.jsx, functions/loans.js): fn is loanRequest, loanRespond, loanRepay or loanManage.
       loan: (fn, req) =>
         store
@@ -1985,6 +1991,9 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
         setLoanFocus(id || null);
         setCoinsTab('loans');
         setCoinsOpen(true);
+      } else if (kind === 'coins') {
+        setCoinsTab(id || 'wallet');
+        setCoinsOpen(true);
       } else if (kind === 'disputes') {
         if (liveOwner.current) setDisputesOpen(true);
         else {
@@ -2253,6 +2262,15 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
   coinSync.current = { noteServer: sync.noteServer, walletOf };
   // Loans (Loans.jsx): mine, either side, and every bank loan for the owner.
   const loans = useLoans({ store, actor, call: api.loan, balance: myWallet.balance, walletOf });
+  // Gambling buddy (functions/buddy.js): the locks I'm in (every one for the
+  // owner). My own lock goes to src/buddy.js, for the casino cards and commands.
+  const [buddyLocks, setBuddyLocks] = useState([]);
+  useEffect(() => (store.subscribeBuddy ? store.subscribeBuddy(actor, setBuddyLocks) : undefined), [store, actor.name, actor.admin]);
+  const buddy = useMemo(() => {
+    const v = buddyView(buddyLocks, actor.name, rename);
+    return { ...v, all: buddyLocks, isOwner: !!isOwner, call: api.buddy };
+  }, [buddyLocks, actor.name, rename, isOwner, api]);
+  useEffect(() => setBuddyLock(buddy.mine), [buddy.mine]);
   const openLoans = useCallback((id) => {
     setLoanFocus(id || null);
     setCoinsTab('loans');
@@ -3542,6 +3560,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
               disputes={myDisputes}
               loans={controls.isOn('coins') ? { ...loans, everyone: ledgerAll } : null}
               everyone={ledgerAll}
+              buddy={controls.isOn('coins') ? buddy : null}
               loanFocus={loanFocus}
               onToast={(text) => setToast({ text })}
               initialTab={coinsTab}

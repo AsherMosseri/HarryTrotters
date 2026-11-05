@@ -21,6 +21,7 @@ import { useMove } from './useMove.js';
 import { GroupFaces } from './MoreCards.jsx';
 import { CoinNum, useCoinFormat } from '../CoinNum.jsx';
 import { coinStyled, exactCoins } from '../../coinFormat.js';
+import { LOCKED_GAMES, useBuddyLock } from '../../buddy.js';
 
 // The Jackson coins economy and casino cards (the play function rolls; these
 // show it). Live games (blackjack, crash, mines, high-low) have buttons for
@@ -332,7 +333,7 @@ function Hand({ label, value, cards, hidden, ghost, appeared, prefix, dealAll })
   );
 }
 
-function Blackjack({ m, c, mine, mv }) {
+function Blackjack({ m, c, mine, mv, locked }) {
   const g = c.game;
   const playing = c.status === 'playing';
   const dealAll = useFresh(m) && g.you.length === 2 && g.dealer.length <= 2;
@@ -372,7 +373,7 @@ function Blackjack({ m, c, mine, mv }) {
             <ActBtn mv={mv} move="stand">
               Stand
             </ActBtn>
-            <ActBtn mv={mv} move="double" disabled={g.you.length !== 2 || g.doubled}>
+            <ActBtn mv={mv} move="double" disabled={g.you.length !== 2 || g.doubled || !!locked}>
               Double{' '}
               <span className="cz-sub">
                 +<Amt n={c.bet} />
@@ -717,7 +718,7 @@ function Ticket({ children, className = '' }) {
     </div>
   );
 }
-function Lottery({ m, c, me, onBuy }) {
+function Lottery({ m, c, me, onBuy, locked }) {
   const lot = useContext(LotteryContext);
   const reveal = useFresh(m);
   // Only one lottery card is open at a time; the rest are closed. A card
@@ -796,7 +797,8 @@ function Lottery({ m, c, me, onBuy }) {
           </div>
         )}
       </Ticket>
-      {onBuy && (
+      {onBuy && locked && <BuddyLockLine lock={locked} />}
+      {onBuy && !locked && (
         <div className="cz-controls">
           <div className="cz-actions">
             <ActBtn mv={mv} move="buy1">
@@ -1039,11 +1041,25 @@ const ahead = (a, b) => {
   return x[0] > y[0] || (x[0] === y[0] && x[1] > y[1]);
 };
 
+// Gambling is locked by your buddy (src/buddy.js): said plainly, and kindly,
+// on your casino cards. Games already going can still be finished.
+function BuddyLockLine({ lock, live = false }) {
+  return (
+    <p className="cz-buddy-lock" role="note">
+      <Icon name="lock" size={15} />
+      <span>
+        Gambling is locked by your buddy, {String(lock.buddy || '').split(' ')[0]}.{live ? ' You can finish this game.' : ''}
+      </span>
+    </p>
+  );
+}
+
 export function CasinoBody({ m, me, Name, onMove, onBuy }) {
   // The play function's answer brings the card as it wrote it; on a slow
   // connection the chat's copy can be seconds behind. The newer one shows.
   const [answered, setAnswered] = useState(null);
   const c = answered && ahead(answered, m.cmd) ? { ...m.cmd, ...answered } : m.cmd;
+  const lock = useBuddyLock();
   const mine = m.by === me;
   const live = LIVE.includes(c.name);
   useEffect(ensureCasinoDefs, []);
@@ -1070,7 +1086,8 @@ export function CasinoBody({ m, me, Name, onMove, onBuy }) {
     if (c.name === 'crash' && c.status === 'playing' && mine && fresh(m)) mv.peek('warm');
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   if (ECONOMY_CARDS.includes(c.name)) return <Economy c={c} by={m.by} Name={Name} />;
-  const props = { m: c === m.cmd ? m : { ...m, cmd: c }, c, mine, mv };
+  const locked = lock && LOCKED_GAMES.includes(c.name) ? lock : null;
+  const props = { m: c === m.cmd ? m : { ...m, cmd: c }, c, mine, mv, locked };
   const body = {
     slots: <Slots {...props} />,
     dice: <Dice {...props} />,
@@ -1080,7 +1097,7 @@ export function CasinoBody({ m, me, Name, onMove, onBuy }) {
     crash: <Crash {...props} />,
     mines: <Mines {...props} />,
     highlow: <HighLow {...props} />,
-    lottery: <Lottery m={m} c={c} me={me} onBuy={onBuy} />,
+    lottery: <Lottery m={m} c={c} me={me} onBuy={onBuy} locked={locked} />,
   }[c.name];
   // The bet, at the top of every game for everyone to see (the lottery shows its tickets instead).
   const bet =
@@ -1097,6 +1114,7 @@ export function CasinoBody({ m, me, Name, onMove, onBuy }) {
     <div className={`cz-body cz-${c.name}${LIVE.includes(c.name) ? ' casino-live' : ''}`}>
       {bet}
       {body}
+      {locked && mine && c.name !== 'lottery' && c.status === 'playing' && <BuddyLockLine lock={locked} live />}
     </div>
   );
 }
