@@ -558,8 +558,19 @@ service cloud.firestore {
       let k = request.resource.data.diff(resource.data).affectedKeys();
       return (!k.hasAny(['reactions', 'supers']) || !featureOff('reactions'))
         && (!k.hasAny(['pinned', 'pinnedBy', 'pinnedAt']) || !featureOff('pins'))
-        && (!k.hasAny(['votes']) || !featureOff('polls'))
+        && (!k.hasAny(['votes']) || (!featureOff('polls') && votesBounded()))
         && (!k.hasAny(['text']) || request.resource.data.get('deleted', false) == true || !featureOff('editing'));
+    }
+    // Poll votes: { [optionId]: { [personKey]: name }, text: { [personKey]: {...} } }.
+    // Which votes count is decided when results are added up (shared/polls.js);
+    // this only keeps a message from being bloated. Up to 40 options plus `text`,
+    // so 60 keys is plenty; a poll edited past that (removed options keep their
+    // keys) can still be voted on as long as it doesn't grow. (Rules can't loop
+    // over the values, so their shape is left to pollTally.)
+    function votesBounded() {
+      let v = request.resource.data.get('votes', {});
+      let old = resource.data.get('votes', {});
+      return v is map && (v.size() <= 60 || (old is map && v.size() <= old.size()));
     }
     // Casino, economy, and arcade game cards only come from the server (the
     // play function), so nobody can post a fake jackpot or a fake win.
