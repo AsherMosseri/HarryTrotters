@@ -76,6 +76,7 @@ eq(L.changeCheck(l2, { role: 'lender', action: 'cancel', now }).error, 'Only the
 r = L.changeCheck(loan, { role: 'lender', action: 'ask', dueAt: now + 2 * D, now });
 eq(r.patch?.change?.by, 'lender', 'lender asks for a shorter loan');
 eq(L.changeCheck(apply(loan, r), { role: 'borrower', action: 'accept', now: now + 2 * D - 1000 }).error, 'That date is too close now.', 'a date that got too close can’t be accepted');
+eq(L.changeCheck(loan, { role: 'lender', action: 'ask', weeks: 4, now }).error, 'More time doesn’t need an answer: use Extend.', 'the lender gives more time with Extend, not an ask');
 // Limits.
 eq(L.changeCheck(loan, { role: 'borrower', action: 'ask', dueAt: now + 3600000, now }).error, 'The new due date has to be at least a day away.', 'at least a day away');
 eq(L.changeCheck(loan, { role: 'borrower', action: 'ask', weeks: 13, now }).error, 'Pick 1 to 12 weeks.', 'at most 12 weeks');

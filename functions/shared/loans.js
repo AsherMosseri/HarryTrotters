@@ -311,8 +311,10 @@ export function manageCheck(loan, { role, action, weeks, balance, note, now }) {
   return { error: 'Forgive or extend?' };
 }
 
-// Changing a running loan's length (3.2). Either side asks for a new due
-// date (more or fewer weeks, or a date); the other side accepts or says no,
+// Changing a running loan's length (3.2), on top of the lender's Extend
+// (more time, right away) and Forgive. The borrower asks for a new due date
+// (more or fewer weeks, or a date); the lender asks only for less time (more
+// is Extend). The other side accepts or says no,
 // and the one who asked can take it back. Nothing changes until the other
 // side agrees, so a borrower can't get out of a due date (or an overdue lock)
 // alone. Only a loan that's still running (active) can change: once the due
@@ -358,6 +360,9 @@ export function changeCheck(loan, { role, action, weeks, dueAt, note, now }) {
     if ((loan.changes || 0) >= LIMITS.changes) return { error: 'That’s a lot of asks on one loan.', body: 'Pay it back, or ask the other side to talk it over.' };
     const t = changeTarget(loan, { weeks, dueAt }, now);
     if (t.error) return t;
+    // The lender gives more time with Extend, which needs no answer; an ask
+    // from the lender is for less time.
+    if (side === 'lender' && t.dueAt > loan.dueAt) return { error: 'More time doesn’t need an answer: use Extend.' };
     // Asking back while the other side's ask waits replaces theirs (a counter).
     return {
       patch: { change: { by: side, dueAt: t.dueAt, at: now, ...(text && { note: text }) }, changes: (loan.changes || 0) + 1 },
