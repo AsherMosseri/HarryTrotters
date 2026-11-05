@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 // box at the screen's sharpness, a fixed-step loop, pausing when the tab is
 // hidden, and no page scrolling or zooming while a finger is on the game.
 
-// Keeps the canvas the size of `wrap` (device pixels, at most 2x so iPads
+// Keeps the canvas the size of `wrap` in device pixels (capped so iPads
 // keep up). Returns { w, h } in CSS pixels (state, so the sprites resize too)
 // and a ref with { w, h, dpr } for the loop.
 export function useFitCanvas(wrap, canvas) {
@@ -17,7 +17,9 @@ export function useFitCanvas(wrap, canvas) {
       // Layout size (not getBoundingClientRect: a dialog's opening zoom would shrink it).
       const w = Math.max(1, el.clientWidth);
       const h = Math.max(1, el.clientHeight);
-      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      // At most 2x, and about 2.4 million pixels in all (a big iPad at 2x
+      // would be almost 4 million to fill 60 times a second).
+      const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1, Math.sqrt(2400000 / (w * h))));
       const cv = canvas.current;
       if (cv) {
         cv.width = Math.round(w * dpr);
