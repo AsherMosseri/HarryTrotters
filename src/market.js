@@ -195,12 +195,16 @@ export function useMarketData(store, { actor, rename, renames, shifts, balanceOf
   // Photos of real pets beside their drawn ones (petPhotos.js).
   const photos = usePetPhotos(store, { actor, rename, renames, on: photosOn, run });
 
+  // The pet games' team boards (functions/petgames.js): read only while the
+  // games are open, so the listener isn't on all the time.
+  const watchGames = useCallback((cb) => store.subscribePetGames?.(cb) || (() => {}), [store]);
+
   // Perks: team management writes them directly (the rules check who).
   const savePerk = useCallback((id, data) => store.savePerk(id, data, actor), [store, actor]);
   const deletePerk = useCallback((id) => store.deletePerk(id), [store]);
 
   return useMemo(
-    () => ({ perks, purchases, pets, tournaments, extras, petOf, petsOf, gifts, run, now, coinsOn, savePerk, deletePerk, events, allEvents: rawEvents, unlocks, askEvents: ask, petEvent, photos, me: actor.name, rename }),
-    [perks, purchases, pets, tournaments, extras, petOf, petsOf, gifts, run, now, coinsOn, savePerk, deletePerk, events, rawEvents, unlocks, ask, petEvent, photos, actor.name, rename],
+    () => ({ perks, purchases, pets, tournaments, extras, petOf, petsOf, gifts, run, now, coinsOn, savePerk, deletePerk, events, allEvents: rawEvents, unlocks, askEvents: ask, petEvent, photos, watchGames, me: actor.name, rename }),
+    [perks, purchases, pets, tournaments, extras, petOf, petsOf, gifts, run, now, coinsOn, savePerk, deletePerk, events, rawEvents, unlocks, ask, petEvent, photos, watchGames, actor.name, rename],
   );
 }

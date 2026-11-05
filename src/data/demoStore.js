@@ -30,6 +30,7 @@ import { asksOn } from '../../functions/shared/checkin.js';
 import * as market from '../../functions/shared/market.js';
 import { PERK_IDEAS } from '../../functions/shared/market.js';
 import { giftAccept, giftEnd, giftOffer, petEdit, petsIn } from '../../functions/shared/pets.js';
+import { cleanScore, scoreAfter } from '../../functions/shared/petgames.js';
 import { ROSTER, SUBTEAMS, cleanName, sameName } from '../../functions/shared/team.js';
 import * as chan from '../../functions/shared/channels.js';
 import { checkPicks, myPicks, personOptionId, usesVoteButton } from '../../functions/shared/polls.js';
@@ -795,6 +796,13 @@ function seedMarket() {
       cared: 3,
     },
   ];
+  // Pet games' best scores (functions/petgames.js), for the team boards.
+  const lap = (ms, ago) => ({ ms, at: now - ago });
+  state.petGames = [
+    { id: 'jackson-lucks', person: 'Jackson Lucks', hop: { best: 23, at: now - day }, rally: { 1: lap(8420, 2 * day), 2: lap(12950, 2 * day), 3: lap(19310, day) } },
+    { id: 'sophia-bermudez', person: 'Sophia Bermudez', hop: { best: 31, at: now - 5 * 3600000 }, rally: { 1: lap(7990, day) } },
+    { id: 'cooper-mlezcko', person: 'Cooper Mlezcko', hop: { best: 12, at: now - 2 * day }, rally: {} },
+  ];
   const players = {
     'Jackson Lucks': { joinedAt: now - day, best: 4200, at: now - 20 * 3600000 },
     'Sophia Bermudez': { joinedAt: now - 20 * 3600000, best: 3100, at: now - 10 * 3600000 },
@@ -1483,6 +1491,10 @@ export const demoStore = {
   async petEvent(req, actor) {
     return events.petEvent(req, actor);
   },
+  // Best scores in the pet games (functions/petgames.js does the same).
+  subscribePetGames(cb) {
+    return listen(() => cb((state.petGames || []).map((d) => ({ ...d }))));
+  },
   // Photos of real pets (demoPetPhotos.js).
   subscribePetPhotos(cb) {
     return petPhotos.subscribeLive(listen, cb);
@@ -1629,6 +1641,18 @@ export const demoStore = {
     }
 
     if (fn === 'pet' && PHOTO_ACTIONS.includes(data.action)) return petPhotos.run(data, actor);
+
+    // A best score in the pet games: the same checks as functions/petgames.js.
+    if (fn === 'pet' && data.action === 'gameScore') {
+      const score = cleanScore(data);
+      if (score.note) return score;
+      const list = state.petGames || (state.petGames = []);
+      const had = list.find((d) => d.person === me) || null;
+      const r = scoreAfter(had, score, { me, now });
+      if (r.note) return r;
+      if (r.better) state.petGames = [...list.filter((d) => d.person !== me), { id: personId(me), ...r.doc }];
+      return done({ ok: true, better: r.better });
+    }
 
     if (fn === 'pet') {
       // The same moves as functions/petfamily.js, on the demo's own docs.

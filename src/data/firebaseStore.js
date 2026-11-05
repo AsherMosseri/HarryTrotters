@@ -811,6 +811,15 @@ export const firebaseStore = {
   async petEvent(req) {
     return (await callable('petEvent')(req)).data;
   },
+  // Best scores in the pet games (functions/petgames.js), for the team
+  // boards. Read-only here; market('pet', { action: 'gameScore' }) sends one.
+  subscribePetGames(cb) {
+    return onSnapshot(
+      collection(db, 'petGames'),
+      (snap) => cb(snap.docs.map(readDoc)),
+      (e) => console.warn('petGames', e),
+    );
+  },
   // Photos of real pets (functions/petphotos.js). The approved ones everyone
   // sees; the waiting and answered ones are yours (or all of them, for team
   // management). The device uploads its own small PNG sticker; the pet

@@ -27,6 +27,7 @@ import { RequestPetLink } from './PetRequest.jsx';
 import { PetWithGear } from './PetGear.jsx';
 import { EventsAdmin, ParkSection } from './PetPark.jsx';
 import { OwnSticker, PetPhotoReview, PetPhotoRow } from './PetPhoto.jsx';
+import { PetGamesHost, PetGamesSection } from './petgames/PetGamesCard.jsx';
 import { Icon } from './shell/icons.jsx';
 
 // Pets in the market, and their family (3.0): your pets with what they wear,
@@ -50,6 +51,8 @@ export function PetsShelf({ actor, balance, buy, busy, onToast, roster = [] }) {
   const { incoming, outgoing } = market.gifts;
   const [careFor, setCareFor] = useState(null);
   const [pathOpen, setPathOpen] = useState(false);
+  // The pet games (3.2): { game, born } while open.
+  const [games, setGames] = useState(null);
   const level = Math.max(1, ...list.map((e) => e.st.level));
   const target = list.find((e) => e.pet.adoptedAt === careFor) || list[0];
 
@@ -69,6 +72,9 @@ export function PetsShelf({ actor, balance, buy, busy, onToast, roster = [] }) {
       )}
 
       <ParkSection />
+
+      {list.length > 0 && <PetGamesSection actor={actor} petName={list[0].pet.name} onOpen={setGames} />}
+      <PetGamesHost actor={actor} open={games} onClose={() => setGames(null)} />
 
       {!list.length ? (
         <section className="mk-sec">
@@ -96,6 +102,7 @@ export function PetsShelf({ actor, balance, buy, busy, onToast, roster = [] }) {
                 actor={actor}
                 offered={outgoing.find((g) => g.pet?.adoptedAt === e.pet.adoptedAt)}
                 onToast={onToast}
+                onPlay={() => setGames({ born: e.pet.adoptedAt })}
               />
             ))}
           </div>
@@ -185,7 +192,7 @@ export function PetsShelf({ actor, balance, buy, busy, onToast, roster = [] }) {
 }
 
 // ---------- one of your pets ----------
-function OwnedPet({ entry, lead, count, roster, actor, offered, onToast }) {
+function OwnedPet({ entry, lead, count, roster, actor, offered, onToast, onPlay }) {
   const market = useMarket();
   const { pet, st } = entry;
   const card = useRef(null);
@@ -255,6 +262,9 @@ function OwnedPet({ entry, lead, count, roster, actor, offered, onToast }) {
         <Meter label="Food" value={st.food} />
         <Meter label="Fun" value={st.fun} />
         <div className="pet-actions">
+          <button className="btn small" onClick={onPlay}>
+            <Icon name="play" size={16} /> Play
+          </button>
           <button className="btn small" onClick={() => setStyling(true)}>
             <Icon name="sparkle" size={16} /> Style
           </button>
