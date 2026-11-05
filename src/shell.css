@@ -5413,6 +5413,10 @@ button.bs-cell:focus-visible { outline: 2px solid var(--accent); outline-offset:
 .move-arcade p { margin: 0; }
 .move-arcade-counts { display: flex; flex-wrap: wrap; gap: 6px; }
 .move-arcade-skips { margin: 0; padding-left: 18px; }
+.move-live { width: 100%; display: flex; flex-direction: column; gap: 6px; }
+.move-live p { margin: 0; }
+.move-live-bar { height: 8px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
+.move-live-bar span { display: block; height: 100%; border-radius: inherit; background: var(--accent); transition: width 0.25s ease; }
 .move-kinds { width: 100%; overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
 .move-kinds-table { width: 100%; border-collapse: collapse; }
 .move-kinds-table th, .move-kinds-table td { padding: 6px 10px; text-align: left; border-top: 1px solid var(--border); vertical-align: top; }

@@ -27,6 +27,7 @@ export default function ControlsPage({
   loanSettings = null,
   // 3.2, once: move past coin and game cards into #arcade (functions/moveArcade.js).
   moveToArcade = null,
+  watchMoveToArcade = null,
   onClose,
 }) {
   // Shutdown or Commands open on top: Escape closes that one, not this.
@@ -177,7 +178,7 @@ export default function ControlsPage({
                   channels.map((c) => [c.id, `#${c.name}`]),
                 )}
                 {group('off', 'Direct messages', [['dms', 'All DMs', 'Sending and reading DMs']])}
-                {moveToArcade && <MoveToArcade run={moveToArcade} channels={channels} />}
+                {moveToArcade && <MoveToArcade run={moveToArcade} watch={watchMoveToArcade} channels={channels} />}
               </>
             )}
           </div>
@@ -267,11 +268,13 @@ function KindTable({ plan }) {
   );
 }
 
-function MoveToArcade({ run, channels }) {
+function MoveToArcade({ run, watch, channels }) {
   const [plan, setPlan] = useState(null);
   const [busy, setBusy] = useState('');
   const [done, setDone] = useState(null);
   const [err, setErr] = useState('');
+  // Live while moving: { moved, left } from the server, card by card.
+  const [live, setLive] = useState(null);
   const nameOf = (id) => `#${channels.find((c) => c.id === id)?.name || id}`;
   const check = async () => {
     setBusy('check');
@@ -295,9 +298,12 @@ function MoveToArcade({ run, channels }) {
     setBusy('move');
     setErr('');
     let moved = 0;
+    const runId = `m${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+    setLive({ moved: 0, left: plan.total });
+    const stop = watch ? watch((p) => p?.run === runId && setLive({ moved: p.moved || 0, left: p.left || 0 })) : null;
     try {
       for (let i = 0; i < 40; i++) {
-        const r = await run({});
+        const r = await run({ run: runId, base: moved });
         if (r?.note) throw new Error(r.note.title);
         moved += r.moved || 0;
         setDone({ moved, skippedCount: r.skippedCount, skipped: r.skipped || [] });
@@ -307,6 +313,8 @@ function MoveToArcade({ run, channels }) {
     } catch (e) {
       setErr(e?.message || String(e));
     }
+    stop?.();
+    setLive(null);
     setBusy('');
   };
   const skipList = (list) =>
@@ -353,6 +361,17 @@ function MoveToArcade({ run, channels }) {
               <p className="small">Nothing to move{plan.skippedCount ? ` (${plan.skippedCount} waiting)` : ''}.</p>
               {plan.skippedCount > 0 && <KindTable plan={plan} />}
             </>
+          )}
+          {busy === 'move' && live && (
+            <div className="move-live" role="status" aria-live="polite">
+              <p className="small">
+                Moved <b className="mono">{live.moved}</b> of <b className="mono">{live.moved + live.left}</b> ·{' '}
+                <b className="mono">{live.left}</b> left
+              </p>
+              <div className="move-live-bar">
+                <span style={{ width: `${live.moved + live.left ? Math.round((100 * live.moved) / (live.moved + live.left)) : 100}%` }} />
+              </div>
+            </div>
           )}
           {plan.skippedCount > 0 && <p className="small">Waiting for a later run ({plan.skippedCount}):</p>}
           {skipList(plan.skipped || [])}

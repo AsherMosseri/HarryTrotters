@@ -21,6 +21,7 @@
 // open, and pinned cards (a pin stays with its channel; unpin it to move it).
 
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
+import { logger } from 'firebase-functions';
 import { ARCADE } from './shared/commandRules.js';
 import { MOVE_KINDS, skipReason } from './shared/moveArcade.js';
 
@@ -164,11 +165,30 @@ export function moveArcadeFunctions({ db, owner, renamer }) {
     if (dry) return { ok: true, dry: true, ...report };
     let moved = 0;
     const late = [];
+    // Live progress for the owner's screen (settings/moveToArcadeRun): the
+    // app passes its run id and how many earlier calls moved (base).
+    const runId = typeof req.data?.run === 'string' && /^[\w-]{1,40}$/.test(req.data.run) ? req.data.run : '';
+    const base = Math.min(1e6, Math.max(0, Math.floor(Number(req.data?.base) || 0)));
+    let lastWrite = 0;
+    let done = 0;
+    const progress = async (force = false) => {
+      const t = Date.now();
+      if (!runId || (!force && t - lastWrite < 400)) return;
+      lastWrite = t;
+      await db
+        .doc('settings/moveToArcadeRun')
+        .set({ run: runId, moved: base + moved, left: Math.max(0, todo.length - done), at: t, by: me })
+        .catch((e) => logger.warn('moveToArcade progress', e.message));
+    };
+    await progress(true);
     for (const c of todo.slice(0, LIMIT)) {
       const r = await moveOne(c, now);
+      done++;
       if (r === 'moved') moved++;
       else if (r.startsWith('skip:')) late.push({ conv: c.conv, id: c.id, kind: c.data.cmd.name, why: r.slice(5) });
+      await progress();
     }
+    await progress(true);
     const more = todo.length > LIMIT;
     const history = more ? 0 : await fixBanks();
     if (!more)

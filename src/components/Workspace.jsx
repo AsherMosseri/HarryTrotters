@@ -3709,6 +3709,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
               onCommands={() => setCommandsPage(true)}
               onAds={() => setAdsPage(true)}
               moveToArcade={store.moveToArcade ? (req) => store.moveToArcade(req, actor) : null}
+              watchMoveToArcade={store.watchMoveToArcade ? (cb) => store.watchMoveToArcade(cb) : null}
               account={(data) => store.account(data)}
               loanSettings={<LoanSettings cfg={loans.cfg} call={api.loan} />}
               me={actor.name}

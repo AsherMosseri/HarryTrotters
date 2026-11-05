@@ -1524,6 +1524,14 @@ export const firebaseStore = {
   async moveToArcade(req) {
     return (await callable('moveToArcade', { timeout: 540000 })(req)).data;
   },
+  // Its live progress while it runs: { run, moved, left }.
+  watchMoveToArcade(cb) {
+    return onSnapshot(
+      doc(db, 'settings', 'moveToArcadeRun'),
+      (snap) => cb(snap.data() || null),
+      () => {},
+    );
+  },
   // Coin requests (/request @person amount; functions/coinRequests.js):
   // create, pay, decline, cancel, peek. Returns { ok } or { note }.
   async coinRequest(req) {

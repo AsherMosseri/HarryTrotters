@@ -1017,6 +1017,8 @@ function clearReportNote(x) {
     (n) => !(n.type === 'dispute' && (n.report === x.id || (!n.report && /reported a/.test(n.title || '') && Math.abs((n.at || 0) - (x.at || 0)) < 120000 && n.title.startsWith(x.by.split(' ')[0])))),
   );
 }
+// Who's watching the move to #arcade (the owner's Controls screen).
+const moveWatchers = new Set();
 function demoTag(conv, msgId, tag) {
   const list = (state.chat || {})[conv] || [];
   const k = personId(tag.name);
@@ -2571,6 +2573,10 @@ export const demoStore = {
   // the way the moveToArcade function does it (functions/moveArcade.js): same
   // id and time, marked moved, everything that names the channel follows,
   // live games, open requests and pinned cards wait. DMs stay.
+  watchMoveToArcade(cb) {
+    moveWatchers.add(cb);
+    return () => moveWatchers.delete(cb);
+  },
   async moveToArcade(req, actor) {
     await demoLag();
     const note = (title, body = '') => ({ note: { title, body } });
@@ -2601,6 +2607,12 @@ export const demoStore = {
     for (const x of skipped) waitByKind[x.kind] = (waitByKind[x.kind] || 0) + 1;
     const report = { byChannel, byKind, waitByKind, total: todo.length, skipped: skipped.slice(0, 100), skippedCount: skipped.length };
     if (req?.dry) return { ok: true, dry: true, ...report };
+    // Live progress, card by card, like the server's settings/moveToArcadeRun.
+    const base = Math.max(0, Number(req?.base) || 0);
+    for (let i = 0; i <= todo.length; i++) {
+      for (const f of moveWatchers) f({ run: req?.run || '', moved: base + i, left: todo.length - i });
+      if (i < todo.length) await new Promise((r) => setTimeout(r, 120));
+    }
     const ids = new Set(todo.map((x) => x.m.id));
     const from = Object.fromEntries(todo.map((x) => [x.m.id, x.conv]));
     const next = { ...chat };
