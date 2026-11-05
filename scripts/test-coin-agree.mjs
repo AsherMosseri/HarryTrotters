@@ -5,13 +5,17 @@
 // entries of every kind, loans from the bank and between people, shifts,
 // tasks, group gifts), works out the true balance from how the data was made, then reads
 // the documents the way the app does
-// (Workspace.jsx: subscribeBank, subscribeCoins, tasks, shifts, coinInput)
+// (Workspace.jsx: subscribeBank, subscribeCoins, tasks, shifts, coinInput; and
+// at start only the person's own entries, subscribeMyCoins)
 // and the way the server does (functions/index.js freshCoins: alias queries
 // on the ledger, bank/{nameKey} reads, freshWallet). All three must agree.
 // It also replays the old code (the shapes before the fix) on the minimized
 // failing case, to show what it caught: a rename that only changes
 // capitals, spaces or punctuation points the old name at the same bank doc as
 // the new one, and the server counted that doc twice.
+//
+// 3.1.5: balances past 2^53 (1.1e16, 3e18, 1e40, near a googol) give the
+// same number on both sides in any order, within a billionth of the exact sum.
 //
 // Run: node scripts/test-coin-agree.mjs [cases]
 import {
@@ -25,8 +29,19 @@ import {
   groupGiftEntries,
   ledgerItems,
   bankItems,
+  historyGroup,
+  historyKey,
   oldBankIds,
   wallet,
+  MAX_BALANCE,
+  breakdown,
+  breakdownGaps,
+  capWin,
+  ceilingRoom,
+  coinsAgree,
+  overCeiling,
+  setParts,
+  sumCoins,
 } from '../functions/shared/coins.js';
 import { bankAfter, closeHold, holdEntry } from '../functions/shared/casino.js';
 import { moneyLine } from '../functions/shared/arcade.js';
@@ -169,6 +184,18 @@ function makeWorld(seed) {
       const amount = int(1, 30);
       mk({ type: 'refund', person: nameAt(p, at), amount, label: 'Refund: a perk', at }, { type: 'refund', person: p.current, amount, label: 'Refund: a perk', at });
     }
+    // 3.1.1: the owner's Refund (positive) or Take back (negative) on a game
+    // card, and a report's refund: 'refund' entries with a game and the
+    // casino line they undo.
+    for (let i = chance(0.5) ? int(1, 3) : 0; i > 0; i--) {
+      const at = t0();
+      const back = chance(0.4);
+      const amount = back ? -int(1, 5000) : int(1, 5000);
+      const game = pick(['slots', 'mines', 'challenge', 'rps', 'heist']);
+      const label = back ? `Taken back: ${game} win (Asher)` : `Refund: ${game} (Asher refunded)`;
+      const extra = { item: `card:m${i}`, game, by: 'Asher Mosseri', ...(chance(0.6) && { reverses: `casino|${at - 1000}|${-amount}|${game}: x` }) };
+      mk({ type: 'refund', person: nameAt(p, at), amount, label, ...extra, at }, { type: 'refund', person: p.current, amount, label, ...extra, at });
+    }
     for (let i = int(0, 3); i > 0; i--) {
       const at = t0();
       const amount = int(1, 20);
@@ -266,8 +293,10 @@ function makeWorld(seed) {
         const id = `g${i}-${int(1, 1e9)}`;
         let delta;
         let entry = null;
-        if (kind === 'win') (delta = int(1, 80)), (entry = { game: 'slots', icon: '🎰', label: `Slots: won ${delta}` });
-        else if (kind === 'loss') (delta = -int(1, 60)), (entry = { game: 'slots', icon: '🎰', label: `Slots: lost ${-delta}` });
+        // 3.1.1: results name their card ('conv/msgId') half the time (older lines don't).
+        const card = chance(0.5) ? { card: `arcade/${id}` } : {};
+        if (kind === 'win') (delta = int(1, 80)), (entry = { game: 'slots', icon: '🎰', label: `Slots: won ${delta}`, ...card });
+        else if (kind === 'loss') (delta = -int(1, 60)), (entry = { game: 'slots', icon: '🎰', label: `Slots: lost ${-delta}`, ...card });
         else if (kind === 'escrow') delta = -int(1, 30); // a bet held for a running game
         else if (kind === 'escrow-then-end') {
           const bet = int(1, 30);
@@ -315,7 +344,7 @@ function makeWorld(seed) {
                 ? { name, delta: 0, entry: { game: 'challenge', icon: 'C', label: 'lost', shown: -bet } }
                 : { name, delta: bet, entry: { game: 'challenge', icon: 'C', label: 'tie', shown: 0 } };
           delta = x.delta;
-          entry = moneyLine(x, 'challenge', id);
+          entry = moneyLine(x, 'challenge', id, card.card ? 'arcade' : '');
         } else if (kind === 'daily') (delta = int(1, 12)), (entry = { icon: '📅', label: 'Daily' });
         else delta = 0;
         b = bankAfter(b, name, delta, entry, {}, at);
@@ -361,6 +390,16 @@ function appView(w, name, { now = NOW } = {}) {
     now: Math.floor(now / MIN) * MIN,
   });
   return wallet(name, data);
+}
+
+// The app at start: only the ledger entries for this person (subscribeMyCoins:
+// person, from or to is any name they've had), not the whole ledger, which
+// loads only when someone else's coins are shown. Their own balance and
+// history must come out exactly the same.
+function appOwnView(w, name, { now = NOW } = {}) {
+  const names = w.aliasesOf(name).slice(0, 30);
+  const own = w.ledger.filter((x) => ['person', 'from', 'to'].some((f) => names.includes(x[f])));
+  return appView({ ...w, ledger: own }, name, { now });
 }
 
 // The server: freshCoins in functions/index.js, against an in-memory database.
@@ -425,7 +464,10 @@ for (let seed = 1; seed <= CASES; seed++) {
     const truth = truthBalance(w, name);
     const app = appView(w, name);
     const srv = serverView(w, name);
+    const own = appOwnView(w, name);
     const tag = `seed ${seed * 7919} ${name} [${p.names.join(' > ')}]`;
+    ok(own.balance === app.balance && own.earned === app.earned, `${tag}: own entries ${own.balance} vs whole ledger ${app.balance}`);
+    ok(JSON.stringify(own.history) === JSON.stringify(app.history), `${tag}: own-entries history differs from the whole ledger's`);
     ok(app.balance === srv.balance, `${tag}: app ${app.balance} vs server ${srv.balance}`);
     ok(app.earned === srv.earned, `${tag}: earned app ${app.earned} vs server ${srv.earned}`);
     ok(app.balance === truth.balance, `${tag}: app ${app.balance} vs truth ${truth.balance}`);
@@ -600,6 +642,166 @@ console.log(`${CASES} random teams checked; ${bankSharedCases} people had a capi
   const m = appView(w, 'Mia Teammate');
   ok(m.balance === 80 + 30 - 33 && serverView(w, 'Mia Teammate').balance === m.balance, `Mia: ${m.balance}`);
   }
+}
+
+{
+  // 3.1.1: Asher refunds Cooper's lost Mines bet from its card (+429,149, a
+  // 'refund' with the game and the casino line it undoes) and takes back a
+  // Slots win (−1,200, a negative 'refund'). Old apps count both already;
+  // the line names its card; history adds up; app and server agree.
+  const at = NOW - 3 * HOUR;
+  let b = bankAfter({}, 'Cooper Mlezcko', -429149, { game: 'mines', icon: '💣', label: 'Mines: lost 429149', shown: -429149, card: 'arcade/m1' }, {}, at);
+  b = bankAfter(b, 'Cooper Mlezcko', 1200, { game: 'slots', icon: '🎰', label: 'Slots: won 1200', card: 'arcade/s1' }, {}, at + HOUR);
+  const line = b.recent.find((x) => x.card === 'arcade/m1');
+  const key = `casino|${line.at}|${line.amount}|${line.label}`;
+  const w = {
+    rename: (n) => n,
+    aliasesOf: (n) => [n],
+    people: [{ current: 'Cooper Mlezcko' }],
+    cfg: coinSettings({}),
+    shifts: [],
+    tasks: [],
+    ledger: [
+      { type: 'grant', to: 'Cooper Mlezcko', amount: 430000, note: 'Bonus', at: NOW - DAY },
+      { type: 'refund', person: 'Cooper Mlezcko', amount: 429149, item: 'card:m1', label: 'Refund: Mines (Asher refunded)', game: 'mines', by: 'Asher Mosseri', reverses: key, at: NOW - HOUR },
+      { type: 'refund', person: 'Cooper Mlezcko', amount: -1200, item: 'card:s1', label: 'Taken back: Slots win (Asher)', game: 'slots', by: 'Asher Mosseri', at: NOW - HOUR + 1 },
+    ],
+    bank: new Map([['cooper-mlezcko', { ...b, name: 'Cooper Mlezcko' }]]),
+  };
+  const a = appView(w, 'Cooper Mlezcko');
+  const sv = serverView(w, 'Cooper Mlezcko');
+  ok(a.balance === 430000 && sv.balance === a.balance, `owner refund case: app ${a.balance}, server ${sv.balance}`);
+  ok(a.history.reduce((t, x) => t + x.amount, 0) === a.balance, 'owner refund case: history adds up');
+  const casinoLine = a.history.find((x) => x.kind === 'casino' && x.card === 'arcade/m1');
+  ok(casinoLine && historyKey(casinoLine) === key, 'the casino line carries its card and the key the refund names');
+  ok(a.history.filter((x) => x.kind === 'refund').every((x) => historyGroup(x) === 'casino'), 'card refunds are under Casino');
+  ok(a.history.find((x) => x.amount === 429149)?.reverses === key, 'the refund names the line it undoes');
+  console.log(`owner refund case: Cooper ${a.balance} (server ${sv.balance})`);
+}
+
+// ---------- 3.1.5: balances past 2^53, up to a googol ----------
+// Past 2^53 amounts are doubles and a plain left-to-right sum depends on the
+// order the entries come in (the app reads the whole ledger, the server one
+// query per field). wallet() adds them exactly (sumCoins), so both land on the
+// same number whatever the order; coinsAgree allows a billionth past 2^53.
+{
+  const EXACT = 2 ** 53;
+  ok(coinsAgree(5, 5) && !coinsAgree(5, 6), 'coinsAgree: exact below 2^53');
+  ok(!coinsAgree(1e15, 1e15 + 1), 'coinsAgree: 1e15 and 1e15 + 1 differ (below 2^53)');
+  ok(!coinsAgree(EXACT - 2, EXACT - 1), 'coinsAgree: just below 2^53 stays exact');
+  ok(coinsAgree(1.1e16, 1.1e16 + 8), 'coinsAgree: 1.1e16 and 1.1e16 + 8 agree');
+  ok(!coinsAgree(1.1e16, 1.1e16 * (1 + 1e-6)), 'coinsAgree: a millionth apart is a real difference');
+  ok(coinsAgree(1e40, 1e40 * (1 + 5e-10)) && !coinsAgree(1e40, 1e40 * (1 + 2e-9)), 'coinsAgree: 1e40 within a billionth');
+  ok(!coinsAgree(NaN, NaN) && !coinsAgree(Infinity, 1e300), 'coinsAgree: NaN and Infinity never agree');
+  ok(sumCoins([{ amount: 1 }, { amount: 2 }]) === 3 && sumCoins([]) === 0, 'sumCoins: small sums');
+  // The order problem a plain sum has, and that sumCoins doesn't.
+  const xs = [1e16, 1, 1, 1, 1, -1e16].map((amount) => ({ amount }));
+  const plain = (list) => list.reduce((t, x) => t + x.amount, 0);
+  const ys = [1, 1, 1, 1, 1e16, -1e16].map((amount) => ({ amount }));
+  ok(plain(xs) !== plain(ys), `a plain sum depends on order past 2^53 (${plain(xs)} vs ${plain(ys)})`);
+  ok(sumCoins(xs) === 4 && sumCoins(ys) === 4 && sumCoins([...xs].reverse()) === 4, `sumCoins doesn't: ${sumCoins(xs)}`);
+
+  const rand = rngOf(31415);
+  const shuffle = (list) => {
+    const a = [...list];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(rand() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  };
+  // One world per scale: a grant to the scale, gifts both ways, bets won and
+  // lost (a bank doc built by bankAfter, which adds one result at a time),
+  // a refund, a bank loan. truth: the same numbers added as BigInt.
+  for (const [scale, tag] of [
+    [1.1e16, '1.1e16'],
+    [3e18, '3e18'],
+    [1e40, '1e40'],
+    [7e99, 'near a googol'],
+  ]) {
+    const A = 'Asher Mosseri';
+    const C = 'Cooper Mlezcko';
+    const amounts = [];
+    const ledger = [{ type: 'grant', to: A, amount: scale, note: 'Bonus', at: NOW - 9 * DAY }];
+    amounts.push(scale);
+    for (let i = 0; i < 40; i++) {
+      const at = NOW - 8 * DAY + i * HOUR;
+      const big = Math.round(scale * (0.0001 + rand() * 0.001));
+      const small = 1 + Math.floor(rand() * 999);
+      if (i % 4 === 0) (ledger.push({ type: 'gift', from: A, to: C, amount: big, note: '', at }), amounts.push(-big));
+      else if (i % 4 === 1) (ledger.push({ type: 'gift', from: C, to: A, amount: small, note: '', at }), amounts.push(small));
+      else if (i % 4 === 2) (ledger.push({ type: 'grant', to: A, amount: small, note: 'Bonus', at }), amounts.push(small));
+      else (ledger.push({ type: 'refund', person: A, amount: big, label: 'Refund', at }), amounts.push(big));
+    }
+    // Same time on purpose (ties keep their order in the history sort).
+    ledger.push({ type: 'grant', to: A, amount: 7, note: 'Tie', at: NOW - DAY }, { type: 'grant', to: A, amount: -3, note: 'Tie', at: NOW - DAY });
+    amounts.push(7, -3);
+    let b = {};
+    for (let i = 0; i < 30; i++) {
+      const bet = Math.round(scale * (0.001 + rand() * 0.01));
+      const won = rand() < 0.5;
+      const d = won ? bet : -bet;
+      b = bankAfter(b, A, d, { game: 'coinflip', icon: '🪙', label: `Coin flip: ${won ? `won ${bet}` : `lost ${bet}`}`, shown: d }, {}, NOW - 2 * DAY + i * MIN);
+      amounts.push(d);
+    }
+    const truth = amounts.reduce((t, x) => t + BigInt(x), 0n);
+    const world = (led) => ({
+      rename: (n) => n,
+      aliasesOf: (n) => [n],
+      people: [{ current: A }, { current: C }],
+      cfg: coinSettings({}),
+      shifts: [],
+      tasks: [],
+      ledger: led,
+      bank: new Map([['asher-mosseri', { ...b, name: A }]]),
+    });
+    const w = world(ledger);
+    const app = appView(w, A);
+    const srv = serverView(w, A);
+    ok(app.balance === srv.balance, `${tag}: app ${app.balance} = server ${srv.balance}`);
+    ok(coinsAgree(app.balance, srv.balance), `${tag}: coinsAgree`);
+    ok(sumCoins(app.history) === app.balance, `${tag}: the history adds up (exactly, in any order)`);
+    const off = Math.abs(app.balance - Number(truth));
+    ok(off <= 1e-9 * Math.abs(Number(truth)), `${tag}: within a billionth of the exact sum (off by ${off})`);
+    ok(!app.history.some((x) => /Earlier/.test(x.label)), `${tag}: no "Earlier" line from rounding alone`);
+    // Shuffled ledgers (the order Firestore hands them back in can differ).
+    const seen = new Set([app.balance]);
+    for (let k = 0; k < 12; k++) {
+      const s = shuffle(ledger);
+      seen.add(appView(world(s), A).balance);
+      seen.add(serverView(world(s), A).balance);
+    }
+    ok(seen.size === 1, `${tag}: the same balance in every order (${[...seen].join(', ')})`);
+    const cooper = appView(w, C);
+    ok(cooper.balance === serverView(w, C).balance, `${tag}: Cooper app ${cooper.balance} = server`);
+    ok(breakdownGaps(breakdown(app.history), breakdown(srv.history)).length === 0, `${tag}: no breakdown gaps`);
+    console.log(`big case ${tag}: Asher ${app.balance} (server ${srv.balance}, exact ${truth})`);
+  }
+
+  // The owner's Set to, past 2^53: exact, even far below a huge balance.
+  for (const [lines, target] of [
+    [[3e45, 1.1e16, 844, -5e15, 1e15], 2e16],
+    [[1.1e16, 844], 0],
+    [[1e100, 12345, -7], 5],
+    [[2.5e40, 3e18, 11], 1.1e16],
+    [[100, 20], 50],
+  ]) {
+    const list = lines.map((amount) => ({ amount }));
+    const parts = setParts(target, list);
+    const after = sumCoins([...list, ...parts.map((amount) => ({ amount }))]);
+    ok(after === target && parts.length <= 6 && parts.every((x) => Number.isInteger(x) && x !== 0), `Set ${target} from ${lines.join(' + ')}: ${parts.length} grant(s) [${parts.join(', ')}] → ${after}`);
+  }
+  ok(setParts(120, [{ amount: 100 }, { amount: 20 }]).length === 0, 'Set to what they have: no grant');
+
+  // At and over the ceiling: a win pays 0, a credit is refused, a loss works.
+  ok(MAX_BALANCE === 1e100, 'the ceiling is a googol');
+  ok(capWin(500, 1e100) === 0 && capWin(500, 2e100) === 0, 'a win at (or over) a googol pays 0');
+  ok(capWin(-500, 1e100) === -500, 'a loss at a googol still costs');
+  ok(capWin(1e95, 1e100 - 1e90) <= 1e90 * 1.00001 && capWin(1e95, 1e100 - 1e90) > 0, 'a win near a googol pays up to it (rounded)');
+  ok(1e100 - 1e90 + capWin(1e95, 1e100 - 1e90) <= MAX_BALANCE, 'and ends at a googol at most');
+  ok(overCeiling(1e100, 1) && overCeiling(2e100, 1) && !overCeiling(1e100, 0) && !overCeiling(1e100, -5), 'a credit at a googol is refused; nothing or a loss is fine');
+  ok(!overCeiling(1.1e16, 5e15) && !overCeiling(1e40, 2.5e40), 'big credits well under a googol are fine');
+  ok(ceilingRoom(-5) >= MAX_BALANCE && ceilingRoom(3e100) === 0, 'room never below 0');
 }
 
 console.log(failures ? `${failures} FAILURES` : 'ALL OK');

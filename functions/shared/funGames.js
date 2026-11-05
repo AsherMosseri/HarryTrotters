@@ -12,7 +12,35 @@ import * as mines from './minesweeper.js';
 
 export const GAMES = ['tetris', 'minesweep'];
 export const GAME_LABEL = { tetris: 'Tetris', minesweep: 'Minesweeper' };
+// Trotbot before 3.1.1: a speed ('speed' in the request and the session),
+// the same skill at every speed. Apps that still send one get that bot.
 export const SPEEDS = ['easy', 'medium', 'hard'];
+// Trotbot's levels since 3.1.1 ('botLevel' in the request and the session):
+// each one changes how fast it plays and how well (BOT_SKILL in tetris.js
+// and minesweeper.js), and what beating it pays.
+export const BOT_LEVELS = ['beginner', 'easy', 'medium', 'hard', 'insane'];
+export const BOT_LEVEL = {
+  beginner: { label: 'Beginner', desc: 'Slow and makes lots of mistakes', coins: 1 },
+  easy: { label: 'Easy', desc: 'Takes its time and slips up now and then', coins: 1 },
+  medium: { label: 'Medium', desc: 'Steady, with the odd mistake', coins: 2 },
+  hard: { label: 'Hard', desc: 'Quick and hardly ever wrong', coins: 4 },
+  insane: { label: 'Insane', desc: 'Near perfect and very fast', coins: 6 },
+};
+// What the start request asked for → the session's { speed, botLevel }.
+// botLevel is checked against BOT_LEVELS (anything else is Medium); a
+// request with only a speed (an older app) gets the old bot at that speed.
+// `speed` is the level too, so cards from older apps still say it.
+export function botPick(req = {}) {
+  if (req.botLevel != null) {
+    const level = BOT_LEVELS.includes(req.botLevel) ? req.botLevel : 'medium';
+    return { speed: level, botLevel: level };
+  }
+  return { speed: SPEEDS.includes(req.speed) ? req.speed : 'medium' };
+}
+// The session's level ('' for a game from before 3.1.1).
+export const botLevelOf = (s) => (BOT_LEVELS.includes(s?.botLevel) ? s.botLevel : '');
+// What to call the Trotbot of a session or a chat card ({ speed }): "Insane", "Medium"…
+export const botLabel = (s) => (BOT_LEVEL[botLevelOf(s) || s?.speed] || BOT_LEVEL.medium).label;
 
 // Ways to play. Races and tournaments use a shared seed; the rest get a fresh one.
 export const MODES = {
@@ -69,11 +97,22 @@ export function replayGame(s, moves) {
   return s.game === 'tetris' ? tetris.replay(gameOpts(s), moves) : mines.replay(gameOpts(s), moves);
 }
 
-// Trotbot's whole game on the session's seed (races against Trotbot).
-export function botResult(s) {
-  if (s.game === 'tetris') return tetris.newBot({ seed: s.seed, pace: tetris.BOT_PACE[s.speed] || tetris.BOT_PACE.medium }).result();
-  return mines.newBot({ seed: s.seed, level: gameOpts(s).level, pace: mines.BOT_PACE[s.speed] || mines.BOT_PACE.medium }).result();
+// Trotbot for a session: the game the phone shows live (advance) and the
+// server replays whole (botResult). Both come only from the session (its
+// seed, board and level), so they're always the same game. A session from
+// before 3.1.1 has no botLevel and gets the old bot at its speed.
+export function botFor(s) {
+  const level = botLevelOf(s);
+  if (s.game === 'tetris')
+    return level ? tetris.newBot({ seed: s.seed, level }) : tetris.newBot({ seed: s.seed, pace: tetris.BOT_PACE[s.speed] || tetris.BOT_PACE.medium });
+  const board = gameOpts(s).level;
+  return level
+    ? mines.newBot({ seed: s.seed, level: board, skill: level })
+    : mines.newBot({ seed: s.seed, level: board, pace: mines.BOT_PACE[s.speed] || mines.BOT_PACE.medium });
 }
+
+// Trotbot's whole game on the session's seed (races against Trotbot).
+export const botResult = (s) => botFor(s).result();
 
 // How long a finished game says it took, in ms.
 export const playedMs = (game, r) => (game === 'tetris' ? Math.round((r.frames * 1000) / tetris.FPS) : r.ms);
@@ -110,19 +149,25 @@ export function rank(game, a, b) {
 // Coins for a finished game (playing alone or against Trotbot). Races pay
 // RACE_PRIZE to the winner; tournaments pay their pot. All under the
 // 'game' daily cap (AWARD_CAPS in coins.js).
-const MS_WIN = { beginner: 0, intermediate: 2, expert: 5 };
-const BOT_BONUS = { easy: 1, medium: 2, hard: 4 };
+// Beating Trotbot pays its level's coins (BOT_LEVEL); a game from before
+// 3.1.1 pays what its speed did then (easy 1, medium 2, hard 4: the same
+// as those levels now). The level is always the session's, from the start.
+export const MS_WIN = { beginner: 0, intermediate: 2, expert: 5 };
+const OLD_BONUS = { easy: 1, medium: 2, hard: 4 };
+export const botBonus = (s) => (botLevelOf(s) ? BOT_LEVEL[botLevelOf(s)].coins : OLD_BONUS[s.speed] || 2);
+// What beating Trotbot pays on a Minesweeper board (a Beginner board pays a coin less).
+export const msBotCoins = (board, bonus) => (MS_WIN[board] ?? 0) + bonus - (board === 'beginner' ? 1 : 0);
 export function coinsFor(s, r, won = false) {
   if (s.game === 'tetris') {
     if (s.mode === 'marathon') return Math.min(4, Math.floor(r.lines / 20));
     if (s.mode === 'ultra') return Math.min(3, Math.floor(r.score / 10000));
     if (s.mode === 'sprint') return r.finished ? 2 : 0;
-    if (s.mode === 'bot') return won ? BOT_BONUS[s.speed] || 2 : 0;
+    if (s.mode === 'bot') return won ? botBonus(s) : 0;
     return 0;
   }
   const level = gameOpts(s).level;
   if (s.mode === 'solo') return r.won ? MS_WIN[level] : 0;
-  if (s.mode === 'bot') return won ? MS_WIN[level] + (BOT_BONUS[s.speed] || 2) - (level === 'beginner' ? 1 : 0) : 0;
+  if (s.mode === 'bot') return won ? msBotCoins(level, botBonus(s)) : 0;
   return 0;
 }
 

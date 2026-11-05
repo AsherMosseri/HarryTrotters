@@ -9,9 +9,10 @@
 // Only the server sells anything (functions/market.js): it reads the balance
 // fresh and writes the spend itself. These checks are shared with demo mode.
 
-import { teamMidnight, teamDay } from './coins.js';
+import { capWin, teamMidnight, teamDay } from './coins.js';
 import { weekStart } from './streaks.js';
 import { PET_ITEMS, careAfter, petItem } from './pets.js';
+import { coinsText } from './coinText.js';
 
 export { PET_ITEMS };
 
@@ -70,7 +71,7 @@ export function cleanPerk(p) {
   const stock = int(p.stock);
   const limit = int(p.limit);
   if (!name) return { error: 'Give it a name.' };
-  if (!Number.isInteger(price) || price < 1 || price > PERK_MAX_PRICE) return { error: `Price: 1 to ${PERK_MAX_PRICE} coins.` };
+  if (!Number.isInteger(price) || price < 1 || price > PERK_MAX_PRICE) return { error: `Price: 1 to ${coinsText(PERK_MAX_PRICE)} coins.` };
   if (stock != null && !(stock >= 0 && stock <= 1000)) return { error: 'How many: up to 1000, or leave it empty.' };
   if (limit != null && !(limit >= 1 && limit <= 100)) return { error: 'Each person: 1 to 100, or leave it empty.' };
   return {
@@ -101,7 +102,7 @@ export function buyCheck(item, ctx) {
   const aliases = ctx.aliases || [me];
   const mine = (ctx.purchases || []).filter((x) => aliases.includes(x.person));
   const [kind, id] = String(item || '').split(/:(.*)/s);
-  const afford = (price) => (price > balance ? { error: `That’s ${price} coins. You have ${balance}.` } : null);
+  const afford = (price) => (price > balance ? { error: `That’s ${coinsText(price)} coins. You have ${coinsText(balance)}.` } : null);
 
   if (kind === 'pet') {
     const it = petItem(id);
@@ -251,7 +252,7 @@ export function newTournament(form, { by, now = Date.now(), seed }) {
   const g = TOURNAMENT_GAMES[form.game];
   if (!g) return { error: 'Pick a game.' };
   const entry = int(form.entry);
-  if (!Number.isInteger(entry) || entry < 1 || entry > ENTRY_MAX) return { error: `Entry: 1 to ${ENTRY_MAX} coins.` };
+  if (!Number.isInteger(entry) || entry < 1 || entry > ENTRY_MAX) return { error: `Entry: 1 to ${coinsText(ENTRY_MAX)} coins.` };
   const opensAt = Math.max(now, Number(form.opensAt) || now);
   const endsAt = Number(form.endsAt);
   if (!Number.isFinite(endsAt) || endsAt < opensAt + HOUR) return { error: 'It has to run at least an hour.' };
@@ -279,7 +280,7 @@ export function joinCheck(t, { me, aliases = [me], balance, now = Date.now() }) 
   if (!t || t.status !== 'open') return { error: 'That tournament is over.' };
   if (now >= t.endsAt) return { error: 'That tournament just ended.' };
   if (aliases.some((n) => t.players?.[n])) return { error: 'You’re already in.' };
-  if (t.entry > balance) return { error: `The entry is ${t.entry} coins. You have ${balance}.` };
+  if (t.entry > balance) return { error: `The entry is ${coinsText(t.entry)} coins. You have ${coinsText(balance)}.` };
   return { pot: (t.pot || 0) + t.entry, player: { joinedAt: now, best: null, at: null } };
 }
 
@@ -308,6 +309,20 @@ export function payoutOf(t, rename = (n) => n) {
   };
 }
 export const prizeLabel = (t) => `Tournament: ${t.title}`.slice(0, 80);
+
+// Prizes or entries back near the ceiling (coins.js MAX_BALANCE): each pays
+// up to what keeps its person at a googol, counting what they already
+// got from this list. have: { name: balance now }. Ones cut to 0 are left out.
+export function capPays(pays = [], have = {}) {
+  const left = { ...have };
+  const out = [];
+  for (const p of pays) {
+    const amount = typeof left[p.name] === 'number' ? capWin(p.amount, left[p.name]) : p.amount;
+    if (typeof left[p.name] === 'number') left[p.name] += amount;
+    if (amount > 0) out.push(amount < p.amount ? { ...p, amount, capped: true } : p);
+  }
+  return out;
+}
 
 // Results in order, best first (voided ones left out), and the voided names.
 export function standings(t) {

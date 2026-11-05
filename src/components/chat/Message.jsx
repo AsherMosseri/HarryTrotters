@@ -15,6 +15,7 @@ import { useMarket } from '../../market.js';
 import { glows } from '../../../functions/shared/market.js';
 import { PetBadge } from '../Pet.jsx';
 import { REPORTS_TO, ReportDialog, reportInfo } from '../Disputes.jsx';
+import { REQUESTS_TO } from '../../config.js';
 
 export const QUICK_REACTIONS = ['👍', '✅', '😂', '❤️', '🔥', '👀'];
 // Commands that post a poll: the poll is the card (Trotbot's name on top).
@@ -94,7 +95,13 @@ export function whatIs(m) {
   if (m.photo) return 'a photo';
   return 'a message';
 }
-export const timeOf = (ms) => new Date(ms).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+// One formatter for every message (making one per call, as toLocaleTimeString
+// does, was the slowest part of drawing the chat). Same text.
+const TIME = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
+export const timeOf = (ms) => {
+  const d = new Date(ms);
+  return Number.isNaN(d.getTime()) ? d.toLocaleTimeString() : TIME.format(d);
+};
 
 // A YouTube link's video id, for the inline player.
 export function youtubeId(url) {
@@ -577,6 +584,8 @@ export default function Message({
   // Report a casino result to the owner, Asher (Disputes.jsx).
   const [reporting, setReporting] = useState(false);
   const canReport = !!reportInfo(m, actor.name, usePeople()?.rename) && !!api.dispute;
+  // The owner (Asher) can refund or take back a game's coins from its card (CardActions.jsx).
+  const canFix = !!actor.admin && actor.name === REQUESTS_TO && !!api.ownerRefund;
   const actionsRef = useRef(null);
   const quick = quickOf(usePeople()?.profileOf(actor.name));
   const feat = useControls().isOn;
@@ -740,6 +749,7 @@ export default function Message({
                 onRun={(game, args) => api.play({ action: 'run', game, args, conv })}
                 onAsk={(action) => api.coinRequest({ action, conv, id: m.id })}
                 onReport={canReport ? () => setReporting(true) : null}
+                onFix={canFix ? (person, mode) => api.ownerRefund({ conv, msgId: m.id, person, mode }) : null}
               />
             )}
             {POLL_COMMANDS.includes(m.cmd?.name) && <Trotbot name={m.cmd.name} />}

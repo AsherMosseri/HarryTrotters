@@ -14,8 +14,10 @@
 
 import { mergedMs } from './hours.js';
 import { nameKey } from './team.js';
-import { BOT, GROUP_MAX } from './groups.js';
+import { BOT } from './groups.js';
 import { secureRandom } from './rng.js';
+import { parseAmount, readAmount } from './amount.js';
+import { coinsText } from './coinText.js';
 
 // The team day 3.0's earning rules start (4 an hour in 15-minute steps, cut
 // at midnight, at most tasksPerDay paid tasks a day). Earlier days pay as
@@ -238,9 +240,20 @@ export function ledgerItems(name, ledger = []) {
     if (x.type === 'spend' && x.person === name)
       out.push({ kind: 'spend', at: x.at, amount: -x.amount, icon: SPEND_ICON[x.what] || '🚫', label: x.label || 'Spent', what: x.what || '' });
     // Coins back from the market (functions/market.js): a declined perk, a
-    // cancelled tournament. Only the server writes these.
+    // cancelled tournament. Only the server writes these. Also a game result
+    // put right by the owner (functions/disputes.js: a report's refund, or
+    // Refund / Take back on the card, which is negative): `game` files it
+    // under Casino, `reverses` marks the casino line it undoes.
     else if (x.type === 'refund' && x.person === name)
-      out.push({ kind: 'refund', at: x.at, amount: x.amount, icon: '↩️', label: x.label || 'Refund' });
+      out.push({
+        kind: 'refund',
+        at: x.at,
+        amount: x.amount,
+        icon: '↩️',
+        label: x.label || 'Refund',
+        ...(x.game ? { game: String(x.game) } : {}),
+        ...(x.reverses ? { reverses: String(x.reverses) } : {}),
+      });
     else if (x.type === 'gift' && x.from === name)
       out.push({ kind: 'gift-out', at: x.at, amount: -x.amount, icon: '🎁', label: `To ${x.to}${x.note ? `: “${x.note}”` : ''}` });
     else if (x.type === 'gift' && x.to === name)
@@ -323,8 +336,14 @@ export function bankItems(name, bank = {}) {
   // Whatever the latest entries don't cover. Also when the net is 0 (a bet
   // held for a game still running can cancel out an earlier win): the history
   // always adds up to the bank's net, which is what the server counts.
-  const older = (b.net || 0) - recent.reduce((t, x) => t + x.amount, 0);
-  if (older)
+  const net = b.net || 0;
+  const older = net - sumCoins(recent);
+  // Past 2^53 the bank's net (added one result at a time) and the exact sum
+  // of its lines can differ by rounding alone: a few coins on a balance of
+  // quadrillions. That is no older line, so none is shown (the same on the
+  // app and the server, so both still count the same).
+  const noise = Math.abs(net) >= EXACT_LIMIT && Math.abs(older) <= Number.EPSILON * Math.abs(net) * (recent.length + 2);
+  if (older && !noise)
     recent.push({
       kind: 'casino',
       at: Math.min(...recent.map((x) => x.at), b.since || 1) - 1,
@@ -342,19 +361,22 @@ const bankRecent = (b) =>
     icon: x.icon || '🎰',
     label: x.label || 'Casino',
     ...(x.hold && { held: true }),
+    // The game card it came from ('conv/msgId', 3.1.1 on): the owner's
+    // Reverse on this line goes through the card (functions/disputes.js).
+    ...(x.card && { card: x.card }),
   }));
 
 export function wallet(name, data) {
   const earned = earnedItems(name, data);
   const ledger = [...ledgerItems(name, data.ledger), ...bankItems(name, data.bank)];
   const history = [...earned, ...ledger].sort((a, b) => b.at - a.at);
-  const sum = (list) => list.reduce((t, x) => t + x.amount, 0);
-  return { balance: sum(history), earned: sum(earned), history };
+  // sumCoins: the same total whatever order the entries came in.
+  return { balance: sumCoins(history), earned: sumCoins(earned), history };
 }
 
 // Which part of the history an entry belongs to (the Everyone view's chips).
 export function historyGroup(x) {
-  if (x.kind === 'casino') return 'casino';
+  if (x.kind === 'casino' || (x.kind === 'refund' && x.game)) return 'casino';
   if (x.kind === 'gift-in' || x.kind === 'gift-out') return 'gifts';
   if (x.kind === 'prize') return 'prizes';
   if (x.kind === 'loan') return 'loans';
@@ -367,12 +389,10 @@ export function historyGroup(x) {
 // app's numbers with the server's (the coinCheck function) category by
 // category. Kinds with nothing in them are left out.
 export function breakdown(history) {
+  const lists = {};
+  for (const x of history) (lists[x.kind] || (lists[x.kind] = [])).push(x);
   const out = {};
-  for (const x of history) {
-    const k = out[x.kind] || (out[x.kind] = { n: 0, coins: 0 });
-    k.n += 1;
-    k.coins += x.amount;
-  }
+  for (const [kind, list] of Object.entries(lists)) out[kind] = { n: list.length, coins: sumCoins(list) };
   return out;
 }
 
@@ -381,7 +401,8 @@ export function breakdownGaps(app, server) {
   return [...new Set([...Object.keys(app), ...Object.keys(server)])]
     .map((kind) => ({ kind, app: app[kind]?.coins || 0, server: server[kind]?.coins || 0, appN: app[kind]?.n || 0, serverN: server[kind]?.n || 0 }))
     .map((r) => ({ ...r, diff: r.app - r.server }))
-    .filter((r) => r.diff || r.appN !== r.serverN);
+    // Past 2^53 a rounding-sized difference is no difference (coinsAgree).
+    .filter((r) => !coinsAgree(r.app, r.server) || r.appN !== r.serverN);
 }
 
 // Who earned the most (tasks, hours, and bonuses; gifts don't count).
@@ -504,12 +525,101 @@ export function oldBankIds(name, aliases) {
 // Gifts and ad prizes are paid by the server (the play function), which
 // checks them against the real balance and today's limits; demo mode runs the
 // same checks. Each returns the ledger entry to add, or { error }.
-// No real limit on an amount (3.1.3): /give, /request, group gifts, teammate
-// loans, the bank and the owner's add / take away / set. One trillion keeps
-// every sum and the loan interest math exact (well under 2^53); the balance
-// checks still apply.
-export const NO_LIMIT = 1000000000000;
+// The most anyone can hold (3.1.5): a googol (1e100). Balances are sums of
+// ledger lines. JavaScript numbers are exact whole numbers only up to 2^53
+// (about 9 quadrillion): amounts and balances past that are approximate
+// doubles (still whole, but rounded to the nearest one a double can hold).
+// A googol keeps everything far below Infinity (about 1.8e308), so no sum,
+// interest or payout can overflow. Coins sent to someone (gifts, /request,
+// loans, refunds, the owner's Add/Set) that would put them over are refused;
+// game wins are cut so the balance ends at MAX_BALANCE (capWin). Earned
+// coins (tasks, lab time) and the small daily-capped awards and prizes
+// aren't checked: they can't come near it.
+export const MAX_BALANCE = 1e100;
+// Up to here every whole number is exact (2^53, Number.MAX_SAFE_INTEGER + 1).
+export const EXACT_LIMIT = 2 ** 53;
+// No real limit on an amount (3.1.3; the ceiling since 3.1.5): /give,
+// /request, group gifts, teammate loans, the bank and the owner's add / take
+// away / set. The balance checks still apply.
+export const NO_LIMIT = MAX_BALANCE;
 export const GIFT_MAX = NO_LIMIT;
+// A whole number of coins, of any size up to the ceiling (either sign):
+// below 2^53 an exact integer; past it any finite double, all of which are
+// whole. NaN, Infinity and fractions below 2^53 are not.
+export const wholeCoins = (n) => typeof n === 'number' && Number.isInteger(n) && Math.abs(n) <= MAX_BALANCE;
+// How many more coins someone with `balance` can take in (never below 0).
+export const ceilingRoom = (balance) => Math.max(0, MAX_BALANCE - (Number(balance) || 0));
+// Would adding `amount` put someone with `balance` over the ceiling? Against
+// the room left, not balance + amount: at a googol a small credit would
+// vanish in the rounding (1e100 + 10 is 1e100) and never look "over".
+export const overCeiling = (balance, amount) => amount > 0 && amount > ceilingRoom(balance);
+// The note for a refused credit: "That would put Cooper over a googol coins."
+export const ceilingNote = (name, body = 'Nobody can hold more than that.') => ({
+  error: `That would put ${String(name || 'them').split(' ')[0]} over a googol coins.`,
+  body,
+});
+// Do two balances agree? Exactly, below 2^53. Past it they are approximate
+// doubles: within a billionth of the balance counts as the same.
+export function coinsAgree(a, b) {
+  if (a === b) return true;
+  const big = Math.max(Math.abs(Number(a) || 0), Math.abs(Number(b) || 0));
+  return Number.isFinite(big) && big >= EXACT_LIMIT && Math.abs(a - b) <= 1e-9 * big;
+}
+// Adds up coin amounts (amount(x) for each x) the same way everywhere, in
+// any order: the app's wallet and the server's (both call wallet() below)
+// must land on the same number for the same entries even when the entries
+// come back in a different order. Below 2^53 every step is exact. When any
+// amount or running total reaches 2^53, it adds them again exactly (BigInt,
+// whole parts) and rounds once at the end, so the result never depends on
+// the order.
+export function sumCoins(list, amount = (x) => x.amount) {
+  let t = 0;
+  let exact = true;
+  for (const x of list) {
+    const v = amount(x);
+    t += v;
+    if (!(Math.abs(v) < EXACT_LIMIT && Math.abs(t) < EXACT_LIMIT)) {
+      exact = false;
+      break;
+    }
+  }
+  if (exact) return t;
+  let whole = 0n;
+  let rest = 0;
+  for (const x of list) {
+    const v = amount(x);
+    if (typeof v !== 'number' || !Number.isFinite(v)) return list.reduce((s, y) => s + amount(y), 0);
+    const w = Math.trunc(v);
+    whole += BigInt(w);
+    rest += v - w;
+  }
+  return Number(whole) + rest;
+}
+// The owner's Set to (3.1.5): the grants that bring someone with these
+// history lines to exactly `target`. One grant of target − balance is enough
+// below 2^53; past it the balance is rounded (3e45 hides a few quadrillion),
+// so the gap is worked out exactly (BigInt) and written as the fewest doubles
+// that add up to it exactly (one, or a few: a big one and its rounding).
+// [] when they're already there.
+export function setParts(target, list, amount = (x) => x.amount) {
+  let have = 0n;
+  for (const x of list) {
+    const v = amount(x);
+    if (typeof v === 'number' && Number.isFinite(v)) have += BigInt(Math.trunc(v));
+  }
+  let gap = BigInt(Math.trunc(target)) - have;
+  const parts = [];
+  while (gap !== 0n && parts.length < 8) {
+    const d = Number(gap);
+    parts.push(d);
+    gap -= BigInt(d);
+  }
+  return parts;
+}
+// A game's result for someone whose balance before it was `before`: a win
+// is cut so they end at MAX_BALANCE at most (never below 0); a loss or a
+// push is unchanged.
+export const capWin = (net, before) => (net > 0 ? Math.min(net, ceilingRoom(before)) : net);
 // The prize wheel's slices, in the order AdGames.jsx draws them, and how
 // likely each one is. The server spins it (prizeEntry); the app only shows
 // where it landed, so it can't pick the +10.
@@ -531,37 +641,44 @@ export function spinWheel(rng = secureRandom) {
 export const GAME_PRIZE_MAX = 20;
 const text = (v, n) => String(v || '').slice(0, n);
 
-export function giftEntry(from, { to, amount, note }, { roster, balance, now = Date.now() }) {
-  const n = Number(amount);
+// amount: a number, or the text of one ("2k", "1,000"; amount.js).
+// toBalance: what the person it goes to has (the server reads it fresh), for
+// the ceiling (MAX_BALANCE); left out, it isn't checked.
+export function giftEntry(from, { to, amount, note }, { roster, balance, toBalance, now = Date.now() }) {
+  const n = typeof amount === 'string' ? (parseAmount(amount) ?? (readAmount(amount)?.over ? Infinity : NaN)) : Number(amount);
   if (!roster.includes(to)) return { error: 'Who’s that?' };
   if (to === from) return { error: 'That’s you.', body: 'Your coins are already yours.' };
+  if (n === Infinity && typeof amount === 'string') return { error: 'That’s more than a googol.', body: 'Nobody can hold more than that.' };
   if (!Number.isInteger(n) || n < 1) return { error: 'Send at least 1 coin.' };
-  if (n > GIFT_MAX) return { error: 'That’s a lot.', body: `Up to ${GIFT_MAX} at a time.` };
-  if (n > balance) return { error: `You only have ${balance} coins.` };
+  if (n > GIFT_MAX) return { error: 'That’s more than a googol.', body: 'Nobody can hold more than that.' };
+  if (n > balance) return { error: `You only have ${coinsText(balance)} coins.` };
+  if (typeof toBalance === 'number' && overCeiling(toBalance, n)) return ceilingNote(to);
   return { type: 'gift', from, to, amount: n, note: text(note, 140).trim(), at: now };
 }
 
 // A gift to a group (/give @Programming 10): the same checks as one /give
-// to each person, then the whole total against the balance. All or nothing:
+// to each person, then the whole total against the balance. Any size, up to
+// the whole team (no group cap since 3.1.5). All or nothing:
 // { entries } (one gift entry per person, sharing a batch id, so the giver's
 // history shows one line) or { error, body } saying who and why.
 // people: who it goes to (already worked out from the server's own team).
-export function groupGiftEntries(from, { people = [], amount, note, batch, group }, { roster, balance, now = Date.now() }) {
+// balances: { name: balance } of the people it goes to, for the ceiling
+// (MAX_BALANCE); anyone left out isn't checked.
+export function groupGiftEntries(from, { people = [], amount, note, batch, group }, { roster, balance, balances = {}, now = Date.now() }) {
   if (!people.length) return { error: 'Nobody to give to.', body: `${group || 'That group'} has nobody in it besides you.` };
-  if (people.length > GROUP_MAX) return { error: 'That’s too many people at once.', body: `Up to ${GROUP_MAX}.` };
   const entries = [];
   for (const to of people) {
     if (!roster.includes(to) || to === BOT)
       return { error: `${to} can’t get coins right now.`, body: `They aren’t on the team. Nothing was sent.` };
-    const e = giftEntry(from, { to, amount, note }, { roster, balance: Infinity, now });
+    const e = giftEntry(from, { to, amount, note }, { roster, balance: Infinity, toBalance: balances[to], now });
     if (e.error) return { error: e.error, body: [e.body, people.length > 1 ? 'Nothing was sent.' : ''].filter(Boolean).join(' ') };
     entries.push({ ...e, batch: String(batch || ''), group: String(group || '').slice(0, 80) });
   }
-  const total = entries.reduce((t, e) => t + e.amount, 0);
+  const total = sumCoins(entries);
   if (total > balance)
     return {
-      error: `That’s ${total} coins (${entries[0].amount} each for ${entries.length} ${entries.length === 1 ? 'person' : 'people'}).`,
-      body: `You have ${balance}. Nothing was sent.`,
+      error: `That’s ${coinsText(total)} coins (${coinsText(entries[0].amount)} each for ${entries.length} ${entries.length === 1 ? 'person' : 'people'}).`,
+      body: `You have ${coinsText(balance)}. Nothing was sent.`,
     };
   return { entries, total };
 }

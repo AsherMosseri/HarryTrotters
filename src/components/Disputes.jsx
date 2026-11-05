@@ -2,9 +2,11 @@ import { useState } from 'react';
 import { DISPUTABLE, GAME_LABEL, LIMITS, REASONS, cardLoss, reportProblem } from '../../functions/shared/disputes.js';
 import { relTime, useEscape } from '../util.js';
 import { Avatar, CloseIcon, Overlay } from './common.jsx';
-import { confirmDialog } from './Dialogs.jsx';
+import { alertDialog, confirmDialog } from './Dialogs.jsx';
 import { Icon } from './shell/icons.jsx';
 import { REQUESTS_TO } from '../config.js';
+import { CoinNum, useCoinFormat } from './CoinNum.jsx';
+import { coinStyled, withExact } from '../coinFormat.js';
 
 // Casino reports. Someone says a result looks wrong; the owner (Asher, the
 // same person feature requests go to) looks at it and refunds by hand, or
@@ -26,9 +28,10 @@ export function reportInfo(m, me, rename) {
   return { game: m.cmd.name, ...cardLoss(m.cmd, me, rename) };
 }
 
-export function statusText(x) {
+// `n` writes the refund in this device's coin style (exact with commas by default).
+export function statusText(x, n = exactCoins) {
   return x.status === 'refunded'
-    ? `Refunded ${x.refund} coins`
+    ? `Refunded ${n(x.refund)} coins`
     : x.status === 'dismissed'
       ? 'Kept as it was'
       : `Waiting for ${REPORTS_TO}`;
@@ -124,6 +127,7 @@ export function ReportDialog({ m, conv, api, onClose }) {
 
 // Your own reports and what happened to them (a tab in the coins screen).
 export function MyReports({ list }) {
+  const f = useCoinFormat();
   if (!list.length) return <p className="muted">Nothing reported. If a casino result looks wrong, use the flag on it in chat.</p>;
   return (
     <ul className="coins-history report-list">
@@ -139,7 +143,7 @@ export function MyReports({ list }) {
             </span>
             {x.resolutionNote && <span className="muted tiny">“{x.resolutionNote}”</span>}
           </span>
-          <span className={`report-status ${x.status}`}>{statusText(x)}</span>
+          <span className={`report-status ${x.status}`}>{statusText(x, f.n)}</span>
         </li>
       ))}
     </ul>
@@ -150,8 +154,43 @@ export function MyReports({ list }) {
 export function DisputesDialog({ list, api, wallet, onToast, onClose }) {
   useEscape(onClose);
   const [tab, setTab] = useState('open');
-  const open = list.filter((x) => x.status === 'open');
+  const [who, setWho] = useState('');
+  const [busy, setBusy] = useState(false);
+  const allOpen = list.filter((x) => x.status === 'open');
+  // Who has reports waiting, most first, for the picker.
+  const people = [...allOpen.reduce((m, x) => m.set(x.by, (m.get(x.by) || 0) + 1), new Map())].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  const person = people.some(([n]) => n === who) ? who : '';
+  const open = person ? allOpen.filter((x) => x.by === person) : allOpen;
   const shown = tab === 'open' ? open : list.filter((x) => x.status !== 'open');
+  // Refund all: every waiting report shown (everyone's, or one person's). The
+  // server checks each one like its own Refund button and skips any it can't.
+  const refundAll = async () => {
+    const n = open.length;
+    const known = open.reduce((t, x) => t + (x.snapshot?.final ? x.snapshot.loss || 0 : 0), 0);
+    const unsure = open.some((x) => !x.snapshot?.final);
+    const ok = await confirmDialog({
+      title: `Refund ${n === 1 ? 'this report' : `all ${n} reports`}${person ? ` from ${first(person)}` : ''}?`,
+      body: withExact(`${unsure ? 'At least' : 'About'} ${coinStyled(known)} coins: each one pays back what its result shows they lost, once, checked like its own Refund button. Any that can’t be refunded stay waiting. It can’t be undone.`, known),
+      okLabel: n === 1 ? 'Refund' : `Refund ${n}`,
+    });
+    if (!ok) return;
+    setBusy(true);
+    const r = await api.disputeRefundAll({ ...(person && { person }) });
+    setBusy(false);
+    if (!r?.ok) {
+      await alertDialog({ title: r?.note?.title || 'That didn’t go through.', body: r?.note?.body || '' });
+      return;
+    }
+    if (r.refunded) onToast?.(`Refunded ${r.refunded} report${r.refunded === 1 ? '' : 's'}: ${coinStyled(r.coins)} coins.`);
+    if (r.skipped?.length)
+      await alertDialog({
+        title: `${r.skipped.length} stayed waiting`,
+        body: r.skipped
+          .slice(0, 12)
+          .map((x) => `${first(x.by)}, ${GAME_LABEL[x.game] || 'Casino'}: ${x.why}`)
+          .join('\n') + (r.skipped.length > 12 ? `\n…and ${r.skipped.length - 12} more.` : ''),
+      });
+  };
   return (
     <Overlay>
       <div className="panel-backdrop center" onClick={onClose}>
@@ -167,7 +206,7 @@ export function DisputesDialog({ list, api, wallet, onToast, onClose }) {
           </div>
           <div className="segmented coins-tabs" role="tablist">
             {[
-              ['open', `Waiting (${open.length})`],
+              ['open', `Waiting (${allOpen.length})`],
               ['done', 'Handled'],
             ].map(([id, label]) => (
               <button
@@ -181,6 +220,23 @@ export function DisputesDialog({ list, api, wallet, onToast, onClose }) {
               </button>
             ))}
           </div>
+          {tab === 'open' && allOpen.length > 0 && (
+            <div className="row gap wrap disputes-bulk">
+              {people.length > 1 && (
+                <select className="input disputes-who" value={person} aria-label="Whose reports" onChange={(e) => setWho(e.target.value)}>
+                  <option value="">Everyone ({allOpen.length})</option>
+                  {people.map(([n, c]) => (
+                    <option key={n} value={n}>
+                      {n} ({c})
+                    </option>
+                  ))}
+                </select>
+              )}
+              <button className="btn" disabled={busy || !open.length} onClick={refundAll}>
+                {busy ? 'Refunding…' : open.length === 1 ? 'Refund it' : `Refund all ${open.length}`}
+              </button>
+            </div>
+          )}
           <div className="coins-body disputes-body">
             {shown.length === 0 && (
               <p className="muted">{tab === 'open' ? 'Nothing waiting. Reports show up here.' : 'Nothing handled yet.'}</p>
@@ -196,6 +252,7 @@ export function DisputesDialog({ list, api, wallet, onToast, onClose }) {
 }
 
 function Report({ x, api, wallet, onToast }) {
+  const f = useCoinFormat();
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -208,8 +265,8 @@ function Report({ x, api, wallet, onToast }) {
   const decide = async (decision) => {
     if (decision === 'refund') {
       const ok = await confirmDialog({
-        title: `Refund ${s.final ? s.loss : 'the loss'} coins to ${first(x.by)}?`,
-        body: 'It pays back what the result shows they lost, once. It can’t be undone.',
+        title: `Refund ${s.final ? coinStyled(s.loss) : 'the loss'} coins to ${first(x.by)}?`,
+        body: withExact('It pays back what the result shows they lost, once. It can’t be undone.', s.final ? s.loss : 0),
         okLabel: 'Refund',
       });
       if (!ok) return;
@@ -218,7 +275,7 @@ function Report({ x, api, wallet, onToast }) {
     setError('');
     const r = await api.disputeDecide({ id: x.id, decision, note: text.trim() });
     setBusy(false);
-    if (r?.ok) onToast?.(decision === 'refund' ? `Refunded ${r.refund} coins to ${first(x.by)}.` : 'Kept as it was.');
+    if (r?.ok) onToast?.(decision === 'refund' ? `Refunded ${coinStyled(r.refund)} coins to ${first(x.by)}.` : 'Kept as it was.');
     else setError(r?.note ? [r.note.title, r.note.body].filter(Boolean).join(' ') : 'That didn’t go through.');
   };
   return (
@@ -231,7 +288,7 @@ function Report({ x, api, wallet, onToast }) {
             {GAME_LABEL[x.cmd] || 'Casino'} · reported {relTime(x.at)}
           </span>
         </span>
-        {!waiting && <span className={`report-status ${x.status}`}>{statusText(x)}</span>}
+        {!waiting && <span className={`report-status ${x.status}`}>{statusText(x, f.n)}</span>}
       </header>
       <div className="report-reason-line">{REASONS[x.reason]}</div>
       {x.note && <blockquote className="report-quote">{x.note}</blockquote>}
@@ -242,11 +299,11 @@ function Report({ x, api, wallet, onToast }) {
         </div>
         <div>
           <dt>Bet</dt>
-          <dd className="mono">{s.bet}</dd>
+          <dd className="mono" title={f.title(s.bet)}>{s.bet == null ? '' : f.n(s.bet)}</dd>
         </div>
         <div>
           <dt>Shows they lost</dt>
-          <dd className="mono">{s.final ? (s.loss ? s.loss : '0 (not a loss)') : 'not finished'}</dd>
+          <dd className="mono">{s.final ? (s.loss ? f.n(s.loss) : '0 (not a loss)') : 'not finished'}</dd>
         </div>
         <div>
           <dt>Played</dt>
@@ -259,12 +316,9 @@ function Report({ x, api, wallet, onToast }) {
           {near.map((h, i) => (
             <li key={`${h.kind}-${h.at}-${i}`}>
               <span aria-hidden="true">{h.icon}</span>
-              <span className="grow">{h.label}</span>
+              <span className="grow">{f.label(h.label)}</span>
               <span className="muted tiny mono">{WHEN(h.at)}</span>
-              <b className={`mono ${h.amount < 0 ? 'coins-minus' : 'coins-plus'}`}>
-                {h.amount > 0 ? '+' : h.amount < 0 ? '−' : ''}
-                {Math.abs(h.amount)}
-              </b>
+              <CoinNum as="b" signed n={h.amount} className={`mono ${h.amount < 0 ? 'coins-minus' : 'coins-plus'}`} />
             </li>
           ))}
         </ul>
@@ -284,7 +338,7 @@ function Report({ x, api, wallet, onToast }) {
           {error && <div className="casino-error">{error}</div>}
           <div className="row gap wrap report-buttons">
             <button className="btn primary" disabled={busy} onClick={() => decide('refund')}>
-              Refund the bet{s.final && s.loss ? ` (${s.loss})` : ''}
+              Refund the bet{s.final && s.loss ? ` (${coinStyled(s.loss)})` : ''}
             </button>
             <button className="btn" disabled={busy} onClick={() => decide('dismiss')}>
               Dismiss

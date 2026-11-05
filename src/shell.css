@@ -4052,6 +4052,10 @@ html.kb-bar .chat-side-body { padding-bottom: calc(8px + var(--kb-bar, 0px)); }
 /* Team management's list. */
 .dialog.disputes-dialog { width: min(600px, calc(100vw - 32px)); max-height: calc(var(--vvh, 100dvh) - 40px); display: flex; flex-direction: column; gap: 10px; }
 .disputes-body { gap: 12px; }
+/* Refund all (3.1.4): whose reports, and the button. */
+.disputes-bulk { align-items: center; }
+.disputes-bulk .disputes-who { flex: 1 1 180px; min-width: 0; width: auto; min-height: 44px; }
+.disputes-bulk .btn { min-height: 44px; margin-left: auto; }
 .report-card { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
 .report-card:not(.open) { opacity: 0.85; }
 .report-head { display: flex; align-items: center; gap: 10px; }
@@ -5183,6 +5187,61 @@ button.bs-cell:focus-visible { outline: 2px solid var(--accent); outline-offset:
 .cv-reversed.busy { font-style: italic; }
 .cv-rev-hint { margin: 4px 0 2px; }
 
+/* ---------- Coin numbers (3.1.1): 1,234 · 1234 · 1.2k (coinFormat.js) ----------
+   With commas the coin pill can be wider than the ~90px the iPad headers used
+   to leave for it (1,234,567 is 9 characters). The pill says how many
+   characters it shows (data-chars) and the page gets --coin-room: the space
+   headers keep clear on their right. Six or fewer keep the old 112px. */
+.app-scroll:has(> .coin-slot .coin-pill[data-chars='7']) { --coin-room: 118px; }
+.app-scroll:has(> .coin-slot .coin-pill[data-chars='8']) { --coin-room: 126px; }
+.app-scroll:has(> .coin-slot .coin-pill[data-chars='9']) { --coin-room: 134px; }
+.app-scroll:has(> .coin-slot .coin-pill[data-chars='10']) { --coin-room: 142px; }
+.app-scroll:has(> .coin-slot .coin-pill[data-chars='11']) { --coin-room: 150px; }
+.app-scroll:has(> .coin-slot .coin-pill[data-chars='12']) { --coin-room: 158px; }
+.app-scroll:has(> .coin-slot .coin-pill[data-chars='13']) { --coin-room: 166px; }
+.app-scroll:has(> .coin-slot) .page-head,
+.app-scroll:has(> .coin-slot) .chat-head,
+.app-scroll:has(> .coin-slot) .content.chat.with-side > .chat-side .chat-side-head { padding-right: var(--coin-room, 112px); }
+.app-scroll:has(> .coin-slot) .ms-header,
+.app-scroll:has(> .coin-slot) .mk-head { padding-right: calc(var(--coin-room, 112px) - 28px); }
+/* The embedded parts chat puts its header under the pill instead (above). */
+.app-scroll:has(> .coin-slot) .content.chat.embedded .chat-head { padding-right: 20px; }
+/* A phone bar with a shift running and a long balance (12,345 and up): the pill
+   and the title tighten up so more of the title shows. */
+.phone-top:has(.shift-pill):has(.coin-pill:is([data-chars='6'], [data-chars='7'], [data-chars='8'], [data-chars='9'], [data-chars='10'], [data-chars='11'], [data-chars='12'], [data-chars='13'])) .phone-title { font-size: 20px; }
+.phone-top:has(.shift-pill) .coin-pill:is([data-chars='6'], [data-chars='7'], [data-chars='8'], [data-chars='9'], [data-chars='10'], [data-chars='11'], [data-chars='12'], [data-chars='13']) { padding: 0 7px 0 5px; gap: 4px; font-size: 11.5px; }
+.phone-top:has(.shift-pill) .coin-pill:is([data-chars='6'], [data-chars='7'], [data-chars='8'], [data-chars='9'], [data-chars='10'], [data-chars='11'], [data-chars='12'], [data-chars='13']) .count-up { letter-spacing: -0.06em; }
+/* Numbers in the pill and bet pills never wrap or squeeze. */
+.coin-pill .count-up, .cz-betpill .cz-amt, .cz-amt .mono, .jcoins { white-space: nowrap; }
+.cz-betpill { white-space: nowrap; flex: none; }
+
+/* Trotbot's levels (3.1.1): the picker's five levels, each with what it's like and what beating it pays. */
+.fun-bot-levels { display: grid; gap: 6px; }
+.fun-pick .fun-bot-level {
+  display: grid; grid-template-columns: auto auto 1fr auto; align-items: center; gap: 4px 10px;
+  min-height: 44px; height: auto; padding: 8px 12px; border-radius: 10px; text-align: left; cursor: pointer;
+  color: var(--text); border: 1px solid transparent; font-weight: 400;
+}
+.fun-pick .fun-bot-level b { font-size: 14px; font-weight: 650; min-width: 64px; }
+.fun-pick .fun-bot-level .fun-bot-desc { font-size: 13px; color: var(--muted); min-width: 0; }
+.fun-pick .fun-bot-level .fun-pay { margin: 0; white-space: nowrap; justify-self: end; }
+.fun-pick .fun-bot-level.on { border-color: var(--accent); }
+.fun-pick .fun-bot-level.on .fun-bot-desc { color: var(--text); }
+.fun-bot-pips { display: inline-flex; gap: 2px; align-items: flex-end; height: 14px; }
+.fun-bot-pips i { width: 3px; border-radius: 1px; background: var(--border); }
+.fun-bot-pips i:nth-child(1) { height: 5px; }
+.fun-bot-pips i:nth-child(2) { height: 7px; }
+.fun-bot-pips i:nth-child(3) { height: 9px; }
+.fun-bot-pips i:nth-child(4) { height: 11px; }
+.fun-bot-pips i:nth-child(5) { height: 13px; }
+.fun-bot-pips i.lit { background: var(--muted); }
+.fun-bot-level.on .fun-bot-pips i.lit { background: var(--accent); }
+@media (max-width: 480px) {
+  /* Phones: the description goes under the name. */
+  .fun-pick .fun-bot-level { grid-template-columns: auto 1fr auto; }
+  .fun-pick .fun-bot-level .fun-bot-desc { grid-column: 2 / 4; grid-row: 2; }
+}
+
 /* Match log: who drove, operated, coached and was human player. */
 .run-roles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 12px; }
 .run-role { display: flex; flex-direction: column; gap: 4px; min-width: 0; font-size: 13px; font-weight: 600; color: var(--muted); }
@@ -5205,7 +5264,29 @@ button.bs-cell:focus-visible { outline: 2px solid var(--accent); outline-offset:
   padding: 1px 10px; font-size: 12px; line-height: 18px; box-shadow: none;
 }
 
-/* ---------- 3.1.4: no game card moves under a tap (all games) ---------- */
+/* ---------- 3.1.1: the owner's Refund / Take back on a game card ---------- */
+/* Everyone sees the tag the server puts on the card; only the owner gets the buttons. */
+.card-fixed { display: flex; flex-wrap: wrap; gap: 6px; }
+.card-fixed-tag {
+  display: inline-flex; align-items: center; gap: 5px; min-height: 24px; padding: 2px 9px; border-radius: 999px;
+  font-size: 12px; font-weight: 650; line-height: 1.2; color: var(--muted); background: var(--surface-2, var(--accent-soft));
+  border: 1px solid var(--border);
+}
+.card-fixed-tag.refund { color: #15803d; border-color: color-mix(in srgb, #15803d 35%, var(--border)); background: color-mix(in srgb, #15803d 8%, var(--surface)); }
+.card-fixed-tag.takeback { color: #b42318; border-color: color-mix(in srgb, #b42318 35%, var(--border)); background: color-mix(in srgb, #b42318 7%, var(--surface)); }
+.card-actions .card-fix { font-weight: 650; }
+.card-actions .card-fix.refund { color: #15803d; }
+.card-actions .card-fix.takeback { color: #b42318; }
+.card-actions .card-fix:disabled { opacity: 0.6; }
+.card-fix-error { flex-basis: 100%; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .card-fixed-tag.refund, :root:not([data-theme='light']) .card-actions .card-fix.refund { color: #4ade80; }
+  :root:not([data-theme='light']) .card-fixed-tag.takeback, :root:not([data-theme='light']) .card-actions .card-fix.takeback { color: #f87171; }
+}
+:root[data-theme='dark'] .card-fixed-tag.refund, :root[data-theme='dark'] .card-actions .card-fix.refund { color: #4ade80; }
+:root[data-theme='dark'] .card-fixed-tag.takeback, :root[data-theme='dark'] .card-actions .card-fix.takeback { color: #f87171; }
+
+/* ---------- 3.1.7: no game card moves under a tap (all games) ---------- */
 /* A finished trivia keeps its timer's space, so the answers stay put. */
 .arc-timer.over { visibility: hidden; }
 /* The players line is as tall when nobody's turn is lit (the game over) as during it. */

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Avatar, DisplayName } from '../common.jsx';
 import { daysBetween, todayISO } from '../../teamCommands.js';
+import { CoinNum } from '../CoinNum.jsx';
 
 // Cards for the 3.0 slash commands (moreCommands.js). Most are an "info"
 // card: a title, a big line, rows, paragraphs, code and where it comes from.
@@ -243,7 +244,8 @@ function Grid({ c, onPerson }) {
               </th>
               {r.c.map((v, k) => (
                 <td key={k} className="mono">
-                  {v}
+                  {/* A Coins column (/whois @group) follows Coin numbers. */}
+                  {c.cols[k] === 'Coins' && /^-?\d+$/.test(v) ? <CoinNum n={Number(v)} /> : v}
                 </td>
               ))}
             </tr>

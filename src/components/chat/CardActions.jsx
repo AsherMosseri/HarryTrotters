@@ -1,19 +1,26 @@
 import { useState } from 'react';
 import { MAX_BET } from '../../../functions/shared/challenge.js';
 import { BOT } from '../../../functions/shared/arcade.js';
+import { adjustOf, cardNets, fixEntry, gameLabel } from '../../../functions/shared/disputes.js';
 import { usePeople } from '../common.jsx';
 import { Icon } from '../shell/icons.jsx';
+import { confirmDialog } from '../Dialogs.jsx';
+import { coinStyled, exactNote, withExact } from '../../coinFormat.js';
 import { REPORTS_TO, reportInfo } from '../Disputes.jsx';
 
-// Two small actions under a finished casino card: dare someone to the same
-// coin flip or dice roll ("Challenge someone", functions/shared/challenge.js),
-// and report the result to the owner ("Report", Disputes.jsx). Money
-// is only ever moved by the server.
+// Small actions under a finished game card: dare someone to the same coin
+// flip or dice roll ("Challenge someone", functions/shared/challenge.js),
+// report the result to the owner ("Report", Disputes.jsx), and, for the owner
+// (Asher) only, Refund a loss or Take back a win for each person in the game
+// (functions/disputes.js ownerRefund). Everyone sees the "Refunded by Asher"
+// tag the server puts on the card. Money is only ever moved by the server.
 
 // Coin flip and dice are the games that can be played head to head.
 const DARES = ['coinflip', 'dice'];
+const commas = (n) => Math.abs(n).toLocaleString('en-US');
+const first = (n) => (n || '').split(' ')[0];
 
-export function CardActions({ m, me, onChallenge, onReport }) {
+export function CardActions({ m, me, onChallenge, onReport, onFix }) {
   const people = usePeople();
   const [asking, setAsking] = useState(false);
   const c = m.cmd;
@@ -22,23 +29,153 @@ export function CardActions({ m, me, onChallenge, onReport }) {
   const info = reportInfo(m, me, rename);
   const mine = (rename ? rename(m.by) : m.by) === me;
   const canDare = DARES.includes(c.name) && mine && done && !!onChallenge;
-  if (!(canDare || (info && onReport && (done || c.status === 'done')))) return null;
+  const canReport = !!(info && onReport && (done || c.status === 'done'));
+  // Each person's result, and whether it was put right already.
+  const { final, nets } = cardNets(c, m.by, rename);
+  const multi = nets.length > 1;
+  const rows = nets.map((x) => ({ ...x, tag: adjustOf(c, x.name) }));
+  const tags = rows.filter((x) => x.tag);
+  const fixes = onFix && final ? rows.filter((x) => !x.tag && x.net) : [];
+  if (!(canDare || canReport || tags.length || fixes.length)) return null;
+  return (
+    <div className="card-actions">
+      {tags.length > 0 && (
+        <div className="card-fixed">
+          {tags.map((x) => (
+            <span key={x.name} className={`card-fixed-tag ${x.tag.mode}`} title={`${x.tag.mode === 'takeback' ? '−' : '+'}${commas(x.tag.amount || 0)} coins`}>
+              <Icon name="rotateCcw" size={13} />
+              {multi ? `${first(x.name)}: ` : ''}
+              {multi ? (x.tag.mode === 'takeback' ? 'taken back' : 'refunded') : x.tag.mode === 'takeback' ? 'Taken back' : 'Refunded'} by {first(x.tag.by)}
+            </span>
+          ))}
+        </div>
+      )}
+      {(canDare || canReport || fixes.length > 0) && (
+        <div className="card-actions-row">
+          {canDare && (
+            <button className="link-btn small" aria-expanded={asking} onClick={() => setAsking((v) => !v)}>
+              <Icon name="swap" size={15} /> Challenge someone
+            </button>
+          )}
+          {fixes.map((x) => (
+            <FixButton key={x.name} c={c} row={x} multi={multi} me={me} onFix={onFix} />
+          ))}
+          {canReport && (
+            <button className="link-btn small card-report" onClick={onReport} title={`Report this result to ${REPORTS_TO}`}>
+              <Icon name="flag" size={15} /> Report
+            </button>
+          )}
+        </div>
+      )}
+      {asking && canDare && <Dare c={c} me={me} roster={people?.roster || []} onChallenge={onChallenge} onDone={() => setAsking(false)} />}
+    </div>
+  );
+}
+
+// A /give card (3.1.4): the owner's Undo (every gift on it goes back to the
+// giver, functions/disputes.js undoGift), and the "Undone by Asher" tag after.
+export function GiftUndo({ m, onFix }) {
+  const c = m.cmd;
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  if (c.undone)
+    return (
+      <div className="card-actions">
+        <div className="card-fixed">
+          <span className="card-fixed-tag takeback">
+            <Icon name="rotateCcw" size={13} /> Undone by {first(c.undone.by)}
+          </span>
+        </div>
+      </div>
+    );
+  if (!onFix || !c.batch) return null;
+  const n = c.group ? c.count || c.people?.length || 0 : 1;
+  const total = c.group ? c.total || c.amount * n : c.amount;
+  const giver = first(m.by);
+  const go = async () => {
+    if (busy) return;
+    setError('');
+    const ok = await confirmDialog({
+      title: c.group ? `Undo ${giver}’s gift to ${c.group}?` : `Undo ${giver}’s gift to ${first(c.to)}?`,
+      body: withExact(
+        `${c.group ? `${n} ${n === 1 ? 'person' : 'people'} each lose ${coinStyled(c.amount)}` : `${first(c.to)} loses ${coinStyled(c.amount)}`}, and ${giver} gets ${coinStyled(total)} back. If they’ve spent it, their balance can go below zero. They’re told, and the card says “Undone by ${first(REPORTS_TO)}”.`,
+        total,
+      ),
+      okLabel: 'Undo gift',
+      danger: true,
+    });
+    if (!ok) return;
+    setBusy(true);
+    const r = await onFix(m.by, 'undogift');
+    setBusy(false);
+    if (!r?.ok) setError(r?.note ? [r.note.title, r.note.body].filter(Boolean).join(' ') : 'That didn’t go through.');
+  };
   return (
     <div className="card-actions">
       <div className="card-actions-row">
-        {canDare && (
-          <button className="link-btn small" aria-expanded={asking} onClick={() => setAsking((v) => !v)}>
-            <Icon name="swap" size={15} /> Challenge someone
-          </button>
-        )}
-        {info && onReport && (
-          <button className="link-btn small card-report" onClick={onReport} title={`Report this result to ${REPORTS_TO}`}>
-            <Icon name="flag" size={15} /> Report
-          </button>
+        <button className="link-btn small card-fix takeback" onClick={go} disabled={busy} title={`Undo this gift (${coinStyled(total)} back to ${giver})`}>
+          <Icon name="rotateCcw" size={15} /> {busy ? '…' : 'Undo gift'}
+        </button>
+        {error && (
+          <span className="casino-error card-fix-error" role="status">
+            {error}
+          </span>
         )}
       </div>
-      {asking && canDare && <Dare c={c} me={me} roster={people?.roster || []} onChallenge={onChallenge} onDone={() => setAsking(false)} />}
     </div>
+  );
+}
+
+// The owner's Refund (a loss) or Take back (a win) for one person, after a
+// confirm that says who, which game, exactly how much, and what happens.
+function FixButton({ c, row, multi, me, onFix }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const refund = row.net < 0;
+  const n = coinStyled(Math.abs(row.net));
+  const exact = exactNote(row.net);
+  const game = gameLabel(c.name);
+  const who = row.name === me ? 'you' : first(row.name);
+  const go = async () => {
+    if (busy) return;
+    setError('');
+    const line = fixEntry({ person: row.name, mode: refund ? 'refund' : 'takeback', amount: Math.abs(row.net), game: c.name, by: me }).label;
+    const ok = await confirmDialog({
+      title: refund ? `Refund ${n} coins to ${who === 'you' ? 'yourself' : who}?` : `Take back ${n} coins from ${who}?`,
+      body: (
+        <>
+          <b>{row.name}</b> {refund ? 'lost' : 'won'} <b>{n}</b> at {game}.{' '}
+          {refund ? `${n} coins go back to them` : `${n} coins come off their balance`}, once, as “{line}” in their coin history
+          {row.name === me ? '' : ', and they’re told'}. The card will say “{refund ? 'Refunded' : 'Taken back'} by {first(me)}”.
+          {!refund && ' If they’ve spent it, their balance can go below zero.'}
+          {exact && (
+            <>
+              <br />
+              {exact}
+            </>
+          )}
+        </>
+      ),
+      okLabel: refund ? `Refund ${n}` : `Take back ${n}`,
+      danger: !refund,
+    });
+    if (!ok) return;
+    setBusy(true);
+    const r = await onFix(row.name, refund ? 'refund' : 'takeback');
+    setBusy(false);
+    if (!r?.ok) setError(r?.note ? [r.note.title, r.note.body].filter(Boolean).join(' ') : 'That didn’t go through.');
+  };
+  return (
+    <>
+      <button className={`link-btn small card-fix ${refund ? 'refund' : 'takeback'}`} onClick={go} disabled={busy} title={`${refund ? 'Refund' : 'Take back'} ${n} coins (${row.name})`}>
+        <Icon name="rotateCcw" size={15} /> {busy ? '…' : `${refund ? 'Refund' : 'Take back'}${multi ? ` ${first(row.name)}` : ''}`}
+      </button>
+      {error && (
+        <span className="casino-error card-fix-error" role="status">
+          {error}
+        </span>
+      )}
+    </>
   );
 }
 

@@ -15,6 +15,8 @@ import { useMarket } from '../market.js';
 import { useLocalStorage } from '../util.js';
 import { Avatar, CloseIcon, Overlay } from './common.jsx';
 import { Coins } from './Coins.jsx';
+import { CoinNum, useCoinFormat } from './CoinNum.jsx';
+import { coinStyled, withExact } from '../coinFormat.js';
 import { confirmDialog, promptDialog } from './Dialogs.jsx';
 import { PetsShelf } from './PetFamily.jsx';
 import { Icon } from './shell/icons.jsx';
@@ -117,7 +119,7 @@ function PerksShelf({ actor, balance, buy, busy, onToast }) {
   const have = new Set(market.perks.map((p) => p.name.toLowerCase()));
   const ideas = PERK_IDEAS.filter((i) => !have.has(i.name.toLowerCase()));
   const decide = async (p, status) => {
-    if (status === 'declined' && !(await confirmDialog({ title: `Decline “${p.name}”?`, body: `${first(p.person)} gets ${p.price} coins back.`, okLabel: 'Decline', danger: true })))
+    if (status === 'declined' && !(await confirmDialog({ title: `Decline “${p.name}”?`, body: withExact(`${first(p.person)} gets ${coinStyled(p.price)} coins back.`, p.price), okLabel: 'Decline', danger: true })))
       return;
     const r = await market.run('marketManage', { action: 'decide', id: p.id, status });
     if (!r?.ok) onToast(said(r) || 'That didn’t go through.');
@@ -145,7 +147,7 @@ function PerksShelf({ actor, balance, buy, busy, onToast }) {
                 <span className="grow">
                   <b>{p.name}</b>
                   <span className="muted tiny">
-                    {p.person} · <span className="mono">{p.price}</span> coins · {dayClock(p.at)}
+                    {p.person} · <CoinNum n={p.price} className="mono" /> coins · {dayClock(p.at)}
                   </span>
                 </span>
                 {statusChip(p.status)}
@@ -209,7 +211,7 @@ function PerksShelf({ actor, balance, buy, busy, onToast }) {
                       onClick={async () => {
                         const ok = await confirmDialog({
                           title: `Buy “${p.name}”?`,
-                          body: `${p.price} coins.${p.approval !== false ? ' Team management will approve it, or give the coins back.' : ''}`,
+                          body: withExact(`${coinStyled(p.price)} coins.${p.approval !== false ? ' Team management will approve it, or give the coins back.' : ''}`, p.price),
                           okLabel: 'Buy',
                         });
                         if (ok) buy(item, {}, (r) => onToast(r.purchase?.status === 'pending' ? 'Bought. Waiting for team management’s OK.' : 'Bought.'));
@@ -276,7 +278,7 @@ function PerksShelf({ actor, balance, buy, busy, onToast }) {
                 <span className="grow">
                   <b>{p.name}</b>
                   <span className="muted tiny">
-                    <span className="mono">{p.price}</span> coins · {dayClock(p.at)}
+                    <CoinNum n={p.price} className="mono" /> coins · {dayClock(p.at)}
                   </span>
                 </span>
                 {statusChip(p.status)}
@@ -414,10 +416,10 @@ function ExtrasShelf({ actor, balance, buy, busy, onToast }) {
                           body: 'Everyone sees it at the top of Today for a day. Team management can take it down.',
                           maxLength: x.text,
                           placeholder: 'Great job on the intake, CAD crew!',
-                          okLabel: `Post for ${x.price}`,
+                          okLabel: `Post for ${coinStyled(x.price)}`,
                         });
                         if (!text || !text.trim()) return;
-                      } else if (!(await confirmDialog({ title: `${x.name}?`, body: `${x.price} coins, for ${x.hours} hours.`, okLabel: 'Buy' }))) return;
+                      } else if (!(await confirmDialog({ title: `${x.name}?`, body: withExact(`${coinStyled(x.price)} coins, for ${x.hours} hours.`, x.price), okLabel: 'Buy' }))) return;
                       buy(item, { text }, () => onToast(x.text ? 'Your shout-out is on Today.' : `${x.name}: on for a day.`));
                     }}
                   >
@@ -532,6 +534,7 @@ function GamesShelf({ actor, balance, onToast, onPlay }) {
 // A finished tournament: who won, who was voided, and (team management) the
 // results, which can still be voided. Coins already paid stay paid.
 function Finished({ t, actor, onToast }) {
+  const f = useCoinFormat();
   const [open, setOpen] = useState(false);
   const { voided } = standings(t);
   return (
@@ -543,7 +546,7 @@ function Finished({ t, actor, onToast }) {
           {t.cancelled
             ? 'Cancelled, entries refunded'
             : t.winners.length
-              ? `${t.winners.join(' and ')} won ${t.pot} coins`
+              ? `${t.winners.join(' and ')} won ${f.n(t.pot)} coins`
               : 'Nobody played; entries refunded'}
         </span>
         {voided.length > 0 && (
@@ -657,7 +660,7 @@ function Tournament({ t, actor, balance, onToast, onPlay }) {
   const canPlay = !!commandByName[g.cmd];
   const ended = t.endsAt <= market.now;
   const join = async () => {
-    if (!(await confirmDialog({ title: `Join ${t.title}?`, body: `The entry is ${t.entry} coins. It goes into the pot.`, okLabel: `Join for ${t.entry}` }))) return;
+    if (!(await confirmDialog({ title: `Join ${t.title}?`, body: withExact(`The entry is ${coinStyled(t.entry)} coins. It goes into the pot.`, t.entry), okLabel: `Join for ${coinStyled(t.entry)}` }))) return;
     setBusy(true);
     const r = await market.run('joinTournament', { id: t.id });
     setBusy(false);
@@ -680,7 +683,7 @@ function Tournament({ t, actor, balance, onToast, onPlay }) {
         </span>
       </div>
       <p className="mk-meta tiny">
-        Entry <span className="mono">{t.entry}</span> · <span className="mono">{players.length}</span> {players.length === 1 ? 'player' : 'players'} ·{' '}
+        Entry <CoinNum n={t.entry} className="mono" /> · <span className="mono">{players.length}</span> {players.length === 1 ? 'player' : 'players'} ·{' '}
         {low ? `lowest ${g.unit} wins` : `most ${g.unit} wins`}
       </p>
       <Results t={t} actor={actor} onToast={onToast} />
@@ -701,7 +704,7 @@ function Tournament({ t, actor, balance, onToast, onPlay }) {
           )
         ) : (
           <button className="btn small primary" disabled={!market.coinsOn || busy || ended || t.entry > balance} onClick={join}>
-            {t.entry > balance ? 'Not enough coins' : `Join for ${t.entry}`}
+            {t.entry > balance ? 'Not enough coins' : `Join for ${coinStyled(t.entry)}`}
           </button>
         )}
         {actor.admin && !ended && (

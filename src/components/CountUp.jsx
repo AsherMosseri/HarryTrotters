@@ -32,6 +32,11 @@ export default function CountUp({ value, format = whole, duration = 450, from = 
     // Interrupted (a new value, or gone): the next run starts from what's showing.
     return () => cancelAnimationFrame(raf);
   }, [value, duration, from]);
+  // A new format with the same number (Coin numbers changed in Appearance):
+  // write what's showing again in it.
+  useLayoutEffect(() => {
+    if (ref.current && shown.current != null) ref.current.textContent = fmt.current(shown.current);
+  });
   // The text is written straight to the element so it can change every frame;
   // the label keeps the real number for screen readers.
   return <span ref={ref} className={`count-up ${className}`} aria-label={fmt.current(Number(value) || 0)} {...rest} />;

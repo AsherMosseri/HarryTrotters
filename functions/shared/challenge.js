@@ -12,6 +12,7 @@
 import { MINUTE, parseBet } from './casino.js';
 import { teamDay } from './coins.js';
 import { secureRandom } from './rng.js';
+import { coinsText } from './coinText.js';
 
 export const KINDS = {
   coinflip: { label: 'Coin flip', icon: '🪙' },
@@ -69,10 +70,10 @@ export function start({ me, words = [], roster = [], balance = 0, bank = {}, now
   if (!betWord) return { error: `How much? ${usage}` };
   const bet = parseBet(betWord, balance);
   if (bet == null || bet < 1) return { error: 'That’s not a bet.' };
-  if (bet > MAX_BET) return { error: `Challenges go up to ${MAX_BET} coins.` };
-  if (bet > balance) return { error: `You only have ${balance} coins.` };
+  if (bet > MAX_BET) return { error: `Challenges go up to ${coinsText(MAX_BET)} coins.` };
+  if (bet > balance) return { error: `You only have ${coinsText(balance)} coins.` };
   if (!peer || peer.name !== them || !peer.active) return { error: `${them.split(' ')[0]} isn’t on the team.` };
-  if (peer.balance < bet) return { error: `${them.split(' ')[0]} only has ${peer.balance} coins.` };
+  if (peer.balance < bet) return { error: `${them.split(' ')[0]} only has ${coinsText(peer.balance)} coins.` };
   if (hasOpen) return { error: 'You already have a challenge waiting. Cancel it, or wait for an answer.' };
   const day = teamDay(now);
   const sent = bank.chDay?.day === day ? bank.chDay.n || 0 : 0;
@@ -133,7 +134,7 @@ export function move({ pub, me, move: mv, balance = 0, now = Date.now(), rng = s
   if (m === 'decline') return end('declined', back);
   if (m !== 'accept') return { error: 'Accept the challenge first.' };
   if (now >= p.expiresAt) return { error: 'That challenge ran out of time.' };
-  if (p.bet > balance) return { error: `It’s a ${p.bet} coin bet. You have ${balance}.` };
+  if (p.bet > balance) return { error: `It’s a ${coinsText(p.bet)} coin bet. You have ${coinsText(balance)}.` };
   const r = roll(p.kind, p, rng);
   const { winner, ...shown } = r;
   const bet = p.bet;

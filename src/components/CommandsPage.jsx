@@ -5,6 +5,7 @@ import { COMMANDS, GROUPS } from '../commands.js';
 import { ALWAYS_ON, whereFor } from '../../functions/shared/commandRules.js';
 import { ICON as ARCADE_ICON, LABEL as ARCADE_LABEL } from '../../functions/shared/arcade.js';
 import { useEscape } from '../util.js';
+import { useCoinFormat } from './CoinNum.jsx';
 
 // Asher's 🤖 Commands page: turn slash commands on and off, pick the channels
 // each group works in, and see how the casino is doing. Saved to
@@ -21,8 +22,6 @@ const GAMES = {
   highlow: ['🔼', 'High-low'],
   ...Object.fromEntries(Object.keys(ARCADE_LABEL).map((k) => [k, [ARCADE_ICON[k], ARCADE_LABEL[k]]])),
 };
-const coins = (n) => `${n.toLocaleString()} 🪙`;
-const signed = (n) => `${n > 0 ? '+' : n < 0 ? '−' : ''}${Math.abs(n).toLocaleString()}`;
 
 // Everyone's casino numbers added up (bank docs: stats and stats.games).
 export function houseNumbers(bank) {
@@ -63,6 +62,10 @@ export function houseNumbers(bank) {
 }
 
 export default function CommandsPage({ cfg = {}, channels, bank, lottery, onSave, onClose }) {
+  // Coin amounts follow Coin numbers (Appearance).
+  const f = useCoinFormat();
+  const coins = (n) => `${f.n(n)} 🪙`;
+  const signed = f.signed;
   useEscape(onClose);
   const [tab, setTab] = useState('on');
   const off = cfg.off || [];
@@ -219,8 +222,8 @@ export default function CommandsPage({ cfg = {}, channels, bank, lottery, onSave
                             {GAMES[r.g]?.[0]} {GAMES[r.g]?.[1] || r.g}
                           </td>
                           <td>{r.played}</td>
-                          <td>{r.won.toLocaleString()}</td>
-                          <td>{r.lost.toLocaleString()}</td>
+                          <td>{f.n(r.won)}</td>
+                          <td>{f.n(r.lost)}</td>
                           <td className={r.house >= 0 ? 'pos' : 'neg'}>{signed(r.house)}</td>
                         </tr>
                       ))}

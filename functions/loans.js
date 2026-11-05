@@ -29,7 +29,8 @@ import { onDocumentWritten } from 'firebase-functions/v2/firestore';
 import { logger } from 'firebase-functions';
 import * as L from './shared/loans.js';
 import { cleanName, memberOk } from './shared/team.js';
-import { teamDay } from './shared/coins.js';
+import { ceilingNote, overCeiling, teamDay } from './shared/coins.js';
+import { coinsText } from './shared/coinText.js';
 
 const OPEN_FN = { maxInstances: 5, invoker: 'public' };
 // The time everything here goes by (tests move it to a due date).
@@ -135,7 +136,7 @@ export function loanFunctions({ db, coinData, freshCoins, bankRef, notify, owner
       {
         to: bank ? boss : lender,
         type: 'loan',
-        title: bank ? `${first(me)} asked the bank for ${t.terms.amount} coins` : `${first(me)} asked you for a loan`,
+        title: bank ? `${first(me)} asked the bank for ${coinsText(t.terms.amount)} coins` : `${first(me)} asked you for a loan`,
         body: L.termsText(t.terms),
         open: `loans:${res.id}`,
         by: me,
@@ -169,6 +170,14 @@ export function loanFunctions({ db, coinData, freshCoins, bankRef, notify, owner
         if (await lockFrom(borrower, bList, data, undefined, now))
           return note(`${role === 'borrower' ? 'You have' : `${first(borrower)} has`} an overdue loan, so this one can’t start now.`);
         if (await coinsOff(borrower, boss)) return note('🪙 Jackson coins are off right now.');
+        // The ceiling (MAX_BALANCE): a loan that would put the borrower over
+        // a googol doesn't start. Their bank doc is read here too, so a
+        // bet of theirs at the same moment takes turns with this.
+        const borrowerBank = await tx.get(bankRef(borrower));
+        if (overCeiling(await balanceOf(borrower, data, borrowerBank.data() || {}), loan.terms.amount)) {
+          const c = ceilingNote(borrower, 'Nobody can hold more than that. The loan didn’t start.');
+          return note(c.error, c.body);
+        }
         if (lender) {
           // The lender's own coins: checked fresh, and their bank doc touched so
           // a bet or buy at the same moment waits for this.
@@ -234,6 +243,15 @@ export function loanFunctions({ db, coinData, freshCoins, bankRef, notify, owner
       const r = L.repayCheck(loan, { role, amount, balance, now });
       if (r.error) return note(r.error, r.body);
       const lender = loan.bank ? '' : data.rename(loan.lender);
+      // The ceiling (MAX_BALANCE): a payment that would put a teammate lender
+      // over a googol is refused (the bank keeps nothing it's paid).
+      if (lender) {
+        const lenderBank = await tx.get(bankRef(lender));
+        if (overCeiling(await balanceOf(lender, data, lenderBank.data() || {}), r.amount)) {
+          const c = ceilingNote(lender, 'Nobody can hold more than that. Nothing was paid.');
+          return note(c.error, c.body);
+        }
+      }
       tx.set(coinsRef(L.entryId(id, 'repay', loan.moves || 0)), L.loanEntry({ ...loan, borrower: me, lender }, 'repay', r.amount, now));
       const done = r.left === 0;
       tx.update(
@@ -254,8 +272,8 @@ export function loanFunctions({ db, coinData, freshCoins, bankRef, notify, owner
         {
           to: res.loan.lender,
           type: 'loan',
-          title: res.left ? `${first(me)} paid back ${res.paid}` : `${first(me)} paid off their loan`,
-          body: res.left ? `${res.left} left.` : `${res.paid} coins, all done.`,
+          title: res.left ? `${first(me)} paid back ${coinsText(res.paid)}` : `${first(me)} paid off their loan`,
+          body: res.left ? `${coinsText(res.left)} left.` : `${coinsText(res.paid)} coins, all done.`,
           open: `loans:${id}`,
           by: me,
         },
@@ -292,7 +310,7 @@ export function loanFunctions({ db, coinData, freshCoins, bankRef, notify, owner
         // lender's own coins (the bank just makes it).
         if (lender) {
           const have = await balanceOf(lender, data, lenderBank.data() || {});
-          if (have < r.give) return note(`That gives ${r.give} back to ${first(borrower)}. You only have ${Math.max(0, have)}.`);
+          if (have < r.give) return note(`That gives ${coinsText(r.give)} back to ${first(borrower)}. You only have ${coinsText(Math.max(0, have))}.`);
           touch(tx, lender, lenderBank, now);
         }
         tx.set(coinsRef(L.entryId(id, action, loan.moves || 0)), L.loanEntry({ ...loan, borrower, lender }, action, r.give, now));
@@ -311,7 +329,7 @@ export function loanFunctions({ db, coinData, freshCoins, bankRef, notify, owner
         body:
           action === 'forgive'
             ? res.give
-              ? `${res.give} coins back. You’re unlocked.`
+              ? `${coinsText(res.give)} coins back. You’re unlocked.`
               : 'You don’t owe the rest.'
             : `Now due ${new Date(res.loan.dueAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone })}.`,
         open: `loans:${id}`,
@@ -373,7 +391,7 @@ export function loanFunctions({ db, coinData, freshCoins, bankRef, notify, owner
             to: lender,
             type: 'loan',
             title: `${first(borrower)}’s loan was due`,
-            body: `${c.take} coins came back to you.`,
+            body: `${coinsText(c.take)} coins came back to you.`,
             open: `loans:${id}`,
           });
         return;
@@ -384,7 +402,7 @@ export function loanFunctions({ db, coinData, freshCoins, bankRef, notify, owner
           to: borrower,
           type: 'loan',
           title: `Your loan is due in ${Math.max(1, Math.round((loan.dueAt - now) / L.DAY))} day${Math.round((loan.dueAt - now) / L.DAY) > 1 ? 's' : ''}`,
-          body: `${L.leftOf(loan, now)} left to pay ${L.lenderName(loan)}. Whatever is left is taken on the due date.`,
+          body: `${coinsText(L.leftOf(loan, now))} left to pay ${L.lenderName(loan)}. Whatever is left is taken on the due date.`,
           open: `loans:${id}`,
         });
         return;

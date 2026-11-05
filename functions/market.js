@@ -29,6 +29,7 @@ import { petFamily } from './petfamily.js';
 import { petPhotos } from './petphotos.js';
 import { PHOTO_ACTIONS } from './shared/petphotos.js';
 import { memberOk } from './shared/team.js';
+import { coinsText } from './shared/coinText.js';
 
 const OPEN = { maxInstances: 5, invoker: 'public' };
 
@@ -183,7 +184,8 @@ export function marketFunctions({ db, coinData, freshCoins, notify, bankRef, per
   // payout, or null if it was already settled.
   async function settle(id, { cancel = false, by = '' } = {}) {
     const ref = db.doc(`tournaments/${id}`);
-    const rename = (await coinData()).rename;
+    const data = await coinData();
+    const rename = data.rename;
     const out = await db.runTransaction(async (tx) => {
       const snap = await tx.get(ref);
       const t = snap.data();
@@ -191,9 +193,17 @@ export function marketFunctions({ db, coinData, freshCoins, notify, bankRef, per
       if (!t || t.status !== 'open' || (!cancel && t.endsAt > now)) return null;
       // A held run that could still win: wait for team management (a while).
       if (!cancel && market.reviewHolds(t, now)) return null;
-      const r = cancel
+      const r0 = cancel
         ? { winners: [], pays: [], refunds: Object.keys(t.players || {}).map((n) => ({ name: rename(n), amount: t.entry })) }
         : market.payoutOf(t, rename);
+      // Nobody ends up over a googol (MAX_BALANCE): each prize or entry
+      // back pays up to it at most; the rest isn't paid to anyone.
+      const names = [...new Set([...r0.pays, ...r0.refunds].map((p) => p.name))];
+      const banks = await Promise.all(names.map((n) => tx.get(bankRef(n))));
+      const have = Object.fromEntries(
+        await Promise.all(names.map(async (n, i) => [n, (await freshCoins(n, banks[i].data() || {}, data)).balance])),
+      );
+      const r = { ...r0, pays: market.capPays(r0.pays, have), refunds: market.capPays(r0.refunds, have) };
       for (const p of r.pays)
         tx.set(db.collection('coins').doc(), {
           type: 'prize',
@@ -222,7 +232,7 @@ export function marketFunctions({ db, coinData, freshCoins, notify, bankRef, per
           to: n,
           type: 'market',
           icon: '🏆',
-          title: won.has(n) ? `You won ${won.get(n)} coins in ${out.t.title}` : `${out.t.title} is over`,
+          title: won.has(n) ? `You won ${coinsText(won.get(n))} coins in ${out.t.title}` : `${out.t.title} is over`,
           body: out.winners.length
             ? won.has(n)
               ? 'Best score. Nice.'
@@ -269,7 +279,7 @@ export function marketFunctions({ db, coinData, freshCoins, notify, bankRef, per
             type: 'market',
             icon: r.status === 'approved' ? '✅' : '↩️',
             title: r.status === 'approved' ? `“${r.p.name}” is approved` : `“${r.p.name}” was declined`,
-            body: r.status === 'approved' ? 'Team management will make it happen.' : `Your ${r.p.price} coins are back.`,
+            body: r.status === 'approved' ? 'Team management will make it happen.' : `Your ${coinsText(r.p.price)} coins are back.`,
             open: 'view:market',
             by: me,
           },

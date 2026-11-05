@@ -3,6 +3,7 @@
 // the same path when you run it.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '../shell/icons.jsx';
+import { CoinNum } from '../CoinNum.jsx';
 import { AUTO, simulate } from '../../../functions/shared/autoPath.js';
 import { animOn, celebrate } from '../../motion.js';
 import { AFTER_GRADE, AFTER_NEW } from './tapGuard.js';
@@ -270,7 +271,7 @@ export default function AutoPlanner({ api, onResult, guard }) {
             {run.newBest && run.score > 0 && <span className="chip lq-chip-good">New best</span>}
             {run.coins > 0 && (
               <span className="chip lq-chip-coin">
-                <Icon name="coin" size={13} /> <span className="mono">+{run.coins}</span>
+                <Icon name="coin" size={13} /> <CoinNum n={run.coins} signed className="mono" />
               </span>
             )}
           </p>

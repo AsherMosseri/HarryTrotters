@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useEscape } from '../util.js';
 import { CloseIcon, Overlay } from './common.jsx';
 import { WHEEL as SLICES } from '../coins.js';
+import { CoinNum } from './CoinNum.jsx';
 
 // The fun ad formats: playable mini-games, the prize wheel, video-style
 // ads, and the "ad blocker detected" wall. Prizes are Jackson coins (small,
@@ -270,7 +271,13 @@ export function GameDialog({ ad, capLeft, onPrize, onClose }) {
                 </div>
                 <h2>{result.label}!</h2>
                 <p className="ad-action-detail">
-                  {result.won ? `+${result.won} Jackson coin${result.won === 1 ? '' : 's'}` : 'No coins this time'}
+                  {result.won ? (
+                    <>
+                      <CoinNum n={result.won} signed /> Jackson coin{result.won === 1 ? '' : 's'}
+                    </>
+                  ) : (
+                    'No coins this time'
+                  )}
                 </p>
                 {result.capped && <p className="muted small">That’s today’s limit for game prizes.</p>}
                 <div className="row gap">
@@ -359,7 +366,7 @@ export function PrizeWheel({ onWin, onClose }) {
             <>
               <p className="ad-action-detail">
                 {won.coins
-                  ? `You won ${won.coins} Jackson coin${won.coins === 1 ? '' : 's'}!`
+                  ? <>You won <CoinNum n={won.coins} /> Jackson coin{won.coins === 1 ? '' : 's'}!</>
                   : won.hour
                     ? 'You won an hour with no ads!'
                     : 'Nothing this time. Come back tomorrow!'}

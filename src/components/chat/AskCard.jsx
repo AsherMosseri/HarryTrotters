@@ -4,7 +4,9 @@ import { PetRequestContext } from '../PetRequest.jsx';
 import { REQUEST_STATUSES } from '../Requests.jsx';
 import { confirmDialog } from '../Dialogs.jsx';
 import { serverNow } from '../../serverTime.js';
-import { coinText } from '../../../functions/shared/coinRequests.js';
+import { coinStyled, withExact } from '../../coinFormat.js';
+// Amounts on request cards follow Appearance → Coin numbers ("25 🪙", "1.2m 🪙").
+const coinText = (n) => `${coinStyled(n)} 🪙`;
 
 // /request cards in chat (src/requestCommand.js).
 //   kind 'idea':  a feature request someone sent; 👍 and Open read the live
@@ -88,8 +90,8 @@ function Coins({ c, me, onAsk }) {
   const pay = async () => {
     const ok = await confirmDialog({
       title: `Pay ${first(a.from)} ${coinText(a.amount)}?`,
-      body: `${a.reason ? `“${a.reason}”\n` : ''}It comes out of your Jackson coins, like /give.`,
-      okLabel: `Pay ${a.amount}`,
+      body: withExact(`${a.reason ? `“${a.reason}”\n` : ''}It comes out of your Jackson coins, like /give.`, a.amount),
+      okLabel: `Pay ${coinStyled(a.amount)}`,
     });
     if (ok) act('pay');
   };
@@ -208,8 +210,8 @@ function GroupCoins({ c, me, onAsk }) {
   const pay = async () => {
     const ok = await confirmDialog({
       title: `Pay ${first(a.from)} ${coinText(a.amount)}?`,
-      body: `${a.reason ? `“${a.reason}”\n` : ''}${first(a.from)} asked ${a.label || c.group?.label || 'a group'}. It comes out of your Jackson coins, like /give.`,
-      okLabel: `Pay ${a.amount}`,
+      body: withExact(`${a.reason ? `“${a.reason}”\n` : ''}${first(a.from)} asked ${a.label || c.group?.label || 'a group'}. It comes out of your Jackson coins, like /give.`, a.amount),
+      okLabel: `Pay ${coinStyled(a.amount)}`,
     });
     if (ok) act('pay');
   };

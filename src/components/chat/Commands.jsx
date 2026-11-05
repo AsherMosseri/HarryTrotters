@@ -5,8 +5,8 @@ import { keepHeight } from './keepHeight.js';
 import { COMMANDS, GROUPS } from '../../commands.js';
 import { CASINO_CARDS, CasinoBody, ECONOMY_CARDS } from './Casino.jsx';
 import { ARCADE_CARDS, ArcadeBody } from './Arcade.jsx';
-import { CardActions } from './CardActions.jsx';
-import { DISPUTABLE } from '../../../functions/shared/disputes.js';
+import { CardActions, GiftUndo } from './CardActions.jsx';
+import { FIXABLE } from '../../../functions/shared/disputes.js';
 import { Die } from './Die.jsx';
 import { GroupFaces, MoreBody } from './MoreCards.jsx';
 import { AskBody } from './AskCard.jsx';
@@ -16,6 +16,7 @@ import { DailyCard } from '../learn/DailyCard.jsx';
 import { priorityById } from '../../config.js';
 import { daysBetween, todayISO } from '../../teamCommands.js';
 import { serverNow } from '../../serverTime.js';
+import { CoinNum } from '../CoinNum.jsx';
 import { isLive } from '../../../functions/shared/arcade.js';
 
 // What slash commands look like in chat (commands.js does the work): the
@@ -236,7 +237,7 @@ function Body({ c, by, onPerson, fresh }) {
                 <b>{c.open ?? 0}</b> open
               </span>
               <span>
-                <b>{c.coins ?? 0}</b> 🪙
+                <CoinNum as="b" n={c.coins ?? 0} /> 🪙
               </span>
             </div>
             {c.onShift && <div className="small cmd-onshift">At the lab right now</div>}
@@ -489,7 +490,7 @@ function useHeightAfter(ref, waiting, ms) {
   });
 }
 
-export function CommandCard({ m, onPerson, me, onMove, onBuy, onChallenge, onReport, onAsk, onRun, conv }) {
+export function CommandCard({ m, onPerson, me, onMove, onBuy, onChallenge, onReport, onFix, onAsk, onRun, conv }) {
   const n = m.cmd.name;
   const kind = ARCADE_CARDS.includes(n)
     ? 'arcade'
@@ -531,7 +532,8 @@ export function CommandCard({ m, onPerson, me, onMove, onBuy, onChallenge, onRep
       ) : (
         <Body c={m.cmd} by={m.by} onPerson={onPerson} fresh={fresh} />
       )}
-      {DISPUTABLE.includes(n) && <CardActions m={m} me={me} onChallenge={onChallenge} onReport={onReport} />}
+      {FIXABLE.includes(n) && <CardActions m={m} me={me} onChallenge={onChallenge} onReport={onReport} onFix={onFix} />}
+      {n === 'give' && <GiftUndo m={m} onFix={onFix} />}
     </div>
   );
 }

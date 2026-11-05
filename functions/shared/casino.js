@@ -5,7 +5,9 @@
 // code locally. A game returns { pub, secret, done, payout }: pub goes on the
 // chat message, payout is everything paid back (0 = lost the bet, bet = push).
 import { secureRandom } from './rng.js';
-import { keepRecent } from './coins.js';
+import { capWin, keepRecent } from './coins.js';
+import { amountTip, parseAmount } from './amount.js';
+import { coinsText } from './coinText.js';
 
 export const TICKET = 5; // lottery ticket price
 export const MINUTE = 60000;
@@ -39,7 +41,8 @@ export const SERVER_COMMANDS = [
 const rint = (rng, a, b) => a + Math.floor(rng() * (b - a + 1));
 const pickOf = (rng, list) => list[Math.floor(rng() * list.length)];
 
-// "50", "all", "half", "25%" → a whole number of coins (null if it isn't one).
+// "50", "2k", "1.5k", "1,000", "all", "half", "25%" → a whole number of coins
+// (null if it isn't one). Numbers are read by amount.js, the same as the app.
 export function parseBet(word, balance) {
   const w = String(word || '')
     .trim()
@@ -49,7 +52,15 @@ export function parseBet(word, balance) {
   if (w === 'half') return Math.floor(balance / 2);
   const pct = /^(\d+(?:\.\d+)?)%$/.exec(w);
   if (pct) return Math.floor((balance * Math.min(100, +pct[1])) / 100);
-  return /^\d+$/.test(w) ? +w : null;
+  return parseAmount(w);
+}
+
+// A bet that isn't a whole number of coins ("/slots 1.2345k"): the note that
+// says so, with the nearest whole amount (never rounded for them). null when
+// every word is fine. The server and demo mode check this first.
+export function wholeCoinsNote(words) {
+  const tip = (words || []).map(amountTip).find(Boolean);
+  return tip ? ['That’s not a whole number of coins.', tip] : null;
 }
 
 // ---------- one-shot games ----------
@@ -406,6 +417,22 @@ export function beg(bank, now, rng = secureRandom) {
   return { amount, card: { amount, who, verb, joke }, bank: set };
 }
 
+// The end of a history line for a win cut at the ceiling (coins.js
+// MAX_BALANCE): "Slots: won 120 (capped at a googol)".
+export const CAPPED = ' (capped at a googol)';
+
+// /rob near the ceiling (coins.js MAX_BALANCE): whoever the coins go to (the
+// robber, or the person robbed when the robber is caught and fined) takes in
+// at most what keeps them at a googol, and the other side loses only
+// that, so no coins are made or lost. myBalance, theirBalance: before the rob.
+export function capRob(r, myBalance, theirBalance) {
+  if (r.error) return r;
+  const mine = r.amount > 0;
+  const n = mine ? capWin(r.amount, myBalance) : capWin(r.theirs, theirBalance);
+  if (n === (mine ? r.amount : r.theirs)) return r;
+  return { ...r, amount: mine ? n : -n, theirs: mine ? -n : n, card: { ...r.card, amount: n, capped: true } };
+}
+
 // Robbing: 35% chance. Success takes 10–25% of their coins (up to 100);
 // failure fines you 10–20% of yours (5 to 60), paid to them.
 export function rob(bank, myBalance, theirBalance, now, rng = secureRandom) {
@@ -453,7 +480,10 @@ export function bankAfter(bank, name, delta, entry, extra = {}, now = Date.now()
   if (held) recent = recent.filter((x) => x.hold !== entry.settles);
   const amount = entry?.hold ? delta : shown;
   if (entry && (amount || held))
-    recent = keepRecent([{ at: now, amount, icon: entry.icon, label: entry.label, ...(entry.hold && { hold: entry.hold }) }, ...recent]);
+    recent = keepRecent([
+      { at: now, amount, icon: entry.icon, label: entry.label, ...(entry.hold && { hold: entry.hold }), ...(entry.card && { card: entry.card }) },
+      ...recent,
+    ]);
   return { ...bank, ...extra, name, net: (bank.net || 0) + delta, stats, recent, since: bank.since || now };
 }
 
@@ -473,7 +503,7 @@ export function lotteryNote(bought, mine, pot, openConv, conv) {
   const tickets = `${mine} ticket${mine === 1 ? '' : 's'}`;
   return {
     title: bought ? `🎟️ Bought ${bought} ticket${bought > 1 ? 's' : ''}` : '🎟️ The lottery is already open',
-    body: `You have ${tickets} in. Pot: ${pot} coins.${openConv === conv ? ' The lottery card is higher up in this channel.' : ` The lottery card is in #${openConv}.`}`,
+    body: `You have ${tickets} in. Pot: ${coinsText(pot)} coins.${openConv === conv ? ' The lottery card is higher up in this channel.' : ` The lottery card is in #${openConv}.`}`,
     ...(openConv !== conv && { go: openConv }),
   };
 }

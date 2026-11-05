@@ -7,7 +7,12 @@ import { PetRequestContext, RequestPetDialog } from './PetRequest.jsx';
 import { StyleRequest } from './People.jsx';
 import { ASK_KEYWORDS, IDEA_MAX } from '../requestCommand.js';
 import { GIFT_MAX } from '../../functions/shared/coins.js';
-import { EXPIRES, REASON_MAX, coinText } from '../../functions/shared/coinRequests.js';
+import { parseAmount } from '../../functions/shared/amount.js';
+import { coinsText } from '../../functions/shared/coinText.js';
+import { EXPIRES, REASON_MAX } from '../../functions/shared/coinRequests.js';
+import { coinStyled } from '../coinFormat.js';
+// The Ask button's amount follows Appearance, Coin numbers.
+const coinText = (n) => `${coinStyled(n)} 🪙`;
 import { REQUESTS_TO } from '../config.js';
 import { firstName, useEscape } from '../util.js';
 
@@ -131,8 +136,9 @@ function CoinsForm({ ask, api, roster, actor, onClose }) {
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
-  const n = Number(amount);
-  const whole = /^\d+$/.test(amount.trim()) && n >= 1 && n <= GIFT_MAX;
+  // Read like the chat command (functions/shared/amount.js): 25, 2k, 5qa, 2.5e40, up to a googol.
+  const n = parseAmount(amount, { positive: true }) ?? NaN;
+  const whole = n >= 1 && n <= GIFT_MAX;
   const ready = !!to && whole && !busy;
   const send = async (e) => {
     e.preventDefault();
@@ -168,11 +174,10 @@ function CoinsForm({ ask, api, roster, actor, onClose }) {
           <input
             className="input mono"
             inputMode="numeric"
-            pattern="[0-9]*"
             value={amount}
-            maxLength={4}
+            maxLength={60}
             placeholder="25"
-            onChange={(e) => setAmount(e.target.value.replace(/[^\d]/g, ''))}
+            onChange={(e) => setAmount(e.target.value.replace(/[^\d.,+a-z]/gi, ''))}
           />
         </label>
         <label className="ask-field">

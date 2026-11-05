@@ -7,6 +7,9 @@
 // the person lost, once, as a 'refund' entry in the coins ledger.
 
 import { nameKey } from './team.js';
+import { BOT, CHALLENGES, LABEL as ARCADE_LABEL } from './arcade.js';
+import { historyKey } from './coins.js';
+import { coinsText } from './coinText.js';
 
 // Results that can be reported: the casino games (not the lottery, which is
 // a pot for everyone) and the head-to-head challenge.
@@ -100,8 +103,12 @@ export function snapshotOf(m, who, rename = (n) => n) {
   };
 }
 
-// The one-per-message-per-person id of a report (and of its refund key).
+// The one-per-message-per-person id of a report.
 export const reportId = (msgId, who) => `${msgId}_${nameKey(who)}`;
+// The refund key (refundKeys/{id}): one per game card per person, shared by a
+// report's refund and the owner's Refund / Take back on the card itself, so a
+// result is put right at most once, whichever way.
+export const refundKeyId = (msgId, who) => `dispute-${msgId}-${nameKey(who)}`;
 
 // Is the loss in the person's own history (bank.recent: the latest 15
 // entries)? 'found', 'missing' (the history reaches back past the card and
@@ -117,12 +124,132 @@ export function historyCheck(recent = [], game, loss, cardAt) {
   return oldest <= cardAt ? 'missing' : 'unknown';
 }
 
-// The coins ledger entry for a refund (the market's refund entries look the same).
-export const refundEntry = (person, amount, game, disputeId, now) => ({
+// The coins ledger entry for a refund (the market's refund entries look the
+// same). game: shows it under Casino in history; reverses: the history line
+// it puts right (cardLine), so that line reads "Reversed".
+export const refundEntry = (person, amount, game, disputeId, now, reverses = '') => ({
   type: 'refund',
   person,
   amount,
   item: `dispute:${disputeId}`,
   label: `Refund: ${GAME_LABEL[game] || 'Casino'} result reviewed`.slice(0, 80),
+  game,
+  ...(reverses && { reverses }),
   at: now,
 });
+
+// ---------- the owner's Refund / Take back on a game card (3.1.1) ----------
+// Asher (the owner) can put any finished game right from its card in chat:
+// refund a loss, or take back a win, for each person in it. The amount is
+// always what the card (written by the server) shows that person's result
+// was, never a number from the app, and it happens once per card and person
+// (refundKeyId, shared with reports).
+
+// Cards with coins on them: the casino games, /challenge, the arcade's
+// head-to-head games (their bets) and heists. Prizes from the free games are
+// awards and aren't refunded here.
+export const FIXABLE = [...DISPUTABLE, ...CHALLENGES, 'heist'];
+export const gameLabel = (game) => GAME_LABEL[game] || ARCADE_LABEL[game] || 'Game';
+
+// What each person in the game ended up with, as the card shows it:
+// { final, nets: [{ name, net }] }. final: the game is over and paid out
+// (a live game's bets are held until it ends). Matches the history line each
+// person got (the `shown` of their bank entry).
+export function cardNets(cmd, by, rename = (n) => n) {
+  if (!cmd || !FIXABLE.includes(cmd.name)) return { final: false, nets: [] };
+  const g = cmd.game || {};
+  const people = (list) => [...new Set(list.filter((n) => n && n !== BOT).map(rename))].filter((n) => n && n !== BOT);
+  const bet = Math.max(0, Math.floor(g.bet || 0));
+  // A win the ceiling cut (g.capped: { name: net paid }, 3.1.4) is what was paid.
+  const cut = Object.fromEntries(Object.entries(g.capped || {}).map(([n, v]) => [rename(n), Math.max(0, Math.floor(v || 0))]));
+  const won = (name, net) => (net > 0 && name in cut ? Math.min(net, cut[name]) : net);
+  if (cmd.name === 'challenge' || CHALLENGES.includes(cmd.name)) {
+    // The winner takes the other's bet (Trotbot's house pays too); no winner
+    // (a tie, or it was declined, cancelled or ran out) gives the bets back.
+    const final = cmd.status === 'done';
+    const played = cmd.name !== 'challenge' || g.how === 'rolled';
+    const winner = final && played && g.winner ? rename(g.winner) : '';
+    return { final, nets: people([g.a, g.b]).map((name) => ({ name, net: !winner || !bet ? 0 : name === winner ? won(name, bet) : -bet })) };
+  }
+  if (cmd.name === 'heist') {
+    const final = cmd.status === 'done';
+    const each = Math.max(0, Math.floor(g.each || 0));
+    return { final, nets: people(g.crew || []).map((name) => ({ name, net: !final ? 0 : g.ok ? won(name, each - bet) : -bet })) };
+  }
+  // A casino card has `net` once the server has paid it out.
+  const final = typeof cmd.net === 'number';
+  return { final, nets: people([by]).map((name) => ({ name, net: final ? Math.floor(cmd.net) : 0 })) };
+}
+
+// The card's tag for a person (cmd.adjust[nameKey]): written by the server
+// only; the rules stop the app changing a game card's cmd.
+export const adjustOf = (cmd, who) => cmd?.adjust?.[nameKey(who)] || null;
+
+// Can the owner refund (mode 'refund') or take back ('takeback') `who`'s
+// result on this message? { problem, body } or { amount, net, game }.
+export function fixCheck(m, who, mode, rename = (n) => n) {
+  if (mode !== 'refund' && mode !== 'takeback') return { problem: 'Refund or take back?' };
+  const cmd = m?.cmd;
+  if (!m || !cmd || !FIXABLE.includes(cmd.name)) return { problem: 'That isn’t a game with coins on it.' };
+  const { final, nets } = cardNets(cmd, m.by, rename);
+  const mine = nets.find((x) => x.name === who);
+  if (!mine) return { problem: `${who} wasn’t in that game.` };
+  if (!final) return { problem: 'That game isn’t over yet.', body: 'Finish or cancel it first: bets in a game that’s still going are held until it ends.' };
+  const done = adjustOf(cmd, who);
+  if (done) return { problem: done.mode === 'takeback' ? 'That win was already taken back.' : 'That result was already refunded.' };
+  if (mode === 'refund' && !(mine.net < 0)) return { problem: 'There’s no loss to refund.', body: 'The card doesn’t show them losing coins.' };
+  if (mode === 'takeback' && !(mine.net > 0)) return { problem: 'There’s no win to take back.', body: 'The card doesn’t show them winning coins.' };
+  return { amount: Math.abs(mine.net), net: mine.net, game: cmd.name };
+}
+
+// A bank history line as the history shows it (coins.js bankItems), for its key.
+export const lineKey = (x) => historyKey({ kind: 'casino', at: x.at, amount: x.amount, label: x.label || 'Casino' });
+// How a game's history lines start ("Mines: lost 50", "Heist: caught (lost 20)").
+const linePrefix = (game) => `${game === 'heist' ? 'Heist' : gameLabel(game)}:`;
+// How long after the card was posted its result can land (a long game).
+const LINE_WINDOW = 2 * 86400000;
+
+// The person's history line for this card's result, from their bank docs'
+// recent lines (under any name they've had): the one tagged with the card
+// (3.1.1 on), or, for older lines, the closest one with the game's name, the
+// same amount and a time from the card on. { line, candidates }: candidates
+// are every untagged line it could be (to check none was reversed already).
+export function cardLine(recent = [], { conv, msgId, game, net, cardAt }) {
+  const card = `${conv}/${msgId}`;
+  const tagged = recent.find((x) => x.card === card);
+  if (tagged) return { line: tagged, candidates: [tagged] };
+  const prefix = linePrefix(game);
+  const candidates = recent
+    .filter((x) => !x.hold && !x.card && x.amount === net && String(x.label || '').startsWith(prefix))
+    .filter((x) => x.at >= cardAt - 60000 && x.at <= cardAt + LINE_WINDOW)
+    .sort((a, b) => Math.abs(a.at - cardAt) - Math.abs(b.at - cardAt));
+  return { line: candidates[0] || null, candidates };
+}
+
+// The ledger entry: a 'refund' (the type the coins math has always counted,
+// on every version of the app), positive for a refund and negative for a win
+// taken back.
+export function fixEntry({ person, mode, amount, game, msgId, by, now, reverses = '' }) {
+  const who = (by || 'Asher').split(' ')[0];
+  return {
+    type: 'refund',
+    person,
+    amount: mode === 'takeback' ? -amount : amount,
+    item: `card:${msgId}`,
+    label: (mode === 'takeback' ? `Taken back: ${gameLabel(game)} win (${who})` : `Refund: ${gameLabel(game)} (${who} refunded)`).slice(0, 80),
+    game,
+    by,
+    ...(reverses && { reverses }),
+    at: now,
+  };
+}
+
+// The tag on the card, and the person's notification.
+export const adjustTag = ({ person, mode, amount, by, now, via = 'card' }) => ({ name: person, mode, amount, by, at: now, via });
+export function fixNote({ mode, amount, game, by }) {
+  const who = (by || 'Asher').split(' ')[0];
+  const n = coinsText(amount);
+  return mode === 'takeback'
+    ? { icon: '↩️', title: `${who} took back your ${gameLabel(game)} win: −${n}`, body: 'It’s in your coin history.' }
+    : { icon: '↩️', title: `${who} refunded your ${gameLabel(game)} bet: +${n}`, body: 'It’s in your coin history.' };
+}

@@ -24,6 +24,8 @@
 //            back on the loan with a new due date).
 
 import { nameKey } from './team.js';
+import { coinsText } from './coinText.js';
+import { MAX_BALANCE } from './coins.js';
 
 export const WEEK = 7 * 86400000;
 export const DAY = 86400000;
@@ -37,8 +39,9 @@ export const STYLES = ['flat', 'weekly'];
 // A teammate's standard rate. The bank's is in the loan settings.
 export const PEER_STANDARD = { style: 'flat', rate: 10 };
 // The most anyone (a teammate or the bank) can lend at once: no real limit
-// since 3.1.3 (the same as GIFT_MAX / NO_LIMIT in shared/coins.js).
-export const PEER_MAX = 1000000000000;
+// since 3.1.3, the ceiling since 3.1.5 (a googol: MAX_BALANCE, the same as
+// GIFT_MAX / NO_LIMIT in shared/coins.js).
+export const PEER_MAX = MAX_BALANCE;
 export const LIMITS = {
   note: 200,
   // Lines kept in a loan's thread, and counters before someone has to say yes or no.
@@ -93,7 +96,7 @@ export function cleanTerms(input, { bank, cfg }) {
   const amount = int(x.amount);
   const max = bank ? cfg.bankMax : PEER_MAX;
   if (!(amount >= 1)) return { error: 'How many coins?' };
-  if (amount > max) return { error: `Up to ${max} coins${bank ? ' from the bank' : ''}.` };
+  if (amount > max) return { error: 'That’s more than a googol.' };
   const term = int(x.term);
   const allowed = bank ? cfg.terms : TERMS;
   if (!allowed.includes(term)) return { error: `Pick ${allowed.map((t) => `${t} week${t > 1 ? 's' : ''}`).join(', ')}.` };
@@ -125,7 +128,7 @@ export const leftOf = (loan, now = Date.now()) => (loan.status === 'active' ? Ma
 export function termsText(t) {
   if (!t) return '';
   const interest = t.rate === 0 ? 'no interest' : t.style === 'weekly' ? `${t.rate}% a week` : `${t.rate}% once`;
-  return `${t.amount} coins · ${interest}${t.standard ? ' (standard)' : ''} · ${t.term} week${t.term > 1 ? 's' : ''}`;
+  return `${coinsText(t.amount)} coins · ${interest}${t.standard ? ' (standard)' : ''} · ${t.term} week${t.term > 1 ? 's' : ''}`;
 }
 export const lenderName = (loan) => (loan.bank ? 'the bank' : loan.lender);
 
@@ -153,7 +156,7 @@ export function lockOf(asBorrower, balance, now = Date.now()) {
   if (owe <= 0) return null;
   return {
     owe,
-    title: `Locked: pay back ${owe.toLocaleString('en-US')} to unlock`,
+    title: `Locked: pay back ${coinsText(owe)} to unlock`,
     body: 'A loan is overdue. Betting, the Market, sending coins, lending and new loans are off until it’s paid. Coins you earn go toward it.',
   };
 }
@@ -202,8 +205,8 @@ export function lendProblem({ lender, amount, balance, theirs, lock, coinsOff, r
   if (lock) return `${lender.split(' ')[0]} has an overdue loan and can’t lend right now.`;
   if (theirs.some((l) => rename(l.borrower) === lender && LIVE.includes(l.status)))
     return `${lender.split(' ')[0]} is paying back a loan, so they can’t lend right now.`;
-  if (amount > PEER_MAX) return `Up to ${PEER_MAX} at a time.`;
-  if (amount > balance) return `${lender.split(' ')[0]} only has ${Math.max(0, balance)} coins.`;
+  if (amount > PEER_MAX) return 'That’s more than a googol.';
+  if (amount > balance) return `${lender.split(' ')[0]} only has ${coinsText(Math.max(0, balance))} coins.`;
   return '';
 }
 
@@ -261,8 +264,8 @@ export function repayCheck(loan, { role, amount, balance, now }) {
   const left = leftOf(loan, now);
   const n = int(amount);
   if (!(n >= 1)) return { error: 'Pay back at least 1 coin.' };
-  if (n > left) return { error: `You only owe ${left}.`, body: 'You can’t pay back more than that.' };
-  if (n > balance) return { error: `You only have ${Math.max(0, balance)} coins.` };
+  if (n > left) return { error: `You only owe ${coinsText(left)}.`, body: 'You can’t pay back more than that.' };
+  if (n > balance) return { error: `You only have ${coinsText(Math.max(0, balance))} coins.` };
   return { amount: n, left: left - n };
 }
 
@@ -381,9 +384,9 @@ export function lineText(line, loan) {
     case 'expire':
       return 'Nobody answered in a week, so it closed';
     case 'repay':
-      return `${who} paid back ${line.amount}`;
+      return `${who} paid back ${coinsText(line.amount)}`;
     case 'collect':
-      return `${who}, ${line.amount} was taken${line.short ? ` (${line.short} past zero)` : ''}`;
+      return `${who}, ${coinsText(line.amount)} was taken${line.short ? ` (${coinsText(line.short)} past zero)` : ''}`;
     case 'forgive':
       return `${who} forgave the rest`;
     case 'extend':

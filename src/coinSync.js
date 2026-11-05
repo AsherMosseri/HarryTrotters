@@ -4,7 +4,7 @@
 // out of date (a listener that stopped, an old copy of the app): log it once
 // with the breakdown, and let the Coins screen say so and offer a refresh.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { breakdown } from './coins.js';
+import { breakdown, coinsAgree } from './coins.js';
 
 // A coin of slack: the app counts lab time to its own minute.
 export const COIN_SLACK = 1;
@@ -27,7 +27,8 @@ export function useCoinSync(wallet) {
     const look = (final) => {
       if (id !== latest.current) return;
       const app = now.current.balance;
-      if (Math.abs(app - server) <= COIN_SLACK) return setStale(null);
+      // Past 2^53 both are approximate: within a billionth agrees (coinsAgree).
+      if (Math.abs(app - server) <= COIN_SLACK || coinsAgree(app, server)) return setStale(null);
       if (!final) {
         timers.current = [setTimeout(() => look(true), 6000)];
         return;

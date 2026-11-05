@@ -17,7 +17,9 @@ import { RACE_COUNTDOWN, RACE_PRIZE, rank, raceLimit } from './funGames.js';
 import { LEVELS } from './minesweeper.js';
 import * as challenge from './challenge.js';
 import { secureRandom } from './rng.js';
-import { holdEntry } from './casino.js';
+import { CAPPED, holdEntry } from './casino.js';
+import { capWin } from './coins.js';
+import { coinsText } from './coinText.js';
 
 export const MULTI = ['rps', 'tictactoe', 'connect4', 'duel', 'trivia', 'hangman', 'typerace', 'heist', 'battleship', 'tetris', 'minesweep', 'challenge'];
 export const CHALLENGES = ['rps', 'tictactoe', 'connect4', 'duel', 'battleship', 'tetris', 'minesweep'];
@@ -134,12 +136,43 @@ const refund = (name, amount) => (amount && name !== BOT ? [{ name, delta: amoun
 // The history line for one of a game's coin moves (casino.bankAfter): a bet
 // taken is held under the game's card id until the game's end replaces it
 // with the result; a bet given back (declined, cancelled, nobody came) ends
-// it at 0. A move with no coins (a cooldown) has no line.
-export function moneyLine(x, game, id) {
-  if (x.entry) return { ...x.entry, settles: id };
+// it at 0. A move with no coins (a cooldown) has no line. conv: the result's
+// line names its card ('conv/id'), for the owner's Reverse in coin history.
+export function moneyLine(x, game, id, conv = '') {
+  const card = conv ? { card: `${conv}/${id}` } : {};
+  if (x.entry) return { ...x.entry, settles: id, ...card };
   if (x.delta < 0) return holdEntry(ICON[game] || '🎲', LABEL[game] || 'Game', -x.delta, id);
-  if (x.delta > 0) return { icon: ICON[game] || '🎲', label: `${LABEL[game] || 'Game'}: bet back`, shown: 0, settles: id };
+  if (x.delta > 0) return { icon: ICON[game] || '🎲', label: `${LABEL[game] || 'Game'}: bet back`, shown: 0, settles: id, ...card };
   return null;
+}
+
+// Wins near the ceiling (coins.js MAX_BALANCE). Each payout in `money` that
+// would put its person over a googol is cut so they end there: their
+// balance before the game is what they have now plus the stake coming back
+// to them (delta − shown: a bet that was held). What's cut isn't paid to
+// anyone, so a pot can lose coins here but never make them. balances:
+// { name: balance now, before this money }, for everyone with a win in it
+// (anyone left out isn't checked). Money for the same person later in the
+// list counts what came before it. Returns { money, capped: { name: net } }.
+export function capMoney(money = [], balances = {}) {
+  const have = { ...balances };
+  const capped = {};
+  const out = money.map((x) => {
+    let y = x;
+    const shown = x.entry?.shown;
+    if (shown > 0 && x.delta > 0 && typeof have[x.name] === 'number') {
+      const held = x.delta - shown;
+      const net = capWin(shown, have[x.name] + held);
+      if (net < shown) {
+        const prefix = String(x.entry.label || '').split(':')[0] || 'Game';
+        y = { ...x, delta: held + net, entry: { ...x.entry, shown: net, label: `${prefix}: won ${net}${CAPPED}` } };
+        capped[x.name] = net;
+      }
+    }
+    if (typeof have[x.name] === 'number') have[x.name] += y.delta;
+    return y;
+  });
+  return { money: out, capped };
 }
 
 // A challenge's bets: the winner gets both; a tie gives both back.
@@ -326,7 +359,7 @@ export function start(
     if (them === BOT && RACES.includes(game)) return { error: `Race Trotbot from the game screen: type /${game} and pick Trotbot.` };
     const bet = betWord ? parseBet(betWord, balance) : 0;
     if (bet == null || bet < 0) return { error: 'That’s not a bet.' };
-    if (bet > balance) return { error: `You only have ${balance} coins.` };
+    if (bet > balance) return { error: `You only have ${coinsText(balance)} coins.` };
     const bot = them === BOT;
     const p = { a: me, b: them, bet, at: now, expiresAt: now + TIMES.challenge, status: bot ? 'playing' : 'open', lastAt: now };
     const secret = {};
@@ -348,8 +381,8 @@ export function start(
 
   if (game === 'heist') {
     const bet = parseBet(words[0], balance);
-    if (!bet || bet < 1) return { error: `/heist needs a bet. Try: /heist 20. You have ${balance} coins.` };
-    if (bet > balance) return { error: `You only have ${balance} coins.` };
+    if (!bet || bet < 1) return { error: `/heist needs a bet. Try: /heist 20. You have ${coinsText(balance)} coins.` };
+    if (bet > balance) return { error: `You only have ${coinsText(balance)} coins.` };
     return { pub: { status: 'open', bet, crew: [me], endsAt: now + TIMES.heist }, secret: {}, money: take(me, bet), mentions: [] };
   }
 
@@ -445,7 +478,7 @@ export function move(game, { pub, secret = {}, me, move: mv, balance = 0, now = 
       if (m === 'decline') return end('', 'declined', refund(p.a, p.bet));
       const accepting = m === 'accept' || (game === 'rps' && RPS[m]);
       if (!accepting) return { error: 'Accept the challenge first.' };
-      if (p.bet > balance) return { error: `It’s a ${p.bet} coin bet. You have ${balance}.` };
+      if (p.bet > balance) return { error: `It’s a ${coinsText(p.bet)} coin bet. You have ${coinsText(balance)}.` };
       Object.assign(p, { status: 'playing', lastAt: now });
       if (game === 'duel') startDuel(p, s, now, rng);
       if (game === 'battleship') startPlacing(p, s, now, rng);
@@ -584,7 +617,7 @@ export function move(game, { pub, secret = {}, me, move: mv, balance = 0, now = 
     if (m !== 'join') return { error: 'Join the crew?' };
     if (now >= p.endsAt) return resolve();
     if (p.crew.includes(me)) return { error: 'You’re already in.' };
-    if (p.bet > balance) return { error: `It costs ${p.bet} coins to join. You have ${balance}.` };
+    if (p.bet > balance) return { error: `It costs ${coinsText(p.bet)} coins to join. You have ${coinsText(balance)}.` };
     p.crew = [...p.crew, me];
     return out(take(me, p.bet));
   }

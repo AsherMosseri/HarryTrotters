@@ -20,8 +20,8 @@ import * as challenge from '../../functions/shared/challenge.js';
 import * as dispute from '../../functions/shared/disputes.js';
 import { blocked, isOff, serverGroup } from '../../functions/shared/commandRules.js';
 import * as coinAsk from '../../functions/shared/coinRequests.js';
-import { AWARD_CAPS, breakdown, giftEntry, groupGiftEntries, prizeEntry, teamDay, teamMidnight } from '../../functions/shared/coins.js';
-import { BOT, GROUP_MAX, groupLabel, resolveTargets } from '../../functions/shared/groups.js';
+import { AWARD_CAPS, breakdown, capWin, ceilingNote, giftEntry, overCeiling, sumCoins, groupGiftEntries, prizeEntry, teamDay, teamMidnight } from '../../functions/shared/coins.js';
+import { BOT, groupLabel, resolveTargets } from '../../functions/shared/groups.js';
 import * as fun from '../../functions/shared/funGames.js';
 import * as mines from '../../functions/shared/minesweeper.js';
 const MINE_LEVELS = mines.LEVELS;
@@ -40,6 +40,7 @@ import { demoPetPhotos } from './demoPetPhotos.js';
 import { demoLoans } from './demoLoans.js';
 import { PHOTO_ACTIONS } from '../../functions/shared/petphotos.js';
 import { earnedIds } from '../../functions/shared/events.js';
+import { coinsText } from '../../functions/shared/coinText.js';
 
 const KEY = 'ftc32313-demo-v13';
 const listeners = new Set();
@@ -957,6 +958,26 @@ events.seedSamples();
 // Loans (demoLoans.js): the same checks as functions/loans.js.
 const loans = demoLoans({ get: () => state, commit: () => commit(), uid });
 
+// Refunds on game cards (ownerRefund, disputeDecide): the person's history
+// line for the card, and the card's "Refunded by Asher" tag, like the server.
+function demoLine({ who, conv, msgId, game, net, cardAt }) {
+  const recent = (state.bank || {})[who]?.recent || [];
+  const note = (title, body = '') => ({ note: { title, body } });
+  if (recent.some((x) => x.hold === msgId)) return { problem: note('Their bet in that game is still held.', 'Finish or cancel the game first.') };
+  const { line } = dispute.cardLine(recent, { conv, msgId, game, net, cardAt });
+  if (line?.card && line.amount !== net) return { problem: note('The card and their coin history don’t match.', 'Nothing was changed. Check it by hand.') };
+  if (!line) return { reverses: '' };
+  const key = dispute.lineKey(line);
+  if ((state.coins || []).some((x) => x.reverses === key && (x.to === who || x.person === who)))
+    return { problem: note('Already reversed in their coin history.', 'That line was put right from Coins. Nothing more to do.') };
+  return { reverses: key };
+}
+function demoTag(conv, msgId, tag) {
+  const list = (state.chat || {})[conv] || [];
+  const k = personId(tag.name);
+  state.chat = { ...state.chat, [conv]: list.map((x) => (x.id === msgId ? { ...x, cmd: { ...x.cmd, adjust: { ...(x.cmd.adjust || {}), [k]: tag } } } : x)) };
+}
+
 function commit() {
   try {
     localStorage.setItem(KEY, JSON.stringify(state));
@@ -1695,17 +1716,8 @@ export const demoStore = {
     const setCard = (conv, id, fn) => {
       state.chat = { ...state.chat, [conv]: msgs(conv).map((x) => (x.id === id ? { ...x, cmd: fn(x.cmd) } : x)) };
     };
-    // My requests still waiting: one-person ones, and groups (each counts once).
-    const openOf = (who) => [
-      ...Object.values(asks).filter((r) => r.from === who && !r.group && r.status === 'open' && r.expiresAt > now),
-      ...Object.values(groups)
-        .filter((g) => g.from === who && g.expiresAt > now)
-        .map((g) => ({ id: g.id, people: g.rows.filter((x) => asks[x.id]?.status === 'open').map((x) => x.to), expiresAt: g.expiresAt }))
-        .filter((g) => g.people.length),
-    ];
-    const madeToday = (who) =>
-      Object.values(asks).filter((r) => r.from === who && !r.group && teamDay(r.at) === teamDay(now)).length +
-      Object.values(groups).filter((g) => g.from === who && teamDay(g.at) === teamDay(now)).length;
+    // No count limits since 3.1.5 (like the server): any number waiting or
+    // made in a day, the same person again, and groups as big as the team.
     // The switches /give has, where a request is made.
     const switchedOff = (conv) => {
       if (coinsOff) return note('🪙 Jackson coins are off right now.');
@@ -1732,14 +1744,12 @@ export const demoStore = {
       const label = groupLabel({ groups: gs, everyone });
       const people = resolveTargets({ groups: gs, everyone, people: named }, { roster: team, subteamsOf, me });
       if (!people.length) return note(`Nobody in ${label} to ask.`, `${label} has nobody in it besides you.`);
-      if (people.length > GROUP_MAX) return note(`That’s ${people.length} people.`, `Up to ${GROUP_MAX} at a time.`);
       const id = `g-${req.key || uid()}-${personId(me)}`;
       const was = groups[id];
       if (was) return { ok: true, id, repeat: true, asked: was.rows.length, skipped: was.skipped, reply: coinAsk.groupReply({ asked: was.rows.map((x) => x.to), skipped: was.skipped, amount: was.amount }) };
-      const open = openOf(me);
-      const { ask, skipped } = coinAsk.skipAsked(people, open, now);
-      if (!ask.length) return note(`You already asked ${skipped.length === 1 ? first(skipped[0]) : `everyone in ${label}`}.`, 'Wait for their answers, or cancel those first.');
-      const r = coinAsk.startGroupAsk({ me, people: ask, label, amount: req.amount, reason: req.reason, open, sentToday: madeToday(me), now });
+      const ask = people;
+      const skipped = [];
+      const r = coinAsk.startGroupAsk({ me, people: ask, label, amount: req.amount, reason: req.reason, now });
       if (r.error) return note(r.error, r.body);
       const pub = r.pub;
       const rows = ask.map((to, i) => ({ id: `${id}-${i}`, to, row: `r${i}` }));
@@ -1775,9 +1785,8 @@ export const demoStore = {
       if (!conv || conv === 'announcements') return note('Not here.', 'Ask in a channel or a DM.');
       const off = switchedOff(conv);
       if (off) return off;
-      const open = openOf(me);
       const to = String(req.to || '');
-      const r = coinAsk.startAsk({ me, to, amount: req.amount, reason: req.reason, roster, active: roster.includes(to), open, sentToday: madeToday(me), now });
+      const r = coinAsk.startAsk({ me, to, amount: req.amount, reason: req.reason, roster, active: roster.includes(to), now });
       if (r.error) return note(r.error, r.body);
       const dm = conv.startsWith('dm:') ? (state.dms || []).find((d) => `dm:${d.id}` === conv) : null;
       if (dm && !dm.people.includes(to)) return note(`${first(to)} isn’t in this conversation.`, 'Ask in a channel they can see, or in a DM with them.');
@@ -1813,7 +1822,8 @@ export const demoStore = {
       const pub = asks[id];
       if (!pub) return note('That request is gone.');
       const balance = mv === 'pay' && me === pub.to ? balanceOf(me) : 0;
-      const r = coinAsk.askMove({ pub, me, move: mv, balance, roster, now });
+      const toBalance = mv === 'pay' && me === pub.to && pub.from !== me ? balanceOf(pub.from) : undefined;
+      const r = coinAsk.askMove({ pub, me, move: mv, balance, toBalance, roster, now });
       if (!r.write) return r.error ? note(r.error, r.body) : { ok: true, status: pub.status, ...(r.already && { already: r.already }) };
       const { status, decidedAt, paidAt } = r.pub;
       asks[id] = { ...pub, status, decidedAt, ...(paidAt && { paidAt }) };
@@ -1936,7 +1946,11 @@ export const demoStore = {
       mines: 'Mines',
       highlow: 'High-low',
     };
-    const result = (net, g) => ({ game: g, icon: ICON[g], label: `${LABEL[g]}: ${net >= 0 ? `won ${net}` : `lost ${-net}`}` });
+    const result = (net, g, capped = false) => ({
+      game: g,
+      icon: ICON[g],
+      label: `${LABEL[g]}: ${net >= 0 ? `won ${net}` : `lost ${-net}`}${capped ? casino.CAPPED : ''}`,
+    });
     const post = (cmd, mentions = []) => {
       const m = {
         id: uid(),
@@ -1964,10 +1978,16 @@ export const demoStore = {
     if (lock) return note(lock.title, lock.body);
     // Several people's coins at once (multiplayer games).
     // card: the game and its card's id, so a held bet and its result share a history line.
+    // A win past a googol is cut (arcade.capMoney, like the server's payOut);
+    // returns { name: net paid } for the card (pub.capped).
     const payOut = (money, card) => {
-      for (const x of money)
-        setBank(x.name, casino.bankAfter(bank(x.name), x.name, x.delta, arcade.moneyLine(x, card.game, card.id), x.extra || {}, now));
+      const winners = money.filter((x) => x.delta > 0 && x.entry?.shown > 0).map((x) => x.name);
+      const { money: paid, capped } = arcade.capMoney(money, Object.fromEntries(winners.map((n) => [n, balanceOf(n)])));
+      for (const x of paid)
+        setBank(x.name, casino.bankAfter(bank(x.name), x.name, x.delta, arcade.moneyLine(x, card.game, card.id, conv), x.extra || {}, now));
+      return capped;
     };
+    const withCapped = (pub, capped) => (Object.keys(capped).length ? { ...pub, capped: { ...(pub.capped || {}), ...capped } } : pub);
 
     // A group gift (/give @Programming 10): the same rules as the server's
     // giveMany, against the demo team. A second send with the same key is
@@ -1984,25 +2004,28 @@ export const demoStore = {
       const batch = `${personId(me)}-${req.key}`;
       const before = (state.coins || []).filter((x) => x.type === 'gift' && x.batch === batch);
       const total = before.reduce((t, x) => t + x.amount, 0);
-      if (before.length) return { ok: true, repeat: true, people: before.map((x) => x.to), amount: before[0].amount, total, group: label };
+      if (before.length) return { ok: true, repeat: true, people: before.map((x) => x.to), amount: before[0].amount, total, group: label, batch };
       const made = groupGiftEntries(
         me,
         { people, amount: req.amount, note: req.note, batch, group: label },
-        { roster: team, balance: balanceOf(me), now },
+        { roster: team, balance: balanceOf(me), balances: Object.fromEntries(people.filter((n) => n !== me).map((n) => [n, balanceOf(n)])), now },
       );
       if (made.error) return note(made.error, made.body);
       for (const e of made.entries) await demoStore.addCoinTx(e);
-      return { ok: true, people, amount: made.entries[0].amount, total: made.total, group: label };
+      return { ok: true, people, amount: made.entries[0].amount, total: made.total, group: label, batch };
     }
     // Gifts and ad prizes, checked the way the server checks them.
     if (action === 'gift' || action === 'prize') {
       const entry =
         action === 'gift'
-          ? giftEntry(me, req, { roster, balance: balanceOf(me), now })
+          ? giftEntry(me, req, { roster, balance: balanceOf(me), toBalance: roster.includes(req.to) && req.to !== me ? balanceOf(req.to) : undefined, now })
           : prizeEntry(me, req, { ledger: state.coins || [], gameCap: state.settings?.ads?.games?.cap ?? 10, now });
       if (entry.error) return note(entry.error, entry.body);
-      await demoStore.addCoinTx(entry);
-      return { ok: true, entry };
+      // A /give with a key: the card keeps it, for the owner's Undo (key, not
+      // batch: batch makes a group line in the giver's history).
+      const batch = action === 'gift' && req.key ? `${personId(me)}-${req.key}` : '';
+      await demoStore.addCoinTx(batch ? { ...entry, key: batch } : entry);
+      return { ok: true, entry, ...(batch && { batch }) };
     }
 
     if (action === 'move') {
@@ -2037,9 +2060,9 @@ export const demoStore = {
         });
         if (r.error) return note(r.error);
         if (!r.write) return { ok: true, serverNow: now };
-        payOut(r.money, { game: c.name, id: msgId });
+        const capped = payOut(r.money, { game: c.name, id: msgId });
         const cut = payDemoAwards(r.awards, msgId, now);
-        const { status, ...g } = r.pub;
+        const { status, ...g } = withCapped(r.pub, capped);
         if (Object.keys(cut).length) g.paid = cut;
         if (arcade.isLive(status)) state.gameSecrets = { ...state.gameSecrets, [msgId]: r.secret };
         else delete state.gameSecrets[msgId];
@@ -2056,13 +2079,17 @@ export const demoStore = {
       const { status, ...g } = r.pub;
       const cmd = { ...c, game: g, status, bet };
       if (r.done) {
-        const net = r.payout - bet;
-        setBank(m.by, casino.bankAfter(bank(m.by), m.by, r.payout - (r.extraBet || 0), { ...result(net, c.name), shown: net, settles: msgId }, {}, now));
-        Object.assign(cmd, { payout: r.payout, net });
+        // Like the server: a win pays up to a googol at most (before: now plus the bet held).
+        const won = r.payout - bet;
+        const net = won > 0 ? capWin(won, balanceOf(m.by) + c.bet) : won;
+        const capped = net < won;
+        const label = `${LABEL[c.name]}: ${net > 0 ? `won ${net}` : net < 0 ? `lost ${-net}` : 'bet back'}${capped ? casino.CAPPED : ''}`;
+        setBank(m.by, casino.bankAfter(bank(m.by), m.by, bet + net - (r.extraBet || 0), { ...result(net, c.name), label, shown: net, settles: msgId, card: `${conv}/${msgId}` }, {}, now));
+        Object.assign(cmd, { payout: bet + net, net, ...(capped && { capped: true }) });
         delete state.gameSecrets[msgId];
       } else state.gameSecrets = { ...state.gameSecrets, [msgId]: r.secret };
       state.chat = { ...state.chat, [conv]: list.map((x) => (x.id === msgId ? { ...x, cmd } : x)) };
-      const card = { game: g, status, bet, ...(r.done && { payout: cmd.payout, net: cmd.net }) };
+      const card = { game: g, status, bet, ...(r.done && { payout: cmd.payout, net: cmd.net, ...(cmd.capped && { capped: true }) }) };
       return done({ ok: true, serverNow: now, ...(localStorage.getItem('demo-no-card') ? {} : { card }) });
     }
 
@@ -2071,6 +2098,9 @@ export const demoStore = {
     const isCasino = casino.CASINO.includes(game);
     const stop = blocked(game, serverGroup(game), conv, state.settings?.commands);
     if (stop) return { note: stop };
+    // A bet that isn't a whole number of coins ("1.2345k"), like the server.
+    const whole = casino.wholeCoinsNote(words);
+    if (whole) return note(...whole);
     // Controls, "Casino and games during shifts" off: not while you're clocked in (like the server; Asher is exempt).
     if (
       casino.shiftLocked(game) &&
@@ -2096,7 +2126,8 @@ export const demoStore = {
       if (r.error) return note(r.error);
       const { status, ...g } = r.pub;
       const m = post({ game: g, status, bet: g.bet || 0 }, r.mentions);
-      payOut(r.money, { game, id: m.id });
+      const capped = payOut(r.money, { game, id: m.id });
+      if (Object.keys(capped).length) setCard({ conv, id: m.id }, { game: withCapped(g, capped) });
       if (r.open) setBank(me, { ...bank(me), chOpen: { conv, id: m.id } });
       state.gameSecrets = { ...(state.gameSecrets || {}), [m.id]: r.secret };
       return done({ ok: true, serverNow: now });
@@ -2108,7 +2139,7 @@ export const demoStore = {
       const n = words[0] ? casino.parseBet(words[0], Math.floor(balance / casino.TICKET)) : 0;
       if (words[0] && (!n || n < 1)) return note('How many tickets?', `Tickets are ${casino.TICKET} coins. Try: /lottery 3`);
       const cost = (n || 0) * casino.TICKET;
-      if (cost > balance) return note(`That’s ${cost} coins. You have ${balance}.`);
+      if (cost > balance) return note(`That’s ${coinsText(cost)} coins. You have ${coinsText(balance)}.`);
       const tickets = { ...(lot.tickets || {}) };
       if (n) tickets[me] = (tickets[me] || 0) + n;
       const pot = (lot.pot || 0) + cost;
@@ -2127,15 +2158,17 @@ export const demoStore = {
     }
     if (isCasino) {
       const bet = casino.parseBet(words[0], balance);
-      if (!bet || bet < 1) return note(`/${game} needs a bet`, `Try: /${game} 20 (or all, half, 25%). You have ${balance} coins.`);
-      if (bet > balance) return note(`You only have ${balance} coins.`, 'Try /daily, /work, or /beg.');
+      if (!bet || bet < 1) return note(`/${game} needs a bet`, `Try: /${game} 20 (or 1k, all, half, 25%). You have ${coinsText(balance)} coins.`);
+      if (bet > balance) return note(`You only have ${coinsText(balance)} coins.`, 'Try /daily, /work, or /beg.');
       const r = casino.startGame(game, bet, words.slice(1), secureRandom, now);
       if (r.error) return note(r.error);
       const { status = 'done', ...g } = r.pub;
       if (r.done) {
-        const net = r.payout - bet;
-        setBank(me, casino.bankAfter(mine, me, net, result(net, game), {}, now));
-        post({ game: g, status, bet, payout: r.payout, net });
+        // Like the server: a win pays up to a googol at most.
+        const net = capWin(r.payout - bet, balance);
+        const capped = net < r.payout - bet;
+        const m = post({ game: g, status, bet, payout: bet + net, net, ...(capped && { capped: true }) });
+        setBank(me, casino.bankAfter(mine, me, net, { ...result(net, game, capped), card: `${conv}/${m.id}` }, {}, now));
       } else {
         const m = post({ game: g, status, bet });
         setBank(me, casino.bankAfter(mine, me, -bet, casino.holdEntry(ICON[game], LABEL[game], bet, m.id), {}, now));
@@ -2150,7 +2183,7 @@ export const demoStore = {
         people.find((n) => target.includes(n.toLowerCase())) || people.find((n) => n.toLowerCase().split(' ')[0] === target.split(' ')[0]);
       if (!them) return note('Rob who?', 'Try: /rob @name');
       if (them === me) return note('You can’t rob yourself.', 'You’d just be moving coins between pockets.');
-      const r = casino.rob(mine, balance, balanceOf(them), now);
+      const r = casino.capRob(casino.rob(mine, balance, balanceOf(them), now), balance, balanceOf(them));
       if (r.error) return note(r.error);
       setBank(
         me,
@@ -2178,7 +2211,7 @@ export const demoStore = {
         {
           ...r.card,
           to: them,
-          line: r.card.ok ? `robbed you and got away with ${r.amount} coins` : `tried to rob you and paid you a ${r.amount} coin fine`,
+          line: r.card.ok ? `robbed you and got away with ${coinsText(r.amount)} coins` : `tried to rob you and paid you a ${coinsText(r.amount)} coin fine`,
         },
         [them],
       );
@@ -2196,6 +2229,11 @@ export const demoStore = {
             })
           : casino.beg(mine, now);
     if (r.error) return note(r.error);
+    // /work and /beg pay up to a googol at most (like the server).
+    if (game !== 'daily' && capWin(r.amount, balance) < r.amount) {
+      r.amount = capWin(r.amount, balance);
+      r.card = { ...r.card, amount: r.amount, capped: true };
+    }
     const label = { daily: `Daily coins (streak ${r.card.streak})`, work: `Work: ${r.card.job}`, beg: 'Begging' }[game];
     if (game === 'daily') {
       // Like the server: an award within the 20-a-day game limit; the bank keeps the streak.
@@ -2256,7 +2294,9 @@ export const demoStore = {
     commit();
     return { ok: true, id };
   },
-  async disputeDecide(req, actor) {
+  // ctx.balanceOf (when given): the ceiling, like the server (a refund that
+  // would put them over a googol is refused).
+  async disputeDecide(req, actor, ctx = {}) {
     const now = Date.now();
     const note = (title, body = '') => ({ note: { title, body } });
     if (!actor.admin || actor.name !== REQUESTS_TO) return note(`Only ${REQUESTS_TO.split(' ')[0]} can do that.`);
@@ -2264,14 +2304,15 @@ export const demoStore = {
     const resolution = String(req.note || '').trim().slice(0, dispute.LIMITS.resolution);
     const x = (state.disputes || []).find((y) => y.id === id);
     if (!x) return note('That report is gone.');
-    if (x.status !== 'open') return note('Already handled.', x.status === 'refunded' ? `Refunded ${x.refund} coins.` : 'It was dismissed.');
+    if (x.status !== 'open') return note('Already handled.', x.status === 'refunded' ? `Refunded ${coinsText(x.refund)} coins.` : 'It was dismissed.');
     if (decision !== 'refund' && decision !== 'dismiss') return note('Refund or dismiss?');
     let refund = 0;
     if (decision === 'refund') {
       const m = ((state.chat || {})[x.conv] || []).find((y) => y.id === x.msgId);
       const keys = (state.refundKeys ||= {});
-      const key = `${x.msgId}-${x.by}`;
-      if (keys[key]) return note('That result was already refunded.');
+      // Shared with Refund / Take back on the card (ownerRefund).
+      const key = dispute.refundKeyId(x.msgId, x.by);
+      if (keys[key]) return note(keys[key].mode === 'takeback' ? 'That win was already taken back.' : 'That result was already refunded.');
       const live = m?.cmd ? dispute.cardLoss(m.cmd, x.by) : null;
       const kept = x.snapshot || {};
       refund = live ? (kept.final ? Math.min(live.loss, kept.loss || 0) : live.loss) : kept.loss || 0;
@@ -2279,16 +2320,27 @@ export const demoStore = {
         return note('There’s no loss to refund.', live && !live.final ? 'The game isn’t finished yet. Wait for it to settle, or dismiss.' : 'That card doesn’t show them losing coins.');
       const seen = dispute.historyCheck(state.bank?.[x.by]?.recent || [], x.cmd, refund, kept.cardAt || x.at);
       if (seen === 'missing') return note('I can’t find that loss in their coin history.', 'Dismiss it, or add the coins yourself as a bonus.');
-      keys[key] = now;
-      state.coins = [...(state.coins || []), { id: `dispute-${id}`, ...dispute.refundEntry(x.by, refund, x.cmd, id, now) }];
+      const link = demoLine({ who: x.by, conv: x.conv, msgId: x.msgId, game: x.cmd, net: -refund, cardAt: kept.cardAt || x.at });
+      if (link.problem) return link.problem;
+      if (ctx.balanceOf && overCeiling(ctx.balanceOf(x.by) + (ctx.paid?.[x.by] || 0), refund)) {
+        const c = ceilingNote(x.by, 'Nobody can hold more than that. Nothing was refunded.');
+        return note(c.error, c.body);
+      }
+      keys[key] = { mode: 'refund', via: 'report', at: now };
+      state.coins = [...(state.coins || []), { id: `dispute-${id}`, ...dispute.refundEntry(x.by, refund, x.cmd, id, now, link.reverses) }];
+      if (m?.cmd) demoTag(x.conv, x.msgId, dispute.adjustTag({ person: x.by, mode: 'refund', amount: refund, by: actor.name, now, via: 'report' }));
     }
     Object.assign(x, { status: decision === 'refund' ? 'refunded' : 'dismissed', handledBy: actor.name, handledAt: now, refund, resolutionNote: resolution });
+    if (req.quiet) {
+      commit();
+      return { ok: true, status: x.status, refund, x };
+    }
     state.inbox = [
       {
         id: uid(),
         type: 'dispute',
         ...(refund && { icon: '↩️' }),
-        title: refund ? `${refund} coins refunded` : 'Your report was looked at',
+        title: refund ? `${coinsText(refund)} coins refunded` : 'Your report was looked at',
         body: refund
           ? `${REQUESTS_TO.split(' ')[0]} refunded your ${dispute.GAME_LABEL[x.cmd] || 'casino'} result.${resolution ? ` ${resolution}` : ''}`
           : `${REQUESTS_TO.split(' ')[0]} kept the result as it was.${resolution ? ` ${resolution}` : ''}`,
@@ -2301,6 +2353,114 @@ export const demoStore = {
     ];
     commit();
     return { ok: true, status: x.status, refund };
+  },
+  // Refund all (the disputeRefundAll function): every waiting report, or one
+  // person's, each through disputeDecide; one notification per person.
+  async disputeRefundAll(req, actor, ctx = {}) {
+    const note = (title, body = '') => ({ note: { title, body } });
+    if (!actor.admin || actor.name !== REQUESTS_TO) return note(`Only ${REQUESTS_TO.split(' ')[0]} can do that.`);
+    const only = String(req?.person || '').trim();
+    const open = (state.disputes || []).filter((x) => x.status === 'open' && (!only || x.by === only)).sort((a, b) => a.at - b.at);
+    if (!open.length) return note(only ? `Nothing waiting from ${only.split(' ')[0]}.` : 'Nothing waiting.');
+    const paid = new Map();
+    const skipped = [];
+    let coins = 0;
+    for (const x of open) {
+      // What this run already paid each person counts toward their ceiling.
+      const sofar = Object.fromEntries([...paid].map(([n, r]) => [n, r.coins]));
+      const out = await this.disputeDecide({ id: x.id, decision: 'refund', note: req?.note, quiet: true }, actor, { ...ctx, paid: sofar });
+      if (out?.ok) {
+        const row = paid.get(x.by) || { count: 0, coins: 0, game: x.cmd };
+        row.count += 1;
+        row.coins += out.refund;
+        paid.set(x.by, row);
+        coins += out.refund;
+      } else skipped.push({ id: x.id, by: x.by, game: x.cmd || '', why: out?.note?.title || 'Skipped.' });
+    }
+    const now = Date.now();
+    const boss = REQUESTS_TO.split(' ')[0];
+    state.inbox = [
+      ...[...paid].map(([to, r]) => ({
+        id: uid(),
+        type: 'dispute',
+        icon: '↩️',
+        title: `${coinsText(r.coins)} coins refunded`,
+        body: r.count === 1 ? `${boss} refunded your ${dispute.GAME_LABEL[r.game] || 'casino'} result.` : `${boss} refunded ${r.count} of your casino reports.`,
+        open: 'disputes:',
+        at: now,
+        read: false,
+        to,
+      })),
+      ...(state.inbox || []),
+    ];
+    commit();
+    return { ok: true, refunded: [...paid.values()].reduce((n, r) => n + r.count, 0), coins, people: paid.size, skipped };
+  },
+  // The owner's Refund / Take back on a game card, checked the way the
+  // ownerRefund function checks it (shared/disputes.js): the card's own
+  // result, once per card and person (the key reports use too).
+  async ownerRefund(req, actor, ctx = {}) {
+    const now = Date.now();
+    const note = (title, body = '') => ({ note: { title, body } });
+    if (!actor.admin || actor.name !== REQUESTS_TO) return note(`Only ${REQUESTS_TO.split(' ')[0]} can do that.`);
+    const { conv, msgId, person, mode } = req || {};
+    const m = ((state.chat || {})[conv] || []).find((y) => y.id === msgId);
+    if (!m?.cmd) return note('That game is gone.');
+    // Undo on a /give card, the way the ownerRefund function does it.
+    if (mode === 'undogift') {
+      const c = m.cmd;
+      if (c.name !== 'give') return note('That gift is gone.');
+      if (!c.batch) return note('This gift can’t be undone from its card.', 'It was sent before Undo existed. Reverse it from their coin history instead.');
+      if (c.undone) return note('That gift was already undone.');
+      const boss = REQUESTS_TO.split(' ')[0];
+      const list = (state.coins || []).filter((x) => x.type === 'gift' && (x.batch === c.batch || x.key === c.batch) && x.from === m.by);
+      if (!list.length) return note('I can’t find that gift in the coin history.', 'Nothing was changed.');
+      const total = sumCoins(list);
+      // Like the server: the giver never goes past a googol.
+      if (ctx.balanceOf && overCeiling(ctx.balanceOf(m.by), total)) return note(ceilingNote(m.by).error, 'Nobody can hold more than that. Nothing was undone.');
+      state.coins = [
+        ...(state.coins || []),
+        ...list.map((x) => ({ id: `undo-${c.batch}-${personId(x.to)}`, type: 'refund', person: x.to, amount: -x.amount, label: `Gift undone by ${boss}: from ${x.from}`, at: now })),
+        { id: `undo-${c.batch}-from`, type: 'refund', person: m.by, amount: total, label: `Gift undone by ${boss}: to ${c.group || list[0].to}`, at: now },
+      ];
+      state.chat = { ...state.chat, [conv]: state.chat[conv].map((x) => (x.id === msgId ? { ...x, cmd: { ...x.cmd, undone: { by: actor.name, at: now, total, n: list.length } } } : x)) };
+      commit();
+      return { ok: true, mode: 'undogift', total, n: list.length };
+    }
+    const who = String(person || '').trim();
+    const check = dispute.fixCheck(m, who, mode);
+    if (check.problem) return note(check.problem, check.body);
+    const keys = (state.refundKeys ||= {});
+    const key = dispute.refundKeyId(msgId, who);
+    if (keys[key]) return note(keys[key].mode === 'takeback' ? 'That win was already taken back.' : 'That result was already refunded.', 'Each result is put right once.');
+    const link = demoLine({ who, conv, msgId, game: check.game, net: check.net, cardAt: m.at || 0 });
+    if (link.problem) return link.problem;
+    const amount = check.amount;
+    if (mode === 'refund' && ctx.balanceOf && overCeiling(ctx.balanceOf(who), amount)) {
+      const c = ceilingNote(who, 'Nobody can hold more than that. Nothing was refunded.');
+      return note(c.error, c.body);
+    }
+    keys[key] = { mode, via: 'card', at: now };
+    state.coins = [
+      ...(state.coins || []),
+      { id: `card-${msgId}-${personId(who)}`, ...dispute.fixEntry({ person: who, mode, amount, game: check.game, msgId, by: actor.name, now, reverses: link.reverses }) },
+    ];
+    demoTag(conv, msgId, dispute.adjustTag({ person: who, mode, amount, by: actor.name, now }));
+    const rep = (state.disputes || []).find((y) => y.id === dispute.reportId(msgId, who) && y.status === 'open');
+    if (rep)
+      Object.assign(
+        rep,
+        mode === 'refund'
+          ? { status: 'refunded', handledBy: actor.name, handledAt: now, refund: amount, resolutionNote: 'Refunded from the card in chat.', via: 'card' }
+          : { status: 'dismissed', handledBy: actor.name, handledAt: now, refund: 0, resolutionNote: 'The win was taken back.', via: 'card' },
+      );
+    if (who !== actor.name)
+      state.inbox = [
+        { id: uid(), type: 'dispute', ...dispute.fixNote({ mode, amount, game: check.game, by: actor.name }), open: `chat:${conv}`, at: now, read: false, to: who },
+        ...(state.inbox || []),
+      ];
+    commit();
+    return { ok: true, mode, amount, person: who, game: check.game };
   },
   // Tetris and Minesweeper, run here the way the funGame function runs them
   // (functions/shared/funGames.js): a game gets its seed here and its moves
@@ -2357,13 +2517,13 @@ export const demoStore = {
         s.seed = newSeed();
         if (game === 'tetris') s.level = Math.max(1, Math.min(15, Math.floor(Number(req.level)) || 1));
         else s.level = MINE_LEVELS[req.level] ? req.level : 'beginner';
-        if (mode === 'bot') s.speed = fun.SPEEDS.includes(req.speed) ? req.speed : 'medium';
+        if (mode === 'bot') Object.assign(s, fun.botPick(req));
       }
       const id = uid();
       games[id] = s;
       commit();
       const server = fun.serverRun(s);
-      return { ok: true, id, seed: server ? null : s.seed, server, mode, level: s.level, speed: s.speed, attempt: s.attempt || 0, serverNow: now };
+      return { ok: true, id, seed: server ? null : s.seed, server, mode, level: s.level, speed: s.speed, botLevel: s.botLevel || '', attempt: s.attempt || 0, serverNow: now };
     }
     const s = games[req.id];
     // A Minesweeper tournament tap, the way funGame 'sweep' plays it.
@@ -2560,7 +2720,7 @@ export const demoStore = {
     state.lottery = { pot: 0, tickets: {}, drawAt: nextFridayLocal(now + 60000), round: (lot.round || 1) + 1, last };
     const m = {
       id: uid(),
-      text: `🎟️ ${winner} won the lottery: ${lot.pot} coins!`,
+      text: `🎟️ ${winner} won the lottery: ${coinsText(lot.pot)} coins!`,
       by: 'Trotbot',
       byUid: 'trotbot',
       bot: true,

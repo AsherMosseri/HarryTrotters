@@ -6,6 +6,8 @@ import { Avatar } from './common.jsx';
 import { confirmDialog } from './Dialogs.jsx';
 import { Switch } from './Ads.jsx';
 import { Icon } from './shell/icons.jsx';
+import { onLoanForm, peekLoanForm, takeLoanForm } from '../loanCommand.js';
+import { coinStyled, withExact } from '../coinFormat.js';
 
 // Loans (3.1), a tab in the coins screen. Ask the bank (Asher answers; the
 // coins are made up, not his) or a teammate (their own coins) for coins, with
@@ -85,15 +87,41 @@ export function loanLines(loans, open) {
   if (soon && !loans.lock)
     out.push({
       tone: 'warn',
-      text: `Your loan is due ${new Date(soon.dueAt).toLocaleDateString('en-US', { weekday: 'long' })}: ${L.leftOf(soon, loans.now)} left`,
+      text: `Your loan is due ${new Date(soon.dueAt).toLocaleDateString('en-US', { weekday: 'long' })}: ${coinStyled(L.leftOf(soon, loans.now))} left`,
       go: () => open(soon.id),
     });
   return out;
 }
 
+// /loan (src/loanCommand.js): what it asked to fill in, taken once: the form
+// to open ({ mode, who, amount, rate, style, term, note }) or { pay }.
+export function useLoanPrefill() {
+  const [prefill, setPrefill] = useState(peekLoanForm);
+  useEffect(() => {
+    takeLoanForm();
+    return onLoanForm((p) => (takeLoanForm(), setPrefill(p)));
+  }, []);
+  return prefill;
+}
+
 export function LoansPanel({ loans, actor, roster, focus, onToast }) {
   const { cfg, owner, borrowing, lending, lock, now } = loans;
   const [ask, setAsk] = useState(null); // 'bank' | 'person' | null
+  // Filled in by /loan until the form closes; the person still taps Send request.
+  const prefill = useLoanPrefill();
+  const [fill, setFill] = useState(null);
+  useEffect(() => {
+    if (prefill?.mode && !lock && (cfg.on || owner) && !(owner && prefill.mode === 'bank')) {
+      setFill(prefill);
+      setAsk(prefill.mode);
+    }
+    if (prefill?.pay && !prefill.focus) document.getElementById('loans-mine')?.scrollIntoView?.({ block: 'start' });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefill]);
+  const setMode = (m) => {
+    setAsk(m);
+    if (!m) setFill(null);
+  };
   const [showPast, setShowPast] = useState(false);
   const [bankTab, setBankTab] = useState('waiting');
   const open = (l) => L.OPEN.includes(l.status);
@@ -172,12 +200,14 @@ export function LoansPanel({ loans, actor, roster, focus, onToast }) {
           <p className="muted small">Loans are off right now.</p>
         ) : ask ? (
           <AskForm
+            key={fill?.n || 0}
+            prefill={fill}
             loans={loans}
             actor={actor}
             roster={roster}
             mode={ask}
-            setMode={setAsk}
-            onDone={(text) => (setAsk(null), onToast?.(text))}
+            setMode={setMode}
+            onDone={(text) => (setMode(null), onToast?.(text))}
           />
         ) : (
           <div className="loan-ask-btns">
@@ -193,7 +223,7 @@ export function LoansPanel({ loans, actor, roster, focus, onToast }) {
         )}
       </section>
 
-      <section className="loan-sec">
+      <section className="loan-sec" id="loans-mine">
         <h3 className="loan-head">My loans</h3>
         {mine.length ? mine.map(card) : <p className="muted small">Nothing borrowed right now.</p>}
       </section>
@@ -236,7 +266,7 @@ function TermsFields({ value, onChange, bank, cfg, idPrefix }) {
         min={1}
         max={max}
         value={value.amount}
-        placeholder={`Up to ${max}`}
+        placeholder={`Up to ${coinStyled(max)}`}
         onChange={(e) => set({ amount: e.target.value })}
       />
       <span className="field-label">Interest</span>
@@ -307,11 +337,11 @@ function Preview({ value, bank, cfg, you = true }) {
   return (
     <p className="small loan-preview">
       {you ? 'You’d pay back ' : 'They’d pay back '}
-      <b className="mono">{total}</b> by <span className="mono">{DATE(due)}</span>
+      <b className="mono">{coinStyled(total)}</b> by <span className="mono">{DATE(due)}</span>
       {t.style === 'weekly' && t.term > 1 && t.rate > 0 ? (
         <span className="muted">
           {' '}
-          if it runs the whole time; <span className="mono">{oneWeek}</span> if paid back in the first week.
+          if it runs the whole time; <span className="mono">{coinStyled(oneWeek)}</span> if paid back in the first week.
         </span>
       ) : (
         '.'
@@ -321,11 +351,18 @@ function Preview({ value, bank, cfg, you = true }) {
   );
 }
 
-function AskForm({ loans, actor, roster, mode, setMode, onDone }) {
+function AskForm({ loans, actor, roster, mode, setMode, onDone, prefill }) {
   const { cfg, owner, call } = loans;
-  const [who, setWho] = useState('');
-  const [value, setValue] = useState({ amount: '', style: 'standard', rate: 10, term: cfg.terms.includes(2) ? 2 : cfg.terms[0] });
-  const [text, setText] = useState('');
+  // From /loan: what it read; anything it didn't stays as the default.
+  const p = prefill || {};
+  const [who, setWho] = useState(p.who || '');
+  const [value, setValue] = useState(() => ({
+    amount: p.amount ?? '',
+    style: p.style || (p.rate !== undefined ? L.standardOf(mode === 'bank', cfg).style : 'standard'),
+    rate: p.rate ?? 10,
+    term: p.term && (mode === 'bank' ? cfg.terms : L.TERMS).includes(p.term) ? p.term : cfg.terms.includes(2) ? 2 : cfg.terms[0],
+  }));
+  const [text, setText] = useState(p.note || '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const bank = mode === 'bank';
@@ -484,8 +521,8 @@ function LoanCard({ loan, loans, focus, onToast }) {
     // A teammate lending hands over their own coins: say so first.
     if (!asBorrower && !loan.bank) {
       const ok = await confirmDialog({
-        title: `Lend ${loan.terms.amount} coins to ${first(loan.borrower)}?`,
-        body: `They come out of your coins now and come back with interest: ${L.fullOwed(loan.terms)} by the due date.`,
+        title: `Lend ${coinStyled(loan.terms.amount)} coins to ${first(loan.borrower)}?`,
+        body: withExact(`They come out of your coins now and come back with interest: ${coinStyled(L.fullOwed(loan.terms))} by the due date.`, loan.terms.amount),
         okLabel: 'Lend',
       });
       if (!ok) return;
@@ -493,7 +530,7 @@ function LoanCard({ loan, loans, focus, onToast }) {
     run(
       'loanRespond',
       { action: 'accept' },
-      asBorrower ? 'Loan started. The coins are yours.' : `Loan started: ${loan.terms.amount} coins to ${first(loan.borrower)}.`,
+      asBorrower ? 'Loan started. The coins are yours.' : `Loan started: ${coinStyled(loan.terms.amount)} coins to ${first(loan.borrower)}.`,
     );
   };
   const forgive = async () => {
@@ -502,7 +539,7 @@ function LoanCard({ loan, loans, focus, onToast }) {
       body:
         loan.status === 'overdue'
           ? `What the due date took past zero goes back to them${loan.bank ? '' : ' from your coins'}, and they’re unlocked. It can’t be undone.`
-          : `They won’t owe the ${left} left. It can’t be undone.`,
+          : `They won’t owe the ${coinStyled(left)} left. It can’t be undone.`,
       okLabel: 'Forgive',
       danger: true,
     });
@@ -533,7 +570,11 @@ function LoanCard({ loan, loans, focus, onToast }) {
           <div>
             <span className="loan-k">{loan.status === 'overdue' ? 'Below zero' : 'Left to pay'}</span>
             <b className="mono loan-big">
-              {loan.status === 'overdue' ? Math.max(0, -(asBorrower ? balance : loans.balanceOf(loan.borrower))) : left}
+              {loan.status === 'overdue'
+                ? !asBorrower && loans.everyone === false
+                  ? '…'
+                  : coinStyled(Math.max(0, -(asBorrower ? balance : loans.balanceOf(loan.borrower))))
+                : coinStyled(left)}
             </b>
           </div>
           <div>
@@ -543,8 +584,8 @@ function LoanCard({ loan, loans, focus, onToast }) {
           <div>
             <span className="loan-k">Paid</span>
             <b className="mono">
-              {loan.paid || 0}
-              {owed ? ` of ${owed}` : ''}
+              {coinStyled(loan.paid || 0)}
+              {owed ? ` of ${coinStyled(owed)}` : ''}
             </b>
           </div>
           {loan.status === 'active' && (
@@ -645,21 +686,21 @@ function LoanCard({ loan, loans, focus, onToast }) {
             min={1}
             max={left}
             value={pay}
-            placeholder={`1 to ${left}`}
+            placeholder={`1 to ${coinStyled(left)}`}
             aria-label="Coins to pay back"
             onChange={(e) => setPay(e.target.value)}
           />
           <button
             className="btn"
             disabled={busy || n < 1 || n > left || n > balance}
-            onClick={() => run('loanRepay', { amount: n }, (r) => (r.left ? `Paid ${r.paid}. ${r.left} left.` : 'Paid off.'))}
+            onClick={() => run('loanRepay', { amount: n }, (r) => (r.left ? `Paid ${coinStyled(r.paid)}. ${coinStyled(r.left)} left.` : 'Paid off.'))}
           >
             Pay
           </button>
           <button className="btn primary" disabled={busy || left > balance} onClick={() => run('loanRepay', { amount: left }, 'Paid off.')}>
-            Pay all <span className="mono">{left}</span>
+            Pay all <span className="mono">{coinStyled(left)}</span>
           </button>
-          {(n > balance || left > balance) && <span className="muted tiny loan-have">You have {Math.max(0, balance)}.</span>}
+          {(n > balance || left > balance) && <span className="muted tiny loan-have">You have {coinStyled(Math.max(0, balance))}.</span>}
         </div>
       )}
 

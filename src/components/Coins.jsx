@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { GIFT_MAX, leaderboard, perHourOf, teamDay, teamMidnight, wallet as walletOf } from '../coins.js';
+import { GIFT_MAX, MAX_BALANCE, ceilingNote, leaderboard, overCeiling, perHourOf, teamDay, teamMidnight, wallet as walletOf } from '../coins.js';
 import { mondayOf } from '../milestones.js';
 import { relTime, useEscape } from '../util.js';
 import { Avatar, CloseIcon, Overlay } from './common.jsx';
@@ -7,6 +7,8 @@ import { Icon } from './shell/icons.jsx';
 import { CompareWithServer, EveryoneCoins, ReversedTag, StaleBanner, reverseProps, useReverse } from './CoinsEveryone.jsx';
 import { MyReports } from './Disputes.jsx';
 import { LoansPanel } from './Loans.jsx';
+import { CoinNum, useCoinFormat } from './CoinNum.jsx';
+import { coinStyled } from '../coinFormat.js';
 
 // A Jackson coin: a little gold coin with a J.
 export const Coin = ({ size = 16 }) => (
@@ -14,10 +16,12 @@ export const Coin = ({ size = 16 }) => (
     J
   </span>
 );
-export const Coins = ({ n, size }) => (
+// The number follows Appearance → Coin numbers (coinFormat.js); `exact`
+// always writes it in full with commas (what was just sent or paid).
+export const Coins = ({ n, size, exact = false, max = 0 }) => (
   <span className="jcoins">
     <Coin size={size} />
-    {Number(n || 0).toLocaleString()}
+    {exact ? coinStyled(n) : <CoinNum n={n} max={max} />}
   </span>
 );
 
@@ -25,11 +29,12 @@ const WHO = (n) => n.split(' ')[0];
 // The exact day and time of a history line (casino lines come in quick runs).
 const whenAt = (at) => new Date(at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
-export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onMarket, onClose, isManager = false, onCheck, stale, onRefresh, disputes = [], initialTab = 'wallet', onAdjust, loans = null, loanFocus = null, onToast }) {
+export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onMarket, onClose, isManager = false, onCheck, stale, onRefresh, disputes = [], initialTab = 'wallet', onAdjust, onFix, loans = null, loanFocus = null, onToast, everyone = true }) {
   useEscape(onClose);
+  const f = useCoinFormat();
   const [tab, setTab] = useState(initialTab);
   // The owner can reverse a line of their own history (CoinsEveryone.jsx useReverse).
-  const rev = useReverse(actor.name, wallet.history, onAdjust);
+  const rev = useReverse(actor.name, wallet.history, onAdjust, onFix);
   // Opened again from a notification while it's already open.
   useEffect(() => setTab(initialTab), [initialTab]);
   const [range, setRange] = useState('week');
@@ -72,10 +77,11 @@ export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onMarket
           <div className="coins-balance">
             <span className="muted small">Your balance</span>
             <b>
-              <Coins n={wallet.balance} size={30} />
+              {/* Up to 13 characters (9,999,999,999,999): a bigger balance is written short. */}
+              <Coins n={wallet.balance} size={30} max={13} />
             </b>
             <span className="muted small">
-              {cfg.perTask} for each task you finish (up to {cfg.tasksPerDay} a day) · {perHourOf(cfg)} an hour at the lab, paid per
+              {f.n(cfg.perTask)} for each task you finish (up to {cfg.tasksPerDay} a day) · {f.n(perHourOf(cfg))} an hour at the lab, paid per
               15 minutes
             </span>
             {onMarket && (
@@ -118,7 +124,11 @@ export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onMarket
           </div>
           <StaleBanner stale={stale} onRefresh={onRefresh} />
           <div className="coins-body">
-            {tab === 'everyone' && isManager && onCheck && <EveryoneCoins roster={roster} data={data} cfg={cfg} onCheck={onCheck} onAdjust={onAdjust} />}
+            {/* everyone: everyone's coins have loaded (only yours load until this screen opens). */}
+            {tab === 'everyone' &&
+              isManager &&
+              onCheck &&
+              (everyone ? <EveryoneCoins roster={roster} data={data} cfg={cfg} onCheck={onCheck} onAdjust={onAdjust} onFix={onFix} /> : <p className="empty">Loading everyone’s coins…</p>)}
             {tab === 'wallet' && onAdjust && wallet.history.length > 0 && (
               <p className="muted tiny cv-rev-hint">Tap a line to reverse it: a loss is refunded, a gain is taken away.</p>
             )}
@@ -136,7 +146,7 @@ export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onMarket
                       </span>
                       <span className="grow">
                         <span className="coins-label">
-                          {x.label} <ReversedTag rev={rev} x={x} />
+                          {f.label(x.label)} <ReversedTag rev={rev} x={x} />
                         </span>
                         <span className="muted tiny">
                           {relTime(x.at)} · <span className="mono">{whenAt(x.at)}</span>
@@ -144,10 +154,7 @@ export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onMarket
                           {x.note ? ` · ${x.note}` : ''}
                         </span>
                       </span>
-                      <b className={x.amount < 0 ? 'coins-minus' : x.amount > 0 ? 'coins-plus' : 'muted'}>
-                        {x.amount > 0 ? '+' : x.amount < 0 ? '−' : ''}
-                        {Math.abs(x.amount)}
-                      </b>
+                      <CoinNum as="b" signed n={x.amount} className={x.amount < 0 ? 'coins-minus' : x.amount > 0 ? 'coins-plus' : 'muted'} />
                     </li>
                   ))}
                 </ul>
@@ -163,7 +170,7 @@ export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onMarket
                     ✓
                   </div>
                   <h3>
-                    Sent <Coins n={sent.amount} /> to {WHO(sent.to)}
+                    Sent <Coins n={sent.amount} exact /> to {WHO(sent.to)}
                   </h3>
                   <button
                     className="btn"
@@ -195,7 +202,7 @@ export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onMarket
                     min={1}
                     max={wallet.balance}
                     value={amount}
-                    placeholder={`Up to ${wallet.balance}`}
+                    placeholder={`Up to ${f.n(wallet.balance)}`}
                     onChange={(e) => setAmount(e.target.value)}
                     aria-label="How many coins"
                   />
@@ -210,9 +217,9 @@ export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onMarket
                   <span />
                   <div className="row gap">
                     {n > wallet.balance ? (
-                      <span className="danger small">You only have {wallet.balance}.</span>
+                      <span className="danger small">You only have {f.exact(wallet.balance)}.</span>
                     ) : n > GIFT_MAX ? (
-                      <span className="danger small">Up to {GIFT_MAX} at a time.</span>
+                      <span className="danger small">That’s more than a googol.</span>
                     ) : (
                       sendError && <span className="danger small">{sendError}</span>
                     )}
@@ -272,16 +279,20 @@ export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onMarket
                     ))}
                   </div>
                 )}
-                <ol className="coins-board">
-                  {board.map((r, i) => (
-                    <li key={r.name} className={r.name === actor.name ? 'me' : ''}>
-                      <span className={`coins-rank${i < 3 ? ` top top-${i + 1}` : ''}`}>{i + 1}</span>
-                      <Avatar name={r.name} size={28} />
-                      <span className="grow">{r.name}</span>
-                      <Coins n={r.coins} />
-                    </li>
-                  ))}
-                </ol>
+                {everyone ? (
+                  <ol className="coins-board">
+                    {board.map((r, i) => (
+                      <li key={r.name} className={r.name === actor.name ? 'me' : ''}>
+                        <span className={`coins-rank${i < 3 ? ` top top-${i + 1}` : ''}`}>{i + 1}</span>
+                        <Avatar name={r.name} size={28} />
+                        <span className="grow">{r.name}</span>
+                        <Coins n={r.coins} />
+                      </li>
+                    ))}
+                  </ol>
+                ) : (
+                  <p className="empty">Loading everyone’s coins…</p>
+                )}
                 <p className="muted tiny">
                   {kind === 'coins'
                     ? 'Everyone’s balance right now: everything earned, won, given, and spent.'
@@ -298,10 +309,19 @@ export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onMarket
 
 // Asher's coin controls (a tab on the Ads page).
 export function CoinsAdmin({ cfg, setCfg, roster, balances, onGrant, ledger, onUndo }) {
+  const f = useCoinFormat();
   const [who, setWho] = useState('');
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
+  const [msg, setMsg] = useState('');
   const num = (v) => Math.max(0, Math.floor(Number(v) || 0));
+  // Nobody goes over a googol (MAX_BALANCE): a grant, or undoing a
+  // take-away, that would put them over isn't written. '' when it's fine.
+  const overNote = (to, amount) => {
+    if (!overCeiling(balances[to] ?? 0, amount)) return '';
+    const c = ceilingNote(to);
+    return `${c.error} ${c.body}`;
+  };
   // At least 1 (the ledger won't take a free purchase).
   const setPrice = (k, v) => setCfg({ ...cfg, prices: { ...cfg.prices, [k]: Math.max(1, num(v)) } });
   const grants = ledger.filter((x) => x.type === 'grant').sort((a, b) => b.at - a.at);
@@ -330,7 +350,7 @@ export function CoinsAdmin({ cfg, setCfg, roster, balances, onGrant, ledger, onU
         'Coins per 15 minutes at the lab',
         cfg.perQuarter,
         (v) => setCfg({ ...cfg, perQuarter: num(v) }),
-        `Paid for each full 15 minutes of a day’s lab time: ${perHourOf(cfg)} an hour.`,
+        `Paid for each full 15 minutes of a day’s lab time: ${f.n(perHourOf(cfg))} an hour.`,
       )}
       {field('Most hours counted a day', cfg.dayCap, (v) => setCfg({ ...cfg, dayCap: Math.max(1, num(v)) }))}
       {field(
@@ -351,7 +371,7 @@ export function CoinsAdmin({ cfg, setCfg, roster, balances, onGrant, ledger, onU
           <option value="">Who…</option>
           {roster.map((x) => (
             <option key={x} value={x}>
-              {x} ({balances[x] ?? 0})
+              {x} ({f.n(balances[x] ?? 0)})
             </option>
           ))}
         </select>
@@ -373,8 +393,11 @@ export function CoinsAdmin({ cfg, setCfg, roster, balances, onGrant, ledger, onU
         />
         <button
           className="btn primary"
-          disabled={!who || !n}
+          disabled={!who || !n || !(Math.abs(n) <= MAX_BALANCE)}
           onClick={() => {
+            const over = overNote(who, n);
+            setMsg(over);
+            if (over) return;
             onGrant({ to: who, amount: n, note: note.trim() });
             setAmount('');
             setNote('');
@@ -383,6 +406,7 @@ export function CoinsAdmin({ cfg, setCfg, roster, balances, onGrant, ledger, onU
           {n < 0 ? 'Take' : 'Give'}
         </button>
       </div>
+      {msg && <p className="muted small">{msg}</p>}
       {grants.length > 0 && (
         <ul className="coins-history">
           {grants.slice(0, 20).map((g) => (
@@ -395,11 +419,15 @@ export function CoinsAdmin({ cfg, setCfg, roster, balances, onGrant, ledger, onU
                 </span>
                 <span className="muted tiny">{relTime(g.at)}</span>
               </span>
-              <b className={g.amount < 0 ? 'coins-minus' : 'coins-plus'}>
-                {g.amount > 0 ? '+' : '−'}
-                {Math.abs(g.amount)}
-              </b>
-              <button className="link-btn small" onClick={() => onUndo(g)}>
+              <CoinNum as="b" signed n={g.amount} className={g.amount < 0 ? 'coins-minus' : 'coins-plus'} />
+              <button
+                className="link-btn small"
+                onClick={() => {
+                  const over = overNote(g.to, -g.amount);
+                  setMsg(over);
+                  if (!over) onUndo(g);
+                }}
+              >
                 Undo
               </button>
             </li>
