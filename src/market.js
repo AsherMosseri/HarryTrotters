@@ -147,20 +147,24 @@ export function useMarketData(store, { actor, rename, renames, shifts, balanceOf
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [unseenKey]);
 
-  // Your pet grew a level since this device last saw it: a celebration.
-  const mine = petOf(actor.name);
-  const level = mine?.st.level || 0;
-  const petKey = mine ? `pet-level-${mine.pet.adoptedAt}` : '';
+  // One of your pets grew a level since this device last saw it: a celebration.
+  const minePets = petsOf(actor.name);
+  const levelKey = minePets.map((e) => `${e.pet.adoptedAt}:${e.st.level}`).join();
   useEffect(() => {
-    if (!petKey || !level || actor.preview) return;
-    const seen = readNum(petKey);
-    if (seen && level > seen) {
-      celebrate();
-      toast.current?.(`${mine.pet.name} grew to level ${level}!`);
+    if (!levelKey || actor.preview) return;
+    const grew = [];
+    for (const { pet, st } of minePets) {
+      const key = `pet-level-${pet.adoptedAt}`;
+      const seen = readNum(key);
+      if (seen && st.level > seen) grew.push(`${pet.name} grew to level ${st.level}!`);
+      if (st.level !== seen) saveNum(key, st.level);
     }
-    if (level !== seen) saveNum(petKey, level);
+    if (grew.length) {
+      celebrate();
+      toast.current?.(grew.join(' '));
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [petKey, level]);
+  }, [levelKey]);
 
   const balanceRef = useRef(balanceOf);
   balanceRef.current = balanceOf;

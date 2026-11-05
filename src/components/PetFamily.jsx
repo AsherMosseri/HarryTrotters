@@ -5,6 +5,8 @@ import {
   FULL,
   GEAR,
   GEAR_SLOTS,
+  GROW_LEVEL,
+  RINGS,
   SPECIES,
   cleanGear,
   hatchBlock,
@@ -12,6 +14,7 @@ import {
   moodLine,
   nextUnlock,
   ringOf,
+  roomBlock,
   stageOf,
   titleOf,
   unlockedGear,
@@ -22,7 +25,7 @@ import { useEscape } from '../util.js';
 import { Avatar, CloseIcon, Overlay } from './common.jsx';
 import { Coins } from './Coins.jsx';
 import { alertDialog, confirmDialog, promptDialog } from './Dialogs.jsx';
-import { AdoptPet, Meter, nextLevelLine } from './Pet.jsx';
+import { AdoptPet, FavoriteFood, Meter, nextLevelLine } from './Pet.jsx';
 import { RequestPetLink } from './PetRequest.jsx';
 import { PetWithGear } from './PetGear.jsx';
 import { EventsAdmin, ParkSection } from './PetPark.jsx';
@@ -39,8 +42,8 @@ import { Icon } from './shell/icons.jsx';
 const first = (n = '') => n.split(' ')[0];
 const said = (r) => [r?.note?.title, r?.note?.body].filter(Boolean).join(' ');
 const speciesName = (id) => SPECIES.find((s) => s.id === id)?.name || id;
-const RING_NAME = { bronze: 'Bronze ring', silver: 'Silver ring', gold: 'Gold ring' };
-const SLOT_NAME = { ...Object.fromEntries(GEAR_SLOTS.map((s) => [s.id, s.name])), ring: 'Chat ring', baby: 'Baby' };
+const RING_NAME = Object.fromEntries(RINGS.map((r) => [r.id, r.name]));
+const SLOT_NAME = { ...Object.fromEntries(GEAR_SLOTS.map((s) => [s.id, s.name])), ring: 'Chat ring', baby: 'Baby', room: 'Pets' };
 // Soft swatches for the fur tints (the pet itself is tinted with CSS).
 const SWATCH = { sunset: 'linear-gradient(135deg, #ffb36b, #f0627f)', midnight: 'linear-gradient(135deg, #5a6bd8, #1c2552)', crimson: 'linear-gradient(135deg, #f0707a, #8c1530)', golden: 'linear-gradient(135deg, #ffe27a, #d9a21b)' };
 
@@ -55,6 +58,10 @@ export function PetsShelf({ actor, balance, buy, busy, onToast, roster = [] }) {
   const [games, setGames] = useState(null);
   const level = Math.max(1, ...list.map((e) => e.st.level));
   const target = list.find((e) => e.pet.adoptedAt === careFor) || list[0];
+  // Another pet (adopted, a baby or a gift) once every pet you have is level 5.
+  const levels = list.map((e) => ({ name: e.pet.name, level: e.st.level }));
+  const room = roomBlock(levels);
+  const [adopting, setAdopting] = useState(false);
 
   return (
     <>
@@ -89,7 +96,9 @@ export function PetsShelf({ actor, balance, buy, busy, onToast, roster = [] }) {
         <section className="mk-sec">
           <div className="sec-head">
             <h2>Your pets</h2>
-            <span className="muted tiny mono">{list.length}/2</span>
+            <span className="muted tiny">
+              <span className="mono">{list.length}</span> {list.length === 1 ? 'pet' : 'pets'}
+            </span>
           </div>
           <div className="pf-pets">
             {list.map((e, i) => (
@@ -97,7 +106,7 @@ export function PetsShelf({ actor, balance, buy, busy, onToast, roster = [] }) {
                 key={e.pet.adoptedAt}
                 entry={e}
                 lead={i === 0}
-                count={list.length}
+                levels={levels}
                 roster={roster}
                 actor={actor}
                 offered={outgoing.find((g) => g.pet?.adoptedAt === e.pet.adoptedAt)}
@@ -106,7 +115,8 @@ export function PetsShelf({ actor, balance, buy, busy, onToast, roster = [] }) {
               />
             ))}
           </div>
-          <RequestPetLink />
+          <MorePets levels={levels} room={room} adopting={adopting} setAdopting={setAdopting} />
+          {!adopting && <RequestPetLink />}
         </section>
       )}
 
@@ -192,7 +202,7 @@ export function PetsShelf({ actor, balance, buy, busy, onToast, roster = [] }) {
 }
 
 // ---------- one of your pets ----------
-function OwnedPet({ entry, lead, count, roster, actor, offered, onToast, onPlay }) {
+function OwnedPet({ entry, lead, levels, roster, actor, offered, onToast, onPlay }) {
   const market = useMarket();
   const { pet, st } = entry;
   const card = useRef(null);
@@ -211,7 +221,7 @@ function OwnedPet({ entry, lead, count, roster, actor, offered, onToast, onPlay 
   const gear = cleanGear(pet.gear);
 
   const meetBaby = async () => {
-    const block = hatchBlock(pet, st.level, count);
+    const block = hatchBlock(pet, st.level, levels);
     if (block) return alertDialog({ title: block.note.title, body: block.note.body });
     const n = await promptDialog({
       title: `Meet ${pet.name}’s baby`,
@@ -247,6 +257,7 @@ function OwnedPet({ entry, lead, count, roster, actor, offered, onToast, onPlay 
           {ring && <span className={`pf-ring-chip ring-${ring}`}>{RING_NAME[ring]}</span>}
         </p>
         <p className="pet-mood">{moodLine(pet.name, st)}</p>
+        <FavoriteFood species={pet.species} />
         <div className="pet-xp" title={nextLevelLine(st)}>
           <span style={{ transform: `scaleX(${Math.max(0.02, st.progress)})` }} />
         </div>
@@ -315,7 +326,9 @@ function OwnedPet({ entry, lead, count, roster, actor, offered, onToast, onPlay 
             onClick={async () => {
               const ok = await confirmDialog({
                 title: `Rehome ${pet.name}?`,
-                body: `${pet.name} goes to a good home. Its level doesn’t come back. To keep it going, give it to a teammate instead.`,
+                body: `${pet.name} goes to a good home. Its level doesn’t come back. To keep it going, give it to a teammate instead.${
+                  levels.length > 1 ? ' Your other pets stay with you.' : ''
+                }`,
                 okLabel: 'Rehome',
                 danger: true,
               });
@@ -568,13 +581,60 @@ function GivePicker({ pet, roster, onPick, onClose }) {
   );
 }
 
-// ---------- on a profile: the second pet, small ----------
+// ---------- room for another pet ----------
+// Under your pets: adopt another once every pet is level 5 (a baby or a
+// gift needs the same room), or what's still to grow.
+function MorePets({ levels, room, adopting, setAdopting }) {
+  if (room) {
+    const young = levels.filter((p) => p.level < GROW_LEVEL);
+    return (
+      <p className="pf-next tiny pf-room">
+        <Icon name="lock" size={13} />
+        {young.length ? (
+          <span>
+            Another pet when every pet you have is level <span className="mono">{GROW_LEVEL}</span>:{' '}
+            {young.map((p, i) => (
+              <span key={i}>
+                {i ? ', ' : ''}
+                {p.name} is <span className="mono">{p.level}</span>
+              </span>
+            ))}
+            .
+          </span>
+        ) : (
+          <span>{room.note.title} {room.note.body}</span>
+        )}
+      </p>
+    );
+  }
+  if (!adopting)
+    return (
+      <div className="pf-room">
+        <button className="btn small" onClick={() => setAdopting(true)}>
+          <Icon name="plus" size={16} /> Adopt another pet
+        </button>
+      </div>
+    );
+  return (
+    <div className="pf-room pf-adopt-more">
+      <div className="sec-head">
+        <h3>Adopt another pet</h3>
+        <button className="link-btn small" onClick={() => setAdopting(false)}>
+          Not now
+        </button>
+      </div>
+      <AdoptPet more onDone={() => setAdopting(false)} />
+    </div>
+  );
+}
+
+// ---------- on a profile: the pets after the first, small ----------
 export function PetExtras({ name }) {
   const market = useMarket();
   const rest = (market?.petsOf(name) || []).slice(1);
   if (!rest.length) return null;
   return (
-    <>
+    <div className="pf-minis">
       {rest.map(({ pet, st }) => (
         <div key={pet.adoptedAt} className="pet-card pf-mini">
           <PetWithGear species={pet.species} mood={st.mood} stage={st.stage} size={56} title={`${pet.name} the ${pet.species}`} gear={pet.gear} />
@@ -589,7 +649,7 @@ export function PetExtras({ name }) {
           </div>
         </div>
       ))}
-    </>
+    </div>
   );
 }
 

@@ -25,7 +25,7 @@ import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { logger } from 'firebase-functions';
 import { FieldPath, FieldValue } from 'firebase-admin/firestore';
 import * as market from './shared/market.js';
-import { petsIn } from './shared/pets.js';
+import { petsIn, withPet } from './shared/pets.js';
 import { petFamily } from './petfamily.js';
 import { petPhotos } from './petphotos.js';
 import { petGames } from './petgames.js';
@@ -124,9 +124,8 @@ export function marketFunctions({ db, coinData, freshCoins, notify, bankRef, per
         purchaseId = ref.id;
         tx.set(ref, r.purchase);
       }
-      if (r.pet && at === 1)
-        tx.update(pet.ref, { person: me, 'extra.food': r.pet.food, 'extra.fun': r.pet.fun, 'extra.cared': (pets[1].cared || 0) + 1, 'extra.caredAt': now });
-      else if (r.pet) tx.update(pet.ref, { ...r.pet, person: me, cared: (pets[0].cared || 0) + 1, caredAt: now });
+      // The whole doc again (it was read in this transaction), with the one pet fed.
+      if (r.pet) tx.set(pet.ref, withPet({ ...pet.snap.data(), person: me }, at, { ...r.pet, cared: (pets[at].cared || 0) + 1, caredAt: now }));
       return { ok: true, price: r.price, purchase: r.purchase ? { id: purchaseId, ...r.purchase } : null, pet: r.pet || null };
     });
     // A perk: tell team management (after the sale, outside the transaction).

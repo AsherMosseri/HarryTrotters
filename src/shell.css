@@ -2086,7 +2086,7 @@ button.pm-row:hover { background: color-mix(in srgb, var(--text) 4%, transparent
 .adopt-tile.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
 .adopt-row { display: flex; gap: 10px; }
 .adopt-grid > .adopt-tile { min-width: 0; }
-/* How the species tiles are laid out: see "Pets: the gem" at the end. */
+/* How the species tiles are laid out: see "Adopt a pet: 17 species" at the end. */
 
 /* The team robot on Today. */
 .mascot-energy { font-size: 13px; font-weight: 700; }
@@ -3521,6 +3521,13 @@ button.pm-row:hover { background: color-mix(in srgb, var(--text) 4%, transparent
    things" on (transform only, fixed keyframes, for iPads). */
 .pet-geared { position: relative; display: inline-block; flex: none; line-height: 0; }
 .pet-geared > .pet-gear { position: absolute; left: 0; top: 0; pointer-events: none; }
+/* A pet in an outfit is drawn in layers (PetGear.jsx): body, outfit, head, all in the same box. */
+.pet-geared > .pet-layer { position: absolute; left: 0; top: 0; }
+/* Star-nosed mole: its star wiggles now and then. */
+.pet-art .pet-star { transform-box: fill-box; transform-origin: 50% 50%; }
+:root[data-anim~='move'] .pet-art.anim .pet-star { animation: pet-star 3.8s ease-in-out infinite; }
+@keyframes pet-star { 0%, 82%, 100% { transform: scale(1) rotate(0deg); } 86% { transform: scale(1.1) rotate(-6deg); } 90% { transform: scale(0.96) rotate(5deg); } 94% { transform: scale(1.05) rotate(-2deg); } }
+:root[data-anim~='move'] .park .pet-art.anim .pet-star { animation-delay: var(--pd, 0s) !important; }
 :root[data-anim~='move'] .gear-halo { animation: gear-halo 3.4s ease-in-out infinite; }
 @keyframes gear-halo { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-1.4px); } }
 /* Fur tints: a soft color filter on the pet art only (never on the gear). */
@@ -3539,6 +3546,23 @@ button.pm-row:hover { background: color-mix(in srgb, var(--text) 4%, transparent
 .pf-ring-chip.ring-bronze { --ring: #c9803a; }
 .pf-ring-chip.ring-silver { --ring: #aeb7c4; }
 .pf-ring-chip.ring-gold { --ring: #f2b82e; }
+/* Rings past 30 (3.2): platinum at 50, diamond at 75, and red, white and blue at 100. */
+.pet-badge.ring-platinum, .pet-badge.ring-diamond, .pet-badge.ring-allstar { padding: 1px; border-radius: 50%; margin-left: 4px; }
+.pet-badge.ring-platinum { box-shadow: 0 0 0 1.5px #c7d2de, 0 0 0 3px color-mix(in srgb, #8fa3b8 45%, transparent); }
+.pet-badge.ring-diamond { box-shadow: 0 0 0 1.5px #7fdcf5, 0 0 0 3px color-mix(in srgb, #c4b5fd 55%, transparent); }
+.pet-badge.ring-allstar { margin-left: 5px; box-shadow: 0 0 0 1.3px #d62839, 0 0 0 2.4px #ffffff, 0 0 0 3.6px #1f3f99; }
+.pf-ring-chip.ring-platinum { --ring: #9fb0c2; }
+.pf-ring-chip.ring-diamond { --ring: #5ccfee; }
+.pf-ring-chip.ring-allstar { box-shadow: inset 0 0 0 1.5px #d62839, inset 0 0 0 2.6px #ffffff, inset 0 0 0 3.8px #1f3f99; padding: 2px 10px; }
+.pf-food { margin-top: -2px !important; }
+.pf-room { margin-top: 14px; }
+p.pf-room { align-items: flex-start; }
+p.pf-room .icon { margin-top: 1px; }
+.pf-adopt-more { padding-top: 12px; border-top: 1px solid var(--border); }
+.pf-adopt-more .sec-head { margin-bottom: 10px; }
+.pf-adopt-more h3 { margin: 0; font-size: 16px; }
+.pf-minis { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; margin-top: 8px; }
+.pf-minis .pf-mini { margin-top: 0; }
 .pf-pets { display: flex; flex-direction: column; gap: 14px; }
 .pf-next { display: flex; align-items: center; gap: 6px; color: var(--muted); }
 .pf-next .icon { flex: none; }
@@ -4840,25 +4864,29 @@ html.kb-open .report-note { min-height: 56px; }
 :root[data-anim~='move'] .park .pet-art.anim .pet-glint.g3 { animation-delay: calc(var(--pd, 0s) - 1.1s) !important; }
 :root[data-anim~='move'] .park .pet-art.anim .pet-glint.g4 { animation-delay: calc(var(--pd, 0s) - 2.6s) !important; }
 
-/* Adopt a pet: 13 species in balanced rows, by the room the list really has
-   (the sidebar takes part of an iPad): 7 + 6 on a wide iPad, 4 + 5 + 4 on a
-   narrow one, and 3 + 2 + 3 + 2 + 3 on a phone. Each tile spans two half
-   columns, so a shorter row can start half a tile in and sit centered. */
+/* Adopt a pet: 17 species in balanced rows, by the room the list really has
+   (the sidebar takes part of an iPad): 6 + 5 + 6 on a wide iPad, 4 + 5 + 4 + 4
+   on a narrow one, and five rows of 3 and a centered 2 on a phone. Each tile
+   spans two half columns, so a shorter row can start half a tile in and sit
+   centered. */
 .adopt { container-type: inline-size; }
 .adopt-grid { grid-template-columns: repeat(6, 1fr); }
-.adopt-grid > .adopt-tile { grid-column: span 2; }
-.adopt-grid > .adopt-tile:nth-child(5n + 4) { grid-column: 2 / span 2; }
+.adopt-grid > .adopt-tile { grid-column: span 2; text-align: center; line-height: 1.2; }
+.adopt-grid > .adopt-tile:nth-child(16) { grid-column: 2 / span 2; }
 @container (min-width: 460px) {
   .adopt-grid { grid-template-columns: repeat(10, 1fr); }
-  .adopt-grid > .adopt-tile:nth-child(5n + 4) { grid-column: span 2; }
+  .adopt-grid > .adopt-tile:nth-child(16) { grid-column: span 2; }
   .adopt-grid > .adopt-tile:nth-child(1),
-  .adopt-grid > .adopt-tile:nth-child(10) { grid-column: 2 / span 2; }
+  .adopt-grid > .adopt-tile:nth-child(10),
+  .adopt-grid > .adopt-tile:nth-child(14) { grid-column: 2 / span 2; }
 }
 @container (min-width: 690px) {
   .adopt-grid { grid-template-columns: repeat(14, 1fr); }
+  .adopt-grid > .adopt-tile:nth-child(10),
+  .adopt-grid > .adopt-tile:nth-child(14) { grid-column: span 2; }
   .adopt-grid > .adopt-tile:nth-child(1),
-  .adopt-grid > .adopt-tile:nth-child(10) { grid-column: span 2; }
-  .adopt-grid > .adopt-tile:nth-child(8) { grid-column: 2 / span 2; }
+  .adopt-grid > .adopt-tile:nth-child(12) { grid-column: 2 / span 2; }
+  .adopt-grid > .adopt-tile:nth-child(7) { grid-column: 3 / span 2; }
 }
 
 /* ===================================================================

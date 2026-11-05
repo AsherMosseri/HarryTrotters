@@ -44,6 +44,26 @@ const LOOK = {
   chicken: { body: '#f6ecd6', dark: '#e9a95c', light: '#fffaf0', shade: '#ead3a6', belly: '#fffbf0', inner: '#e0483c', nose: '#f2a31e', line: '#c9a272', comb: '#e44a3c', combLine: '#a8302a', leg: '#f08a24', legLine: '#c4661a', wing: '#f0d3a0' },
   // A pale mint pear-cut gem (green amethyst): seafoam facets from deep to near-white, a lighter table.
   gem: { body: '#a3e2c6', dark: '#3f9e80', light: '#effdf6', shade: '#6cc6a4', belly: '#dcf8ea', inner: '#ff9fb2', nose: INK, line: '#3c937a', deep: '#47a888', table: '#d4f6e6' },
+  // A creamy white goat: tan horns with ridges, pink ear insides and nose, a white beard, gray-brown hooves, amber eyes.
+  goat: {
+    body: '#f4eee3', dark: '#9c8a74', light: '#fffdf8', shade: '#dccfb9', belly: '#ffffff', inner: '#f3a9b5', nose: '#e7a0aa', line: '#a4927a',
+    horn: '#dcc59d', hornLine: '#97804f', hoof: '#6f6359', iris: '#e8a93a', patch: '#d9b48a',
+  },
+  // Pink, wrinkly and nearly hairless: rosy skin with deeper folds, tiny eyes, and big cream buck teeth.
+  molerat: {
+    body: '#f5b8a8', dark: '#c9786a', light: '#ffe2d8', shade: '#e09484', belly: '#ffe5dc', inner: '#c7766a', nose: '#e88b8f', line: '#bd6c5f',
+    fold: '#d68979', tooth: '#fff5d8', toothLine: '#b99a5e',
+  },
+  // Velvety near-black fur with a soft sheen, a bright pink star of a nose, and big pink digging paws.
+  starmole: {
+    body: '#54454f', dark: '#2a2027', light: '#86737f', shade: '#382d35', belly: '#6e5d68', inner: '#f39ab0', nose: '#ef7f9f', line: '#2a1f26',
+    star: '#f8a6bb', starLine: '#d4617f', paw: '#f6b6c3', pawLine: '#c9788b', socket: '#7d6a76',
+  },
+  // A fluffy apricot-gold doodle: curly coat and floppy curly ears, a lighter muzzle and topknot, a dark nose.
+  goldendoodle: {
+    body: '#eab676', dark: '#bb7d3f', light: '#fcdcae', shade: '#d09452', belly: '#f8e3c1', inner: '#e9a0a0', nose: '#3a2824', line: '#a96d35',
+    curl: '#c4843f',
+  },
 };
 
 // --- shared face parts ----------------------------------------------------
@@ -274,6 +294,60 @@ const Glint = ({ x, y, r, className, o = 1 }) => {
     />
   );
 };
+
+// --- fluffy and starry shapes (the goldendoodle, the star-nosed mole) -------
+
+// A curly outline round an ellipse: n round puffs, each an arc from one point
+// on the ellipse to the next (a0: where the first puff starts, in degrees,
+// going clockwise from the right). bump: how round the puffs are (0.5 to 1).
+function fluffPath(cx, cy, rx, ry, n, bump = 0.62, a0 = -90) {
+  const pt = (a) => [cx + rx * Math.cos((a * Math.PI) / 180), cy + ry * Math.sin((a * Math.PI) / 180)];
+  let [x0, y0] = pt(a0);
+  let d = `M${f1(x0)} ${f1(y0)}`;
+  for (let i = 1; i <= n; i++) {
+    const [x, y] = pt(a0 + (360 * i) / n);
+    const r = Math.hypot(x - x0, y - y0) * bump;
+    d += ` A${f1(r)} ${f1(r)} 0 0 1 ${f1(x)} ${f1(y)}`;
+    [x0, y0] = [x, y];
+  }
+  return d + 'Z';
+}
+
+// Curls in the coat: small open loops, each [x, y, r, turn in degrees].
+const Curls = ({ pts, color, w = 0.85, o = 0.7 }) => (
+  <g stroke={color} strokeWidth={w} fill="none" strokeLinecap="round" opacity={o}>
+    {pts.map(([x, y, r = 1.4, a = 0], i) => (
+      <path key={i} d={`M${f1(x - r)} ${f1(y)} A${f1(r)} ${f1(r)} 0 1 1 ${f1(x + r * 0.5)} ${f1(y + r * 0.85)}`} transform={a ? `rotate(${a} ${x} ${y})` : undefined} />
+    ))}
+  </g>
+);
+
+// The star-nosed mole's star: n fleshy rays round a little round nose at (x, y).
+function StarNose({ c, x, y, n, inner, len, w }) {
+  const rays = [];
+  for (let i = 0; i < n; i++) {
+    // The two rays at the bottom middle are shorter, like the real one's.
+    const a = 90 + (360 * (i + 0.5)) / n;
+    const bottom = Math.abs(((a % 360) + 360) % 360 - 90) < 360 / n + 1;
+    const l = bottom ? len * 0.68 : len;
+    const r = inner + l / 2;
+    const cx = x + r * Math.cos((a * Math.PI) / 180);
+    const cy = y + r * Math.sin((a * Math.PI) / 180);
+    rays.push(<ellipse key={i} cx={f1(cx)} cy={f1(cy)} rx={f1(l / 2 + w * 0.15)} ry={f1(w)} transform={`rotate(${f1(a)} ${f1(cx)} ${f1(cy)})`} />);
+  }
+  return (
+    <g className="pet-star">
+      <g fill={c.star} stroke={c.starLine} strokeWidth="0.55">
+        {rays}
+      </g>
+      <circle cx={x} cy={y} r={inner + 0.5} fill={c.star} />
+      <circle cx={x} cy={y} r={inner} fill={c.nose} stroke={c.starLine} strokeWidth="0.5" />
+      <ellipse cx={x - inner * 0.4} cy={y + inner * 0.15} rx={inner * 0.22} ry={inner * 0.34} fill="#7a2a3e" />
+      <ellipse cx={x + inner * 0.4} cy={y + inner * 0.15} rx={inner * 0.22} ry={inner * 0.34} fill="#7a2a3e" />
+      <ellipse cx={x - inner * 0.35} cy={y - inner * 0.55} rx={inner * 0.4} ry={inner * 0.2} fill="#fff" opacity="0.6" />
+    </g>
+  );
+}
 
 // --- species --------------------------------------------------------------
 
@@ -985,6 +1059,283 @@ const DRAW = {
       ),
     };
   },
+  // A creamy goat: curved, ridged horns (little buds on a kid), ears that stick
+  // out sideways (they droop when it's sad and perk up when it's happy), amber
+  // eyes with a goat's sideways pupils, a pink nose, a white beard that grows
+  // with it, a short perky tail and gray-brown hooves.
+  goat({ c, id, mood, detail, ek, L, stage }) {
+    const droop = mood === 'sad' ? -20 : mood === 'happy' ? 7 : -3;
+    const hornK = stage === 'baby' ? 0 : stage === 'young' ? 0.8 : 1;
+    const beard = stage === 'baby' ? 2.6 : stage === 'young' ? 4.4 : 5.8;
+    const LH = { stroke: c.hornLine, strokeWidth: L.strokeWidth, strokeLinejoin: 'round' };
+    const leg = (x) => (
+      <g>
+        <rect x={x - 2.7} y="51.4" width="5.4" height="6.6" rx="2.2" fill={`url(#${id}b)`} {...L} />
+        <path d={`M${x - 2.9} 56.8 h5.8 v1.6 q0 1.5 -1.5 1.5 h-2.8 q-1.5 0 -1.5 -1.5 Z`} fill={c.hoof} stroke={c.hoof} strokeWidth="0.6" strokeLinejoin="round" />
+        {detail && <path d={`M${x} 57.4 v2.3`} stroke="#3e3631" strokeWidth="0.7" strokeLinecap="round" />}
+      </g>
+    );
+    // The left horn (the right one is the same, flipped).
+    const horn = (s) => (
+      <g transform={s > 0 ? 'translate(64 0) scale(-1 1)' : undefined}>
+        {hornK ? (
+          <g transform={hornK !== 1 ? `translate(25 18) scale(${hornK}) translate(-25 -18)` : undefined}>
+            <path d="M27.6 17.6 C26.4 12 23.2 7.8 18.4 6.4 C17.3 6.1 16.7 7.2 17.4 7.9 C20.2 10.6 21.8 14.4 22.2 18.8 Z" fill={`url(#${id}hn)`} {...LH} />
+            {detail && <path d="M19.8 9.2 l1.7 -1.5 M21.3 11.7 l2.1 -1.5 M22.3 14.4 l2.5 -1.2" stroke={c.hornLine} strokeWidth="0.75" strokeLinecap="round" opacity="0.6" />}
+          </g>
+        ) : (
+          <ellipse cx="25.6" cy="15.8" rx="2.5" ry="2.1" fill={`url(#${id}hn)`} {...LH} />
+        )}
+      </g>
+    );
+    const ear = (s) => (
+      <g transform={`${s > 0 ? 'translate(64 0) scale(-1 1) ' : ''}rotate(${droop} 17.8 26.8)`}>
+        <path d="M18 24 C13 22.8 8.2 24.6 6 28 C8.2 30.6 13.8 30.8 18.4 29.2 Z" fill={`url(#${id}b)`} {...L} />
+        <path d="M17 25.4 C13.6 25 10.4 26.2 8.8 28.1 C11 29.3 14.4 29.3 17.2 28.2 Z" fill={c.inner} />
+      </g>
+    );
+    const ex = [24.8, 39.2];
+    const ey = 27.4;
+    const eyes =
+      mood === 'ok' && detail ? (
+        <g className="pet-eyes">
+          {ex.map((x) => (
+            <g key={x}>
+              <circle cx={x} cy={ey} r={3.4 * ek} fill={c.iris} stroke="#8a5a14" strokeWidth="0.8" />
+              <rect x={x - 1.85 * ek} y={ey - 1 * ek} width={3.7 * ek} height={2 * ek} rx={1 * ek} fill={INK} />
+              <circle cx={x - 1.2 * ek} cy={ey - 1.5 * ek} r={1.1 * ek} fill="#fff" />
+              <circle cx={x + 1.3 * ek} cy={ey + 1.4 * ek} r={0.45 * ek} fill="#fff" opacity="0.9" />
+            </g>
+          ))}
+        </g>
+      ) : (
+        <Eyes mood={mood} xs={ex} y={ey} r={3.1} ek={ek} brow={c.dark} detail={detail} />
+      );
+    return {
+      back: (
+        <g className="pet-tail">
+          <path d="M44.6 43.6 C46.4 40.2 49.2 38 51.6 38.4 C51.4 41.4 48.8 44.6 46 46.2 Z" fill={`url(#${id}b)`} {...L} />
+        </g>
+      ),
+      body: (
+        <>
+          {leg(25.2)}
+          {leg(38.8)}
+          <ellipse cx="32" cy="47" rx="14.8" ry="10.6" fill={`url(#${id}b)`} {...L} />
+          <ellipse cx="32" cy="49.2" rx="8.4" ry="6.8" fill={`url(#${id}f)`} />
+          {detail && <path d="M19.4 43.8 q2.6 0.8 3.4 3.2 M44.6 43.8 q-2.6 0.8 -3.4 3.2" stroke={c.dark} strokeWidth="0.8" fill="none" strokeLinecap="round" opacity="0.35" />}
+        </>
+      ),
+      head: (
+        <>
+          {horn(-1)}
+          {horn(1)}
+          {ear(-1)}
+          <g className="pet-ear">{ear(1)}</g>
+          <ellipse cx="32" cy="28.4" rx="15.8" ry="14.2" fill={`url(#${id}b)`} {...L} />
+          <Gloss id={id} cx={24.6} cy={19.2} rx={7.6} ry={3.4} />
+          {detail && <path d="M27.2 16.4 Q28.6 12.6 31.4 14.4 Q33.2 11.8 35.4 13.6 Q36.8 14.8 36.8 16.4 Q32 18.6 27.2 16.4Z" fill={c.light} stroke={c.line} strokeWidth="0.7" strokeOpacity="0.5" />}
+          <ellipse cx="32" cy="35.2" rx="8.8" ry="6.6" fill={`url(#${id}f)`} />
+          <path
+            d={`M29.4 40.6 C29.4 ${40.6 + beard * 0.6} 31 ${40.6 + beard * 0.95} 32.4 ${40.6 + beard} C33.4 ${40.6 + beard * 0.62} 34.8 ${40.6 + beard * 0.3} 34.6 40.4 Q32 41.6 29.4 40.6Z`}
+            fill={`url(#${id}f)`}
+            stroke={c.line}
+            strokeWidth={L.strokeWidth * 0.8}
+            strokeLinejoin="round"
+          />
+          {detail && beard > 3 && <path d={`M31.4 41.8 q0.2 ${beard * 0.4} 0.9 ${beard * 0.7} M33.2 41.6 q0 ${beard * 0.3} -0.4 ${beard * 0.55}`} stroke={c.line} strokeWidth="0.55" fill="none" strokeLinecap="round" opacity="0.5" />}
+          {detail && <Blush y={33.4} dx={11.8} rx={2.8} ry={1.8} o={0.42} />}
+          {eyes}
+          <path d="M29.2 32.4 Q32 31 34.8 32.4 Q33.8 34.8 32 35.2 Q30.2 34.8 29.2 32.4Z" fill={c.nose} stroke="#c87b86" strokeWidth="0.6" strokeLinejoin="round" />
+          {detail && <path d="M30.7 33 q0.7 0.5 0.5 1.2 M33.3 33 q-0.7 0.5 -0.5 1.2" stroke="#a9505f" strokeWidth="0.7" fill="none" strokeLinecap="round" />}
+          <ellipse cx="31" cy="32.1" rx="1" ry="0.45" fill="#fff" opacity="0.6" />
+          <path d="M32 35.2 v1.3" stroke={INK} strokeWidth="1.2" strokeLinecap="round" />
+          <Mouth mood={mood} y={36.6} w={3.4} h={2.4} kind="w" />
+        </>
+      ),
+    };
+  },
+
+  // A naked mole rat: pink, wrinkly and nearly hairless, a long body and a thin
+  // tail, tiny eyes and ear holes, a few stray whiskers, and its big cream buck
+  // teeth (an upper pair and a lower pair) always showing. A baby is smoother,
+  // with smaller teeth.
+  molerat({ c, id, mood, detail, ek, L, stage }) {
+    const baby = stage === 'baby';
+    const folds = detail && !baby;
+    const fold = { stroke: c.fold, strokeWidth: 0.9, fill: 'none', strokeLinecap: 'round', opacity: 0.8 };
+    const tk = baby ? 0.78 : stage === 'young' ? 0.9 : 1;
+    const tooth = (x, top, w, h) => {
+      const r = w * 0.42;
+      return `M${f1(x)} ${f1(top)} h${f1(w)} v${f1(h - r)} q0 ${f1(r)} ${f1(-r)} ${f1(r)} h${f1(-(w - 2 * r))} q${f1(-r)} 0 ${f1(-r)} ${f1(-r)} Z`;
+    };
+    const lip = mood === 'happy' ? 37.2 : mood === 'sad' ? 37.4 : 37;
+    const tw = 2.2 * tk;
+    const th = 4.6 * tk;
+    const lw = 1.7 * tk;
+    const lh = 2.4 * tk;
+    const T = { fill: c.tooth, stroke: c.toothLine, strokeWidth: detail ? 0.6 : 0.8, strokeLinejoin: 'round' };
+    return {
+      back: (
+        <g className="pet-tail">
+          <path d="M45.6 52.4 C51.2 54 55.6 51.6 57.4 47.4" stroke={c.line} strokeWidth="3.6" fill="none" strokeLinecap="round" />
+          <path d="M45.6 52.4 C51.2 54 55.6 51.6 57.4 47.4" stroke={c.body} strokeWidth="2" fill="none" strokeLinecap="round" />
+        </g>
+      ),
+      body: (
+        <>
+          <ellipse cx="32" cy="47.4" rx="16.2" ry="10.6" fill={`url(#${id}b)`} {...L} />
+          <ellipse cx="32" cy="50" rx="9.4" ry="6.8" fill={`url(#${id}f)`} />
+          {folds && <path d="M18 45.4 q2.8 1 3.8 3.8 M17.6 50.2 q2.6 0.8 3.6 3 M46 45.4 q-2.8 1 -3.8 3.8 M46.4 50.2 q-2.6 0.8 -3.6 3 M28.4 46.4 q3.6 1.4 7.2 0" {...fold} />}
+          <ellipse cx="25" cy="55.8" rx="4.6" ry="2.8" fill={`url(#${id}b)`} {...L} />
+          <ellipse cx="39" cy="55.8" rx="4.6" ry="2.8" fill={`url(#${id}b)`} {...L} />
+          {detail && <path d="M22.4 57.2 v0.8 M24.4 57.6 v0.8 M26.4 57.4 v0.8 M37.6 57.4 v0.8 M39.6 57.6 v0.8 M41.6 57.2 v0.8" stroke="#fff6ee" strokeWidth="0.8" strokeLinecap="round" />}
+        </>
+      ),
+      head: (
+        <>
+          <ellipse cx="32" cy="29.6" rx="17.2" ry="13.6" fill={`url(#${id}b)`} {...L} />
+          <Gloss id={id} cx={24.4} cy={20.4} rx={7.6} ry={3.2} />
+          {folds && <path d="M25 19.6 q7 -2.6 14 0 M26.6 22.4 q5.4 -1.8 10.8 0 M16.6 30.4 q1.2 2.6 3.8 3.6 M47.4 30.4 q-1.2 2.6 -3.8 3.6" {...fold} />}
+          <ellipse cx="15.8" cy="26.4" rx="1.3" ry="1.8" fill={c.inner} />
+          <ellipse cx="48.2" cy="26.4" rx="1.3" ry="1.8" fill={c.inner} />
+          <ellipse cx="32" cy="34.8" rx="10.2" ry="6.8" fill={`url(#${id}f)`} />
+          {detail && <Blush y={32.8} dx={12.6} rx={2.8} ry={1.8} o={0.5} />}
+          {detail && <path d="M21.6 34.2 l-6.6 -1.4 M21.8 36.2 l-6.2 0.6 M42.4 34.2 l6.6 -1.4 M42.2 36.2 l6.2 0.6" stroke={c.dark} strokeWidth="0.55" strokeLinecap="round" opacity="0.55" />}
+          <Eyes mood={mood} xs={[25.6, 38.4]} y={26.4} r={2.4} ek={ek} brow={c.dark} detail={detail} browGap={1.9} />
+          <path d="M30.2 30.8 Q32 29.9 33.8 30.8 Q33.1 32.6 32 32.8 Q30.9 32.6 30.2 30.8Z" fill={c.nose} />
+          {detail && <path d="M31.2 31.4 v0.6 M32.8 31.4 v0.6" stroke="#9c4250" strokeWidth="0.6" strokeLinecap="round" />}
+          <path d="M32 32.8 v2.4" stroke={c.line} strokeWidth="0.9" strokeLinecap="round" opacity="0.8" />
+          {mood === 'happy' ? (
+            <path d="M24.8 35.4 Q32 42.4 39.2 35.4 Q32 38.4 24.8 35.4Z" fill="#6e2437" stroke="#6e2437" strokeWidth="1" strokeLinejoin="round" />
+          ) : mood === 'sad' ? (
+            <path d="M25.8 38.6 Q32 35.4 38.2 38.6" stroke={INK} strokeWidth="1.3" fill="none" strokeLinecap="round" />
+          ) : (
+            <path d="M25.6 35.8 Q32 38.6 38.4 35.8" stroke={INK} strokeWidth="1.3" fill="none" strokeLinecap="round" />
+          )}
+          {/* The teeth: the lower pair first, the big upper pair over them. */}
+          <path d={tooth(32 - lw - 0.15, lip + th - 0.6, lw, lh)} {...T} />
+          <path d={tooth(32 + 0.15, lip + th - 0.6, lw, lh)} {...T} />
+          <path d={tooth(32 - tw - 0.15, lip - 0.4, tw, th)} {...T} />
+          <path d={tooth(32 + 0.15, lip - 0.4, tw, th)} {...T} />
+          {detail && <path d={`M${f1(32 - tw * 0.6)} ${f1(lip + 0.6)} v${f1(th * 0.45)}`} stroke="#fff" strokeWidth="0.6" strokeLinecap="round" opacity="0.9" />}
+        </>
+      ),
+    };
+  },
+
+  // A star-nosed mole: velvety near-black fur with a soft sheen, small bright
+  // eyes in lighter fur, its famous pink star of a nose (22 rays that wiggle
+  // now and then, pet-star), big pink digging paws and a thick tail.
+  starmole({ c, id, mood, detail, ek, L, stage }) {
+    const happy = mood === 'happy';
+    const k = stage === 'baby' ? 0.86 : 1;
+    const pale = mix(c.body, c.light, 0.45);
+    const paw = (s) => (
+      <g transform={s > 0 ? 'translate(64 0) scale(-1 1)' : undefined}>
+        <path d="M22 47.4 C17.4 46.4 12.6 48.8 12 53 C11.7 55.4 13.8 56.8 16.4 56.4 C19.6 55.8 22.6 53.6 23.6 50.4 Z" fill={`url(#${id}p)`} stroke={c.pawLine} strokeWidth={L.strokeWidth * 0.85} strokeLinejoin="round" />
+        {detail ? (
+          <path d="M12.6 50.4 l-1.8 -0.6 M12 52.6 l-1.9 0.1 M12.4 54.8 l-1.7 0.8 M14.2 56.4 l-1.2 1.4 M16.6 56.6 l-0.5 1.7" stroke="#fff4ec" strokeWidth="1.3" strokeLinecap="round" />
+        ) : (
+          <path d="M12.4 51.8 l-1.8 0 M12.8 54.6 l-1.6 1" stroke="#fff4ec" strokeWidth="1.6" strokeLinecap="round" />
+        )}
+        {detail && <path d="M15.4 50.6 q2.6 -0.6 4.6 0.6" stroke={c.pawLine} strokeWidth="0.6" fill="none" strokeLinecap="round" opacity="0.6" />}
+      </g>
+    );
+    const ex = [25.2, 38.8];
+    const ey = 26.6;
+    return {
+      back: (
+        <g className="pet-tail">
+          <path d="M45.4 51.8 C50.8 52.8 54.6 50.2 55.6 45.8" stroke={c.line} strokeWidth="6" fill="none" strokeLinecap="round" />
+          <path d="M45.4 51.8 C50.8 52.8 54.6 50.2 55.6 45.8" stroke={c.body} strokeWidth="3.8" fill="none" strokeLinecap="round" />
+          {detail && <path d="M50.6 52 l0.4 -1.6 M53.4 50 l-0.2 -1.6" stroke={c.light} strokeWidth="0.7" strokeLinecap="round" opacity="0.6" />}
+        </g>
+      ),
+      body: (
+        <>
+          <ellipse cx="26" cy="56.4" rx="3.8" ry="2.3" fill={c.paw} stroke={c.pawLine} strokeWidth={L.strokeWidth * 0.8} />
+          <ellipse cx="38" cy="56.4" rx="3.8" ry="2.3" fill={c.paw} stroke={c.pawLine} strokeWidth={L.strokeWidth * 0.8} />
+          <ellipse cx="32" cy="47.4" rx="15.2" ry="10.8" fill={`url(#${id}b)`} {...L} />
+          <ellipse cx="32" cy="49.8" rx="9" ry="7" fill={pale} opacity="0.75" />
+          {detail && <path d="M23.6 44.8 l0.6 -1.4 M27.4 52.4 l0.5 -1.3 M36.4 52.6 l-0.5 -1.3 M40.6 44.8 l-0.6 -1.4" stroke={c.light} strokeWidth="0.7" strokeLinecap="round" opacity="0.6" />}
+          {paw(-1)}
+          {paw(1)}
+        </>
+      ),
+      head: (
+        <>
+          <ellipse cx="32" cy="29" rx="17" ry="14.2" fill={`url(#${id}b)`} {...L} />
+          <Gloss id={id} cx={24.6} cy={19.2} rx={8} ry={3.4} />
+          {detail && <path d="M27.4 16 l0.5 -1.6 M31.8 15 v-1.7 M36.4 16 l-0.5 -1.6" stroke={c.light} strokeWidth="0.8" strokeLinecap="round" opacity="0.7" />}
+          {!happy && (
+            <>
+              <ellipse cx={ex[0]} cy={ey} rx={3.5 * ek} ry={3.2 * ek} fill={c.socket} />
+              <ellipse cx={ex[1]} cy={ey} rx={3.5 * ek} ry={3.2 * ek} fill={c.socket} />
+            </>
+          )}
+          <Eyes mood={mood} xs={ex} y={ey} r={2.4} ek={ek} ink={happy ? '#f4dde7' : '#120b10'} brow="#d9c3cf" detail={detail} browGap={1.9} />
+          <ellipse cx="32" cy="39.6" rx="7.4" ry="3.9" fill={pale} />
+          {detail && <Blush y={33.6} dx={13} rx={2.6} ry={1.7} o={0.38} />}
+          <Mouth mood={mood} y={40.6} w={2.6} h={1.7} ink="#f4dde7" />
+          <StarNose c={c} x={32} y={33.4} n={detail ? 22 : 14} inner={2.4 * k} len={4.3 * k} w={detail ? 0.85 : 1.25} />
+        </>
+      ),
+    };
+  },
+
+  // A goldendoodle: an apricot-gold curly coat (every outline is made of little
+  // puffs), long floppy curly ears, a fluffy topknot and plume of a tail, a
+  // lighter muzzle with a big dark nose. The puppy is softer and rounder, with
+  // shorter ears.
+  goldendoodle({ c, id, mood, detail, ek, L, stage }) {
+    const pup = stage === 'baby';
+    const b = pup ? 0.58 : 0.66;
+    const many = detail ? 1 : 0.65;
+    const P = (cx, cy, rx, ry, n, a0) => fluffPath(cx, cy, rx, ry, Math.max(5, Math.round(n * many)), b, a0);
+    const sad = mood === 'sad';
+    const earLen = pup ? 7.8 : 9.8;
+    const ear = (s) => (
+      <g transform={`${s > 0 ? 'translate(64 0) scale(-1 1) ' : ''}rotate(${sad ? -4 : 6} 15 24)`}>
+        <path d={P(14.6, 24 + earLen * 0.86, 5.3, earLen, 10, -90)} fill={`url(#${id}k)`} {...L} />
+        {detail && <Curls pts={[[14.2, 27 + earLen * 0.5, 1.2, 30], [15.4, 22.6 + earLen * 1.15, 1.1, 200]]} color={mix(c.dark, '#000000', 0.15)} o={0.5} />}
+      </g>
+    );
+    return {
+      back: (
+        <g className="pet-tail">
+          <path d={P(50.6, 42.8, 4.4, 8, 9, -90)} transform="rotate(26 50.6 42.8)" fill={`url(#${id}b)`} {...L} />
+          {detail && <Curls pts={[[50.4, 40, 1.1, 10], [51.6, 45.2, 1, 140]]} color={c.curl} o={0.55} />}
+        </g>
+      ),
+      body: (
+        <>
+          <path d={P(32, 47, 15, 11.2, 15, -90)} fill={`url(#${id}b)`} {...L} />
+          <path d={P(32, 49.8, 8.6, 7, 10, -90)} fill={`url(#${id}f)`} />
+          {detail && <Curls pts={[[21.4, 46, 1.2, 60], [43, 46.4, 1.2, 120], [24.6, 51.4, 1.1, 20], [39.6, 51.6, 1.1, 160]]} color={c.curl} o={0.6} />}
+          <path d={P(25.4, 55.6, 4.8, 3.1, 7, 180)} fill={`url(#${id}f)`} {...L} />
+          <path d={P(38.6, 55.6, 4.8, 3.1, 7, 0)} fill={`url(#${id}f)`} {...L} />
+        </>
+      ),
+      head: (
+        <>
+          <path d={P(32, 28.6, 17, 14.2, 18, -90)} fill={`url(#${id}b)`} {...L} />
+          <path d={P(32, 15.4, pup ? 6.6 : 7.8, pup ? 3.8 : 4.4, 8, 180)} fill={`url(#${id}b)`} {...L} />
+          <Gloss id={id} cx={24} cy={19.6} rx={7.4} ry={3.4} />
+          {detail && <Curls pts={[[27.6, 14.8, 1.1, 10], [35.6, 14.6, 1.1, 170], [21.2, 20.2, 1.2, 40], [43, 20.4, 1.2, 140], [32, 19.6, 1, 90]]} color={c.curl} o={0.6} />}
+          <path d={P(32, 34.6, 9.6, 6.8, 11, -90)} fill={`url(#${id}f)`} stroke={c.line} strokeWidth="0.6" strokeOpacity="0.35" strokeLinejoin="round" />
+          {detail && <Blush y={33.6} dx={13.2} rx={2.6} ry={1.8} o={0.4} />}
+          {ear(-1)}
+          <g className="pet-ear">{ear(1)}</g>
+          <Eyes mood={mood} xs={[24.6, 39.4]} y={27} r={3.2} ek={ek} brow={c.dark} detail={detail} />
+          <ellipse cx="32" cy="31.4" rx="3.6" ry="2.6" fill={c.nose} />
+          <ellipse cx="30.9" cy="30.6" rx="1.2" ry="0.6" fill="#fff" opacity="0.7" />
+          <path d="M32 33.8 v1.8" stroke={INK} strokeWidth="1.3" strokeLinecap="round" />
+          <Mouth mood={mood} y={35.8} w={4.4} h={3.2} kind="w" />
+        </>
+      ),
+    };
+  },
 };
 
 // --- the whole pet --------------------------------------------------------
@@ -1031,6 +1382,19 @@ function Defs({ id, c }) {
           </linearGradient>
         </>
       )}
+      {c.horn && (
+        <radialGradient id={`${id}hn`} cx="0.3" cy="0.3" r="0.95">
+          <stop offset="0" stopColor={mix(c.horn, '#ffffff', 0.5)} />
+          <stop offset="0.6" stopColor={c.horn} />
+          <stop offset="1" stopColor={mix(c.horn, c.hornLine, 0.45)} />
+        </radialGradient>
+      )}
+      {c.paw && (
+        <radialGradient id={`${id}p`} cx="0.6" cy="0.3" r="0.9">
+          <stop offset="0" stopColor={mix(c.paw, '#ffffff', 0.45)} />
+          <stop offset="1" stopColor={mix(c.paw, c.pawLine, 0.3)} />
+        </radialGradient>
+      )}
       {c.table && (
         <radialGradient id={`${id}t`} cx="0.34" cy="0.3" r="0.85">
           <stop offset="0" stopColor="#f6fffb" />
@@ -1071,10 +1435,19 @@ const Scarf = ({ detail }) => (
   </g>
 );
 
+// The gem's outline (for a jersey worn over it): the rough crystal for a baby,
+// the cut pear after that. In the art's own coordinates.
+export const gemOutline = (stage) => (stage === 'baby' ? roughCut() : gemCut(6, false)).outline;
+
 // neck: what the pet wears at the neck (PetGear's Neck, in this art's own
 // coordinates). It's drawn under the head, so a long nose, a beak or a wattle
 // stays in front of it.
-export function PetArt({ species = 'cat', mood = 'ok', stage = 'young', size = 64, still = false, className = '', title, neck = null }) {
+// layer: 'all' (the whole pet), or one of two layers for a pet in an outfit
+// (PetGear draws the outfit between them): 'base' (the tail and the body) and
+// 'top' (the head, with what hangs under it). A pet that is all one piece (the
+// gem) has everything in 'base'. scarf: false leaves the grown pet's scarf off
+// (an outfit takes its place).
+export function PetArt({ species = 'cat', mood = 'ok', stage = 'young', size = 64, still = false, className = '', title, neck = null, layer = 'all', scarf: withScarf = true }) {
   const id = 'p' + useId().replace(/[^a-zA-Z0-9]/g, '');
   const c = LOOK[species] || LOOK.cat;
   const detail = size >= 40;
@@ -1085,16 +1458,19 @@ export function PetArt({ species = 'cat', mood = 'ok', stage = 'young', size = 6
   const L = { stroke: c.line, strokeWidth: detail ? 1.35 : 1.9, strokeLinejoin: 'round' };
   const part = (DRAW[species] || DRAW.cat)({ c, id, mood, detail, ek: (baby ? 1.28 : 1) * (detail ? 1 : 1.16), L, stage });
   // A pet that's all one piece (the gem) wears its scarf over itself, lower down, and has no neck shadow.
-  const scarf = grown && (
+  const scarf = grown && withScarf && (
     <g transform={part.scarfY ? `translate(0 ${part.scarfY})` : undefined}>
       <Scarf detail={detail} />
     </g>
   );
   const headT = st.head !== 1 ? `translate(32 41) scale(${st.head}) translate(-32 -41)` : undefined;
   const bodyT = st.body !== 1 ? `translate(32 58) scale(${st.body}) translate(-32 -58)` : undefined;
+  const base = layer !== 'top';
+  const top = layer !== 'base' || !!part.over;
+  if (!base && part.over) return null;
   return (
     <svg
-      className={`pet-art pet-${mood}${still ? '' : ' anim'} ${className}`}
+      className={`pet-art pet-${mood}${still ? '' : ' anim'}${layer !== 'all' ? ' pet-layer' : ''} ${className}`}
       width={size}
       height={size}
       viewBox="0 0 64 64"
@@ -1103,18 +1479,20 @@ export function PetArt({ species = 'cat', mood = 'ok', stage = 'young', size = 6
       aria-hidden={title ? undefined : 'true'}
     >
       <Defs id={id} c={c} />
-      <ellipse cx="32" cy="60.4" rx={17 * s} ry="2.7" fill="currentColor" opacity="0.13" />
+      {base && <ellipse cx="32" cy="60.4" rx={17 * s} ry="2.7" fill="currentColor" opacity="0.13" />}
       <g className="pet-bob">
+        {/* Layers keep the same box, so they bob as one. */}
+        {layer !== 'all' && <rect x="0" y="0" width="64" height="64" fill="none" />}
         <g transform={`translate(${32 - 32 * s} ${60 - 60 * s}) scale(${s})`}>
-          {part.back}
-          <g transform={bodyT}>{part.body}</g>
+          {base && part.back}
+          {base && <g transform={bodyT}>{part.body}</g>}
           {/* a soft shadow where the head sits on the body */}
-          {!part.over && <ellipse cx="32" cy="41.6" rx="12" ry="3.4" fill={c.dark} opacity="0.22" />}
-          {!part.over && scarf}
-          {!part.over && neck}
-          <g transform={headT}>{part.head}</g>
-          {part.over && scarf}
-          {part.over && neck}
+          {top && !part.over && <ellipse cx="32" cy="41.6" rx="12" ry="3.4" fill={c.dark} opacity="0.22" />}
+          {top && !part.over && scarf}
+          {top && !part.over && neck}
+          {top && <g transform={headT}>{part.head}</g>}
+          {top && part.over && scarf}
+          {top && part.over && neck}
         </g>
       </g>
     </svg>
