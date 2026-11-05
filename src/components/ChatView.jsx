@@ -376,12 +376,18 @@ export default function ChatView({
     atBottom.current = true;
     setNewBelow(0);
   };
+  // A node's top on screen as laid out: its own animation (the pop of the
+  // square you just played, a shake) doesn't count, or the list would chase it.
+  const layoutTop = (node) => {
+    const p = node.offsetParent;
+    return p ? p.getBoundingClientRect().top + p.clientTop + node.offsetTop : node.getBoundingClientRect().top;
+  };
   // Where the anchor (see above) is now.
   const takeAnchor = () => {
     const el = list.current;
     if (!el) return;
     const top = el.getBoundingClientRect().top;
-    const at = (node) => (node ? { node, off: node.getBoundingClientRect().top - top } : null);
+    const at = (node) => (node ? { node, off: layoutTop(node) - top } : null);
     const t = tapped.current;
     // (top: the list's scroll then, see keepAnchor.)
     const scrolled = el.scrollTop;
@@ -418,8 +424,11 @@ export default function ChatView({
     // A scroll since the anchor was taken whose scroll event hasn't come yet
     // (Safari sends them late; a fling, or the list sent to a message) stays:
     // only what changed size is made up for, never the scroll undone.
-    const scrolled = el.scrollTop - (was.top ?? el.scrollTop);
-    const moved = a.node.getBoundingClientRect().top - el.getBoundingClientRect().top - (a.off - scrolled);
+    // (Pulled back while at the very end: the list got shorter and the
+    // browser clamped it, which is no scroll anyone made.)
+    const delta = el.scrollTop - (was.top ?? el.scrollTop);
+    const scrolled = delta < 0 && distance(el) < 1 ? 0 : delta;
+    const moved = layoutTop(a.node) - el.getBoundingClientRect().top - (a.off - scrolled);
     if (Math.abs(moved) >= 1) setTop(el, el.scrollTop + moved, 'anchor');
     // The anchor for the next change (it can be another one now). The same
     // one keeps where it should be, so moves under a pixel don't add up.

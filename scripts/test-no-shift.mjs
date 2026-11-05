@@ -160,6 +160,8 @@ function inPage({ engine, busy }) {
         let last = null;
         let n = 0;
         const look = () => {
+          // (Gone meanwhile: the game ended on its own. Nothing to aim at.)
+          if (!el.isConnected) return done(null);
           const r = el.getBoundingClientRect();
           const b = { x: r.x, y: r.y, width: r.width, height: r.height };
           if ((last && Math.abs(last.y - b.y) < 1 && Math.abs(last.x - b.x) < 1) || ++n > 20) return done(b);
@@ -374,11 +376,20 @@ async function newPage(vpName, as = '') {
   if (process.env.DEBUG_SCROLL)
     await ctx.addInitScript(() => {
       const log = (window.__scrolls = []);
+      // The last card tapped: its top in the list, and its parts' tops in it.
+      let last = null;
+      addEventListener('pointerdown', (e) => (last = e.target.closest?.('.cmd-card') || last), true);
+      const layout = (list) => {
+        if (!last?.isConnected) return '';
+        const top = last.getBoundingClientRect().top;
+        const parts = [...(last.querySelector('[class^="arc-"], [class^="cz-"]')?.children || [])].map((x) => `${String(x.className).split(' ')[0]}${Math.round(x.getBoundingClientRect().top - top)}`);
+        return `| card ${Math.round(top - list.getBoundingClientRect().top)} h${Math.round(last.getBoundingClientRect().height)} ${parts.join(' ')}`;
+      };
       const d = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollTop');
       Object.defineProperty(Element.prototype, 'scrollTop', {
         get: d.get,
         set(v) {
-          if (this.classList?.contains('msg-list')) log.push(`${Math.round(performance.now())} set ${Math.round(this.scrollTop)}→${Math.round(v)} ${new Error().stack.split('\n').slice(1, 4).join(' < ')}`);
+          if (this.classList?.contains('msg-list')) log.push(`${Math.round(performance.now())} set ${Math.round(this.scrollTop)}→${Math.round(v)} ${new Error().stack.split('\n').slice(1, 4).join(' < ')} ${layout(this)}`);
           return d.set.call(this, v);
         },
       });
@@ -405,6 +416,19 @@ async function newPage(vpName, as = '') {
       });
       const watch = () => document.querySelectorAll('.msg-list > *').forEach((x) => ro.observe(x));
       setInterval(watch, 200);
+      // The list's own box (something above or below it changing size).
+      let box = '';
+      const frame = () => {
+        const l = document.querySelector('.msg-list');
+        if (l) {
+          const r = l.getBoundingClientRect();
+          const b = `${Math.round(r.top)}+${Math.round(r.height)}`;
+          if (b !== box) log.push(`${Math.round(performance.now())} list box ${box}→${b}`);
+          box = b;
+        }
+        requestAnimationFrame(frame);
+      };
+      requestAnimationFrame(frame);
       new MutationObserver((ms) => {
         for (const m of ms)
           if (m.attributeName === 'data-live') log.push(`${Math.round(performance.now())} data-live ${m.target.closest('.msg')?.id} ${m.oldValue}→${m.target.getAttribute('data-live')}`);
