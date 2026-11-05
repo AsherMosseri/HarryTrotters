@@ -1345,7 +1345,7 @@ export const { coinCheck } = coinCheckFunctions({ db, coinData, freshCoins, bank
 // Casino reports (functions/disputes.js): a teammate reports a result, team
 // management refunds by hand or dismisses it.
 // The owner's Refund / Take back on a game card in chat (ownerRefund) shares their refund key.
-export const { dispute, disputeDecide, disputeRefundAll, ownerRefund } = disputeFunctions({ db, coinData, freshCoins, notify, bankRef, owner: REQUESTS_TO });
+export const { dispute, disputeDecide, disputeRefundAll, ownerRefund } = disputeFunctions({ db, coinData, freshCoins, notify, bankRef, owner: REQUESTS_TO, personId });
 
 // Team events: the team's lab time fills a meter, tiers give pet gear.
 export const { petEvent, petEventTick } = petEventFunctions({
