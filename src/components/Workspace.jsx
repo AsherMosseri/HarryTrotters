@@ -1512,10 +1512,11 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
       ping: () => store.ping(),
       // Casino reports (Disputes.jsx).
       dispute: (req) => store.dispute(req, actor).catch((e) => ({ note: noteFor(e, 'That didn’t go through') })),
-      disputeDecide: (req) => store.disputeDecide(req, actor).catch((e) => ({ note: noteFor(e, 'That didn’t go through') })),
-      disputeRefundAll: (req) => store.disputeRefundAll(req, actor).catch((e) => ({ note: noteFor(e, 'That didn’t go through') })),
+      // balanceOf: demo mode checks the ceiling (a googol) on a refund the way the server does.
+      disputeDecide: (req) => store.disputeDecide(req, actor, { balanceOf: (n) => cmdData.current.wallet(n).balance }).catch((e) => ({ note: noteFor(e, 'That didn’t go through') })),
+      disputeRefundAll: (req) => store.disputeRefundAll(req, actor, { balanceOf: (n) => cmdData.current.wallet(n).balance }).catch((e) => ({ note: noteFor(e, 'That didn’t go through') })),
       // The owner's Refund / Take back on a game card (CardActions.jsx, and coin history's Reverse).
-      ownerRefund: (req) => store.ownerRefund(req, actor).catch((e) => ({ note: noteFor(e, 'That didn’t go through') })),
+      ownerRefund: (req) => store.ownerRefund(req, actor, { balanceOf: (n) => cmdData.current.wallet(n).balance }).catch((e) => ({ note: noteFor(e, 'That didn’t go through') })),
       // Loans (Loans.jsx, functions/loans.js): fn is loanRequest, loanRespond, loanRepay or loanManage.
       loan: (fn, req) =>
         store

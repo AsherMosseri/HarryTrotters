@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { GIFT_MAX, ceilingNote, leaderboard, overCeiling, perHourOf, teamDay, teamMidnight, wallet as walletOf } from '../coins.js';
+import { GIFT_MAX, MAX_BALANCE, ceilingNote, leaderboard, overCeiling, perHourOf, teamDay, teamMidnight, wallet as walletOf } from '../coins.js';
 import { mondayOf } from '../milestones.js';
 import { relTime, useEscape } from '../util.js';
 import { Avatar, CloseIcon, Overlay } from './common.jsx';
@@ -218,7 +218,7 @@ export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onMarket
                     {n > wallet.balance ? (
                       <span className="danger small">You only have {f.exact(wallet.balance)}.</span>
                     ) : n > GIFT_MAX ? (
-                      <span className="danger small">Up to {f.exact(GIFT_MAX)} at a time.</span>
+                      <span className="danger small">That’s more than a googol.</span>
                     ) : (
                       sendError && <span className="danger small">{sendError}</span>
                     )}
@@ -314,7 +314,7 @@ export function CoinsAdmin({ cfg, setCfg, roster, balances, onGrant, ledger, onU
   const [note, setNote] = useState('');
   const [msg, setMsg] = useState('');
   const num = (v) => Math.max(0, Math.floor(Number(v) || 0));
-  // Nobody goes over 1 quadrillion (MAX_BALANCE): a grant, or undoing a
+  // Nobody goes over a googol (MAX_BALANCE): a grant, or undoing a
   // take-away, that would put them over isn't written. '' when it's fine.
   const overNote = (to, amount) => {
     if (!overCeiling(balances[to] ?? 0, amount)) return '';
@@ -392,7 +392,7 @@ export function CoinsAdmin({ cfg, setCfg, roster, balances, onGrant, ledger, onU
         />
         <button
           className="btn primary"
-          disabled={!who || !n}
+          disabled={!who || !n || !(Math.abs(n) <= MAX_BALANCE)}
           onClick={() => {
             const over = overNote(who, n);
             setMsg(over);

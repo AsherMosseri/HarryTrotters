@@ -418,12 +418,12 @@ export function beg(bank, now, rng = secureRandom) {
 }
 
 // The end of a history line for a win cut at the ceiling (coins.js
-// MAX_BALANCE): "Slots: won 120 (capped at 1 quadrillion)".
-export const CAPPED = ' (capped at 1 quadrillion)';
+// MAX_BALANCE): "Slots: won 120 (capped at a googol)".
+export const CAPPED = ' (capped at a googol)';
 
 // /rob near the ceiling (coins.js MAX_BALANCE): whoever the coins go to (the
 // robber, or the person robbed when the robber is caught and fined) takes in
-// at most what keeps them at 1 quadrillion, and the other side loses only
+// at most what keeps them at a googol, and the other side loses only
 // that, so no coins are made or lost. myBalance, theirBalance: before the rob.
 export function capRob(r, myBalance, theirBalance) {
   if (r.error) return r;

@@ -5,7 +5,7 @@
 // Michael asking Sebastian; Sebastian lending to Jackson; Ira overdue
 // (locked); Sophia's paid off.
 import * as L from '../../functions/shared/loans.js';
-import { teamDay } from '../../functions/shared/coins.js';
+import { ceilingNote, overCeiling, teamDay } from '../../functions/shared/coins.js';
 import { REQUESTS_TO } from '../config.js';
 import { coinsText } from '../../functions/shared/coinText.js';
 
@@ -80,6 +80,11 @@ export function demoLoans({ get, commit, uid }) {
       if (lockFor(loan.borrower, balanceOf, now))
         return note(`${role === 'borrower' ? 'You have' : `${first(loan.borrower)} has`} an overdue loan, so this one can’t start now.`);
       if (coinsOff(loan.borrower)) return note('🪙 Jackson coins are off right now.');
+      // Like the server: a loan that would put the borrower over a googol doesn't start.
+      if (overCeiling(balanceOf(loan.borrower), loan.terms.amount)) {
+        const c = ceilingNote(loan.borrower, 'Nobody can hold more than that. The loan didn’t start.');
+        return note(c.error, c.body);
+      }
       if (!loan.bank) {
         const problem = L.lendProblem({
           lender: loan.lender,
@@ -116,6 +121,11 @@ export function demoLoans({ get, commit, uid }) {
     if (!role) return note(loan ? 'That isn’t your loan.' : 'That loan is gone.');
     const r = L.repayCheck(loan, { role, amount: req.amount, balance: balanceOf(actor.name), now });
     if (r.error) return note(r.error, r.body);
+    // Like the server: a payment that would put a teammate lender over a googol is refused.
+    if (!loan.bank && overCeiling(balanceOf(loan.lender), r.amount)) {
+      const c = ceilingNote(loan.lender, 'Nobody can hold more than that. Nothing was paid.');
+      return note(c.error, c.body);
+    }
     pay(loan, 'repay', r.amount, now);
     const done = r.left === 0;
     save({

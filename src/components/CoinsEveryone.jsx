@@ -1,7 +1,7 @@
 // Coins screen extras: comparing the app's balance with the server's, and
 // (team management only) everyone's coin history.
 import { useMemo, useState } from 'react';
-import { MAX_BALANCE, breakdown, breakdownGaps, ceilingNote, historyGroup, historyKey, overCeiling, wallet as walletOf } from '../coins.js';
+import { MAX_BALANCE, breakdown, breakdownGaps, ceilingNote, coinsAgree, historyGroup, historyKey, overCeiling, sumCoins, wallet as walletOf } from '../coins.js';
 import { Avatar } from './common.jsx';
 import { Icon } from './shell/icons.jsx';
 import { alertDialog, confirmDialog } from './Dialogs.jsx';
@@ -31,7 +31,8 @@ export function compareLine(app, server) {
   const gaps = breakdownGaps(breakdown(app.history), server.breakdown || {});
   const off = server.balance - app.balance;
   // A running shift counts by the minute on both sides: a coin of slack.
-  if (Math.abs(off) <= 1) return { match: true, gaps: [], text: 'They match.' };
+  // Past 2^53 balances are approximate: within a billionth agrees (coinsAgree).
+  if (Math.abs(off) <= 1 || coinsAgree(app.balance, server.balance)) return { match: true, gaps: [], text: 'They match.' };
   const where = gaps.filter((g) => g.diff).map((g) => KIND[g.kind] || g.kind);
   return {
     match: false,
@@ -85,18 +86,18 @@ export function CompareWithServer({ name, mine, onCheck }) {
               </thead>
               <tbody>
                 {rows.map((r) => (
-                  <tr key={r.k} className={r.app !== r.server ? 'off' : ''}>
+                  <tr key={r.k} className={coinsAgree(r.app, r.server) ? '' : 'off'}>
                     <td>{KIND[r.k] || r.k}</td>
                     <td className="mono">{f.signed(r.app)}</td>
                     <td className="mono">{f.signed(r.server)}</td>
-                    <td className="mono">{r.app === r.server ? '' : f.signed(r.app - r.server)}</td>
+                    <td className="mono">{coinsAgree(r.app, r.server) ? '' : f.signed(r.app - r.server)}</td>
                   </tr>
                 ))}
-                <tr className={`total${mine.balance !== result.balance ? ' off' : ''}`}>
+                <tr className={`total${coinsAgree(mine.balance, result.balance) ? '' : ' off'}`}>
                   <td>Balance</td>
                   <td className="mono" title={f.title(mine.balance)}>{f.n(mine.balance)}</td>
                   <td className="mono" title={f.title(result.balance)}>{f.n(result.balance)}</td>
-                  <td className="mono">{mine.balance === result.balance ? '' : f.signed(mine.balance - result.balance)}</td>
+                  <td className="mono">{coinsAgree(mine.balance, result.balance) ? '' : f.signed(mine.balance - result.balance)}</td>
                 </tr>
               </tbody>
             </table>
@@ -275,12 +276,11 @@ function Person({ name, w, casino, cfg, onCheck, onAdjust, onFix, onBack }) {
 // The owner only: add, take away, or set someone's Jackson coins. It goes in
 // as a grant (bonus or "taken away") with a note, like the Ads page's grants;
 // "set" works out the difference from the server's balance when it can.
-// The most the owner can add or take away at once (the rules allow the same).
-// Grants are written from here (the rules can't read balances), so the
-// ceiling (MAX_BALANCE, 1 quadrillion) is checked here too: an Add or Set
-// that would put them over it is refused, against the server's balance when
-// it answers.
-const OWNER_MAX = 1000000000000;
+// The most the owner can add or take away at once is the ceiling itself, a
+// googol (MAX_BALANCE; the rules allow the same). Grants are written from
+// here (the rules can't read balances), so the ceiling is checked here too:
+// an Add or Set that would put them over it is refused, against the server's
+// balance when it answers. Past 2^53 the numbers are approximate.
 function AdjustCoins({ name, balance, onCheck, onAdjust }) {
   const [mode, setMode] = useState('add');
   const [amount, setAmount] = useState('');
@@ -289,7 +289,7 @@ function AdjustCoins({ name, balance, onCheck, onAdjust }) {
   const [msg, setMsg] = useState('');
   const n = Math.floor(Number(amount));
   // Set to more than the ceiling can never work, whatever the difference.
-  const ok = Number.isFinite(n) && amount !== '' && (mode === 'set' ? n >= 0 && n <= MAX_BALANCE : n > 0 && n <= OWNER_MAX);
+  const ok = Number.isFinite(n) && amount !== '' && (mode === 'set' ? n >= 0 : n > 0) && n <= MAX_BALANCE;
   const go = async () => {
     if (!ok || busy) return;
     setBusy(true);
@@ -310,8 +310,8 @@ function AdjustCoins({ name, balance, onCheck, onAdjust }) {
         setMsg(`${c.error} ${c.body}`);
         return;
       }
-      if (Math.abs(delta) > OWNER_MAX) {
-        setMsg(`That’s a change of ${Math.abs(delta).toLocaleString()}: up to ${OWNER_MAX.toLocaleString()} at a time.`);
+      if (Math.abs(delta) > MAX_BALANCE) {
+        setMsg('That’s a change of more than a googol.');
         return;
       }
       const after = now + delta;
@@ -347,13 +347,13 @@ function AdjustCoins({ name, balance, onCheck, onAdjust }) {
         ))}
       </div>
       <div className="cv-adjust-row">
-        <input className="input mono" type="number" inputMode="numeric" min={0} max={100000} value={amount} onChange={(e) => setAmount(e.target.value)} placeholder={mode === 'set' ? String(balance) : '0'} aria-label="Coins" />
+        <input className="input mono" type="number" inputMode="numeric" min={0} value={amount} onChange={(e) => setAmount(e.target.value)} placeholder={mode === 'set' ? String(balance) : '0'} aria-label="Coins" />
         <input className="input grow" maxLength={140} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Note (they see it in their history)" aria-label="Note" />
         <button className="btn primary" disabled={!ok || busy} onClick={go}>
           {busy ? '…' : 'Save'}
         </button>
       </div>
-      {mode === 'set' && amount !== '' && n > MAX_BALANCE && <p className="muted tiny">Nobody can hold more than 1 quadrillion coins.</p>}
+      {amount !== '' && n > MAX_BALANCE && <p className="muted tiny">Nobody can hold more than a googol coins.</p>}
       {msg && <p className="muted tiny">{msg}</p>}
     </div>
   );
@@ -382,9 +382,9 @@ export function useReverse(name, history, onAdjust, onFix) {
     const first = name.split(' ')[0];
     const viaCard = !!(x.card && onFix);
     const [conv, msgId] = viaCard ? String(x.card).split('/') : [];
-    // A refund written from here (a grant) can't put them over 1 quadrillion
+    // A refund written from here (a grant) can't put them over a googol
     // either (the card's refund is checked by the server).
-    if (refund && !viaCard && overCeiling(history.reduce((t, y) => t + y.amount, 0), -x.amount)) {
+    if (refund && !viaCard && overCeiling(sumCoins(history), -x.amount)) {
       const c = ceilingNote(name);
       await alertDialog({ title: c.error, body: c.body });
       return;

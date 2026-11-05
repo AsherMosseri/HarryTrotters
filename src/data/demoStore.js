@@ -20,7 +20,7 @@ import * as challenge from '../../functions/shared/challenge.js';
 import * as dispute from '../../functions/shared/disputes.js';
 import { blocked, isOff, serverGroup } from '../../functions/shared/commandRules.js';
 import * as coinAsk from '../../functions/shared/coinRequests.js';
-import { AWARD_CAPS, breakdown, capWin, giftEntry, groupGiftEntries, prizeEntry, teamDay, teamMidnight } from '../../functions/shared/coins.js';
+import { AWARD_CAPS, breakdown, capWin, ceilingNote, giftEntry, overCeiling, groupGiftEntries, prizeEntry, teamDay, teamMidnight } from '../../functions/shared/coins.js';
 import { BOT, GROUP_MAX, groupLabel, resolveTargets } from '../../functions/shared/groups.js';
 import * as fun from '../../functions/shared/funGames.js';
 import * as mines from '../../functions/shared/minesweeper.js';
@@ -1990,7 +1990,7 @@ export const demoStore = {
     if (lock) return note(lock.title, lock.body);
     // Several people's coins at once (multiplayer games).
     // card: the game and its card's id, so a held bet and its result share a history line.
-    // A win past 1 quadrillion is cut (arcade.capMoney, like the server's payOut);
+    // A win past a googol is cut (arcade.capMoney, like the server's payOut);
     // returns { name: net paid } for the card (pub.capped).
     const payOut = (money, card) => {
       const winners = money.filter((x) => x.delta > 0 && x.entry?.shown > 0).map((x) => x.name);
@@ -2088,7 +2088,7 @@ export const demoStore = {
       const { status, ...g } = r.pub;
       const cmd = { ...c, game: g, status, bet };
       if (r.done) {
-        // Like the server: a win pays up to 1 quadrillion at most (before: now plus the bet held).
+        // Like the server: a win pays up to a googol at most (before: now plus the bet held).
         const won = r.payout - bet;
         const net = won > 0 ? capWin(won, balanceOf(m.by) + c.bet) : won;
         const capped = net < won;
@@ -2173,7 +2173,7 @@ export const demoStore = {
       if (r.error) return note(r.error);
       const { status = 'done', ...g } = r.pub;
       if (r.done) {
-        // Like the server: a win pays up to 1 quadrillion at most.
+        // Like the server: a win pays up to a googol at most.
         const net = capWin(r.payout - bet, balance);
         const capped = net < r.payout - bet;
         const m = post({ game: g, status, bet, payout: bet + net, net, ...(capped && { capped: true }) });
@@ -2238,7 +2238,7 @@ export const demoStore = {
             })
           : casino.beg(mine, now);
     if (r.error) return note(r.error);
-    // /work and /beg pay up to 1 quadrillion at most (like the server).
+    // /work and /beg pay up to a googol at most (like the server).
     if (game !== 'daily' && capWin(r.amount, balance) < r.amount) {
       r.amount = capWin(r.amount, balance);
       r.card = { ...r.card, amount: r.amount, capped: true };
@@ -2303,7 +2303,9 @@ export const demoStore = {
     commit();
     return { ok: true, id };
   },
-  async disputeDecide(req, actor) {
+  // ctx.balanceOf (when given): the ceiling, like the server (a refund that
+  // would put them over a googol is refused).
+  async disputeDecide(req, actor, ctx = {}) {
     const now = Date.now();
     const note = (title, body = '') => ({ note: { title, body } });
     if (!actor.admin || actor.name !== REQUESTS_TO) return note(`Only ${REQUESTS_TO.split(' ')[0]} can do that.`);
@@ -2329,6 +2331,10 @@ export const demoStore = {
       if (seen === 'missing') return note('I can’t find that loss in their coin history.', 'Dismiss it, or add the coins yourself as a bonus.');
       const link = demoLine({ who: x.by, conv: x.conv, msgId: x.msgId, game: x.cmd, net: -refund, cardAt: kept.cardAt || x.at });
       if (link.problem) return link.problem;
+      if (ctx.balanceOf && overCeiling(ctx.balanceOf(x.by) + (ctx.paid?.[x.by] || 0), refund)) {
+        const c = ceilingNote(x.by, 'Nobody can hold more than that. Nothing was refunded.');
+        return note(c.error, c.body);
+      }
       keys[key] = { mode: 'refund', via: 'report', at: now };
       state.coins = [...(state.coins || []), { id: `dispute-${id}`, ...dispute.refundEntry(x.by, refund, x.cmd, id, now, link.reverses) }];
       if (m?.cmd) demoTag(x.conv, x.msgId, dispute.adjustTag({ person: x.by, mode: 'refund', amount: refund, by: actor.name, now, via: 'report' }));
@@ -2359,7 +2365,7 @@ export const demoStore = {
   },
   // Refund all (the disputeRefundAll function): every waiting report, or one
   // person's, each through disputeDecide; one notification per person.
-  async disputeRefundAll(req, actor) {
+  async disputeRefundAll(req, actor, ctx = {}) {
     const note = (title, body = '') => ({ note: { title, body } });
     if (!actor.admin || actor.name !== REQUESTS_TO) return note(`Only ${REQUESTS_TO.split(' ')[0]} can do that.`);
     const only = String(req?.person || '').trim();
@@ -2369,7 +2375,9 @@ export const demoStore = {
     const skipped = [];
     let coins = 0;
     for (const x of open) {
-      const out = await this.disputeDecide({ id: x.id, decision: 'refund', note: req?.note, quiet: true }, actor);
+      // What this run already paid each person counts toward their ceiling.
+      const sofar = Object.fromEntries([...paid].map(([n, r]) => [n, r.coins]));
+      const out = await this.disputeDecide({ id: x.id, decision: 'refund', note: req?.note, quiet: true }, actor, { ...ctx, paid: sofar });
       if (out?.ok) {
         const row = paid.get(x.by) || { count: 0, coins: 0, game: x.cmd };
         row.count += 1;
@@ -2400,7 +2408,7 @@ export const demoStore = {
   // The owner's Refund / Take back on a game card, checked the way the
   // ownerRefund function checks it (shared/disputes.js): the card's own
   // result, once per card and person (the key reports use too).
-  async ownerRefund(req, actor) {
+  async ownerRefund(req, actor, ctx = {}) {
     const now = Date.now();
     const note = (title, body = '') => ({ note: { title, body } });
     if (!actor.admin || actor.name !== REQUESTS_TO) return note(`Only ${REQUESTS_TO.split(' ')[0]} can do that.`);
@@ -2416,6 +2424,10 @@ export const demoStore = {
     const link = demoLine({ who, conv, msgId, game: check.game, net: check.net, cardAt: m.at || 0 });
     if (link.problem) return link.problem;
     const amount = check.amount;
+    if (mode === 'refund' && ctx.balanceOf && overCeiling(ctx.balanceOf(who), amount)) {
+      const c = ceilingNote(who, 'Nobody can hold more than that. Nothing was refunded.');
+      return note(c.error, c.body);
+    }
     keys[key] = { mode, via: 'card', at: now };
     state.coins = [
       ...(state.coins || []),

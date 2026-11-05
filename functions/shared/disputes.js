@@ -9,6 +9,7 @@
 import { nameKey } from './team.js';
 import { BOT, CHALLENGES, LABEL as ARCADE_LABEL } from './arcade.js';
 import { historyKey } from './coins.js';
+import { coinsText } from './coinText.js';
 
 // Results that can be reported: the casino games (not the lottery, which is
 // a pot for everyone) and the head-to-head challenge.
@@ -247,7 +248,7 @@ export function fixEntry({ person, mode, amount, game, msgId, by, now, reverses 
 export const adjustTag = ({ person, mode, amount, by, now, via = 'card' }) => ({ name: person, mode, amount, by, at: now, via });
 export function fixNote({ mode, amount, game, by }) {
   const who = (by || 'Asher').split(' ')[0];
-  const n = amount.toLocaleString('en-US');
+  const n = coinsText(amount);
   return mode === 'takeback'
     ? { icon: '↩️', title: `${who} took back your ${gameLabel(game)} win: −${n}`, body: 'It’s in your coin history.' }
     : { icon: '↩️', title: `${who} refunded your ${gameLabel(game)} bet: +${n}`, body: 'It’s in your coin history.' };

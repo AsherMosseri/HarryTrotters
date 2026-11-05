@@ -35,13 +35,13 @@ function LimitLine({ g, me }) {
   );
 }
 // Wins the ceiling cut (the server puts what it paid in g.capped): nobody
-// holds more than 1 quadrillion coins (functions/shared/coins.js MAX_BALANCE).
+// holds more than a googol coins (functions/shared/coins.js MAX_BALANCE).
 function CapLine({ g, me }) {
   const f = useCoinFormat();
   const cut = Object.entries(g.capped || {});
   if (!cut.length) return null;
   const who = cut.map(([n, k]) => `${n === me ? 'you' : n.split(' ')[0]} won ${f.n(k)}`).join(' · ');
-  return <div className="muted tiny">Capped ({who}): nobody can hold more than 1 quadrillion coins.</div>;
+  return <div className="muted tiny">Capped ({who}): nobody can hold more than a googol coins.</div>;
 }
 const secs = (ms) => Math.max(0, Math.ceil(ms / 1000));
 const clock = (ms) => {

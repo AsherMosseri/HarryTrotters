@@ -171,7 +171,7 @@ export function loanFunctions({ db, coinData, freshCoins, bankRef, notify, owner
           return note(`${role === 'borrower' ? 'You have' : `${first(borrower)} has`} an overdue loan, so this one can’t start now.`);
         if (await coinsOff(borrower, boss)) return note('🪙 Jackson coins are off right now.');
         // The ceiling (MAX_BALANCE): a loan that would put the borrower over
-        // 1 quadrillion doesn't start. Their bank doc is read here too, so a
+        // a googol doesn't start. Their bank doc is read here too, so a
         // bet of theirs at the same moment takes turns with this.
         const borrowerBank = await tx.get(bankRef(borrower));
         if (overCeiling(await balanceOf(borrower, data, borrowerBank.data() || {}), loan.terms.amount)) {
@@ -244,7 +244,7 @@ export function loanFunctions({ db, coinData, freshCoins, bankRef, notify, owner
       if (r.error) return note(r.error, r.body);
       const lender = loan.bank ? '' : data.rename(loan.lender);
       // The ceiling (MAX_BALANCE): a payment that would put a teammate lender
-      // over 1 quadrillion is refused (the bank keeps nothing it's paid).
+      // over a googol is refused (the bank keeps nothing it's paid).
       if (lender) {
         const lenderBank = await tx.get(bankRef(lender));
         if (overCeiling(await balanceOf(lender, data, lenderBank.data() || {}), r.amount)) {

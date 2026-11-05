@@ -311,7 +311,7 @@ export function payoutOf(t, rename = (n) => n) {
 export const prizeLabel = (t) => `Tournament: ${t.title}`.slice(0, 80);
 
 // Prizes or entries back near the ceiling (coins.js MAX_BALANCE): each pays
-// up to what keeps its person at 1 quadrillion, counting what they already
+// up to what keeps its person at a googol, counting what they already
 // got from this list. have: { name: balance now }. Ones cut to 0 are left out.
 export function capPays(pays = [], have = {}) {
   const left = { ...have };

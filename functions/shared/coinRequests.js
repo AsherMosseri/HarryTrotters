@@ -78,7 +78,7 @@ export function startAsk({ me, to, amount, reason = '', roster = [], active = fa
   if (!roster.includes(to)) return { error: 'Who’s that?', body: usage };
   if (typeof amount !== 'number' || !Number.isInteger(amount) || amount < 1)
     return { error: 'Ask for a whole number of coins, at least 1.', body: usage };
-  if (amount > GIFT_MAX) return { error: 'That’s a lot.', body: `Up to ${coinsText(GIFT_MAX)} at a time, the same as /give.` };
+  if (amount > GIFT_MAX) return { error: 'That’s more than a googol.', body: 'Nobody can hold more than that.' };
   if (!active) return { error: `${first(to)} isn’t on the team.` };
   // open: one-person requests ({ to }) and group requests ({ people: the
   // ones still waiting on }), each counting as one toward MAX_OPEN.
@@ -148,7 +148,7 @@ export function startGroupAsk({ me, people = [], label = '', amount, reason = ''
   const usage = `Try: /request ${label || '@Programming'} 5 for pizza`;
   if (typeof amount !== 'number' || !Number.isInteger(amount) || amount < 1)
     return { error: 'Ask for a whole number of coins each, at least 1.', body: usage };
-  if (amount > GIFT_MAX) return { error: 'That’s a lot.', body: `Up to ${coinsText(GIFT_MAX)} each, the same as /give.` };
+  if (amount > GIFT_MAX) return { error: 'That’s more than a googol.', body: 'Nobody can hold more than that.' };
   if (people.some((n) => n === me || !n)) return { error: 'That’s you.', body: 'Your coins are already yours.' };
   if (!people.length) return { error: `Nobody in ${label || 'that group'} to ask.` };
   if (people.length > GROUP_MAX) return { error: `That’s ${people.length} people.`, body: `Up to ${GROUP_MAX} at a time.` };

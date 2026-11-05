@@ -69,10 +69,16 @@ eq(title(R('bank -5')), 'Ask for a whole number of coins, at least 1.', 'run: -5
 eq(title(R('bank 0')), 'Ask for a whole number of coins, at least 1.', 'run: 0');
 eq(R('bank 2m').loan?.amount, 2000000, 'run: 2m from the bank (no 500 cap since 3.1.3)');
 eq(R('bank 501').loan?.amount, 501, 'run: 501 from the bank');
-eq(/^Up to .* coins from the bank\.$/.test(title(R('bank 2t')) || ''), true, 'run: 2t is over the bank cap of 1 trillion');
+eq(R('bank 2t').loan?.amount, 2e12, 'run: 2t from the bank (no trillion cap since 3.1.5)');
+eq(R('bank 5qa').loan?.amount, 5e15, 'run: 5qa from the bank');
+eq(R('bank 2.5e40').loan?.amount, 2.5e40, 'run: 2.5e40 from the bank');
+eq(R('bank googol').loan?.amount, 1e100, 'run: a googol from the bank');
+eq(title(R('bank 2e101')), 'That’s more than a googol.', 'run: over a googol from the bank');
 eq(R('bank 500').loan.amount, 500, 'run: 500 from the bank');
 eq(R('@Cooper 5001').loan?.amount, 5001, 'run: 5001 from a teammate (no 5000 cap since 3.1.3)');
-eq(/^Up to .* coins from a teammate\.$/.test(title(R('@Cooper 2t')) || ''), true, 'run: 2t is over the teammate cap of 1 trillion');
+eq(R('@Cooper 2t').loan?.amount, 2e12, 'run: 2t from a teammate (no trillion cap since 3.1.5)');
+eq(R('@Cooper 11qa').loan?.amount, 1.1e16, 'run: 11qa from a teammate');
+eq(title(R('@Cooper 1e101')), 'That’s more than a googol.', 'run: over a googol from a teammate');
 eq(R('@Cooper 5k').loan.amount, 5000, 'run: 5k from a teammate');
 eq(title(R('bank 100 60%')), 'Interest is a whole number from 0 to 50%.', 'run: 60%');
 eq(title(R('bank 100 2.5%')), 'Interest is a whole number from 0 to 50%.', 'run: 2.5%');

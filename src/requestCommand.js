@@ -99,7 +99,7 @@ async function groupCoins(t, ctx) {
   const w = words[at].replace('🪙', '');
   const amount = parseAmount(w, { positive: true });
   if (amount === null) return note('Ask for a whole number of coins each, at least 1.', amountTip(w) || usage);
-  if (amount > GIFT_MAX) return note('That’s a lot.', `Up to ${coinsText(GIFT_MAX)} each, the same as /give.`);
+  if (amount > GIFT_MAX) return note('That’s more than a googol.', 'Nobody can hold more than that.');
   const reason = words.slice(at + 1).join(' ');
   const r = await ctx.coinRequest({ action: 'create', group: t.ask, amount, reason, key: ctx.key });
   if (r?.note) return { note: r.note };

@@ -336,8 +336,14 @@ export function bankItems(name, bank = {}) {
   // Whatever the latest entries don't cover. Also when the net is 0 (a bet
   // held for a game still running can cancel out an earlier win): the history
   // always adds up to the bank's net, which is what the server counts.
-  const older = (b.net || 0) - recent.reduce((t, x) => t + x.amount, 0);
-  if (older)
+  const net = b.net || 0;
+  const older = net - sumCoins(recent);
+  // Past 2^53 the bank's net (added one result at a time) and the exact sum
+  // of its lines can differ by rounding alone: a few coins on a balance of
+  // quadrillions. That is no older line, so none is shown (the same on the
+  // app and the server, so both still count the same).
+  const noise = Math.abs(net) >= EXACT_LIMIT && Math.abs(older) <= Number.EPSILON * Math.abs(net) * (recent.length + 2);
+  if (older && !noise)
     recent.push({
       kind: 'casino',
       at: Math.min(...recent.map((x) => x.at), b.since || 1) - 1,
@@ -364,8 +370,8 @@ export function wallet(name, data) {
   const earned = earnedItems(name, data);
   const ledger = [...ledgerItems(name, data.ledger), ...bankItems(name, data.bank)];
   const history = [...earned, ...ledger].sort((a, b) => b.at - a.at);
-  const sum = (list) => list.reduce((t, x) => t + x.amount, 0);
-  return { balance: sum(history), earned: sum(earned), history };
+  // sumCoins: the same total whatever order the entries came in.
+  return { balance: sumCoins(history), earned: sumCoins(earned), history };
 }
 
 // Which part of the history an entry belongs to (the Everyone view's chips).
@@ -383,12 +389,10 @@ export function historyGroup(x) {
 // app's numbers with the server's (the coinCheck function) category by
 // category. Kinds with nothing in them are left out.
 export function breakdown(history) {
+  const lists = {};
+  for (const x of history) (lists[x.kind] || (lists[x.kind] = [])).push(x);
   const out = {};
-  for (const x of history) {
-    const k = out[x.kind] || (out[x.kind] = { n: 0, coins: 0 });
-    k.n += 1;
-    k.coins += x.amount;
-  }
+  for (const [kind, list] of Object.entries(lists)) out[kind] = { n: list.length, coins: sumCoins(list) };
   return out;
 }
 
@@ -397,7 +401,8 @@ export function breakdownGaps(app, server) {
   return [...new Set([...Object.keys(app), ...Object.keys(server)])]
     .map((kind) => ({ kind, app: app[kind]?.coins || 0, server: server[kind]?.coins || 0, appN: app[kind]?.n || 0, serverN: server[kind]?.n || 0 }))
     .map((r) => ({ ...r, diff: r.app - r.server }))
-    .filter((r) => r.diff || r.appN !== r.serverN);
+    // Past 2^53 a rounding-sized difference is no difference (coinsAgree).
+    .filter((r) => !coinsAgree(r.app, r.server) || r.appN !== r.serverN);
 }
 
 // Who earned the most (tasks, hours, and bonuses; gifts don't count).
@@ -520,31 +525,76 @@ export function oldBankIds(name, aliases) {
 // Gifts and ad prizes are paid by the server (the play function), which
 // checks them against the real balance and today's limits; demo mode runs the
 // same checks. Each returns the ledger entry to add, or { error }.
-// No real limit on an amount (3.1.3): /give, /request, group gifts, teammate
-// loans, the bank and the owner's add / take away / set. One trillion keeps
-// every sum and the loan interest math exact (well under 2^53); the balance
-// checks still apply.
-export const NO_LIMIT = 1000000000000;
+// The most anyone can hold (3.1.5): a googol (1e100). Balances are sums of
+// ledger lines. JavaScript numbers are exact whole numbers only up to 2^53
+// (about 9 quadrillion): amounts and balances past that are approximate
+// doubles (still whole, but rounded to the nearest one a double can hold).
+// A googol keeps everything far below Infinity (about 1.8e308), so no sum,
+// interest or payout can overflow. Coins sent to someone (gifts, /request,
+// loans, refunds, the owner's Add/Set) that would put them over are refused;
+// game wins are cut so the balance ends at MAX_BALANCE (capWin). Earned
+// coins (tasks, lab time) and the small daily-capped awards and prizes
+// aren't checked: they can't come near it.
+export const MAX_BALANCE = 1e100;
+// Up to here every whole number is exact (2^53, Number.MAX_SAFE_INTEGER + 1).
+export const EXACT_LIMIT = 2 ** 53;
+// No real limit on an amount (3.1.3; the ceiling since 3.1.5): /give,
+// /request, group gifts, teammate loans, the bank and the owner's add / take
+// away / set. The balance checks still apply.
+export const NO_LIMIT = MAX_BALANCE;
 export const GIFT_MAX = NO_LIMIT;
-
-// The most anyone can hold (3.1.4): 1 quadrillion. Balances are sums of
-// ledger lines, and JavaScript numbers are exact only up to 2^53 (about 9
-// quadrillion), so no balance may grow past this, however many grants, gifts
-// or all-in wins it takes. Coins sent to someone (gifts, /request, loans,
-// refunds, the owner's Add/Set) that would put them over are refused; game
-// wins are cut so the balance ends at MAX_BALANCE (capWin). Earned coins
-// (tasks, lab time) and the small daily-capped awards and prizes aren't
-// checked: they can't come near 2^53.
-export const MAX_BALANCE = 1000000000000000;
+// A whole number of coins, of any size up to the ceiling (either sign):
+// below 2^53 an exact integer; past it any finite double, all of which are
+// whole. NaN, Infinity and fractions below 2^53 are not.
+export const wholeCoins = (n) => typeof n === 'number' && Number.isInteger(n) && Math.abs(n) <= MAX_BALANCE;
 // How many more coins someone with `balance` can take in (never below 0).
 export const ceilingRoom = (balance) => Math.max(0, MAX_BALANCE - (Number(balance) || 0));
-// Would adding `amount` put someone with `balance` over the ceiling?
-export const overCeiling = (balance, amount) => amount > 0 && (Number(balance) || 0) + amount > MAX_BALANCE;
-// The note for a refused credit: "That would put Cooper over 1 quadrillion coins."
+// Would adding `amount` put someone with `balance` over the ceiling? Against
+// the room left, not balance + amount: at a googol a small credit would
+// vanish in the rounding (1e100 + 10 is 1e100) and never look "over".
+export const overCeiling = (balance, amount) => amount > 0 && amount > ceilingRoom(balance);
+// The note for a refused credit: "That would put Cooper over a googol coins."
 export const ceilingNote = (name, body = 'Nobody can hold more than that.') => ({
-  error: `That would put ${String(name || 'them').split(' ')[0]} over 1 quadrillion coins.`,
+  error: `That would put ${String(name || 'them').split(' ')[0]} over a googol coins.`,
   body,
 });
+// Do two balances agree? Exactly, below 2^53. Past it they are approximate
+// doubles: within a billionth of the balance counts as the same.
+export function coinsAgree(a, b) {
+  if (a === b) return true;
+  const big = Math.max(Math.abs(Number(a) || 0), Math.abs(Number(b) || 0));
+  return Number.isFinite(big) && big >= EXACT_LIMIT && Math.abs(a - b) <= 1e-9 * big;
+}
+// Adds up coin amounts (amount(x) for each x) the same way everywhere, in
+// any order: the app's wallet and the server's (both call wallet() below)
+// must land on the same number for the same entries even when the entries
+// come back in a different order. Below 2^53 every step is exact. When any
+// amount or running total reaches 2^53, it adds them again exactly (BigInt,
+// whole parts) and rounds once at the end, so the result never depends on
+// the order.
+export function sumCoins(list, amount = (x) => x.amount) {
+  let t = 0;
+  let exact = true;
+  for (const x of list) {
+    const v = amount(x);
+    t += v;
+    if (!(Math.abs(v) < EXACT_LIMIT && Math.abs(t) < EXACT_LIMIT)) {
+      exact = false;
+      break;
+    }
+  }
+  if (exact) return t;
+  let whole = 0n;
+  let rest = 0;
+  for (const x of list) {
+    const v = amount(x);
+    if (typeof v !== 'number' || !Number.isFinite(v)) return list.reduce((s, y) => s + amount(y), 0);
+    const w = Math.trunc(v);
+    whole += BigInt(w);
+    rest += v - w;
+  }
+  return Number(whole) + rest;
+}
 // A game's result for someone whose balance before it was `before`: a win
 // is cut so they end at MAX_BALANCE at most (never below 0); a loss or a
 // push is unchanged.
@@ -578,7 +628,7 @@ export function giftEntry(from, { to, amount, note }, { roster, balance, toBalan
   if (!roster.includes(to)) return { error: 'Who’s that?' };
   if (to === from) return { error: 'That’s you.', body: 'Your coins are already yours.' };
   if (!Number.isInteger(n) || n < 1) return { error: 'Send at least 1 coin.' };
-  if (n > GIFT_MAX) return { error: 'That’s a lot.', body: `Up to ${coinsText(GIFT_MAX)} at a time.` };
+  if (n > GIFT_MAX) return { error: 'That’s more than a googol.', body: 'Nobody can hold more than that.' };
   if (n > balance) return { error: `You only have ${coinsText(balance)} coins.` };
   if (typeof toBalance === 'number' && overCeiling(toBalance, n)) return ceilingNote(to);
   return { type: 'gift', from, to, amount: n, note: text(note, 140).trim(), at: now };

@@ -147,7 +147,7 @@ export function moneyLine(x, game, id, conv = '') {
 }
 
 // Wins near the ceiling (coins.js MAX_BALANCE). Each payout in `money` that
-// would put its person over 1 quadrillion is cut so they end there: their
+// would put its person over a googol is cut so they end there: their
 // balance before the game is what they have now plus the stake coming back
 // to them (delta − shown: a bet that was held). What's cut isn't paid to
 // anyone, so a pot can lose coins here but never make them. balances:

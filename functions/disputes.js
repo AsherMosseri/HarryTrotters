@@ -6,11 +6,11 @@
 // Callables:
 //   dispute({ conv, msgId, reason, note })        report a casino result you were part of
 //   disputeDecide({ id, decision, note })         the owner only: 'refund' or 'dismiss'
-//   disputeRefundAll({ person?, note })           the owner only (3.1.4): refund every waiting report,
+//   disputeRefundAll({ person?, note })           the owner only (3.1.5): refund every waiting report,
 //                                                 or every one from one person, each checked like disputeDecide
 //   ownerRefund({ conv, msgId, person, mode })     the owner only, from the card in chat (3.1.1):
 //                                                 'refund' a loss or 'takeback' a win, report or not
-// A refund that would put the person over 1 quadrillion (MAX_BALANCE, 3.1.4)
+// A refund that would put the person over a googol (MAX_BALANCE, 3.1.5)
 // is refused and nothing changes; Refund all skips it and it stays waiting.
 //
 // Everything is checked here, against the card on the message (which only the
@@ -139,8 +139,8 @@ export function disputeFunctions({ db, coinData, freshCoins, notify, bankRef, ow
     return { ok: true, id };
   });
 
-  // A refund restores a past loss, but still never puts anyone over 1
-  // quadrillion (MAX_BALANCE): { problem } when it would, inside the
+  // A refund restores a past loss, but still never puts anyone over a
+  // googol (MAX_BALANCE): { problem } when it would, inside the
   // transaction (their bank doc read in it), before anything is written.
   async function ceilingCheck(tx, who, amount, data) {
     const bank = (await tx.get(bankRef(who))).data() || {};

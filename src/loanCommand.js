@@ -14,7 +14,7 @@
 // commands.js runs it; Workspace opens the coins screen (api.openLoan) and
 // Loans.jsx (useLoanPrefill) fills in the form.
 
-import { amountTip, looksLikeAmount, readAmount } from '../functions/shared/amount.js';
+import { OVER_GOOGOL, amountTip, looksLikeAmount, readAmount } from '../functions/shared/amount.js';
 import { parseAsk } from '../functions/shared/coinRequests.js';
 import { BOT } from '../functions/shared/groups.js';
 import * as L from '../functions/shared/loans.js';
@@ -129,10 +129,12 @@ export function runLoan(args, ctx) {
     if (p.who === me) return note('That’s you.', 'Ask the bank or a teammate: /loan bank 100');
     if (p.who === BOT) return note('Trotbot doesn’t lend coins.', 'Ask the bank or a teammate: /loan bank 100');
   }
+  if (readAmount(p.amountWord || '')?.over) return note(OVER_GOOGOL, 'Nobody can hold more than that.');
   if (Number.isNaN(p.amount) || p.amount === 0)
     return note('Ask for a whole number of coins, at least 1.', amountTip(p.amountWord) || usage);
+  // Up to a googol (3.1.5: the bank's and a teammate's limit is the ceiling).
   const max = bank ? cfg.bankMax : L.PEER_MAX;
-  if (p.amount > max) return note(`Up to ${max} coins${bank ? ' from the bank' : ' from a teammate'}.`, `Try: /loan ${bank ? 'bank' : `@${p.who}`} ${max}`);
+  if (p.amount > max) return note(OVER_GOOGOL, 'Nobody can hold more than that.');
   if (p.rate !== undefined && !(Number.isInteger(p.rate) && p.rate <= L.RATE_MAX))
     return note(`Interest is a whole number from 0 to ${L.RATE_MAX}%.`, `${usage} 10%`);
   if (loans?.lock) return note(loans.lock.title, loans.lock.body);

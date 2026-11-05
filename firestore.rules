@@ -176,8 +176,16 @@ service cloud.firestore {
       function validGrant(d) {
         // reverses: the history line it undoes (the owner's Reverse in Coins), which can be a big casino line.
         return d.keys().hasOnly(['type', 'to', 'amount', 'note', 'by', 'at', 'reverses']) && requestsOwner() && d.to is string
-          && d.amount is int && d.amount != 0 && d.amount >= -1000000000000 && d.amount <= 1000000000000 && shortStr(d.get('note', ''), 140)
+          && grantAmount(d.amount) && shortStr(d.get('note', ''), 140)
           && shortStr(d.get('reverses', ''), 200);
+      }
+      // Up to a googol either way (3.1.5, the most anyone can hold). The app
+      // sends whole numbers below 2^53 as ints; past 2^53 a number can only
+      // be a double, and every double that big is whole. A double below 2^53
+      // would be a fraction, so it isn't allowed.
+      function grantAmount(n) {
+        return (n is int || (n is float && math.abs(n) >= 9007199254740992.0))
+          && n != 0 && n >= -math.pow(10, 100) && n <= math.pow(10, 100);
       }
       allow read: if isMember();
       allow create: if isMember() && !featureOff('coins') && request.resource.data.at is int

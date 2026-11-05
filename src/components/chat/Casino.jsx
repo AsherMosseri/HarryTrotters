@@ -79,7 +79,7 @@ export const Amt = ({ n }) => (
 
 // A win the ceiling cut (functions/shared/coins.js MAX_BALANCE): the card
 // shows what was paid, and says why.
-export const CapNote = ({ on }) => (on ? <div className="muted tiny">Capped: nobody can hold more than 1 quadrillion coins.</div> : null);
+export const CapNote = ({ on }) => (on ? <div className="muted tiny">Capped: nobody can hold more than a googol coins.</div> : null);
 
 function Outcome({ c, reveal = '' }) {
   if (c.status === 'playing')

@@ -1392,7 +1392,7 @@ async function workContext(me, data) {
 // (Prizes from the free games are awards instead: payAwards.)
 // card: { game, id }, so a bet held for the game and its result share one
 // line in each person's history (arcade.moneyLine).
-// A win that would put someone over 1 quadrillion (MAX_BALANCE) is cut so
+// A win that would put someone over a googol (MAX_BALANCE) is cut so
 // they end there (arcade.capMoney, from their balance read fresh); the rest
 // of the pot isn't paid. Returns { name: net paid } for the wins it cut, for
 // the card (pub.capped).
@@ -1503,7 +1503,7 @@ async function runMove({ conv, msgId, me, move, data, now, house = false, verifi
     if (r.done) {
       // The bet was taken when the game started (and again when doubling):
       // pay back what it won; the history shows the overall result. A win
-      // that would put them over 1 quadrillion pays up to it (capWin): their
+      // that would put them over a googol pays up to it (capWin): their
       // balance before the game is what they have now plus the bet held.
       const won = r.payout - bet;
       const net = won > 0 ? capWin(won, (await balanceOf(player, bank, data)) + c.bet) : won;
@@ -1619,7 +1619,7 @@ async function giveMany(me, body, data, now) {
       return { ok: true, repeat: true, people: sent.map((x) => x.to), amount: sent[0]?.amount || 0, total, group: label };
     }
     const mine = await freshCoins(me, myBank, data);
-    // Everyone it goes to, for the ceiling: one who'd go over 1 quadrillion
+    // Everyone it goes to, for the ceiling: one who'd go over a googol
     // stops the whole gift (all or nothing, like the balance check).
     const balances = await balancesOf(
       people.filter((n) => n !== me),
@@ -1814,7 +1814,7 @@ export const play = onCall({ maxInstances: 5, invoker: 'public' }, withBalance(a
       if (r.error) return note(r.error);
       const { status = 'done', ...game2 } = r.pub;
       if (r.done) {
-        // A win that would put them over 1 quadrillion pays up to it (capWin).
+        // A win that would put them over a googol pays up to it (capWin).
         const net = capWin(r.payout - bet, balance);
         const capped = net < r.payout - bet;
         tx.set(
@@ -2316,12 +2316,12 @@ export const drawLottery = onSchedule({ schedule: '0 18 * * 5', timeZone: TIME_Z
     const last = { winner, pot: lot.pot, tickets: theirs, of: total, people: entries.length, at: now, ...(capped && { won }) };
     tx.set(lotteryRef, { pot: 0, tickets: {}, drawAt: nextFriday(now + 60000), round: (lot.round || 1) + 1, last });
     tx.set(db.collection('channels/arcade/messages').doc(), {
-      text: `🎟️ ${winner} won the lottery: ${coinsText(won)} coins!${capped ? ' (capped at 1 quadrillion)' : ''}`,
+      text: `🎟️ ${winner} won the lottery: ${coinsText(won)} coins!${capped ? ' (capped at a googol)' : ''}`,
       by: 'Trotbot',
       byUid: 'trotbot',
       bot: true,
       at: now,
-      cmd: { name: 'lottery', draw: last, line: `won the lottery: ${coinsText(won)} coins${capped ? ' (capped at 1 quadrillion)' : ''}` },
+      cmd: { name: 'lottery', draw: last, line: `won the lottery: ${coinsText(won)} coins${capped ? ' (capped at a googol)' : ''}` },
       mentions: [winner],
       taskIds: [],
       replyTo: null,

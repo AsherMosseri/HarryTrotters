@@ -196,7 +196,7 @@ export function marketFunctions({ db, coinData, freshCoins, notify, bankRef, per
       const r0 = cancel
         ? { winners: [], pays: [], refunds: Object.keys(t.players || {}).map((n) => ({ name: rename(n), amount: t.entry })) }
         : market.payoutOf(t, rename);
-      // Nobody ends up over 1 quadrillion (MAX_BALANCE): each prize or entry
+      // Nobody ends up over a googol (MAX_BALANCE): each prize or entry
       // back pays up to it at most; the rest isn't paid to anyone.
       const names = [...new Set([...r0.pays, ...r0.refunds].map((p) => p.name))];
       const banks = await Promise.all(names.map((n) => tx.get(bankRef(n))));

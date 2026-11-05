@@ -519,7 +519,7 @@ export async function runCommand({ cmd, args }, ctx) {
       if (group) {
         const n = group.people.length;
         if (!amount) return { note: { title: 'Give how much each?', body: `Try: /give ${group.label} 10 (10 coins to each person)` } };
-        if (amount > GIFT_MAX) return { note: { title: 'That’s a lot.', body: `Up to ${coinsText(GIFT_MAX)} each.` } };
+        if (amount > GIFT_MAX) return { note: { title: 'That’s more than a googol.', body: 'Nobody can hold more than that.' } };
         const have = ctx.wallet(me).balance;
         if (amount * n > have)
           return {
@@ -550,7 +550,7 @@ export async function runCommand({ cmd, args }, ctx) {
       if (to === me) return { note: { title: 'That’s you.', body: 'Your coins are already yours.' } };
       const have = ctx.wallet(me).balance;
       if (amount > have) return { note: { title: `You only have ${coinsText(have)} coins.` } };
-      if (amount > GIFT_MAX) return { note: { title: 'That’s a lot.', body: `Up to ${coinsText(GIFT_MAX)} at a time.` } };
+      if (amount > GIFT_MAX) return { note: { title: 'That’s more than a googol.', body: 'Nobody can hold more than that.' } };
       const r = await ctx.gift(to, amount, '', ctx.key);
       if (!r?.ok) return { note: r?.note || { title: 'That didn’t go through.' } };
       return card({ to, amount, line: `sent you ${coinsText(amount)} Jackson coins` }, { mentions: [to] });
