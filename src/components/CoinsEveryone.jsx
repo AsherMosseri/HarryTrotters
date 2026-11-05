@@ -280,7 +280,9 @@ function Person({ name, w, casino, cfg, onCheck, onAdjust, onFix, onBack }) {
 // googol (MAX_BALANCE; the rules allow the same). Grants are written from
 // here (the rules can't read balances), so the ceiling is checked here too:
 // an Add or Set that would put them over it is refused, against the server's
-// balance when it answers. Past 2^53 the numbers are approximate.
+// balance when it answers (the rules allow any finite amount from the owner).
+// Past 2^53 (about 9 quadrillion) amounts are rounded, like every big balance.
+const OWNER_MAX = MAX_BALANCE;
 function AdjustCoins({ name, balance, onCheck, onAdjust }) {
   const [mode, setMode] = useState('add');
   const [amount, setAmount] = useState('');
@@ -289,7 +291,7 @@ function AdjustCoins({ name, balance, onCheck, onAdjust }) {
   const [msg, setMsg] = useState('');
   const n = Math.floor(Number(amount));
   // Set to more than the ceiling can never work, whatever the difference.
-  const ok = Number.isFinite(n) && amount !== '' && (mode === 'set' ? n >= 0 : n > 0) && n <= MAX_BALANCE;
+  const ok = Number.isFinite(n) && amount !== '' && (mode === 'set' ? n >= 0 : n > 0) && n <= OWNER_MAX;
   const go = async () => {
     if (!ok || busy) return;
     setBusy(true);
@@ -310,7 +312,7 @@ function AdjustCoins({ name, balance, onCheck, onAdjust }) {
         setMsg(`${c.error} ${c.body}`);
         return;
       }
-      if (Math.abs(delta) > MAX_BALANCE) {
+      if (Math.abs(delta) > OWNER_MAX) {
         setMsg('That’s a change of more than a googol.');
         return;
       }
@@ -353,7 +355,7 @@ function AdjustCoins({ name, balance, onCheck, onAdjust }) {
           {busy ? '…' : 'Save'}
         </button>
       </div>
-      {amount !== '' && n > MAX_BALANCE && <p className="muted tiny">Nobody can hold more than a googol coins.</p>}
+      {amount !== '' && n > OWNER_MAX && <p className="muted tiny">Nobody can hold more than a googol coins.</p>}
       {msg && <p className="muted tiny">{msg}</p>}
     </div>
   );
