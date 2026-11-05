@@ -487,7 +487,8 @@ export default function ChatView({
       keepAnchor();
       // Held still (a finger, a card, the game view): it didn't follow, so it
       // won't later either, until you go down (or tap the pill).
-      atBottom.current = !holding() && distance(el) < BOTTOM_PX;
+      // (Room for them below without moving: still at the bottom, no pill.)
+      atBottom.current = distance(el) < BOTTOM_PX;
       const added = (was >= 0 ? all.slice(was + 1) : [newest]).filter((m) => !sentByMe(m, actor)).length;
       if (!atBottom.current && added) {
         if (!newBelow) setPillDocked(holding());

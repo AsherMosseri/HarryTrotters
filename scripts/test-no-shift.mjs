@@ -12,8 +12,16 @@
 //                        !important }): Safari has none (the default)
 //            chromium    Chromium as it is
 //            webkit      Playwright's WebKit (PLAYWRIGHT_BROWSERS_PATH must have it)
-//   --only mines,crash   games to play (default: all, see GAMES)
-//   --rounds 2           rounds per game
+//   --only mines,crash   games to play (default: all, see GAMES): mines (and minesfirst,
+//                        minesfast, minesstale), blackjack, highlow, crash, slots, dice,
+//                        coinflip, roulette, lottery (Buy), challenge (Accept, Decline,
+//                        Cancel, Report), rps, tictactoe, connect4 (card and game view),
+//                        duel, heist (Join), trivia, hangman, typerace, battleship (card
+//                        and game view), launch (Tetris/Minesweeper Play), economy
+//                        (/daily, /balance, /leaderboard), request (Pay, Decline), learn
+//                        (the daily question in #general)
+//   --rounds 2           rounds per game (one trivia, hangman, type race or request runs at
+//                        a time: list a viewport twice, --vp phone,phone, for more of those)
 //   --lag 150            demo answers to moves come this late (ms), like a server
 //   --quiet              no busy chat
 //   --json out.json      every tap's record
@@ -202,12 +210,14 @@ function inPage({ engine, busy }) {
     },
     // Teammates at work. conv: where; focus(): the message being played (for "above").
     busyConv: null,
+    me: 'Asher Mosseri',
     focusId: null,
     n: 0,
     post(kind) {
       const conv = ns.busyConv;
       if (!conv) return;
-      const people = ['Cooper Mlezcko', 'Sophia Lee', 'Ethan Park', 'Maya Patel', 'Liam Chen'];
+      // Teammates: never the one playing (a message of yours takes the chat to the bottom, as it should).
+      const people = ['Cooper Mlezcko', 'Sophia Lee', 'Ethan Park', 'Maya Patel', 'Liam Chen'].filter((x) => x !== ns.me);
       const by = people[Math.floor(Math.random() * people.length)];
       const n = ++ns.n;
       const lines = [
@@ -363,6 +373,7 @@ async function newPage(vpName, as = '') {
   return p;
 }
 async function goChannel(p, name) {
+  await closeDialogs(p);
   await p.evaluate(() => document.querySelector('.demo-banner')?.remove());
   const got = p.locator('button:has-text("Got it")');
   if (await got.count()) await got.first().click({ force: true }).catch(() => {});
@@ -370,11 +381,11 @@ async function goChannel(p, name) {
     const chat = p.locator('.bottom-nav button:has-text("Chat")');
     if (await chat.count()) await chat.click({ force: true });
     await p.waitForTimeout(300);
-    await p.locator('select').first().selectOption({ label: `#${name}` });
+    await p.locator('select.channel-select').selectOption({ label: `#${name}` });
   } else await p.click(`.sidebar .sb-row:has-text("${name}")`);
   await p.waitForSelector('.composer textarea');
   await p.waitForTimeout(400);
-  await p.evaluate((c) => (window.__ns.busyConv = c), name);
+  await p.evaluate(({ c, me }) => Object.assign(window.__ns, { busyConv: c, me }), { c: name, me: ME[p.who || 'asher'] });
 }
 // Switch who's playing (demo: one saved state, so it's a reload).
 async function as(p, who, channel = 'arcade') {
@@ -446,7 +457,11 @@ async function tap(p, loc, label, { think = false, ambush = false, watch = LAG +
   }
   if (think) await sleep(SLOW ? rand(5000, 10000) : 4400);
   // Something left open over the chat (a profile, a dialog): what opened it?
-  const cover = !loc.toString().includes("game-sheet") && (await p.evaluate(() => document.querySelector(".panel-backdrop, [role=dialog]:not(.game-sheet), [role=alertdialog]")?.className || ""));
+  // (Not the one the tap is in: a dialog's own button, the game view.)
+  const cover = await loc.evaluate((el) => {
+    const c = document.querySelector('.panel-backdrop, [role=dialog]:not(.game-sheet), [role=alertdialog]');
+    return c && !c.contains(el) && !el.closest('.game-sheet') ? c.className : '';
+  });
   if (cover) problems.push(`${current.vp} ${current.game}: "${cover}" open before "${label}" (the tap before: ${taps.at(-1)?.label} hit ${taps.at(-1)?.hit})`);
   // Off screen (or under the composer): scroll it in first, then aim.
   const inView = await loc.evaluate((el) => {
