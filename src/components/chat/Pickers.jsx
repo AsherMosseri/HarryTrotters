@@ -461,6 +461,12 @@ export function PollDialog({ onCreate, onClose, canRequire = false, initialQuest
   // Choices, plus a box to write your own answer (or both).
   const [write, setWrite] = useState(!!editing?.write);
   const [required, setRequired] = useState(!!editing?.required);
+  // Anonymous until it ends (shared/polls.js hidesVoters). Once people have
+  // answered an open anonymous poll, it stays anonymous: turning it off would
+  // show names they gave thinking nobody would see.
+  const [anonymous, setAnonymous] = useState(!!editing?.anonymous);
+  const answeredAnon =
+    !!editing?.anonymous && !editing.closed && Object.entries(votes || {}).some(([, v]) => v && Object.keys(v).length > 0);
   useEscape(onClose);
   const filled = options.filter((o) => o.text.trim());
 
@@ -504,6 +510,8 @@ export function PollDialog({ onCreate, onClose, canRequire = false, initialQuest
   // The poll this dialog would post.
   const build = () => {
     const base = { ...(editing || {}), question: question.trim().slice(0, 500), required };
+    if (anonymous) base.anonymous = true;
+    else delete base.anonymous;
     if (kind === 'text') return { ...base, kind: 'text', multi: false, write: false, options: [] };
     let opts;
     if (kind === 'people') {
@@ -773,6 +781,17 @@ export function PollDialog({ onCreate, onClose, canRequire = false, initialQuest
               <input type="checkbox" checked={write} onChange={(e) => setWrite(e.target.checked)} /> Also let people write their own answer
             </label>
           )}
+          <label className="row gap small poll-required-opt">
+            <input type="checkbox" checked={anonymous} disabled={answeredAnon} onChange={(e) => setAnonymous(e.target.checked)} />
+            <span>
+              <b>Anonymous until it ends</b>
+              <span className="muted">
+                {answeredAnon
+                  ? ' · people have answered thinking it’s anonymous, so it stays that way until it ends'
+                  : ' · nobody sees who picked or wrote what until the poll ends, then the names show'}
+              </span>
+            </span>
+          </label>
           {canRequire && (
             <label className="row gap small poll-required-opt">
               <input type="checkbox" checked={required} onChange={(e) => setRequired(e.target.checked)} />

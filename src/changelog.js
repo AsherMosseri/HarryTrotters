@@ -4,6 +4,14 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '3.2.4',
+    date: '2026-11-06',
+    title: 'Anonymous polls',
+    items: [
+      'New poll option: Anonymous until it ends. Everyone sees the counts, but not who picked or wrote what, until the poll is ended. Then the names show.',
+    ],
+  },
+  {
     version: '3.2.3',
     date: '2026-11-06',
     title: 'Polls: pick and write together',

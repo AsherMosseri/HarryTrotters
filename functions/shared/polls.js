@@ -6,7 +6,7 @@
 //
 // A poll: { question, kind: 'choices'|'people'|'text', options: [{ id, text, person? }],
 //   multi, pick?: { mode: 'one'|'upto'|'exact'|'any', n }, selfVote?: false,
-//   write, required, closed }
+//   write, writePick?, anonymous?, required, closed }
 // Old polls have no `pick`: multi means any number, otherwise one.
 // A "several" choice poll that also takes written answers (write) counts
 // your own written answer as one of your picks (writeCounts).
@@ -46,6 +46,11 @@ export function pickRule(poll) {
 export function writeCounts(poll) {
   return !!poll?.write && !!poll.writePick && (poll.kind || 'choices') === 'choices' && ['upto', 'exact', 'any'].includes(poll.pick?.mode);
 }
+
+// Anonymous polls: nobody sees who picked or wrote what until the poll ends
+// (anonymous: true). The counts show; your own picks show to you. Ending the
+// poll shows everyone's names.
+export const hidesVoters = (poll) => !!poll?.anonymous && !poll.closed;
 
 // Whether voting here is "choose, then press Vote" (a rule was set) rather than
 // tapping a choice to toggle it (single choice, and old any-number polls).

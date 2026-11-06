@@ -1,7 +1,7 @@
 // Polls: on a "several" choice poll that takes written answers, your own
 // written answer is one of your picks (functions/shared/polls.js writeCounts).
 //   node scripts/test-poll-write.mjs
-import { checkPicks, pickBounds, pickRule, pollTally, writeCounts, votesFit, hasAnswered } from '../functions/shared/polls.js';
+import { checkPicks, hidesVoters, pickBounds, pickRule, pollTally, writeCounts, votesFit, hasAnswered } from '../functions/shared/polls.js';
 
 let pass = 0;
 let fail = 0;
@@ -68,6 +68,11 @@ eq(hasAnswered({ poll: ex2, votes: votes({}, { Jo: 'x' }) }, 'Jo'), true, 'anyon
 const m = { poll: up2, votes: votes({ Sam: ['a'] }, { Sam: 'Mine' }) };
 eq(votesFit(m, poll({ mode: 'exact', n: 2 })).ok, true, 'up to 2 → exactly 2: Sam’s 1 + own still fits');
 eq(votesFit(m, poll({ mode: 'upto', n: 1 }, { options: opts })).ok, false, 'up to 1 would drop Sam (1 + own = 2)');
+
+// Anonymous until it ends
+eq(hidesVoters({ anonymous: true }), true, 'anonymous and open: names hidden');
+eq(hidesVoters({ anonymous: true, closed: true }), false, 'anonymous and ended: names show');
+eq(hidesVoters({}), false, 'a normal poll shows names');
 
 console.log(fail ? `${fail} FAILED, ${pass} passed` : `ALL PASSED (${pass})`);
 process.exit(fail ? 1 : 0);
