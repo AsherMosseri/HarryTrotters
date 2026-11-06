@@ -21,6 +21,7 @@ import { statusOf as eventStatus } from '../../../functions/shared/events.js';
 import { LabLogContext } from '../LabLog.jsx';
 import { BingoCard, RecapRow } from '../Life.jsx';
 import Readiness from './Readiness.jsx';
+import PinnedChecklists from '../PinnedChecklists.jsx';
 import { readiness } from '../../readiness.js';
 
 // The first page, like a pit board: the countdown and the robot up top with a
@@ -76,6 +77,7 @@ export default function Today({
   matches = [],
   batteries = [],
   checklists = [],
+  pinned = [],
   roster = [],
   joinRequests = [],
   chanWaiting = 0,
@@ -120,6 +122,7 @@ export default function Today({
         matches={matches}
         batteries={batteries}
         checklists={checklists}
+        pinned={pinned}
         roster={roster}
         competition={competition}
         api={api}
@@ -131,7 +134,7 @@ export default function Today({
   return (
     <UsualToday
       {...{ actor, tasks, milestones, competition, shifts, runs, myShift, convs, unread, chat, on, onOpenTask, onOpenConv, onPage, onNewTask, roster, joinRequests, chanWaiting, onChannelRequests }}
-      {...{ settings, checklists, parts, onShowTasks, onShowParts }}
+      {...{ settings, checklists, parts, onShowTasks, onShowParts, pinned, matches }}
       {...{ onStartShift, onOpenShift, onPerson, onEditProfile, people, today, api, disputes, onDisputes, extraLines }}
       pitButton={
         compOn ? (
@@ -155,6 +158,8 @@ function UsualToday({
   competition,
   settings = {},
   checklists = [],
+  pinned = [],
+  matches = [],
   parts = [],
   onShowTasks,
   onShowParts,
@@ -401,6 +406,7 @@ function UsualToday({
               onOpenTask={onOpenTask}
             />
           )}
+          {on.includes('checklists') && <PinnedChecklists pinned={pinned} checklists={checklists} matches={matches} settings={settings} api={api} onPage={onPage} />}
           {on.includes('tasks') && (
             <section className="today-sec">
               <div className="sec-head">

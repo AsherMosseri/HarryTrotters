@@ -3,6 +3,7 @@ import { Avatar } from '../common.jsx';
 import { Icon } from './icons.jsx';
 import { PitGuess } from '../Life.jsx';
 import Debrief from './Debrief.jsx';
+import PinnedChecklists from '../PinnedChecklists.jsx';
 import { BatteryStrip } from '../Batteries.jsx';
 import { QUEUE_CHECKLIST, STARTER_CHECKLISTS, isQueueChecklist, starterItems } from '../../checklists.js';
 import { parseDay } from '../../milestones.js';
@@ -596,7 +597,7 @@ function SyncButton({ settings, api }) {
   );
 }
 
-export default function PitScreen({ actor, settings, matches, batteries = [], checklists, roster, competition, api, predictions = [], onPerson, onUsual }) {
+export default function PitScreen({ actor, settings, matches, batteries = [], checklists, pinned = [], roster, competition, api, predictions = [], onPerson, onUsual }) {
   const now = useNow(1000);
   const isManager = !!actor.admin;
   const event = settings.compEvent || {};
@@ -689,6 +690,8 @@ export default function PitScreen({ actor, settings, matches, batteries = [], ch
         <div className="today-col">
           <BatteryStrip batteries={batteries} matches={ours} api={api} isManager={isManager} />
           <QueueCard list={list} next={next} lead={lead} now={now} actor={actor} api={api} onAddList={addList} />
+          {/* Your pinned checklists (the queue list is already right above). */}
+          <PinnedChecklists pinned={pinned} checklists={checklists} matches={matches} settings={settings} api={api} skip={list?.id} />
           <ScorePad matches={ours} now={now} driveTeam={team} api={api} />
           <PitGuess predictions={predictions} next={next} actor={actor} api={api} now={now} />
         </div>
