@@ -5424,7 +5424,7 @@ button.bs-cell:focus-visible { outline: 2px solid var(--accent); outline-offset:
 .move-kinds-table .num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; width: 1%; }
 .move-kinds-group th, .move-kinds-group td { background: var(--surface-2); font-weight: 700; }
 
-/* ---------- 3.1.7: no game card moves under a tap (all games) ---------- */
+/* ---------- 3.2.1: no game card moves under a tap (all games) ---------- */
 /* A finished trivia keeps its timer's space, so the answers stay put. */
 .arc-timer.over { visibility: hidden; }
 /* The players line is as tall when nobody's turn is lit (the game over) as during it. */

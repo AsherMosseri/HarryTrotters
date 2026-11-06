@@ -134,6 +134,7 @@ function FixButton({ c, row, multi, me, onFix }) {
   const refund = row.net < 0;
   const n = coinStyled(Math.abs(row.net));
   const exact = exactNote(row.net);
+  const cw = Math.abs(row.net) === 1 ? 'coin' : 'coins';
   const game = gameLabel(c.name);
   const who = row.name === me ? 'you' : first(row.name);
   const go = async () => {
@@ -141,11 +142,11 @@ function FixButton({ c, row, multi, me, onFix }) {
     setError('');
     const line = fixEntry({ person: row.name, mode: refund ? 'refund' : 'takeback', amount: Math.abs(row.net), game: c.name, by: me }).label;
     const ok = await confirmDialog({
-      title: refund ? `Refund ${n} coins to ${who === 'you' ? 'yourself' : who}?` : `Take back ${n} coins from ${who}?`,
+      title: refund ? `Refund ${n} ${cw} to ${who === 'you' ? 'yourself' : who}?` : `Take back ${n} ${cw} from ${who}?`,
       body: (
         <>
           <b>{row.name}</b> {refund ? 'lost' : 'won'} <b>{n}</b> at {game}.{' '}
-          {refund ? `${n} coins go back to them` : `${n} coins come off their balance`}, once, as “{line}” in their coin history
+          {refund ? `${n} ${cw} ${cw === 'coin' ? 'goes' : 'go'} back to them` : `${n} ${cw} ${cw === 'coin' ? 'comes' : 'come'} off their balance`}, once, as “{line}” in their coin history
           {row.name === me ? '' : ', and they’re told'}. The card will say “{refund ? 'Refunded' : 'Taken back'} by {first(me)}”.
           {!refund && ' If they’ve spent it, their balance can go below zero.'}
           {exact && (
@@ -167,7 +168,7 @@ function FixButton({ c, row, multi, me, onFix }) {
   };
   return (
     <>
-      <button className={`link-btn small card-fix ${refund ? 'refund' : 'takeback'}`} onClick={go} disabled={busy} title={`${refund ? 'Refund' : 'Take back'} ${n} coins (${row.name})`}>
+      <button className={`link-btn small card-fix ${refund ? 'refund' : 'takeback'}`} onClick={go} disabled={busy} title={`${refund ? 'Refund' : 'Take back'} ${n} ${cw} (${row.name})`}>
         <Icon name="rotateCcw" size={15} /> {busy ? '…' : `${refund ? 'Refund' : 'Take back'}${multi ? ` ${first(row.name)}` : ''}`}
       </button>
       {error && (

@@ -4,6 +4,18 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '3.2.1',
+    date: '2026-11-05',
+    title: 'Cards stay put while you play',
+    items: [
+      'Game and casino cards in chat no longer move under your finger while teammates post, react or play. That covers every casino game, challenges, arcade games, battleship, Tetris and Minesweeper, coin cards, coin requests and the daily question.',
+      'A card that ends with your tap (a duel shot, a paid request) keeps its size for a moment, so what’s below it doesn’t slide under your finger.',
+      'Tap Cancel on a challenge right after sending it, or Play on a score as it appears, and it stays where you aimed.',
+      'While you play, the “new messages” button sits under the chat instead of over your game.',
+      'A finished trivia keeps its answers where they were, and hangman’s keys don’t jump on the first guess.',
+    ],
+  },
+  {
     version: '3.2',
     date: '2026-11-05',
     title: 'New pets, pet games, coin stats and #arcade',
