@@ -4,6 +4,14 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '3.2.6',
+    date: '2026-11-06',
+    title: 'Polls with hidden results',
+    items: [
+      'Polls can now hide everything until they end: people vote, but all anyone sees is the question and how many have voted. No counts, bars, names or answers until the poll is ended.',
+    ],
+  },
+  {
     version: '3.2.5',
     date: '2026-11-06',
     title: 'The jersey is the goat’s',

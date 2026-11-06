@@ -9,7 +9,7 @@ import { EmojiPicker, PollDialog, QUICK_MAX } from './Pickers.jsx';
 import { CUSTOM_RE } from './emoji.js';
 import { isCoinCommand, useControls } from '../../controls.js';
 import { myPicks, pollTally, sentByMe } from '../../people.js';
-import { hidesVoters, optionLabel, pickBounds, pickRule, pollHeadline, usesVoteButton, writeCounts } from '../../../functions/shared/polls.js';
+import { hidesResults, hidesVoters, optionLabel, pickBounds, pickRule, pollHeadline, usesVoteButton, writeCounts } from '../../../functions/shared/polls.js';
 import { nameKey } from '../../../functions/shared/team.js';
 import { useMarket } from '../../market.js';
 import { glows } from '../../../functions/shared/market.js';
@@ -167,7 +167,7 @@ function TextPoll({ m, actor, onAnswer, onEnd, onReopen, canEnd }) {
       <div className="muted tiny">
         {closed ? 'Poll ended' : 'Write your answer'} · {answers} {answers === 1 ? 'answer' : 'answers'}
         {m.poll.required && !closed && <span className="poll-required"> · Everyone has to answer</span>}
-        {hidesVoters(m.poll) && ' · Anonymous until it ends'}
+        {hidesResults(m.poll) ? ' · Answers hidden until it ends' : hidesVoters(m.poll) && ' · Anonymous until it ends'}
       </div>
       <WrittenAnswers m={m} actor={actor} onAnswer={onAnswer} closed={closed} />
       {canEnd && <PollControls closed={closed} onEnd={onEnd} onReopen={onReopen} />}
@@ -187,6 +187,9 @@ function WrittenAnswers({ m, actor, onAnswer, closed, optional, noBox = false })
   // away who answered when.
   const hidden = hidesVoters(m.poll);
   if (hidden) answers.sort((a, b) => scramble(a.id + m.id) - scramble(b.id + m.id));
+  // Results hidden until it ends: only your own answer shows.
+  const secret = hidesResults(m.poll);
+  if (secret) answers.splice(0, answers.length, ...answers.filter((a) => a.id === me));
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
   const [all, setAll] = useState(false);
@@ -342,6 +345,7 @@ function ChoicePoll({ m, actor, onVote, onPicks, onEnd, onReopen, canEnd, onAnsw
   }, [hint]);
   const isPeople = poll.kind === 'people';
   const hidden = hidesVoters(poll); // anonymous until it ends
+  const secret = hidesResults(poll); // only how many voted, until it ends
   const selfBlocked = (o) => poll.selfVote === false && !!o.person && nameKey(rename(o.person)) === me;
   const toggle = (o) => {
     if (!picking) return onVote(o.id, !votes[o.id]?.[me]);
@@ -377,7 +381,7 @@ function ChoicePoll({ m, actor, onVote, onPicks, onEnd, onReopen, canEnd, onAnsw
         : n
           ? `${n} of ${bounds.max} picked`
           : `Pick up to ${bounds.max}`;
-  const lead = (o, i) => counts[i] > 0 && t.leaders.has(o.id);
+  const lead = (o, i) => !secret && counts[i] > 0 && t.leaders.has(o.id);
   // Someone above the last place is leading; those level at it are tied for it.
   const leadWord = (i) => (t.tied && counts[i] === t.line ? 'Tied' : closed ? (t.cut > 1 ? 'Top pick' : 'Winner') : 'Leading');
   const long = poll.options.length > 8;
@@ -390,7 +394,7 @@ function ChoicePoll({ m, actor, onVote, onPicks, onEnd, onReopen, canEnd, onAnsw
         {nVoters === 1 ? 'vote' : 'votes'}
         {poll.required && !closed && <span className="poll-required"> · Everyone has to answer</span>}
         {poll.selfVote === false && !closed && ' · No voting for yourself'}
-        {hidden && ' · Anonymous until it ends'}
+        {secret ? ' · Results hidden until it ends' : hidden && ' · Anonymous until it ends'}
       </div>
       <div className={`poll-list${long ? ' scroll' : ''}`} role="group" aria-label="Choices" tabIndex={long ? 0 : undefined}>
         {poll.options.map((o, i) => {
@@ -406,9 +410,9 @@ function ChoicePoll({ m, actor, onVote, onPicks, onEnd, onReopen, canEnd, onAnsw
               role={picking ? 'checkbox' : undefined}
               aria-checked={picking ? picked : undefined}
               onClick={() => toggle(o)}
-              title={blocked ? 'You can’t vote for yourself here' : hidden ? (counts[i] ? `${counts[i]} ${counts[i] === 1 ? 'vote' : 'votes'}, anonymous until it ends` : 'No votes yet') : names.join(', ') || 'No votes yet'}
+              title={blocked ? 'You can’t vote for yourself here' : secret ? 'Results show when the poll ends' : hidden ? (counts[i] ? `${counts[i]} ${counts[i] === 1 ? 'vote' : 'votes'}, anonymous until it ends` : 'No votes yet') : names.join(', ') || 'No votes yet'}
             >
-              <span className="poll-bar" style={{ width: `${(counts[i] / max) * 100}%`, opacity: counts[i] ? 1 : 0 }} />
+              {!secret && <span className="poll-bar" style={{ width: `${(counts[i] / max) * 100}%`, opacity: counts[i] ? 1 : 0 }} />}
               <span className="poll-check">{picked ? '✓' : ''}</span>
               {isPeople && o.person && <Avatar name={o.person} size={26} decoration="" />}
               <span className="grow">
@@ -421,8 +425,8 @@ function ChoicePoll({ m, actor, onVote, onPicks, onEnd, onReopen, canEnd, onAnsw
                   <Avatar key={nm} name={nm} size={18} decoration="" />
                 ))}
               </span>
-              <b>{counts[i]}</b>
-              {picking && nVoters > 0 && <span className="poll-pct mono">{pct}%</span>}
+              {!secret && <b>{counts[i]}</b>}
+              {!secret && picking && nVoters > 0 && <span className="poll-pct mono">{pct}%</span>}
             </button>
           );
         })}

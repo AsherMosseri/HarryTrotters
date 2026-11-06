@@ -1,7 +1,7 @@
 // Polls: on a "several" choice poll that takes written answers, your own
 // written answer is one of your picks (functions/shared/polls.js writeCounts).
 //   node scripts/test-poll-write.mjs
-import { checkPicks, hidesVoters, pickBounds, pickRule, pollTally, writeCounts, votesFit, hasAnswered } from '../functions/shared/polls.js';
+import { checkPicks, hidesResults, hidesVoters, privacyOf, pickBounds, pickRule, pollTally, writeCounts, votesFit, hasAnswered } from '../functions/shared/polls.js';
 
 let pass = 0;
 let fail = 0;
@@ -73,6 +73,11 @@ eq(votesFit(m, poll({ mode: 'upto', n: 1 }, { options: opts })).ok, false, 'up t
 eq(hidesVoters({ anonymous: true }), true, 'anonymous and open: names hidden');
 eq(hidesVoters({ anonymous: true, closed: true }), false, 'anonymous and ended: names show');
 eq(hidesVoters({}), false, 'a normal poll shows names');
+eq(hidesResults({ anonymous: true }), false, 'anonymous: counts still show');
+eq(hidesResults({ anonymous: true, hideResults: true }), true, 'hidden: no counts while open');
+eq(hidesVoters({ hideResults: true }), true, 'hidden also hides names');
+eq(hidesResults({ hideResults: true, closed: true }), false, 'hidden and ended: everything shows');
+eq([privacyOf({}), privacyOf({ anonymous: true }), privacyOf({ anonymous: true, hideResults: true })], ['open', 'anonymous', 'hidden'], 'privacy levels');
 
 console.log(fail ? `${fail} FAILED, ${pass} passed` : `ALL PASSED (${pass})`);
 process.exit(fail ? 1 : 0);
