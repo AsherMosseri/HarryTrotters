@@ -9,7 +9,7 @@ import { EmojiPicker, PollDialog, QUICK_MAX } from './Pickers.jsx';
 import { CUSTOM_RE } from './emoji.js';
 import { isCoinCommand, useControls } from '../../controls.js';
 import { myPicks, pollTally, sentByMe } from '../../people.js';
-import { optionLabel, pickBounds, pickRule, pollHeadline, usesVoteButton } from '../../../functions/shared/polls.js';
+import { optionLabel, pickBounds, pickRule, pollHeadline, usesVoteButton, writeCounts } from '../../../functions/shared/polls.js';
 import { nameKey } from '../../../functions/shared/team.js';
 import { useMarket } from '../../market.js';
 import { glows } from '../../../functions/shared/market.js';
@@ -169,7 +169,7 @@ function TextPoll({ m, actor, onAnswer, onEnd, onReopen, canEnd }) {
 
 // The written answers under a poll (a written-answer poll, or a choice poll
 // that also takes written answers), with a box to write or edit yours.
-function WrittenAnswers({ m, actor, onAnswer, closed, optional }) {
+function WrittenAnswers({ m, actor, onAnswer, closed, optional, noBox = false }) {
   const me = personId(actor.name);
   const answers = Object.entries(m.votes?.text || {})
     .map(([id, a]) => ({ id, ...a }))
@@ -185,8 +185,10 @@ function WrittenAnswers({ m, actor, onAnswer, closed, optional }) {
   };
   return (
     <div className={optional ? 'poll-write' : undefined}>
-      {optional && <div className="muted tiny poll-write-head">{closed ? 'Written answers' : 'Or write your own'}</div>}
-      {!closed && (!mine || editing) && (
+      {optional && (!noBox || answers.length > 0) && (
+        <div className="muted tiny poll-write-head">{closed || noBox ? 'Written answers' : 'Or write your own'}</div>
+      )}
+      {!closed && !noBox && (!mine || editing) && (
         <div className="poll-answer-box">
           <AutoTextarea
             className="input"
@@ -217,7 +219,7 @@ function WrittenAnswers({ m, actor, onAnswer, closed, optional }) {
                 <b className="small">{a.name}</b>
                 <div className="poll-answer-text">{a.text}</div>
               </div>
-              {a.id === me && !closed && !editing && (
+              {a.id === me && !closed && !editing && !noBox && (
                 <button
                   className="link-btn small"
                   onClick={() => {
@@ -309,11 +311,17 @@ function ChoicePoll({ m, actor, onVote, onPicks, onEnd, onReopen, canEnd, onAnsw
   const stored = myPicks(m, actor.name, rename);
   const mineValid = t.voters.has(me);
   const [draft, setDraft] = useState(null); // the picks being made (null: your saved vote)
+  // Your own written answer as one of your picks (shared/polls.js writeCounts).
+  const ownPick = writeCounts(poll);
+  const savedText = m.votes?.text?.[me]?.text || '';
+  const [textDraft, setTextDraft] = useState(null); // null: your saved answer
   const [hint, setHint] = useState('');
   const [busy, setBusy] = useState(false);
-  const editing = picking && !closed && (draft !== null || !mineValid);
+  const editing = picking && !closed && (draft !== null || textDraft !== null || !mineValid);
   const shown = editing ? (draft ?? stored) : stored;
-  const n = shown.length;
+  const ownText = ownPick ? (editing ? (textDraft ?? savedText) : savedText) : '';
+  const own = ownText.trim() ? 1 : 0;
+  const n = shown.length + own;
   const fits = n >= bounds.min && n <= bounds.max;
   useEffect(() => {
     if (!hint) return;
@@ -328,16 +336,20 @@ function ChoicePoll({ m, actor, onVote, onPicks, onEnd, onReopen, canEnd, onAnsw
       setHint('');
       return setDraft(shown.filter((x) => x !== o.id));
     }
-    if (shown.length >= bounds.max)
+    if (n >= bounds.max)
       return setHint(bounds.min === bounds.max ? `You can pick ${bounds.max}. Unselect one to change.` : `You can pick up to ${bounds.max}`);
     setHint('');
     setDraft([...shown, o.id]);
   };
   const submit = async () => {
     setBusy(true);
-    const saved = await onPicks(shown);
+    const saved = await (ownPick ? onPicks(shown, ownText.trim()) : onPicks(shown));
     setBusy(false);
-    if (saved) setDraft(null);
+    if (saved) {
+      setDraft(null);
+      setTextDraft(null);
+      setHint('');
+    }
   };
   // "Pick 2 more", "2 of 3 picked", "Pick up to 3".
   const counter =
@@ -361,7 +373,8 @@ function ChoicePoll({ m, actor, onVote, onPicks, onEnd, onReopen, canEnd, onAnsw
     <div className={`poll${isPeople ? ' poll-people' : ''}`} onClick={(e) => e.stopPropagation()}>
       <div className="poll-q">{poll.question}</div>
       <div className="muted tiny">
-        {closed ? 'Poll ended' : `${pickWords(poll)}${poll.write ? ' or write your own' : ''}`} · {nVoters} {nVoters === 1 ? 'vote' : 'votes'}
+        {closed ? 'Poll ended' : `${pickWords(poll)}${poll.write ? (ownPick ? ', your own answer counts as one' : ' or write your own') : ''}`} · {nVoters}{' '}
+        {nVoters === 1 ? 'vote' : 'votes'}
         {poll.required && !closed && <span className="poll-required"> · Everyone has to answer</span>}
         {poll.selfVote === false && !closed && ' · No voting for yourself'}
       </div>
@@ -399,6 +412,30 @@ function ChoicePoll({ m, actor, onVote, onPicks, onEnd, onReopen, canEnd, onAnsw
             </button>
           );
         })}
+        {ownPick && (editing || own > 0) && (
+          <div className={`poll-opt pick poll-own${own ? ' mine' : ''}`}>
+            <span className="poll-check">{own ? '✓' : ''}</span>
+            {editing ? (
+              <AutoTextarea
+                className="input grow"
+                value={ownText}
+                onChange={(e) => {
+                  setHint('');
+                  setTextDraft(e.target.value);
+                }}
+                placeholder={!own && shown.length >= bounds.max ? 'Unpick one to write your own' : 'Write your own (counts as a pick)'}
+                disabled={!own && shown.length >= bounds.max}
+                maxLength={1000}
+                aria-label="Your own answer"
+              />
+            ) : (
+              <span className="grow">
+                <span className="muted tiny">Your own: </span>
+                {ownText}
+              </span>
+            )}
+          </div>
+        )}
       </div>
       {long && (
         <div className="muted tiny">
@@ -412,8 +449,14 @@ function ChoicePoll({ m, actor, onVote, onPicks, onEnd, onReopen, canEnd, onAnsw
           </span>
           {editing ? (
             <span className="row gap">
-              {draft !== null && mineValid && (
-                <button className="btn small-btn" onClick={() => setDraft(null)}>
+              {(draft !== null || textDraft !== null) && mineValid && (
+                <button
+                  className="btn small-btn"
+                  onClick={() => {
+                    setDraft(null);
+                    setTextDraft(null);
+                  }}
+                >
                   Cancel
                 </button>
               )}
@@ -422,7 +465,13 @@ function ChoicePoll({ m, actor, onVote, onPicks, onEnd, onReopen, canEnd, onAnsw
               </button>
             </span>
           ) : (
-            <button className="btn small-btn" onClick={() => setDraft(stored)}>
+            <button
+              className="btn small-btn"
+              onClick={() => {
+                setDraft(stored);
+                if (ownPick) setTextDraft(savedText);
+              }}
+            >
               Change vote
             </button>
           )}
@@ -437,7 +486,7 @@ function ChoicePoll({ m, actor, onVote, onPicks, onEnd, onReopen, canEnd, onAnsw
           <b>{headline}</b>
         </div>
       )}
-      {poll.write && <WrittenAnswers m={m} actor={actor} onAnswer={onAnswer} closed={closed} optional />}
+      {poll.write && <WrittenAnswers m={m} actor={actor} onAnswer={onAnswer} closed={closed} optional noBox={ownPick} />}
       {canEnd && <PollControls closed={closed} onEnd={onEnd} onReopen={onReopen} />}
     </div>
   );
@@ -759,7 +808,7 @@ export default function Message({
                 actor={actor}
                 canEnd={mine || isManager}
                 onVote={(optionId, on) => api.vote(conv, m, optionId, on)}
-                onPicks={(ids) => api.votePicks(conv, m, ids)}
+                onPicks={(ids, text) => api.votePicks(conv, m, ids, text)}
                 onAnswer={(text) => api.answerPoll(conv, m, text)}
                 onEnd={() => api.editMessage(conv, m.id, { poll: { ...m.poll, closed: true } })}
                 onReopen={() => api.editMessage(conv, m.id, { poll: { ...m.poll, closed: false } })}

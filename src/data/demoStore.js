@@ -3384,10 +3384,11 @@ export const demoStore = {
     });
   },
   // A person's whole vote at once; the picks have to follow the poll's rule.
-  async votePicks(conv, msg, ids, actor, rename) {
+  async votePicks(conv, msg, ids, actor, rename, text) {
     const me = personId(actor.name);
     const cur = findMsg(conv, msg.id) || msg;
-    const check = checkPicks(cur.poll, ids, actor.name, rename);
+    const written = text !== undefined ? !!text : !!cur.votes?.text?.[me]?.text;
+    const check = checkPicks(cur.poll, ids, actor.name, rename, { written });
     if (!check.ok) throw new Error(check.why);
     updateMsg(conv, msg.id, (m) => {
       const votes = Object.fromEntries(Object.entries(m.votes || {}).map(([k, v]) => [k, { ...v }]));
@@ -3395,6 +3396,10 @@ export const demoStore = {
         votes[o.id] = votes[o.id] || {};
         if (check.ids.includes(o.id)) votes[o.id][me] = actor.name;
         else delete votes[o.id][me];
+      }
+      if (text !== undefined) {
+        if (text) votes.text = { ...(votes.text || {}), [me]: { name: actor.name, text, at: Date.now() } };
+        else if (votes.text) delete votes.text[me];
       }
       return { ...m, votes };
     });

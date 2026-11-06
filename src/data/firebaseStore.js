@@ -1382,15 +1382,19 @@ export const firebaseStore = {
   // Set a person's whole vote at once (a pick-N poll's Vote button, the
   // required-poll screen): the picks must follow the poll's rule, so a half
   // pick is never saved. Their other choices are cleared in the same write.
-  async votePicks(conv, msg, ids, actor, rename) {
+  // text: their own written answer, saved in the same write ('' takes it
+  // away; undefined leaves it). It's one of their picks when writeCounts.
+  async votePicks(conv, msg, ids, actor, rename, text) {
     const me = personId(actor.name);
-    const check = checkPicks(msg.poll, ids, actor.name, rename);
+    const written = text !== undefined ? !!text : !!msg.votes?.text?.[me]?.text;
+    const check = checkPicks(msg.poll, ids, actor.name, rename, { written });
     if (!check.ok) throw new Error(check.why);
     const args = [];
     for (const o of msg.poll.options) {
       if (check.ids.includes(o.id)) args.push(new FieldPath('votes', o.id, me), actor.name);
       else if (msg.votes?.[o.id]?.[me] !== undefined) args.push(new FieldPath('votes', o.id, me), deleteField());
     }
+    if (text !== undefined) args.push(new FieldPath('votes', 'text', me), text ? { name: actor.name, text, at: Date.now() } : deleteField());
     return updateDoc(doc(convCol(conv), msg.id), ...args);
   },
 

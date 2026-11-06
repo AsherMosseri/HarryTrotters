@@ -4,7 +4,7 @@ import { addDays, parseDay, todayISO } from '../milestones.js';
 import { firstName } from '../util.js';
 import { AutoTextarea, Avatar, CloseIcon, Overlay } from './common.jsx';
 import { nameKey, sameName } from '../../functions/shared/team.js';
-import { checkPicks, optionLabel, pickBounds } from '../../functions/shared/polls.js';
+import { checkPicks, optionLabel, pickBounds, writeCounts } from '../../functions/shared/polls.js';
 import { teamDay } from '../../functions/shared/coins.js';
 import { cleanSkips, upcomingDays } from '../../functions/shared/checkin.js';
 import { confirmDialog } from './Dialogs.jsx';
@@ -411,6 +411,9 @@ export function PollGate({ msg, rename, me, onVote, onAnswer, onSkip }) {
   const written = msg.poll.kind === 'text';
   // A choice poll that also takes written answers: pick, write, or both.
   const both = !written && !!msg.poll.write;
+  // ...where your own answer is one of your picks (shared/polls.js writeCounts).
+  const ownPick = both && writeCounts(msg.poll);
+  const own = ownPick && answer.trim() ? 1 : 0;
   const [busy, setBusy] = useState(false);
   const { poll } = msg;
   const bounds = pickBounds(poll, nameKey(rename(me || '')), rename);
@@ -419,11 +422,11 @@ export function PollGate({ msg, rename, me, onVote, onAnswer, onSkip }) {
   const toggle = (id) => {
     if (picked.includes(id)) return setPicked(picked.filter((x) => x !== id));
     if (bounds.max === 1) return setPicked([id]);
-    if (picked.length >= bounds.max) return setHint(bounds.min === bounds.max ? `You can pick ${bounds.max}. Unselect one to change.` : `You can pick up to ${bounds.max}`);
+    if (picked.length + own >= bounds.max) return setHint(bounds.min === bounds.max ? `You can pick ${bounds.max}. Unselect one to change.` : `You can pick up to ${bounds.max}`);
     setHint('');
     setPicked([...picked, id]);
   };
-  const valid = checkPicks({ ...poll, closed: false }, picked, me || '', rename).ok;
+  const valid = checkPicks({ ...poll, closed: false }, picked, me || '', rename, { written: !!own }).ok;
   const ask = written
     ? 'Write your answer'
     : rule === 'upto'
@@ -433,11 +436,12 @@ export function PollGate({ msg, rename, me, onVote, onAnswer, onSkip }) {
         : bounds.max === 1
           ? 'Pick one'
           : 'Pick one or more';
+  const nPicked = picked.length + own;
   const counter =
     bounds.min === bounds.max && bounds.max > 1
-      ? `${picked.length} of ${bounds.max} picked`
-      : bounds.max > 1 && picked.length
-        ? `${picked.length} of ${bounds.max} picked`
+      ? `${nPicked} of ${bounds.max} picked`
+      : bounds.max > 1 && nPicked
+        ? `${nPicked} of ${bounds.max} picked`
         : '';
   return (
     <Overlay>
@@ -447,7 +451,7 @@ export function PollGate({ msg, rename, me, onVote, onAnswer, onSkip }) {
           <h1 id="pollgate-title">{poll.question}</h1>
           <p className="muted">
             Poll from {firstName(rename(msg.by || ''))} in #announcements. {ask}
-            {both ? ', or write your own' : ''} to keep going.
+            {ownPick ? '. Writing your own counts as one of your picks. Answer' : both ? ', or write your own,' : ''} to keep going.
           </p>
           {written && (
             <AutoTextarea
@@ -489,16 +493,18 @@ export function PollGate({ msg, rename, me, onVote, onAnswer, onSkip }) {
               className="input"
               value={answer}
               onChange={(e) => setAnswer(e.target.value)}
-              placeholder="Or write your own answer"
+              placeholder={ownPick ? (!own && picked.length >= bounds.max ? 'Unpick one to write your own' : 'Write your own (counts as a pick)') : 'Or write your own answer'}
+              disabled={ownPick && !own && picked.length >= bounds.max}
               maxLength={1000}
             />
           )}
           <button
             className="btn primary big-btn"
-            disabled={(written ? !answer.trim() : !valid && !(both && answer.trim() && !picked.length)) || busy}
+            disabled={(written ? !answer.trim() : !valid && !(both && !ownPick && answer.trim() && !picked.length)) || busy}
             onClick={async () => {
               setBusy(true);
               if (written) await onAnswer(answer);
+              else if (ownPick) await onVote(picked, answer.trim());
               else {
                 if (picked.length) await onVote(picked);
                 if (both && answer.trim()) await onAnswer(answer.trim());

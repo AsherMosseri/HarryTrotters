@@ -3865,7 +3865,7 @@ html.kb-bar .chat-side-body { padding-bottom: calc(8px + var(--kb-bar, 0px)); }
 .pollgate-opt { min-height: 48px; }
 .pollgate-opt:disabled { opacity: 0.6; cursor: default; }
 .pollgate-opt .avatar { flex: none; }
-.checkin-card .poll-counter { text-align: center; }
+.checkin-card .poll-counter { text-align: center; flex: none; margin: 0; }
 /* The poll maker */
 .poll-dialog { max-height: calc(100dvh - 24px); overflow-y: auto; }
 .poll-sec-label { text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; padding: 0; }
@@ -5437,3 +5437,9 @@ button.bs-cell:focus-visible { outline: 2px solid var(--accent); outline-offset:
 .gif-lookup-big { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start; padding: 10px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); }
 .gif-lookup-big img { display: block; max-width: min(100%, 420px); max-height: 360px; width: auto; height: auto; border-radius: 10px; }
 .gif-lookup-meta { display: flex; flex-direction: column; gap: 6px; flex: 1 1 180px; min-width: 0; overflow-wrap: anywhere; }
+
+/* Polls: your own written answer as one of your picks (a row in the list). */
+.poll-own { cursor: default; align-items: flex-start; }
+.poll-own .poll-check { margin-top: 10px; }
+.poll-own textarea.input { min-height: 38px; font-size: 14px; background: var(--surface); }
+.poll-own .grow { overflow-wrap: anywhere; white-space: pre-wrap; }

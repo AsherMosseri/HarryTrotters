@@ -476,14 +476,19 @@ export function PollDialog({ onCreate, onClose, canRequire = false, initialQuest
   const chosen = kind !== 'people' ? [] : everyone ? everyone : listPool.filter((p) => picked.has(p));
   const count = kind === 'people' ? chosen.length : filled.length;
   const limit = optionLimit(kind);
-  // N can go up to the number of options (one fewer if people can't pick themselves).
-  const maxN = Math.min(MAX_PICK, count - (kind === 'people' && !selfVote ? 1 : 0));
   const several = pickKind === 'several';
+  // A new "several" choice poll that takes written answers counts your own
+  // answer as one of your picks (shared/polls.js writeCounts). Old polls keep
+  // writing apart, so their votes still count.
+  const writePick = kind === 'choices' && write && several && (!editing || !!editing.writePick);
+  // N can go up to the number of options (one fewer if people can't pick
+  // themselves, one more when your own answer is a pick).
+  const maxN = Math.min(MAX_PICK, count - (kind === 'people' && !selfVote ? 1 : 0) + (writePick ? 1 : 0));
   const nEff = Math.max(2, Math.min(n, Math.max(2, maxN)));
   const pickField = !several
     ? { mode: 'one', n: 1 }
     : mode === 'any'
-      ? { mode: 'any', n: Math.min(count, MAX_PICK) }
+      ? { mode: 'any', n: Math.min(count + (writePick ? 1 : 0), MAX_PICK) }
       : { mode, n: nEff };
 
   // Ids that are or ever were taken: the poll's choices, any choice that
@@ -513,6 +518,8 @@ export function PollDialog({ onCreate, onClose, canRequire = false, initialQuest
       });
     }
     const out = { ...base, kind, multi: several, write: kind === 'choices' ? write : false, options: opts, pick: pickField };
+    if (writePick) out.writePick = true;
+    else delete out.writePick;
     if (kind === 'people') out.selfVote = selfVote;
     else delete out.selfVote;
     // An old poll saved with the same rule it always had keeps having no rule.
@@ -752,6 +759,7 @@ export function PollDialog({ onCreate, onClose, canRequire = false, initialQuest
                     {mode === 'upto' && `People can pick 1 to ${nEff}.`}
                     {mode === 'exact' && `Exactly ${nEff}: people have to pick ${nEff} before their vote counts.`}
                     {mode === 'any' && 'People can pick as many as they like.'}
+                    {writePick && ' Writing their own answer counts as one of their picks.'}
                   </p>
                 </>
               )}

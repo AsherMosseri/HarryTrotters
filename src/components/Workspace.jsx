@@ -1602,7 +1602,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
       },
       vote: (conv, msg, optionId, on) => store.vote(conv, msg, optionId, actor, on, rename).catch(fail),
       // A whole vote at once (pick-N polls, the required-poll screen): true once saved.
-      votePicks: (conv, msg, ids) => ok(store.votePicks(conv, msg, ids, actor, rename)),
+      votePicks: (conv, msg, ids, text) => ok(store.votePicks(conv, msg, ids, actor, rename, text === undefined ? undefined : String(text).trim().slice(0, 1000))),
       answerPoll: (conv, msg, text) => store.answerPoll(conv, msg, text.trim().slice(0, 1000), actor).catch(fail),
       pin: (conv, id, on) => store.pin(conv, id, on, actor).catch(fail),
       subscribePins: (conv, cb) => store.subscribePins(conv, cb, fail),
@@ -3343,7 +3343,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
                     rename={rename}
                     me={actor.name}
                     onSkip={skipInPreview?.(`poll:${pendingPoll.id}`)}
-                    onVote={(ids) => api.votePicks('announcements', pendingPoll, ids)}
+                    onVote={(ids, text) => api.votePicks('announcements', pendingPoll, ids, text)}
                     onAnswer={(text) => api.answerPoll('announcements', pendingPoll, text)}
                   />
                 )}

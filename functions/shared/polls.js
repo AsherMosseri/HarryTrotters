@@ -8,6 +8,8 @@
 //   multi, pick?: { mode: 'one'|'upto'|'exact'|'any', n }, selfVote?: false,
 //   write, required, closed }
 // Old polls have no `pick`: multi means any number, otherwise one.
+// A "several" choice poll that also takes written answers (write) counts
+// your own written answer as one of your picks (writeCounts).
 // Votes: { [optionId]: { [personKey]: name }, text: { [personKey]: { name, text, at } } }
 
 import { nameKey } from './team.js';
@@ -26,8 +28,8 @@ export const optionLabel = (o, rename = (n) => n) => (o.person ? rename(o.person
 // n is capped at the number of options (an "exactly 5" of 4 choices could never
 // be met). legacy: an old poll with no rule, which keeps counting as before.
 export function pickRule(poll) {
-  const count = (poll?.options || []).length;
   const p = poll?.pick;
+  const count = (poll?.options || []).length + (writeCounts(poll) ? 1 : 0);
   if (p && ['one', 'upto', 'exact', 'any'].includes(p.mode)) {
     if (p.mode === 'any') return { mode: 'any', n: count, legacy: false };
     if (p.mode === 'one') return { mode: 'one', n: 1, legacy: false };
@@ -35,6 +37,14 @@ export function pickRule(poll) {
     return { mode: p.mode, n, legacy: false };
   }
   return poll?.multi ? { mode: 'any', n: count, legacy: true } : { mode: 'one', n: 1, legacy: true };
+}
+
+// Whether your own written answer is one of your picks: a choice poll with a
+// pick rule for several (up to / exactly N, any number) that takes written
+// answers. Polls made before this (no writePick), and "just one", keep
+// writing apart from voting, so no vote already in stops counting.
+export function writeCounts(poll) {
+  return !!poll?.write && !!poll.writePick && (poll.kind || 'choices') === 'choices' && ['upto', 'exact', 'any'].includes(poll.pick?.mode);
 }
 
 // Whether voting here is "choose, then press Vote" (a rule was set) rather than
@@ -54,7 +64,7 @@ export function eligibleOptions(poll, voterKey, rename = (n) => n) {
 // What a voter's picks have to be: { min, max } picks for their vote to count.
 export function pickBounds(poll, voterKey = '', rename = (n) => n) {
   const r = pickRule(poll);
-  const have = eligibleOptions(poll, voterKey, rename).length;
+  const have = eligibleOptions(poll, voterKey, rename).length + (writeCounts(poll) ? 1 : 0);
   if (r.mode === 'one') return { min: 1, max: 1 };
   if (r.mode === 'any') return { min: 1, max: Math.max(1, have) };
   const n = Math.max(1, Math.min(r.n, have));
@@ -63,7 +73,8 @@ export function pickBounds(poll, voterKey = '', rename = (n) => n) {
 
 // Can this voter submit these picks (option ids)? { ok, ids, why }. Used by the
 // phone before it writes, so an honest phone never saves an invalid vote.
-export function checkPicks(poll, ids, voterName, rename = (n) => n) {
+// written: they're also sending their own answer (a pick when writeCounts).
+export function checkPicks(poll, ids, voterName, rename = (n) => n, { written = false } = {}) {
   if (!poll || poll.kind === 'text') return { ok: false, ids: [], why: 'This poll takes written answers.' };
   if (poll.closed) return { ok: false, ids: [], why: 'This poll has ended.' };
   const key = nameKey(rename(voterName));
@@ -73,9 +84,10 @@ export function checkPicks(poll, ids, voterName, rename = (n) => n) {
   const ok = new Set(eligibleOptions(poll, key, rename).map((o) => o.id));
   if (unique.some((id) => !ok.has(id))) return { ok: false, ids: unique, why: 'You can’t vote for yourself here.' };
   const { min, max } = pickBounds(poll, key, rename);
-  if (unique.length > max) return { ok: false, ids: unique, why: max === 1 ? 'Pick one.' : `You can pick up to ${max}.` };
-  if (unique.length < min)
-    return { ok: false, ids: unique, why: min === max ? `Pick ${min}.` : 'Pick at least one.' };
+  const total = unique.length + (written && writeCounts(poll) ? 1 : 0);
+  const own = writeCounts(poll) ? ' (your own answer counts as one)' : '';
+  if (total > max) return { ok: false, ids: unique, why: max === 1 ? 'Pick one.' : `You can pick up to ${max}${own}.` };
+  if (total < min) return { ok: false, ids: unique, why: min === max ? `Pick ${min}${own}.` : 'Pick at least one.' };
   return { ok: true, ids: unique, why: '' };
 }
 
@@ -110,10 +122,19 @@ export function pollTally(m, { rename = (n) => n } = {}) {
   const skipped = new Set();
   const who = new Set();
   for (const o of options) for (const k of Object.keys(all[o.id] || {})) who.add(k);
+  // Written answers that count as a pick (writeCounts), by person.
+  const wrote = new Set();
+  if (writeCounts(poll))
+    for (const [k, a] of Object.entries(all.text || {})) {
+      if (!a?.text) continue;
+      const key = nameKey(rename(a.name || '')) || k;
+      wrote.add(key);
+      who.add(k);
+    }
   // People who are in two keys (an old id and a renamed one) count once.
   const seen = new Map();
   for (const k of who) {
-    const name = options.map((o) => all[o.id]?.[k]).find((v) => typeof v === 'string');
+    const name = options.map((o) => all[o.id]?.[k]).find((v) => typeof v === 'string') ?? all.text?.[k]?.name;
     const key = name ? nameKey(rename(name)) || k : k;
     if (!seen.has(key)) seen.set(key, []);
     seen.get(key).push(k);
@@ -123,18 +144,19 @@ export function pollTally(m, { rename = (n) => n } = {}) {
     for (const k of keys) for (const o of options) if (all[o.id]?.[k] !== undefined && all[o.id]?.[k] !== null && !theirs.has(o.id)) theirs.set(o.id, all[o.id][k]);
     let picks = options.filter((o) => theirs.has(o.id));
     if (poll.selfVote === false) picks = picks.filter((o) => !(o.person && personKeyOf(o, rename) === key));
-    let valid = picks.length > 0;
+    const own = wrote.has(key) ? 1 : 0; // their written answer, as a pick
+    let valid = picks.length + own > 0;
     if (!rule.legacy) {
       const { min, max } = pickBounds(poll, key, rename);
-      if (rule.mode === 'exact') valid = picks.length === min;
+      if (rule.mode === 'exact') valid = picks.length + own === min;
       else {
-        picks = picks.slice(0, max);
-        valid = picks.length >= 1;
+        picks = picks.slice(0, Math.max(0, max - own));
+        valid = picks.length + own >= 1;
       }
-      if (picks.length < min) valid = false;
+      if (picks.length + own < min) valid = false;
     }
     if (!valid) {
-      if (theirs.size) skipped.add(key);
+      if (theirs.size || own) skipped.add(key);
       continue;
     }
     voters.add(key);
@@ -186,10 +208,11 @@ export function votesFit(m, nextPoll, { rename = (n) => n } = {}) {
   for (const key of before.voters) {
     const ids = (nextPoll.options || []).filter((o) => before.votes[o.id]?.[key] !== undefined).map((o) => o.id);
     const gone = (m.poll.options || []).some((o) => !kept.has(o.id) && before.votes[o.id]?.[key] !== undefined);
-    if (!ids.length || gone) continue;
+    const own = writeCounts(nextPoll) && Object.entries(before.votes.text || {}).some(([k, a]) => a?.text && (k === key || nameKey(rename(a.name || '')) === key)) ? 1 : 0;
+    if (!(ids.length + own) || gone) continue;
     const { min, max } = pickBounds(nextPoll, key, rename);
     const okIds = new Set(eligibleOptions(nextPoll, key, rename).map((o) => o.id));
-    if (ids.length < min || ids.length > max || ids.some((id) => !okIds.has(id))) lost.push(key);
+    if (ids.length + own < min || ids.length + own > max || ids.some((id) => !okIds.has(id))) lost.push(key);
   }
   return { ok: lost.length === 0, lost };
 }

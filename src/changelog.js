@@ -4,6 +4,14 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '3.2.3',
+    date: '2026-11-06',
+    title: 'Polls: pick and write together',
+    items: [
+      'Polls where people can pick several and write their own: your own answer is now one of your picks, right in the list. Pick 2 and write 1 for “exactly 3”, then vote once.',
+    ],
+  },
+  {
     version: '3.2.2',
     date: '2026-11-06',
     title: 'Lab check-in fix',
