@@ -19,7 +19,7 @@ import { PreviewBar, lookOnly } from './components/Preview.jsx';
 
 // A device that has never signed in (or hasn't picked its name yet) has
 // nothing saved to open with: it needs the internet once.
-const SIGN_IN_OFFLINE = 'Signing in the first time needs internet. Connect to Wi‑Fi and this opens on its own.';
+const SIGN_IN_OFFLINE = 'Signing in the first time needs a connection. Connect to Wi‑Fi and this opens on its own.';
 const AUTH_ERRORS = {
   'auth/operation-not-allowed': 'Anonymous sign-in is turned off in Firebase (Authentication → Sign-in method → Anonymous).',
   'auth/admin-restricted-operation': 'Anonymous sign-in is turned off in Firebase (Authentication → Sign-in method → Anonymous).',

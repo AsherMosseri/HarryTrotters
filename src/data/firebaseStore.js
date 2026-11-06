@@ -26,6 +26,7 @@ import {
   getDocs,
   FieldPath,
   where,
+  waitForPendingWrites,
 } from 'firebase/firestore';
 import {
   getStorage,
@@ -53,7 +54,7 @@ import { API_FNS } from '../../functions/shared/api.js';
 import { RUNS_KEPT } from '../../functions/shared/checklists.js';
 import { NEXT } from '../next.js';
 import { swOptions } from '../offline.js';
-import { browserIsOnline, isOnline, needsInternet, setServerReachable } from '../connection.js';
+import { browserIsOnline, isOnline, needsInternet, setServerReachable, settleLeftover, trackWrite } from '../connection.js';
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -75,24 +76,36 @@ const db = initializeFirestore(app, {
 // with a connection. With none (or Wi-Fi that's connected but dead) a screen
 // that waits for it would wait forever, so once the write is safely queued we
 // carry on. A late refusal from the rules just takes the change back out.
+// Each write is counted as waiting to send until the server answers it (the
+// offline strip's "3 changes waiting to send"; connection.js trackWrite),
+// except quiet ones: background bookkeeping (who's online, what you've read).
 const SAVE_WAIT = 6000;
-function queued(p) {
+function queued(p, quiet = false) {
+  if (!quiet) trackWrite(p);
   p.catch(() => {});
   return Promise.race([p, new Promise((r) => setTimeout(r, isOnline() ? SAVE_WAIT : 0))]);
 }
 const setDoc = (...a) => queued(fsSetDoc(...a));
 const updateDoc = (...a) => queued(fsUpdateDoc(...a));
 const deleteDoc = (...a) => queued(fsDeleteDoc(...a));
-function writeBatch(...a) {
-  const batch = fsWriteBatch(...a);
+const quietSetDoc = (...a) => queued(fsSetDoc(...a), true);
+function writeBatch(dbRef, { quiet = false } = {}) {
+  const batch = fsWriteBatch(dbRef);
   const commit = batch.commit.bind(batch);
-  batch.commit = () => queued(commit());
+  batch.commit = () => queued(commit(), quiet);
   return batch;
 }
+// Changes made on an earlier visit that were still waiting when the app
+// closed: counted until Firestore has sent everything it had waiting.
+settleLeftover(waitForPendingWrites(db));
+
+// Coins can't wait offline (coin safety): a spend or grant queued on the
+// device would show before the server has taken it. Refused at once instead.
+const coinWrite = (write) => (isOnline() ? write() : Promise.reject(needsInternet()));
 
 // Pictures, files and anything else that goes through Storage can't wait in
 // the offline copy: say so right away instead of hanging.
-const UPLOAD_OFFLINE = 'Needs internet to upload. Try again when you’re back online.';
+const UPLOAD_OFFLINE = 'Needs a connection to upload. Try again when you’re back online.';
 const uploadBytes = (...a) => (browserIsOnline() ? fsUploadBytes(...a) : Promise.reject(needsInternet(UPLOAD_OFFLINE)));
 const deleteObject = (...a) => (browserIsOnline() ? fsDeleteObject(...a) : Promise.reject(needsInternet()));
 function uploadBytesResumable(...a) {
@@ -374,7 +387,7 @@ export const firebaseStore = {
   // Accounts (functions/index.js account): status, create, signIn, change,
   // list, reset. Returns { ok, member } or { error } (or what was asked for).
   async account(data) {
-    const call = callable('account', { offline: 'Needs internet. Connect to Wi‑Fi and try again.' });
+    const call = callable('account', { offline: 'Needs a connection. Connect to Wi‑Fi and try again.' });
     try {
       return (await call(data)).data;
     } catch (e) {
@@ -421,7 +434,7 @@ export const firebaseStore = {
     return onSnapshot(query(inboxCol(name), orderBy('at', 'desc'), limit(40)), (snap) => cb(snap.docs.map(readDoc)), onError);
   },
   markInboxRead(name, ids) {
-    const batch = writeBatch(db);
+    const batch = writeBatch(db, { quiet: true });
     for (const id of ids) batch.update(doc(inboxCol(name), id), { read: true });
     return batch.commit();
   },
@@ -738,10 +751,10 @@ export const firebaseStore = {
     return () => offs.forEach((off) => off());
   },
   addCoinTx(tx) {
-    return setDoc(doc(collection(db, 'coins')), { ...tx, at: Date.now() });
+    return coinWrite(() => setDoc(doc(collection(db, 'coins')), { ...tx, at: Date.now() }));
   },
   deleteCoinTx(id) {
-    return deleteDoc(doc(db, 'coins', id));
+    return coinWrite(() => deleteDoc(doc(db, 'coins', id)));
   },
   // The market and pets (functions/market.js). Perks are team management's to
   // add and change; buying, tournaments and pets go through the server:
@@ -961,7 +974,7 @@ export const firebaseStore = {
     return onSnapshot(doc(db, 'chatReads', personId(owner)), (snap) => cb(snap.exists() ? snap.data().reads || {} : {}), onError);
   },
   saveChatReads(owner, reads) {
-    return setDoc(doc(db, 'chatReads', personId(owner)), { owner, reads }, { merge: true });
+    return quietSetDoc(doc(db, 'chatReads', personId(owner)), { owner, reads }, { merge: true });
   },
   subscribeNotes(owner, cb, onError) {
     return onSnapshot(doc(notesCol, personId(owner)), (snap) => cb(snap.exists() ? snap.data().notes || {} : {}), onError);
@@ -1318,7 +1331,7 @@ export const firebaseStore = {
                   : '');
       batch.update(doc(dmsCol, conv.slice(3)), { lastAt: at, lastBy: actor.name, lastText: lastText.slice(0, 120) });
     }
-    const sent = batch.commit();
+    const sent = trackWrite(batch.commit());
     // Reading it back from the offline copy waits in line behind the write,
     // so this answers once the write is in.
     const local = getDocFromCache(ref).then(
@@ -1676,7 +1689,7 @@ export const firebaseStore = {
   setRaceLive(race, data, actor) {
     const uid = auth.currentUser?.uid;
     if (!uid) return Promise.resolve();
-    return setDoc(doc(db, 'raceLive', `${race}_${uid}`), { ...data, race, uid, name: actor.name, at: Date.now() });
+    return quietSetDoc(doc(db, 'raceLive', `${race}_${uid}`), { ...data, race, uid, name: actor.name, at: Date.now() });
   },
   subscribeRaceLive(race, cb) {
     return onSnapshot(
@@ -1803,7 +1816,9 @@ export const firebaseStore = {
     return onSnapshot(presenceCol, (snap) => cb(snap.docs.map(readDoc)), onError);
   },
   setPresence(actor, patch) {
-    return setDoc(doc(presenceCol, actor.uid), { name: actor.name, ...patch }, { merge: true });
+    // Offline, "online" and "typing" mean nothing, and a pile of them would send on reconnect.
+    if (!isOnline()) return Promise.resolve();
+    return quietSetDoc(doc(presenceCol, actor.uid), { name: actor.name, ...patch }, { merge: true });
   },
 
   // Team stickers, sent as their own message.
@@ -1888,7 +1903,7 @@ export const firebaseStore = {
   },
   bumpLabChips(ids) {
     if (!ids.length) return Promise.resolve();
-    return setDoc(
+    return quietSetDoc(
       doc(db, 'labChips', 'counts'),
       { counts: Object.fromEntries(ids.map((id) => [id, increment(1)])), updatedAt: Date.now() },
       { merge: true },
@@ -1905,7 +1920,7 @@ export const firebaseStore = {
     }
   },
   addLabTouch(day, name, taskId) {
-    return setDoc(
+    return quietSetDoc(
       doc(db, 'labTouches', `${day}_${personId(name)}`),
       { day, person: name, taskIds: arrayUnion(taskId), at: Date.now() },
       { merge: true },

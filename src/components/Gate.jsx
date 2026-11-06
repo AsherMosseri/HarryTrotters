@@ -46,7 +46,7 @@ export function LoadingScreen({ error, step = 1, offline = false }) {
         <p>{TEAM_NAME}</p>
         {error ? (
           <div className="splash-error">
-            <b>{offline ? 'Needs internet' : 'Something went wrong'}</b>
+            <b>{offline ? 'Needs a connection' : 'Something went wrong'}</b>
             <span>{error}</span>
             <button className="btn primary" onClick={() => location.reload()}>
               {offline ? 'Try again' : 'Reload'}

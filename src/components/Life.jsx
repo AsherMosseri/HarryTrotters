@@ -326,7 +326,7 @@ export function BingoCard({ actor, api, sig }) {
           </span>
         </button>
       ) : (
-        <p className="today-empty">{err ? (isOnline() ? 'Couldn’t load this week’s card.' : 'Needs internet to load this week’s card.') : 'Getting this week’s card…'}</p>
+        <p className="today-empty">{err ? (isOnline() ? 'Couldn’t load this week’s card.' : 'Needs a connection to load this week’s card.') : 'Getting this week’s card…'}</p>
       )}
       {open && card && <BingoDialog card={card} onClose={() => setOpen(false)} onOpen={ask} />}
     </section>

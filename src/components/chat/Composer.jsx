@@ -17,6 +17,7 @@ import { openGame } from '../games/launch.js';
 import { askOptions } from '../../requestCommand.js';
 import { loanOptions } from '../../loanCommand.js';
 import { groupKind } from '../../groups.js';
+import { NEEDS_CONNECTION, useNeedsConnection } from '../../connection.js';
 
 // A /give's key: the same when the same text is sent again (a double tap, or a
 // retry after it didn't answer), so the server pays it once; new after it goes
@@ -80,6 +81,7 @@ export default function Composer({
   const [suggest, setSuggest] = useState(null); // { kind: '@' | '#' | ':', query, start, end }
   const [active, setActive] = useState(0);
   const [sending, setSending] = useState(false);
+  const offline = useNeedsConnection();
   const [panel, setPanel] = useState(null); // 'gif' | 'emoji' | 'poll'
   const [formatBar, setFormatBar] = useState(false);
   const [emojiReady, setEmojiReady] = useState(!!emojiList());
@@ -428,12 +430,16 @@ export default function Composer({
       (n) => n !== actor.name,
     );
     const linked = taskIds.filter((id) => tasks.some((t) => t.id === id && body.includes(`#${t.title}`)));
+    // A photo can't wait offline (the upload needs the server); text can. Both stay in the box.
+    if (photo && !editing && offline)
+      return onNote({ title: NEEDS_CONNECTION, body: 'Photos send once you’re back online. Your photo and message stay here until then.' });
     setSending(true);
     try {
       if (editing) {
         await api.editMessage(conv, editing.id, { text: body, mentions, taskIds: linked, roles, everyone });
       } else {
-        await api.sendMessage(conv, { text: body, mentions, taskIds: linked, replyTo: replyInfo(), roles, everyone }, photo?.file);
+        const sent = await api.sendMessage(conv, { text: body, mentions, taskIds: linked, replyTo: replyInfo(), roles, everyone }, photo?.file);
+        if (sent === false) return;
         // AFK: you're back once you talk; and anyone you @ who's away gets mentioned.
         if (people?.profileOf(actor.name)?.afk) {
           api.saveProfile(actor.name, { afk: null });
@@ -479,6 +485,7 @@ export default function Composer({
           <button className="icon-btn small" onClick={() => setPhoto(null)} aria-label="Remove photo">
             <CloseIcon />
           </button>
+          {offline && <span className="composer-photo-wait">{NEEDS_CONNECTION}</span>}
         </div>
       )}
       {panel === 'gif' && <GifPicker onPick={(gif) => sendExtra({ gif })} onUpload={uploadGif} onClose={() => setPanel(null)} />}

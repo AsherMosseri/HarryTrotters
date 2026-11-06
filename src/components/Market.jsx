@@ -21,6 +21,7 @@ import { coinStyled, exactCoins, withExact } from '../coinFormat.js';
 import { confirmDialog, promptDialog } from './Dialogs.jsx';
 import { PetsShelf } from './PetFamily.jsx';
 import { Icon } from './shell/icons.jsx';
+import ServerButton from './ServerButton.jsx';
 
 // The market (F1): spend Jackson coins on pet care, real perks team
 // management adds, short-lived chat extras, and game tournaments. Every buy
@@ -206,7 +207,7 @@ function PerksShelf({ actor, balance, buy, busy, onToast }) {
                       .join(' · ')}
                   </p>
                   <div className="mk-card-btns">
-                    <button
+                    <ServerButton
                       className="btn small mk-buy"
                       disabled={!market.coinsOn || p.active === false || soldOut || atLimit || p.price > balance || !!busy}
                       onClick={async () => {
@@ -219,7 +220,7 @@ function PerksShelf({ actor, balance, buy, busy, onToast }) {
                       }}
                     >
                       {soldOut ? 'Sold out' : atLimit ? 'Limit reached' : p.price > balance ? 'Not enough coins' : busy === item ? 'Buying…' : 'Buy'}
-                    </button>
+                    </ServerButton>
                     {isManager && (
                       <span className="mk-manage">
                         <button className="link-btn small" onClick={() => setEditing(p)}>
@@ -405,7 +406,7 @@ function ExtrasShelf({ actor, balance, buy, busy, onToast }) {
                 {mine ? (
                   <ExtraSwitch p={mine} x={x} onToast={onToast} />
                 ) : (
-                  <button
+                  <ServerButton
                     className="btn small mk-buy"
                     disabled={!market.coinsOn || x.price > balance || !!busy}
                     onClick={async () => {
@@ -424,7 +425,7 @@ function ExtrasShelf({ actor, balance, buy, busy, onToast }) {
                     }}
                   >
                     {x.price > balance ? 'Not enough coins' : busy === item ? 'Buying…' : 'Buy'}
-                  </button>
+                  </ServerButton>
                 )}
               </li>
             );
@@ -768,9 +769,9 @@ function Tournament({ t, actor, balance, onToast, onPlay }) {
             </span>
           )
         ) : (
-          <button className="btn small primary" disabled={!market.coinsOn || busy || ended || t.entry > balance} onClick={join}>
+          <ServerButton className="btn small primary" disabled={!market.coinsOn || busy || ended || t.entry > balance} onClick={join}>
             {t.entry > balance ? 'Not enough coins' : `Join for ${coinStyled(t.entry)}`}
-          </button>
+          </ServerButton>
         )}
         {actor.admin && !ended && (
           <button className="link-btn small danger" onClick={() => setCancelling(true)}>

@@ -37,7 +37,7 @@ import TrashDialog from './TrashDialog.jsx';
 import RunsView from './RunsView.jsx';
 import ChatView from './ChatView.jsx';
 import Sidebar from './shell/Sidebar.jsx';
-import ConnectionPill from './shell/ConnectionPill.jsx';
+import ConnectionPill, { DemoOfflineSwitch } from './shell/ConnectionPill.jsx';
 import { isOnline, noteFor } from '../connection.js';
 import Today from './shell/Today.jsx';
 import { Icon } from './shell/icons.jsx';
@@ -1597,7 +1597,8 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
           return Promise.resolve();
         }
         // Done once it's on screen (pending); a refusal after that still says so.
-        return store.sendMessage(conv, data, actor, photoFiles, { onError: fail }).catch(fail);
+        // false: it didn't go (say, a photo with no connection), so the box keeps it.
+        return store.sendMessage(conv, data, actor, photoFiles, { onError: fail }).catch((e) => (fail(e), false));
       },
       // "Typing…": at most one write every 3 seconds.
       typing: (conv) => {
@@ -2760,7 +2761,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
           {preview && <PreviewBar as={preview.as} onExit={onExitPreview} />}
           {store.mode === 'demo' && (
             <div className="demo-banner">
-              Demo mode — sample data saved only in this browser. <a href="./">Go to the real board</a>
+              Demo mode — sample data saved only in this browser. <a href="./">Go to the real board</a> <DemoOfflineSwitch />
             </div>
           )}
           <AppBackdrop theme={activeTheme} />

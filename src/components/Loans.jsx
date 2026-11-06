@@ -9,6 +9,7 @@ import { Icon } from './shell/icons.jsx';
 import { onLoanForm, peekLoanForm, takeLoanForm } from '../loanCommand.js';
 import { coinStyled, withExact } from '../coinFormat.js';
 import { amountTip, readAmount } from '../../functions/shared/amount.js';
+import ServerButton from './ServerButton.jsx';
 
 // Typed like chat amounts: 500, 2.5k, 1,000,000, 7Sx or 2.5e40. NaN if it isn't one.
 const toCoins = (v) => {
@@ -234,13 +235,13 @@ export function LoansPanel({ loans, actor, roster, focus, onToast }) {
         ) : (
           <div className="loan-ask-btns">
             {!owner && (
-              <button className="btn" onClick={() => setAsk('bank')} disabled={!!lock}>
+              <ServerButton className="btn" onClick={() => setAsk('bank')} disabled={!!lock}>
                 <Icon name="bank" size={18} /> Ask the bank
-              </button>
+              </ServerButton>
             )}
-            <button className="btn" onClick={() => setAsk('person')} disabled={!!lock}>
+            <ServerButton className="btn" onClick={() => setAsk('person')} disabled={!!lock}>
               <Icon name="person" size={18} /> Ask a teammate
-            </button>
+            </ServerButton>
           </div>
         )}
       </section>
@@ -472,9 +473,9 @@ function AskForm({ loans, actor, roster, mode, setMode, onDone, prefill }) {
         <button className="btn" onClick={() => setMode(null)}>
           Cancel
         </button>
-        <button className="btn primary" disabled={busy || (!bank && !who) || !(toCoins(value.amount) > 0)} onClick={send}>
+        <ServerButton className="btn primary" disabled={busy || (!bank && !who) || !(toCoins(value.amount) > 0)} onClick={send}>
           Send request
-        </button>
+        </ServerButton>
       </div>
     </div>
   );
@@ -726,9 +727,9 @@ function LoanCard({ loan, loans, focus, onToast }) {
           >
             Pay
           </button>
-          <button className="btn primary" disabled={busy || left > balance} onClick={() => run('loanRepay', { amount: left }, 'Paid off.')}>
+          <ServerButton className="btn primary" disabled={busy || left > balance} onClick={() => run('loanRepay', { amount: left }, 'Paid off.')}>
             Pay all <span className="mono">{coinStyled(left)}</span>
-          </button>
+          </ServerButton>
           {amountHint(pay) && <span className="muted tiny loan-have">{amountHint(pay)}</span>}
           {(n > balance || left > balance) && <span className="muted tiny loan-have">You have {coinStyled(Math.max(0, balance))}.</span>}
         </div>

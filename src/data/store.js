@@ -1,3 +1,6 @@
+import { browserIsOnline, needsInternet, settleLeftover, trackWrite } from '../connection.js';
+import { offlineStore } from './needsServer.js';
+
 // Picks the backend: ?demo in the URL runs fully offline with sample data.
 export const isDemo = new URLSearchParams(location.search).has('demo');
 
@@ -23,10 +26,29 @@ export function reloadOnceForNewVersion() {
 
 export async function loadStore() {
   try {
-    if (isDemo) return (await import('./demoStore.js')).demoStore;
+    if (isDemo) return demoOffline((await import('./demoStore.js')).demoStore);
     return (await import('./firebaseStore.js')).firebaseStore;
   } catch (e) {
     if (reloadOnceForNewVersion()) return new Promise(() => {});
     throw e;
   }
+}
+
+// Demo mode behaves like the real app with no connection while it pretends to
+// be offline (?demo&offline, or the switch on the demo banner): see
+// needsServer.js. Changes "send" a moment after it's back.
+function demoOffline(store) {
+  let back = null;
+  const whenOnline = () =>
+    (back ||= new Promise((resolve) => {
+      const wait = setInterval(() => {
+        if (!browserIsOnline()) return;
+        clearInterval(wait);
+        back = null;
+        setTimeout(resolve, 900);
+      }, 200);
+    }));
+  // Anything left from a visit that closed "offline" sends once it's online.
+  settleLeftover(whenOnline());
+  return offlineStore(store, { online: browserIsOnline, refusal: () => needsInternet(), track: trackWrite, whenOnline });
 }

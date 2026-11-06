@@ -3452,7 +3452,14 @@ button.pm-row:hover { background: color-mix(in srgb, var(--text) 4%, transparent
 .conn-pill.back { color: #15803d; background: color-mix(in srgb, #22c55e 12%, var(--surface-2)); border-color: color-mix(in srgb, #22c55e 30%, transparent); }
 .conn-pill.compact { margin: 0 0 4px; width: 34px; height: 34px; padding: 0; justify-content: center; border-radius: 10px; }
 .conn-pill .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-.conn-pill.conn-phone { align-self: center; margin: 4px 0 2px; font-size: 12.5px; padding: 4px 11px; }
+.conn-pill.conn-phone { align-self: center; margin: 4px 0 2px; font-size: 12.5px; padding: 4px 11px; max-width: calc(100% - 24px); }
+/* 3.2.8: "Offline · 3 changes waiting to send"; one line, cut short on a very narrow screen. */
+.conn-pill .conn-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.conn-pill.compact { position: relative; }
+.conn-pill .conn-count {
+  position: absolute; top: -5px; right: -6px; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 999px; font-size: 10.5px; font-weight: 700;
+  line-height: 17px; text-align: center; font-variant-numeric: tabular-nums; background: var(--text); color: var(--surface);
+}
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) .conn-pill.back { color: #4ade80; }
 }

@@ -33,6 +33,7 @@ import { EventsAdmin, ParkSection } from './PetPark.jsx';
 import { OwnSticker, PetPhotoReview, PetPhotoRow } from './PetPhoto.jsx';
 import { PetGamesHost, PetGamesSection } from './petgames/PetGamesCard.jsx';
 import { Icon } from './shell/icons.jsx';
+import ServerButton from './ServerButton.jsx';
 
 // Pets in the market, and their family (3.0): your pets with what they wear,
 // their title and level, a style sheet for the gear levels unlock, the one
@@ -185,13 +186,13 @@ export function PetsShelf({ actor, balance, buy, busy, onToast, roster = [] }) {
                   <p className="muted small">
                     {it.desc} {[it.food && `+${it.food} food`, it.fun && `+${it.fun} fun`].filter(Boolean).join(', ')}
                   </p>
-                  <button
+                  <ServerButton
                     className="btn small mk-buy"
                     disabled={!market.coinsOn || full || it.price > balance || !!busy}
                     onClick={() => buy(item, { born: pet.adoptedAt }, () => onToast(`${pet.name} loved the ${it.name.toLowerCase()}.`))}
                   >
                     {full ? `${pet.name} is full` : it.price > balance ? 'Not enough coins' : busy === item ? 'Buying…' : 'Buy'}
-                  </button>
+                  </ServerButton>
                 </li>
               );
             })}

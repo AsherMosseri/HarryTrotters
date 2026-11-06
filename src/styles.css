@@ -177,6 +177,9 @@ a { color: var(--accent); }
 .app.chat-mode .app-scroll { overflow: hidden; }
 .demo-banner { background: #fef3c7; color: #78350f; text-align: center; padding: 12px 16px 6px; font-size: 13px; } /* top: clear of .status-bar-band */
 .demo-banner a { color: inherit; font-weight: 700; }
+/* Demo only: pretend there's no connection (3.2.8). */
+.demo-banner .demo-offline { margin-left: 6px; padding: 1px 9px; border-radius: 999px; border: 1px solid currentColor; background: transparent; color: inherit; font: inherit; font-weight: 600; cursor: pointer; }
+.demo-banner .demo-offline[aria-pressed='true'] { background: #78350f; color: #fef3c7; }
 
 .topbar {
   /* No z-index: pop-ups (inside .app-scroll, below) must always draw over the
@@ -900,6 +903,7 @@ div.org-member { cursor: default; }
 .composer-photo { position: relative; width: 84px; height: 84px; border-radius: 10px; overflow: hidden; }
 .composer-photo img { width: 100%; height: 100%; object-fit: cover; }
 .composer-photo .icon-btn { position: absolute; top: 2px; right: 2px; background: rgb(0 0 0 / 55%); color: #fff; }
+.composer-photo-wait { position: absolute; left: 0; right: 0; bottom: 0; padding: 3px 4px; font-size: 10.5px; font-weight: 600; line-height: 1.2; text-align: center; background: rgb(0 0 0 / 62%); color: #fff; }
 .composer-row { display: flex; align-items: flex-end; gap: 6px; }
 .composer-row textarea {
   flex: 1; resize: none; min-height: 40px; max-height: 160px; padding: 9px 12px; border-radius: 10px;
