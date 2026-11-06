@@ -92,15 +92,20 @@ export function scaledPay(source, base, balance) {
 // The balance earnings grow with: the lowest it's been in the last 24 hours
 // (history: a wallet's lines, newest or any order).
 export const EARN_WINDOW = 86400000;
+// Walked back exactly (whole coins as BigInt): with huge balances, plain
+// subtraction left rounding crumbs of billions behind, so the lowest could
+// come out far from what it really was.
 export function earnBalance(history = [], now = Date.now()) {
-  let bal = sumCoins(history);
+  const whole = (v) => (typeof v === 'number' && Number.isFinite(v) ? BigInt(Math.trunc(v)) : 0n);
+  let bal = 0n;
+  for (const x of history) bal += whole(x.amount);
   let low = bal;
   const recent = history.filter((x) => (x.at || 0) > now - EARN_WINDOW).sort((a, b) => (b.at || 0) - (a.at || 0));
   for (const x of recent) {
-    bal -= x.amount || 0;
+    bal -= whole(x.amount);
     if (bal < low) low = bal;
   }
-  return low;
+  return recent.length ? Number(low) : sumCoins(history);
 }
 // The ledger doc that tops up a task's or a lab day's pay (written once by
 // the server; it counts only while that task or day still pays).

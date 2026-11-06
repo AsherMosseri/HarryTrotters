@@ -109,6 +109,10 @@ const H = (amount, at) => ({ amount, at });
 eq(C.earnBalance([H(100, now - 2 * D), H(1e9, now - 1000)], now), 100, 'a fortune from a minute ago doesn’t count yet');
 eq(C.earnBalance([H(1e9, now - 2 * D), H(-1e9 + 5, now - 3600000), H(1e9, now - 1000)], now), 5, 'given away and back within the day: the low point');
 eq(C.earnBalance([H(1e9, now - 2 * D)], now), 1e9, 'held all day: the balance');
+// Huge balances: the low point is exact, not rounding crumbs (3.2.2).
+eq(C.earnBalance([H(5e9, now - 2 * D), H(1.3e27, now - 3600000), H(7, now - 1000)], now), 5e9, 'set to an octillion within the day: the low point is the old balance, exactly');
+eq(C.earnBalance([H(5e9, now - 2 * D), H(1.3e27, now - 2 * D + 1), H(7, now - 1000)], now), C.sumCoins([H(5e9, 0), H(1.3e27, 0)]), 'an octillion held all day: the full balance before the new 7');
+eq(C.earnBalance([H(2 ** 90, now - 2 * D), H(-(2 ** 90) + 2 ** 40, now - 3600000), H(2 ** 90, now - 1000)], now), 2 ** 40, 'nearly all spent and back within the day: the exact low point');
 // The wallet counts a top-up only while its task still pays.
 const cfg = C.coinSettings({ ratesFrom: '2026-01-01', start: '2026-01-01' });
 const t = { id: 't1', title: 'X', status: 'done', assignees: ['Mia Chen'], createdBy: 'Cooper Mlezcko', completedAt: Date.UTC(2026, 10, 5, 15) };
