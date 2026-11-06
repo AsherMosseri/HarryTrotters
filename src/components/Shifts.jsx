@@ -769,7 +769,8 @@ export function SeasonStrip({ stats }) {
 // "Lab check-in is asked every school day at 12:00 AM", with team
 // management's quick skips: "Not today" and "Not tomorrow" (the next school
 // day), each undoable. Skipping today also takes back today's automatic
-// check-in if it was already asked (Undo puts it back, answers and all).
+// check-in if it was already asked. Undo asks it again from the start: the
+// old answers went with it, so everyone answers again.
 function ScheduleLine({ schedule, checkins, isManager, api, onEdit }) {
   const today = teamDay(Date.now());
   const skip = schedule.skip || [];
@@ -797,7 +798,7 @@ function ScheduleLine({ schedule, checkins, isManager, api, onEdit }) {
       const back = removed.current.get(day);
       if (back) {
         removed.current.delete(day);
-        await api.restoreCheckin(back);
+        await api.restoreCheckin({ ...back, answers: {}, at: Date.now() });
       }
     });
   const next = nextSchoolDay(today);

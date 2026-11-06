@@ -13,6 +13,7 @@ export const CHANGELOG = [
       'Tap Cancel on a challenge right after sending it, or Play on a score as it appears, and it stays where you aimed.',
       'While you play, the “new messages” button sits under the chat instead of over your game.',
       'A finished trivia keeps its answers where they were, and hangman’s keys don’t jump on the first guess.',
+      'Lab check-in: tap Undo after “Not today” and everyone is asked again, with a fresh notification.',
     ],
   },
   {

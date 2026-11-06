@@ -1964,7 +1964,7 @@ export const firebaseStore = {
   deleteCheckin(id) {
     return deleteDoc(doc(checkinsCol, id));
   },
-  // Undo for "Not today": the check-in put back as it was.
+  // Undo for "Not today": the check-in asked again (Shifts.jsx clears its answers).
   restoreCheckin(c) {
     const { id, ...data } = c;
     return setDoc(doc(checkinsCol, id), data);
