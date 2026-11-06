@@ -925,13 +925,19 @@ function settleDemoTournaments(now = Date.now()) {
   }
   return changed;
 }
+// The app's balances, from the last market call (the server reads them
+// fresh), so payouts stop at a googol like capPays does there.
+let demoBalanceOf = null;
 function settleDemoTournament(t, now, cancel, by = '') {
-  const r = cancel ? { winners: [], pays: [], refunds: Object.keys(t.players || {}).map((name) => ({ name, amount: t.entry })) } : market.payoutOf(t);
+  const r0 = cancel ? { winners: [], pays: [], refunds: Object.keys(t.players || {}).map((name) => ({ name, amount: t.entry })) } : market.payoutOf(t);
+  const have = demoBalanceOf ? Object.fromEntries([...r0.pays, ...r0.refunds].map((p) => [p.name, demoBalanceOf(p.name)])) : {};
+  const r = { ...r0, pays: market.capPays(r0.pays, have), refunds: market.capPays(r0.refunds, have) };
   state.coins = state.coins || [];
   for (const p of r.pays)
-    state.coins.push({ id: `c${uid()}`, type: 'prize', person: p.name, amount: p.amount, what: 'tournament', label: market.prizeLabel(t), item: `tour:${t.id}`, at: now });
+    for (const amount of market.payParts(p))
+      state.coins.push({ id: `c${uid()}`, type: 'prize', person: p.name, amount, what: 'tournament', label: market.prizeLabel(t), item: `tour:${t.id}`, at: now });
   for (const p of r.refunds) state.coins.push({ id: `c${uid()}`, ...market.refundEntry(p.name, p.amount, t.title, `tour:${t.id}`, now) });
-  Object.assign(t, { status: 'done', winners: r.winners, paid: r.pays, paidAt: now, ...(cancel && { cancelled: true, cancelledBy: by }) });
+  Object.assign(t, { status: 'done', winners: r.winners, paid: r.pays.map(({ parts: _p, ...x }) => x), paidAt: now, ...(cancel && { cancelled: true, cancelledBy: by }) });
 }
 
 // A finished tournament game, the way recordTournamentRun saves it: the
@@ -1579,6 +1585,7 @@ export const demoStore = {
     const note = (title, body = '') => ({ note: { title, body } });
     const done = (r) => (commit(), r);
     const myPet = () => (state.pets || []).find((p) => p.person === me);
+    demoBalanceOf = balanceOf;
     // Turning your own chat extra off or back on (functions/market.js extraSwitch): no coins move.
     if (fn === 'buy' && data.action === 'extraSwitch') {
       const p = (state.purchases || []).find((x) => x.id === data.id) || null;

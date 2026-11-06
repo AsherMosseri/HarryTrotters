@@ -231,21 +231,23 @@ export function marketFunctions({ db, coinData, freshCoins, notify, bankRef, per
         await Promise.all(names.map(async (n, i) => [n, (await freshCoins(n, banks[i].data() || {}, data)).balance])),
       );
       const r = { ...r0, pays: market.capPays(r0.pays, have), refunds: market.capPays(r0.refunds, have) };
+      // A prize past 2^53 can be a few lines that add up to it exactly (payParts).
       for (const p of r.pays)
-        tx.set(db.collection('coins').doc(), {
-          type: 'prize',
-          person: p.name,
-          amount: p.amount,
-          what: 'tournament',
-          label: market.prizeLabel(t),
-          item: `tour:${id}`,
-          at: now,
-        });
+        for (const amount of market.payParts(p))
+          tx.set(db.collection('coins').doc(), {
+            type: 'prize',
+            person: p.name,
+            amount,
+            what: 'tournament',
+            label: market.prizeLabel(t),
+            item: `tour:${id}`,
+            at: now,
+          });
       for (const p of r.refunds) tx.set(db.collection('coins').doc(), market.refundEntry(p.name, p.amount, t.title, `tour:${id}`, now));
       tx.update(ref, {
         status: 'done',
         winners: r.winners,
-        paid: r.pays,
+        paid: r.pays.map(({ parts: _p, ...x }) => x),
         paidAt: now,
         ...(cancel && { cancelled: true, cancelledBy: by }),
       });

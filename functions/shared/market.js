@@ -9,7 +9,8 @@
 // Only the server sells anything (functions/market.js): it reads the balance
 // fresh and writes the spend itself. These checks are shared with demo mode.
 
-import { capWin, teamMidnight, teamDay } from './coins.js';
+import { MAX_BALANCE, capWin, teamMidnight, teamDay } from './coins.js';
+import { OVER_GOOGOL, amountTip, readAmount } from './amount.js';
 import { weekStart } from './streaks.js';
 import { PET_ITEMS, careAfter, petItem } from './pets.js';
 import { coinsText } from './coinText.js';
@@ -278,15 +279,33 @@ export const TOURNAMENT_GAMES = {
   tetris: { name: 'Tetris', better: 'high', unit: 'points', cmd: 'tetris' },
   minesweeper: { name: 'Minesweeper', better: 'low', unit: 'seconds', cmd: 'minesweep' },
 };
-export const ENTRY_MAX = 500;
+// No limit on the entry since 3.2.7, other than the most anyone can hold
+// (a googol, coins.js MAX_BALANCE).
+export const ENTRY_MAX = MAX_BALANCE;
 const HOUR = 3600000;
+
+// The entry as team management types it: "50", "2.5k", "1,000", "7Sx",
+// "2.5e40" or "googol" (amount.js, the same as the rest of the app). Returns
+// { entry } (whole coins, 1 to a googol) or { error }.
+export function readEntry(v) {
+  const word = typeof v === 'number' ? v : String(v ?? '').replace(/\s+/g, '');
+  if (word === '') return { error: 'How much is the entry?' };
+  const r = readAmount(word);
+  if (!r) return { error: 'Type the entry like 50, 2.5k, 7Sx or 2.5e40.' };
+  if (r.over) return { error: OVER_GOOGOL };
+  if (r.amount === undefined) return { error: amountTip(word) };
+  if (!(r.amount >= 1)) return { error: 'The entry is at least 1 coin.' };
+  if (r.amount > ENTRY_MAX) return { error: OVER_GOOGOL };
+  return { entry: r.amount };
+}
 
 // A new tournament from team management's form, or { error }.
 export function newTournament(form, { by, now = Date.now(), seed }) {
   const g = TOURNAMENT_GAMES[form.game];
   if (!g) return { error: 'Pick a game.' };
-  const entry = int(form.entry);
-  if (!Number.isInteger(entry) || entry < 1 || entry > ENTRY_MAX) return { error: `Entry: 1 to ${coinsText(ENTRY_MAX)} coins.` };
+  const read = readEntry(form.entry);
+  if (read.error) return read;
+  const { entry } = read;
   const opensAt = Math.max(now, Number(form.opensAt) || now);
   const endsAt = Number(form.endsAt);
   if (!Number.isFinite(endsAt) || endsAt < opensAt + HOUR) return { error: 'It has to run at least an hour.' };
@@ -315,7 +334,35 @@ export function joinCheck(t, { me, aliases = [me], balance, now = Date.now() }) 
   if (now >= t.endsAt) return { error: 'That tournament just ended.' };
   if (aliases.some((n) => t.players?.[n])) return { error: 'You’re already in.' };
   if (t.entry > balance) return { error: `The entry is ${coinsText(t.entry)} coins. You have ${coinsText(balance)}.` };
-  return { pot: (t.pot || 0) + t.entry, player: { joinedAt: now, best: null, at: null } };
+  return { pot: Number(potOf({ ...t, players: { ...t.players, [me]: {} } })), player: { joinedAt: now, best: null, at: null } };
+}
+
+// The pot, exactly (a BigInt): every player paid the same entry, so it's the
+// entry times the players (voided ones too: their entry stays in). Past 2^53
+// a running pot + entry in doubles would round; this never does. The doc's
+// pot is this rounded to a double, for showing.
+export const potOf = (t) => BigInt(Math.trunc(Number(t.entry) || 0)) * BigInt(Object.keys(t.players || {}).length);
+
+// The largest double that's at most n (a positive BigInt).
+function doubleAtMost(n) {
+  const d = Number(n);
+  if (BigInt(d) <= n) return d;
+  const f = new Float64Array([d]);
+  new BigUint64Array(f.buffer)[0] -= 1n;
+  return f[0];
+}
+// Coin amounts (doubles, none below 1) that add up to exactly n: one below
+// 2^53, or past it a big one and what its rounding left (a few at most). Each
+// is a ledger line, so the wallet's exact sum (coins.js sumCoins) comes to n.
+export function exactParts(n) {
+  let left = BigInt(n);
+  const out = [];
+  while (left > 0n && out.length < 12) {
+    const d = doubleAtMost(left);
+    out.push(d);
+    left -= BigInt(d);
+  }
+  return out;
 }
 
 // Who wins: the pot to the best score (ties split; a leftover coin goes to
@@ -332,16 +379,27 @@ export function payoutOf(t, rename = (n) => n) {
   if (!scored.length) return { winners: [], pays: [], refunds: players.map((p) => ({ name: p.name, amount: t.entry })) };
   const best = better === 'low' ? Math.min(...scored.map((p) => p.best)) : Math.max(...scored.map((p) => p.best));
   const top = scored.filter((p) => p.best === best).sort((a, b) => (a.at || 0) - (b.at || 0));
-  const pot = t.pot || 0;
-  const each = Math.floor(pot / top.length);
-  const extra = pot - each * top.length;
+  // Split exactly (BigInt), so a pot past 2^53 is paid to the coin: each
+  // share is one ledger line, or a few that add up to it (parts).
+  const pot = potOf(t);
+  const k = BigInt(top.length);
+  const each = pot / k;
+  const extra = pot - each * k;
   return {
     winners: top.map((p) => p.name),
     best,
-    pays: top.map((p, i) => ({ name: p.name, amount: each + (i < extra ? 1 : 0) })).filter((p) => p.amount > 0),
+    pays: top
+      .map((p, i) => {
+        const share = each + (BigInt(i) < extra ? 1n : 0n);
+        const parts = exactParts(share);
+        return { name: p.name, amount: Number(share), ...(parts.length > 1 && { parts }) };
+      })
+      .filter((p) => p.amount > 0),
     refunds: [],
   };
 }
+// The ledger amounts for one payout: its parts, or the amount itself.
+export const payParts = (p) => p.parts || [p.amount];
 export const prizeLabel = (t) => `Tournament: ${t.title}`.slice(0, 80);
 
 // Prizes or entries back near the ceiling (coins.js MAX_BALANCE): each pays
@@ -353,7 +411,8 @@ export function capPays(pays = [], have = {}) {
   for (const p of pays) {
     const amount = typeof left[p.name] === 'number' ? capWin(p.amount, left[p.name]) : p.amount;
     if (typeof left[p.name] === 'number') left[p.name] += amount;
-    if (amount > 0) out.push(amount < p.amount ? { ...p, amount, capped: true } : p);
+    // Cut: one line of what's left to a googol (its exact parts don't apply).
+    if (amount > 0) out.push(amount < p.amount ? { name: p.name, amount, capped: true } : p);
   }
   return out;
 }

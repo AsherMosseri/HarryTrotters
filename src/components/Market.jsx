@@ -6,6 +6,7 @@ import {
   TOURNAMENT_GAMES,
   cleanPerk,
   pendingReview,
+  readEntry,
   reviewHolds,
   standings,
   weekFrom,
@@ -16,7 +17,7 @@ import { useLocalStorage } from '../util.js';
 import { Avatar, CloseIcon, Overlay } from './common.jsx';
 import { Coins } from './Coins.jsx';
 import { CoinNum, useCoinFormat } from './CoinNum.jsx';
-import { coinStyled, withExact } from '../coinFormat.js';
+import { coinStyled, exactCoins, withExact } from '../coinFormat.js';
 import { confirmDialog, promptDialog } from './Dialogs.jsx';
 import { PetsShelf } from './PetFamily.jsx';
 import { Icon } from './shell/icons.jsx';
@@ -540,7 +541,7 @@ function GamesShelf({ actor, balance, onToast, onPlay }) {
         <div className="sec-head">
           <h2>Tournaments</h2>
           {isManager && !form && (
-            <button className="text-btn" onClick={() => setForm({ game: 'tetris', title: '', entry: 10, hours: 24 })}>
+            <button className="text-btn" onClick={() => setForm({ game: 'tetris', title: '', entry: '10', hours: 24 })}>
               <Icon name="plus" size={16} /> New tournament
             </button>
           )}
@@ -772,6 +773,10 @@ function TournamentForm({ form, setForm, onToast }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const g = TOURNAMENT_GAMES[form.game];
+  // Typed like amounts everywhere else: 50, 2.5k, 1,000, 7Sx, 2.5e40, googol.
+  const word = String(form.entry ?? '').replace(/\s+/g, '');
+  const read = readEntry(word);
+  const hint = !word ? '' : read.error || (/[^\d,]/.test(word) ? `= ${exactCoins(read.entry)} coins` : '');
   const start = async () => {
     setBusy(true);
     setError('');
@@ -779,7 +784,8 @@ function TournamentForm({ form, setForm, onToast }) {
       action: 'createTournament',
       game: form.game,
       title: form.title.trim() || `${g.name} tournament`,
-      entry: Number(form.entry),
+      // As typed ("2.5k", "1e40"): the server reads it with the same code.
+      entry: String(form.entry).replace(/\s+/g, ''),
       endsAt: Date.now() + form.hours * 3600000,
     });
     setBusy(false);
@@ -802,16 +808,21 @@ function TournamentForm({ form, setForm, onToast }) {
         <label className="field-label">Name</label>
         <input className="input" maxLength={60} value={form.title} placeholder={`${g.name} tournament`} onChange={(e) => setForm({ ...form, title: e.target.value })} />
         <label className="field-label">Entry</label>
-        <input
-          className="input mk-num"
-          type="number"
-          inputMode="numeric"
-          min={1}
-          max={500}
-          value={form.entry}
-          onChange={(e) => setForm({ ...form, entry: e.target.value })}
-          aria-label="Entry in coins"
-        />
+        <div className="mk-entry">
+          <input
+            className="input mk-num mono"
+            type="text"
+            inputMode="text"
+            autoCapitalize="off"
+            autoCorrect="off"
+            spellCheck={false}
+            maxLength={60}
+            value={form.entry}
+            onChange={(e) => setForm({ ...form, entry: e.target.value })}
+            aria-label="Entry in coins"
+          />
+          {hint && <p className="muted tiny mk-entry-hint">{hint}</p>}
+        </div>
         <label className="field-label">Runs for</label>
         <div className="segmented">
           {LENGTHS.map(([label, h]) => (
@@ -827,7 +838,7 @@ function TournamentForm({ form, setForm, onToast }) {
         <button className="btn" onClick={() => setForm(null)}>
           Cancel
         </button>
-        <button className="btn primary" disabled={busy} onClick={start}>
+        <button className="btn primary" disabled={busy || !!read.error} onClick={start}>
           Start
         </button>
       </div>

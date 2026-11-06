@@ -1,8 +1,26 @@
 // The market's 3.2.7 changes (functions/shared/market.js): turning your own
 // chat extra off and back on (extraSwitchCheck, and every reader of chat
-// extras treating one that's off as off).
+// extras treating one that's off as off); tournament entries typed short
+// (readEntry) with no limit but a googol, and pots and prizes exact past 2^53
+// (potOf, exactParts, payoutOf, capPays).
 // Run: node scripts/test-market327.mjs
-import { BANNERS_MAX, activeExtras, buyCheck, extraOn, extraSwitchCheck, glows } from '../functions/shared/market.js';
+import {
+  BANNERS_MAX,
+  activeExtras,
+  buyCheck,
+  capPays,
+  exactParts,
+  extraOn,
+  extraSwitchCheck,
+  glows,
+  joinCheck,
+  newTournament,
+  payParts,
+  payoutOf,
+  potOf,
+  readEntry,
+} from '../functions/shared/market.js';
+import { MAX_BALANCE, sumCoins } from '../functions/shared/coins.js';
 
 let failures = 0;
 let passes = 0;
@@ -73,6 +91,76 @@ eq(buyCheck('extra:banner', { me: 'Ira Kumar', balance: 1000, now, text: 'Yo', p
 eq(extraSwitchCheck(mine, true, { ...me, purchases: three }).error, 'Today is full of shout-outs.', 'back on refused when Today is full');
 eq(extraSwitchCheck(mine, true, { ...me, purchases: three.slice(0, 2) }).patch?.paused, false, 'back on when there’s room');
 eq(extraSwitchCheck(mine, false, { ...me, purchases: three }), { same: true }, 'off when already off, even when full');
+
+// ---------- tournament entries ----------
+eq(readEntry('10'), { entry: 10 }, 'entry 10');
+eq(readEntry(10), { entry: 10 }, 'entry 10 as a number (older apps)');
+eq(readEntry('2.5k'), { entry: 2500 }, 'entry 2.5k');
+eq(readEntry('1,000'), { entry: 1000 }, 'entry 1,000');
+eq(readEntry(' 7Sx '), { entry: 7e21 }, 'entry 7Sx');
+eq(readEntry('2.5e40'), { entry: 2.5e40 }, 'entry 2.5e40');
+eq(readEntry('googol'), { entry: MAX_BALANCE }, 'entry googol: the ceiling is fine');
+eq(readEntry('501'), { entry: 501 }, 'over the old 500 limit');
+eq(readEntry('1e101').error, 'That’s more than a googol.', 'over a googol');
+eq(readEntry('0').error, 'The entry is at least 1 coin.', 'zero');
+eq(readEntry('1.2345k').error, '1.2345k is 1234.5 coins. Coins are whole: try 1235.', 'not whole');
+eq(readEntry('-5').error, 'Type the entry like 50, 2.5k, 7Sx or 2.5e40.', 'negative');
+eq(readEntry('ten').error, 'Type the entry like 50, 2.5k, 7Sx or 2.5e40.', 'words');
+eq(readEntry('').error, 'How much is the entry?', 'empty');
+eq(readEntry(Infinity).error !== undefined, true, 'Infinity refused');
+eq(readEntry(NaN).error !== undefined, true, 'NaN refused');
+const T = (entry) => newTournament({ game: 'tetris', title: 'Big', entry, endsAt: now + 24 * H }, { by: 'Asher Mosseri', now, seed: 's' });
+eq(T('5qa').entry, 5e15, 'newTournament reads 5qa');
+eq(T('1e60').entry, 1e60, 'newTournament: 1e60');
+eq(T('1e200').error, 'That’s more than a googol.', 'newTournament: over a googol');
+eq(T(3.5).error, '3.5 is 3.5 coins. Coins are whole: try 4.', 'newTournament: a fraction');
+
+// ---------- exact pots past 2^53 ----------
+const big = 2.5e40; // a double: exactly 25000000000000000304240406893063389380608
+const players = (names, best = {}) => Object.fromEntries(names.map((n, i) => [n, { joinedAt: i, best: best[n] ?? null, at: best[n] != null ? 100 + i : null }]));
+const t3 = { game: 'tetris', better: 'high', entry: big, players: players(['A', 'B', 'C'], { A: 10, B: 30, C: 20 }) };
+eq(potOf(t3), BigInt(big) * 3n, 'potOf: entry × players, exactly');
+// Joining: the pot shown is the exact pot rounded once, not a running double sum.
+const j = joinCheck({ ...t3, status: 'open', endsAt: now + H, pot: Number(potOf(t3)) }, { me: 'D', balance: 1e41, now });
+eq(j.pot, Number(BigInt(big) * 4n), 'joinCheck pot is entry × 4');
+eq(joinCheck({ status: 'open', endsAt: now + H, entry: 10, pot: 20, players: players(['A', 'B']) }, { me: 'D', balance: 100, now }).pot, 30, 'small pots as before');
+eq(joinCheck({ status: 'open', endsAt: now + H, entry: big, pot: 0, players: {} }, { me: 'D', balance: 1e40, now }).error, 'The entry is 2.5e40 coins. You have 1e40.', 'can’t afford a huge entry');
+// One winner gets the whole pot, to the coin.
+const exactSum = (list) => list.reduce((t, x) => t + BigInt(x), 0n);
+let po = payoutOf(t3);
+eq(po.winners, ['B'], 'B wins');
+eq(exactSum(payParts(po.pays[0])), BigInt(big) * 3n, 'the prize lines add up to the pot exactly');
+eq(payParts(po.pays[0]).every((x) => Number.isInteger(x) && x >= 1), true, 'every prize line is a whole, positive amount');
+eq(sumCoins(payParts(po.pays[0]).map((amount) => ({ amount }))), Number(BigInt(big) * 3n), 'the wallet’s sum of them is the pot');
+eq(po.pays[0].amount, Number(BigInt(big) * 3n), 'amount: the pot rounded once');
+// A tie splits it exactly: shares differ by at most 1 and add up to the pot.
+const tie = { ...t3, entry: big, players: players(['A', 'B', 'C', 'D', 'E', 'F', 'G'], { A: 9, B: 9, C: 9, D: 1 }) };
+po = payoutOf(tie);
+eq(po.winners, ['A', 'B', 'C'], 'three-way tie');
+const shares = po.pays.map((p) => exactSum(payParts(p)));
+eq(shares.reduce((a, b) => a + b, 0n), BigInt(big) * 7n, 'tie shares add up to the pot exactly');
+eq(shares[0] - shares[2] <= 1n && shares[0] >= shares[1] && shares[1] >= shares[2], true, 'shares differ by at most a coin, first first');
+// Small pots: one line each, exactly as before.
+const small = { game: 'tetris', better: 'high', entry: 15, pot: 45, players: players(['A', 'B', 'C'], { A: 5, B: 5 }) };
+eq(payoutOf(small).pays, [{ name: 'A', amount: 23 }, { name: 'B', amount: 22 }], 'small tie: 23 and 22, no parts');
+eq(payoutOf({ ...small, players: players(['A', 'B']) }).refunds, [{ name: 'A', amount: 15 }, { name: 'B', amount: 15 }], 'nobody scored: entries back');
+// A googol entry: three players is 3 googol; the cap keeps the winner at a googol.
+const gg = { game: 'tetris', better: 'high', entry: MAX_BALANCE, players: players(['A', 'B', 'C'], { A: 1 }) };
+po = payoutOf(gg);
+eq(exactSum(payParts(po.pays[0])), BigInt(MAX_BALANCE) * 3n, 'googol entries: exact pot of 3 googol before the cap');
+eq(capPays(po.pays, { A: 0 }), [{ name: 'A', amount: MAX_BALANCE, capped: true }], 'capped at a googol, one line');
+eq(capPays(po.pays, { A: MAX_BALANCE }), [], 'already at a googol: nothing paid');
+eq(capPays(payoutOf(t3).pays, { B: 0 }), payoutOf(t3).pays, 'far from the ceiling: parts unchanged');
+// exactParts.
+eq(exactParts(0n), [], 'exactParts(0)');
+eq(exactParts(12345n), [12345], 'exactParts small');
+eq(exactParts(2n ** 53n + 1n).length, 2, 'just past 2^53: two lines');
+eq(exactSum(exactParts(2n ** 53n + 1n)), 2n ** 53n + 1n, 'just past 2^53: exact');
+const g3 = 3n * 10n ** 100n + 12345678901234567890123n;
+eq(exactSum(exactParts(g3)), g3, 'exactParts near 3 googol: exact');
+eq(exactParts(g3).length <= 12 && exactParts(g3).every((x) => x >= 1), true, 'exactParts: a few positive lines');
+// Same answer every time (the payout is idempotent by the tournament's status; the math is pure).
+eq(JSON.stringify(payoutOf(tie)) === JSON.stringify(payoutOf(tie)), true, 'payoutOf is deterministic');
 
 console.log(failures ? `${failures} FAILED, ${passes} passed` : `ALL PASSED (${passes})`);
 process.exit(failures ? 1 : 0);
