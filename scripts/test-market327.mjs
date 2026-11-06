@@ -2,18 +2,21 @@
 // chat extra off and back on (extraSwitchCheck, and every reader of chat
 // extras treating one that's off as off); tournament entries typed short
 // (readEntry) with no limit but a googol, and pots and prizes exact past 2^53
-// (potOf, exactParts, payoutOf, capPays).
+// (potOf, exactParts, payoutOf, capPays); deleting tournaments (deleteCheck,
+// listedTournaments).
 // Run: node scripts/test-market327.mjs
 import {
   BANNERS_MAX,
   activeExtras,
   buyCheck,
   capPays,
+  deleteCheck,
   exactParts,
   extraOn,
   extraSwitchCheck,
   glows,
   joinCheck,
+  listedTournaments,
   newTournament,
   payParts,
   payoutOf,
@@ -161,6 +164,14 @@ eq(exactSum(exactParts(g3)), g3, 'exactParts near 3 googol: exact');
 eq(exactParts(g3).length <= 12 && exactParts(g3).every((x) => x >= 1), true, 'exactParts: a few positive lines');
 // Same answer every time (the payout is idempotent by the tournament's status; the math is pure).
 eq(JSON.stringify(payoutOf(tie)) === JSON.stringify(payoutOf(tie)), true, 'payoutOf is deterministic');
+
+// ---------- deleting ----------
+eq(deleteCheck(null).error, 'That tournament is gone.', 'delete: missing');
+eq(/Cancel it first/.test(deleteCheck({ status: 'open' }).error), true, 'delete: an open one has to be cancelled first');
+eq(deleteCheck({ status: 'done', cancelled: true }), { ok: true }, 'delete: cancelled');
+eq(deleteCheck({ status: 'done', winners: ['A'] }), { ok: true }, 'delete: finished');
+eq(deleteCheck({ status: 'done', deleted: true }), { same: true }, 'delete: twice is fine');
+eq(listedTournaments([{ id: 'a' }, { id: 'b', deleted: true }, { id: 'c', deleted: false }]).map((t) => t.id), ['a', 'c'], 'lists leave deleted ones out');
 
 console.log(failures ? `${failures} FAILED, ${passes} passed` : `ALL PASSED (${passes})`);
 process.exit(failures ? 1 : 0);

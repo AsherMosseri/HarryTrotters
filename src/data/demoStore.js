@@ -928,7 +928,7 @@ function settleDemoTournaments(now = Date.now()) {
 // The app's balances, from the last market call (the server reads them
 // fresh), so payouts stop at a googol like capPays does there.
 let demoBalanceOf = null;
-function settleDemoTournament(t, now, cancel, by = '') {
+function settleDemoTournament(t, now, cancel, by = '', del = false) {
   const r0 = cancel ? { winners: [], pays: [], refunds: Object.keys(t.players || {}).map((name) => ({ name, amount: t.entry })) } : market.payoutOf(t);
   const have = demoBalanceOf ? Object.fromEntries([...r0.pays, ...r0.refunds].map((p) => [p.name, demoBalanceOf(p.name)])) : {};
   const r = { ...r0, pays: market.capPays(r0.pays, have), refunds: market.capPays(r0.refunds, have) };
@@ -937,7 +937,7 @@ function settleDemoTournament(t, now, cancel, by = '') {
     for (const amount of market.payParts(p))
       state.coins.push({ id: `c${uid()}`, type: 'prize', person: p.name, amount, what: 'tournament', label: market.prizeLabel(t), item: `tour:${t.id}`, at: now });
   for (const p of r.refunds) state.coins.push({ id: `c${uid()}`, ...market.refundEntry(p.name, p.amount, t.title, `tour:${t.id}`, now) });
-  Object.assign(t, { status: 'done', winners: r.winners, paid: r.pays.map(({ parts: _p, ...x }) => x), paidAt: now, ...(cancel && { cancelled: true, cancelledBy: by }) });
+  Object.assign(t, { status: 'done', winners: r.winners, paid: r.pays.map(({ parts: _p, ...x }) => x), paidAt: now, ...(cancel && { cancelled: true, cancelledBy: by }), ...(cancel && del && { deleted: true, deletedBy: by, deletedAt: now }) });
 }
 
 // A finished tournament game, the way recordTournamentRun saves it: the
@@ -1685,12 +1685,24 @@ export const demoStore = {
         state.tournaments = [...(state.tournaments || []), { id: tid, ...t }];
         return done({ ok: true, id: tid });
       }
+      // The same as functions/market.js: cancel (and with delete, off the
+      // list too), or delete one that's cancelled or finished.
+      const deleteOne = (t) => {
+        const d = market.deleteCheck(t);
+        if (d.error) return note(d.error);
+        if (!d.same) Object.assign(t, { deleted: true, deletedBy: me, deletedAt: now });
+        return done({ ok: true, changed: !d.same });
+      };
       if (action === 'cancelTournament') {
         const t = (state.tournaments || []).find((x) => x.id === id);
-        if (!t || t.status !== 'open') return note('That tournament is already over.');
-        settleDemoTournament(t, now, true, me);
-        return done({ ok: true });
+        const del = data.delete === true;
+        if (t?.status === 'open') {
+          settleDemoTournament(t, now, true, me, del);
+          return done({ ok: true });
+        }
+        return del ? deleteOne(t || null) : note('That tournament is already over.');
       }
+      if (action === 'deleteTournament') return deleteOne((state.tournaments || []).find((x) => x.id === id) || null);
       if (action === 'voidResult') {
         const t = (state.tournaments || []).find((x) => x.id === id);
         const p = t?.players?.[data.name];

@@ -268,7 +268,8 @@ export const playLine = (t) => `/${TOURNAMENT_GAMES[t.game]?.cmd || t.game} tour
 // ---------- tournaments ----------
 // tournaments/{id}: { game, title, entry, pot, status: 'open'|'done',
 //   opensAt, endsAt, players: { [name]: { joinedAt, best, at, voided? } },
-//   review: { [game id]: { name, score, at, why } }, winners, by }
+//   review: { [game id]: { name, score, at, why } }, winners, by,
+//   deleted?: true (3.2.7: off the lists, kept for the record) }
 // The fun-games side plays them and saves each player's best; `better` says
 // whether a high or a low score wins. The seed the games come from is in
 // tournamentSecrets/{id} (server only), never on the doc the team reads.
@@ -401,6 +402,19 @@ export function payoutOf(t, rename = (n) => n) {
 // The ledger amounts for one payout: its parts, or the amount itself.
 export const payParts = (p) => p.parts || [p.amount];
 export const prizeLabel = (t) => `Tournament: ${t.title}`.slice(0, 80);
+
+// Deleting a tournament (3.2.7, team management): only a cancelled or
+// finished one (an open one is cancelled first, which refunds it). It's
+// flagged deleted, never removed. { ok }, { same: true } if it already
+// was, or { error }.
+export function deleteCheck(t) {
+  if (!t) return { error: 'That tournament is gone.' };
+  if (t.deleted) return { same: true };
+  if (t.status !== 'done') return { error: 'Cancel it first (everyone gets their entry back), or wait for it to pay out.' };
+  return { ok: true };
+}
+// The tournaments the lists show: not deleted ones.
+export const listedTournaments = (list = []) => list.filter((t) => !t.deleted);
 
 // Prizes or entries back near the ceiling (coins.js MAX_BALANCE): each pays
 // up to what keeps its person at a googol, counting what they already

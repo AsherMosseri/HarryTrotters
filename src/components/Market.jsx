@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   CHAT_EXTRAS,
   PERK_IDEAS,
@@ -577,9 +577,25 @@ function GamesShelf({ actor, balance, onToast, onPlay }) {
 // A finished tournament: who won, who was voided, and (team management) the
 // results, which can still be voided. Coins already paid stay paid.
 function Finished({ t, actor, onToast }) {
+  const market = useMarket();
   const f = useCoinFormat();
   const [open, setOpen] = useState(false);
   const { voided } = standings(t);
+  // Team management (3.2.7): off the list. No coins move, and everyone's coin
+  // history keeps its lines.
+  const remove = async () => {
+    if (
+      !(await confirmDialog({
+        title: `Delete ${t.title}?`,
+        body: 'It comes off the list. No coins move: what was paid or refunded stays, and everyone’s coin history keeps its lines.',
+        okLabel: 'Delete',
+        danger: true,
+      }))
+    )
+      return;
+    const r = await market.run('marketManage', { action: 'deleteTournament', id: t.id });
+    onToast(r?.ok ? `${t.title} is deleted.` : said(r) || 'That didn’t go through.');
+  };
   return (
     <li className="mk-row mk-done">
       <Icon name="trophy" size={20} />
@@ -602,6 +618,11 @@ function Finished({ t, actor, onToast }) {
       {actor.admin && !t.cancelled && Object.keys(t.players || {}).length > 0 && (
         <button className="link-btn small" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
           {open ? 'Hide results' : 'Results'}
+        </button>
+      )}
+      {actor.admin && (
+        <button className="link-btn small danger" onClick={remove} aria-label={`Delete ${t.title}`}>
+          Delete
         </button>
       )}
       {open && <Results t={t} actor={actor} onToast={onToast} all />}
@@ -694,6 +715,7 @@ function Review({ t, onToast }) {
 function Tournament({ t, actor, balance, onToast, onPlay }) {
   const market = useMarket();
   const [busy, setBusy] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const g = TOURNAMENT_GAMES[t.game] || { name: t.game, unit: '' };
   const players = Object.entries(t.players || {}).map(([name, p]) => ({ name, ...p }));
   const low = (t.better || g.better) === 'low';
@@ -751,20 +773,71 @@ function Tournament({ t, actor, balance, onToast, onPlay }) {
           </button>
         )}
         {actor.admin && !ended && (
-          <button
-            className="link-btn small danger"
-            onClick={async () => {
-              if (!(await confirmDialog({ title: `Cancel ${t.title}?`, body: 'Everyone who joined gets their entry back.', okLabel: 'Cancel it', cancelLabel: 'Keep it', danger: true })))
-                return;
-              const r = await market.run('marketManage', { action: 'cancelTournament', id: t.id });
-              if (!r?.ok) onToast(said(r) || 'That didn’t go through.');
-            }}
-          >
+          <button className="link-btn small danger" onClick={() => setCancelling(true)}>
             Cancel tournament
           </button>
         )}
       </div>
+      {cancelling && (
+        <CancelTournament
+          t={t}
+          onClose={() => setCancelling(false)}
+          onDone={(del) => {
+            setCancelling(false);
+            const refunded = Object.keys(t.players || {}).length ? ' Entries refunded.' : '';
+            onToast(`${t.title} is cancelled${del ? ' and deleted' : ''}.${refunded}`);
+          }}
+          onToast={onToast}
+        />
+      )}
     </li>
+  );
+}
+
+// Cancelling a tournament (team management): everyone who joined gets their
+// entry back either way; it can stay at the bottom of the list (Finished,
+// "Cancelled, entries refunded") or be deleted so it doesn't show (3.2.7).
+function CancelTournament({ t, onClose, onDone, onToast }) {
+  const market = useMarket();
+  const [busy, setBusy] = useState('');
+  const players = Object.keys(t.players || {}).length;
+  const go = async (del) => {
+    setBusy(del ? 'delete' : 'keep');
+    const r = await market.run('marketManage', { action: 'cancelTournament', id: t.id, ...(del && { delete: true }) });
+    setBusy('');
+    if (!r?.ok) return onToast(said(r) || 'That didn’t go through.');
+    onDone(del);
+  };
+  useEffect(() => {
+    const esc = (e) => e.key === 'Escape' && !busy && onClose();
+    window.addEventListener('keydown', esc);
+    return () => window.removeEventListener('keydown', esc);
+  }, [busy, onClose]);
+  return (
+    <Overlay>
+      <div className="panel-backdrop center ask-backdrop" onClick={() => !busy && onClose()}>
+        <div className="dialog ask danger mk-cancel" role="alertdialog" aria-modal="true" aria-label={`Cancel ${t.title}?`} onClick={(e) => e.stopPropagation()}>
+          <h2>Cancel {t.title}?</h2>
+          <p className="muted">
+            {players
+              ? withExact(`${players === 1 ? 'The one player gets' : `All ${players} players get`} their ${coinStyled(t.entry)} coins back, either way.`, t.entry)
+              : 'Nobody has joined yet, so there’s nothing to refund.'}{' '}
+            Keep it in the list as cancelled, or delete it so it’s gone from the list.
+          </p>
+          <div className="mk-cancel-actions">
+            <button className="btn danger solid" disabled={!!busy} onClick={() => go(false)}>
+              {busy === 'keep' ? 'Cancelling…' : 'Cancel, keep it in the list'}
+            </button>
+            <button className="btn danger" disabled={!!busy} onClick={() => go(true)}>
+              {busy === 'delete' ? 'Deleting…' : 'Cancel and delete it'}
+            </button>
+            <button className="btn" disabled={!!busy} onClick={onClose}>
+              Keep the tournament
+            </button>
+          </div>
+        </div>
+      </div>
+    </Overlay>
   );
 }
 

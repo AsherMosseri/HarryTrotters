@@ -11,8 +11,9 @@
 //   joinTournament({ id })         pay the entry, join, add it to the pot
 //   marketManage({ action, … })    team management: approve/decline/redeem a
 //                                  perk, take down a shout-out, start or
-//                                  cancel a tournament, void a result, clear
-//                                  or void a run held for review
+//                                  cancel a tournament (and delete it), delete
+//                                  a finished one, void a result, clear or
+//                                  void a run held for review
 //   pet({ action, … })             adopt, rename, show in chat, rehome, style,
 //                                  hatch a baby, give a pet to a teammate,
 //                                  photos of real pets (petphotos.js), best
@@ -207,9 +208,9 @@ export function marketFunctions({ db, coinData, freshCoins, notify, bankRef, per
     return res.ok ? { ...res, balance: await balanceAfter(me, data) } : res;
   });
 
-  // Pays one tournament that has ended (or is being cancelled). Returns the
-  // payout, or null if it was already settled.
-  async function settle(id, { cancel = false, by = '' } = {}) {
+  // Pays one tournament that has ended (or is being cancelled; del: and
+  // deleted, 3.2.7). Returns the payout, or null if it was already settled.
+  async function settle(id, { cancel = false, by = '', del = false } = {}) {
     const ref = db.doc(`tournaments/${id}`);
     const data = await coinData();
     const rename = data.rename;
@@ -250,6 +251,7 @@ export function marketFunctions({ db, coinData, freshCoins, notify, bankRef, per
         paid: r.pays.map(({ parts: _p, ...x }) => x),
         paidAt: now,
         ...(cancel && { cancelled: true, cancelledBy: by }),
+        ...(cancel && del && { deleted: true, deletedBy: by, deletedAt: now }),
       });
       return { t, ...r };
     });
@@ -273,6 +275,23 @@ export function marketFunctions({ db, coinData, freshCoins, notify, bankRef, per
       ).catch((e) => logger.warn('tournament notify', e.message));
     }
     return out;
+  }
+
+  // Deleting a cancelled or finished tournament (3.2.7): it's flagged
+  // deleted and the lists leave it out. The doc stays (with who played and
+  // what was paid) because runs, payouts and reviews point at its id; no coins
+  // move and nobody's history changes (those lines carry their own label).
+  // An open one has to be cancelled first. Asking twice is fine.
+  async function deleteTournament(id, me) {
+    const ref = db.doc(`tournaments/${id}`);
+    return db.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      const t = snap.exists ? snap.data() : null;
+      const r = market.deleteCheck(t);
+      if (r.error) return note(r.error);
+      if (!r.same) tx.update(ref, { deleted: true, deletedBy: me, deletedAt: Date.now() });
+      return { ok: true, changed: !r.same };
+    });
   }
 
   const payTournaments = onSchedule({ schedule: 'every 10 minutes', timeZone }, async () => {
@@ -378,10 +397,18 @@ export function marketFunctions({ db, coinData, freshCoins, notify, bankRef, per
       });
     }
 
+    // Cancel: everyone who joined gets their entry back. With del (3.2.7) it
+    // also comes off the list, in the same write; asked again after it was
+    // already cancelled, the delete still happens (and nothing is refunded twice).
     if (action === 'cancelTournament') {
-      const out = await settle(id, { cancel: true, by: me });
-      return out ? { ok: true } : note('That tournament is already over.');
+      const del = req.data?.delete === true;
+      const out = await settle(id, { cancel: true, by: me, del });
+      if (out) return { ok: true };
+      if (del) return deleteTournament(id, me);
+      return note('That tournament is already over.');
     }
+
+    if (action === 'deleteTournament') return deleteTournament(id, me);
     throw new HttpsError('invalid-argument', 'Unknown action.');
   });
 

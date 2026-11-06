@@ -2001,6 +2001,8 @@ button.pm-row:hover { background: color-mix(in srgb, var(--text) 4%, transparent
 .mk-entry { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .mk-entry .mk-num { width: 180px; max-width: 100%; }
 .mk-entry-hint { margin: 0; overflow-wrap: anywhere; }
+.mk-cancel-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+.mk-cancel-actions .btn { min-height: 44px; justify-content: center; font-weight: 600; }
 .dialog.mk-editor { width: min(520px, calc(100vw - 32px)); display: flex; flex-direction: column; gap: 12px; }
 .mk-editor .fields, .mk-tour-form .fields { display: grid; grid-template-columns: auto 1fr; gap: 10px 12px; align-items: center; }
 @media (max-width: 480px) {

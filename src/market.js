@@ -4,7 +4,7 @@
 // same checks in demoStore.js). Nothing here decides what anything costs or
 // pays: the server does.
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { activeExtras } from '../functions/shared/market.js';
+import { activeExtras, listedTournaments } from '../functions/shared/market.js';
 import { eventGearItem, giftOpen, petState, petsIn } from '../functions/shared/pets.js';
 import { earnedIds, shownEvents, unseenIds } from '../functions/shared/events.js';
 import { celebrate } from './motion.js';
@@ -59,7 +59,8 @@ export function useMarketData(store, { actor, rename, renames, shifts, balanceOf
   const pets = useMemo(() => new Map(rawPets.map((p) => [rename(p.person || ''), { ...p, person: rename(p.person || '') }])), [rawPets, rename]);
   const tournaments = useMemo(
     () =>
-      rawTournaments
+      // Deleted ones (3.2.7) stay on the server for the record, off every list.
+      listedTournaments(rawTournaments)
         .map((t) => ({
           ...t,
           players: Object.fromEntries(Object.entries(t.players || {}).map(([n, p]) => [rename(n), p])),
