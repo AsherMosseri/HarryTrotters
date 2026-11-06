@@ -4,6 +4,7 @@ import {
   EVENT_GEAR,
   FULL,
   GEAR,
+  gearFits,
   GEAR_SLOTS,
   GROW_LEVEL,
   RINGS,
@@ -216,9 +217,9 @@ function OwnedPet({ entry, lead, levels, roster, actor, offered, onToast, onPlay
     if (r?.note) onToast(said(r));
     return r;
   };
-  const next = nextUnlock(st.level);
+  const next = nextUnlock(st.level, pet.species);
   const ring = ringOf(st.level);
-  const gear = cleanGear(pet.gear);
+  const gear = cleanGear(pet.gear, pet.species);
 
   const meetBaby = async () => {
     const block = hatchBlock(pet, st.level, levels);
@@ -368,14 +369,14 @@ function OwnedPet({ entry, lead, levels, roster, actor, offered, onToast, onPlay
 function StyleSheet({ entry, onClose, onSave }) {
   const { pet, st } = entry;
   useEscape(onClose);
-  const [draft, setDraft] = useState(() => cleanGear(pet.gear));
+  const [draft, setDraft] = useState(() => cleanGear(pet.gear, pet.species));
   const [saving, setSaving] = useState(false);
   const market = useMarket();
-  const open = new Set(unlockedGear(st.level).map((g) => g.id));
+  const open = new Set(unlockedGear(st.level, pet.species).map((g) => g.id));
   // Event gear: any level, but only if you earned it (the server checks too).
   const earned = new Set(market.unlocks.earned);
-  const next = nextUnlock(st.level);
-  const changed = GEAR_SLOTS.some((s) => draft[s.id] !== cleanGear(pet.gear)[s.id]);
+  const next = nextUnlock(st.level, pet.species);
+  const changed = GEAR_SLOTS.some((s) => draft[s.id] !== cleanGear(pet.gear, pet.species)[s.id]);
   const pick = (slot, id) => setDraft((d) => ({ ...d, [slot]: id }));
   return (
     <Overlay>
@@ -405,7 +406,8 @@ function StyleSheet({ entry, onClose, onSave }) {
               </div>
             </div>
             {GEAR_SLOTS.map((slot) => {
-              const items = [...GEAR.filter((g) => g.slot === slot.id), ...EVENT_GEAR.filter((g) => g.slot === slot.id)];
+              // Species-only gear (the goat's jersey) shows only for that kind of pet.
+              const items = [...GEAR.filter((g) => g.slot === slot.id && gearFits(g, pet.species)), ...EVENT_GEAR.filter((g) => g.slot === slot.id)];
               return (
                 <fieldset key={slot.id} className="pf-slot">
                   <legend>{slot.name}</legend>
@@ -489,7 +491,10 @@ function LevelPath({ level }) {
                 {r.unlocks.map((u) => (
                   <li key={u.name}>
                     <span>{u.name}</span>
-                    <span className="muted tiny">{SLOT_NAME[u.slot] || u.slot}</span>
+                    <span className="muted tiny">
+                      {SLOT_NAME[u.slot] || u.slot}
+                      {u.only ? ` · ${u.only}` : ''}
+                    </span>
                   </li>
                 ))}
               </ul>

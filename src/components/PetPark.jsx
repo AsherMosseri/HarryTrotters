@@ -126,7 +126,7 @@ export function ParkCard({ entry, onClose }) {
   useEscape(onClose);
   const { pet, st, owner } = entry;
   const photo = usePetPhoto(owner);
-  const worn = Object.values(cleanGear(pet.gear))
+  const worn = Object.values(cleanGear(pet.gear, pet.species))
     .filter(Boolean)
     .map((id) => (gearItem(id) || eventGearItem(id))?.name)
     .filter(Boolean);

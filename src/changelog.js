@@ -4,6 +4,14 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '3.2.5',
+    date: '2026-11-06',
+    title: 'The jersey is the goat’s',
+    items: [
+      'The level 100 number 12 jersey is now just for goats, as it was meant to be. Every pet still gets the Royal crown at level 50.',
+    ],
+  },
+  {
     version: '3.2.4',
     date: '2026-11-06',
     title: 'Anonymous polls',

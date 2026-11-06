@@ -321,7 +321,7 @@ function Halo({ head, high }) {
 
 // The gear itself, over a pet drawn in the same 64x64 box (`size` px).
 export function GearOverlay({ species, gear, stage = 'young', mood = 'ok', size = 64, still = false }) {
-  const g = cleanGear(gear);
+  const g = cleanGear(gear, species);
   const a = anchorsOf(species, stage);
   const k = a.head.r / 14;
   const hat = HEAD[g.head];
@@ -347,7 +347,7 @@ export function GearOverlay({ species, gear, stage = 'young', mood = 'ok', size 
 
 // A pet with what it wears. Takes PetArt's props plus `gear`.
 export function PetWithGear({ gear, size = 64, ...art }) {
-  const g = cleanGear(gear);
+  const g = cleanGear(gear, art.species);
   const anchor = PET_ANCHORS[art.species] || PET_ANCHORS.cat;
   // A pet with something hanging over its neck (anchor.under: the monkey's
   // nose, the chicken's wattle): neck gear goes inside its own drawing, under

@@ -137,5 +137,18 @@ const full = P.docOf(me, Array.from({ length: 20 }, (_, i) => pet(`N${i}`, 40 - 
 r = P.giftAccept(gift, { me, doc: full, giverDoc, giver: 'Cooper Mlezcko', shifts, now: now + 1000 });
 check(!!r.note && r.note.title.includes('20'), 'gift blocked at 20 pets');
 
+// The level 100 jersey is the goat's.
+check(P.unlockedGear(100, 'goat').some((g) => g.id === 'jersey'), 'a level 100 goat has the jersey');
+check(!P.unlockedGear(100, 'cat').some((g) => g.id === 'jersey'), 'a level 100 cat doesn’t');
+check(P.unlockedGear(100, 'cat').some((g) => g.id === 'royalcrown'), 'everyone still gets the Royal crown');
+check(P.gearCheck({ body: 'jersey' }, 100, [], 'goat').gear?.body === 'jersey', 'a goat can wear it');
+check(P.gearCheck({ body: 'jersey' }, 100, [], 'cat').error === 'The Number 12 jersey is just for goats.', 'a cat can’t: ' + P.gearCheck({ body: 'jersey' }, 100, [], 'cat').error);
+check(P.cleanGear({ body: 'jersey', head: 'crown' }, 'cat').body === '' && P.cleanGear({ body: 'jersey', head: 'crown' }, 'cat').head === 'crown', 'a cat already wearing it stops showing it, the rest stays');
+check(P.cleanGear({ body: 'jersey' }, 'goat').body === 'jersey', 'a goat keeps it on');
+check(P.nextUnlock(60, 'cat')?.kind === 'ring', 'a level 60 cat’s next unlock isn’t the jersey');
+check(P.nextUnlock(80, 'goat')?.id === 'jersey', 'a level 80 goat’s next unlock is the jersey');
+check(P.levelPath().find((r) => r.level === 100).unlocks.find((u) => u.name === 'Number 12 jersey')?.only === 'Goats only', 'the level path says Goats only');
+check(!P.levelPath('cat').find((r) => r.level === 100).unlocks.some((u) => u.name === 'Number 12 jersey'), 'a cat’s level path leaves it out');
+
 console.log(`${failures ? 'FAILED' : 'OK'}: ${passes} passed, ${failures} failed`);
 process.exit(failures ? 1 : 0);

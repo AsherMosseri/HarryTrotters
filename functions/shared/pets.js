@@ -292,11 +292,17 @@ export const GEAR = [
   { id: 'monocle', name: 'Monocle', slot: 'face', level: 28 },
   { id: 'halo', name: 'Halo', slot: 'extra', level: 30 },
   // Past 30 (3.2): a grander crown than the level 25 one, and the team jersey.
+  // species: only pets of these kinds can wear it (the jersey is the goat's).
   { id: 'royalcrown', name: 'Royal crown', slot: 'head', level: 50 },
-  { id: 'jersey', name: 'Number 12 jersey', slot: 'body', level: 100 },
+  { id: 'jersey', name: 'Number 12 jersey', slot: 'body', level: 100, species: ['goat'] },
 ];
 export const gearItem = (id) => GEAR.find((g) => g.id === id) || null;
-export const unlockedGear = (level) => GEAR.filter((g) => g.level <= (level || 1));
+// Whether this kind of pet can wear it (no species: everyone can; no pet given: yes).
+export const gearFits = (g, species) => !g?.species || !species || g.species.includes(species);
+// Who a species-only piece is for, in words ("Goats only"), or ''.
+const kindsOf = (g) => g.species.map((id) => `${(speciesOf(id)?.name || id).toLowerCase()}s`).join(' and ');
+export const gearOnly = (g) => (g?.species ? `${kindsOf(g).replace(/^./, (c) => c.toUpperCase())} only` : '');
+export const unlockedGear = (level, species) => GEAR.filter((g) => g.level <= (level || 1) && gearFits(g, species));
 
 // Event gear (team events, shared/events.js): limited items that a pet of any
 // level can wear, but only for a person who earned it in the event (the
@@ -344,24 +350,25 @@ export function roomBlock(pets) {
 }
 
 // What the next level-up brings (gear or a ring), or null at the top.
-export function nextUnlock(level) {
+export function nextUnlock(level, species) {
   const lv = level || 1;
   const all = [
-    ...GEAR.map((g) => ({ kind: 'gear', id: g.id, name: g.name, slot: g.slot, level: g.level })),
+    ...GEAR.filter((g) => gearFits(g, species)).map((g) => ({ kind: 'gear', id: g.id, name: g.name, slot: g.slot, level: g.level })),
     ...RINGS.map((r) => ({ kind: 'ring', id: r.id, name: r.name, slot: 'ring', level: r.level })),
   ].filter((u) => u.level > lv);
   all.sort((a, b) => a.level - b.level);
   return all[0] || null;
 }
 // Every level that brings something, for the "Level path" list.
-export function levelPath() {
+// species: leave out gear that kind of pet can't wear.
+export function levelPath(species) {
   const rows = new Map();
   const row = (level) => {
     if (!rows.has(level)) rows.set(level, { level, title: '', unlocks: [] });
     return rows.get(level);
   };
   for (const t of TITLES) row(t.level).title = t.title;
-  for (const g of GEAR) row(g.level).unlocks.push({ kind: 'gear', name: g.name, slot: g.slot });
+  for (const g of GEAR) if (gearFits(g, species)) row(g.level).unlocks.push({ kind: 'gear', name: g.name, slot: g.slot, only: gearOnly(g) });
   for (const r of RINGS) row(r.level).unlocks.push({ kind: 'ring', name: r.name, slot: 'ring' });
   row(GROW_LEVEL).unlocks.push({ kind: 'room', name: 'Counts toward another pet', slot: 'room' });
   row(BABY_LEVEL).unlocks.push({ kind: 'baby', name: 'Can have a baby', slot: 'baby' });
@@ -370,18 +377,19 @@ export function levelPath() {
 
 // What a pet wears: an id or '' for each slot.
 export const emptyGear = () => ({ head: '', face: '', neck: '', body: '', extra: '', palette: '' });
-export function cleanGear(gear) {
+// species: drop anything that kind of pet can't wear.
+export function cleanGear(gear, species) {
   const out = emptyGear();
   for (const s of GEAR_SLOTS) {
     const g = anyGear(gear?.[s.id]);
-    if (g && g.slot === s.id) out[s.id] = g.id;
+    if (g && g.slot === s.id && gearFits(g, species)) out[s.id] = g.id;
   }
   return out;
 }
 // A gear choice, checked against the pet's level: { gear } or { error }.
 // earned: the event gear its owner has earned (ids); event gear needs it at
 // any level, and level gear never does.
-export function gearCheck(gear, level, earned = []) {
+export function gearCheck(gear, level, earned = [], species) {
   if (!gear || typeof gear !== 'object') return { error: 'Pick what to wear.' };
   const out = emptyGear();
   for (const s of GEAR_SLOTS) {
@@ -396,6 +404,7 @@ export function gearCheck(gear, level, earned = []) {
     }
     const g = gearItem(String(id));
     if (!g || g.slot !== s.id) return { error: 'That doesn’t go there.' };
+    if (!gearFits(g, species)) return { error: `The ${g.name} is just for ${kindsOf(g)}.` };
     if (g.level > level) return { error: `${g.name} unlocks at level ${g.level}.` };
     out[s.id] = g.id;
   }
@@ -489,7 +498,7 @@ export function petEdit(action, input = {}, { me, doc, shifts = [], earned = [],
   if (action === 'release') return { ok: true, doc: docOf(me, list.filter((_, k) => k !== i)) };
   const level = levelAt(pet, shifts, now);
   if (action === 'style') {
-    const g = gearCheck(input.gear, level, earned);
+    const g = gearCheck(input.gear, level, earned, pet.species);
     return g.error ? note(g.error) : swap({ gear: g.gear });
   }
   // hatch: one baby per pet, from level 10, when there's room for another pet.
