@@ -4,6 +4,17 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '3.2.7',
+    date: '2026-11-06',
+    title: 'Check-in times off, extras switch, tournament fixes',
+    items: [
+      'Lab check-in: team management can mark lunch or after school as not available on a day, with a reason (“Lab closed for a teacher meeting”) or without one. Nobody is asked about it, and the check-in shows why.',
+      'Chat extras: turn yours off and back on any time while it lasts. Its time keeps running while it’s off.',
+      'Tournaments: the entry takes short amounts like 2.5k or 7Sx, with no upper limit.',
+      'Tournaments: team management can delete a tournament when cancelling it, or delete finished ones, so the list stays tidy. Entries are refunded the same way.',
+    ],
+  },
+  {
     version: '3.2.6',
     date: '2026-11-06',
     title: 'Polls with hidden results',
