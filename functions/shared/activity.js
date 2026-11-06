@@ -11,7 +11,7 @@
 // Manual (team management, on the Roster): settings/team.inactive =
 //   { [personId]: { name, mode: 'inactive' | 'active', at, by } }
 // 'active' ("keep active") beats the automatic rule until it's cleared.
-// 'inactive' holds until they clock in: a shift that starts at or after `at`
+// 'inactive' holds until they're at the lab again: any shift time after `at`
 // clears it (no write needed, so the server and every phone see it the same
 // moment). Team management themselves are never inactive.
 //
@@ -64,7 +64,9 @@ export function activityOf(name, { shifts = [], joinedAt = 0, override = null, n
   if (override?.mode === 'active') return { ...base, kept: true };
   if (override?.mode === 'inactive') {
     const at = Number(override.at) || 0;
-    const back = shifts.some((s) => s?.person === name && Number.isFinite(s.start) && s.start >= at);
+    // Any lab time after the mark: a shift started since (even one moved to
+    // start a bit earlier), or one still running or ended since.
+    const back = shifts.some((s) => s?.person === name && Number.isFinite(s.start) && (s.start >= at || (s.end ?? now) > at));
     if (!back) return { ...base, inactive: true, why: 'manual' };
   }
   const today = teamDay(now);
