@@ -167,13 +167,15 @@ export function settleLeftover(drained) {
 export const pendingCount = () => count;
 export const useSync = () => useSyncExternalStore(subscribe, () => (snap ||= { status, pending: count, sent: sentSome }));
 
-// What the offline strip says ('' when there's nothing to say).
-export function syncText({ status: s, pending, sent }) {
+// What the offline strip says, as [what, more] (more can be ''), or null
+// when there's nothing to say. syncText: the two in one line.
+export function syncParts({ status: s, pending, sent }) {
   const changes = `${pending} change${pending === 1 ? '' : 's'}`;
-  if (s === 'offline') return pending ? `Offline · ${changes} waiting to send` : 'Offline · changes send when you’re back';
-  if (s === 'back') return pending ? `Back online · sending ${changes}…` : sent ? 'Back online · sent' : 'Back online';
-  return '';
+  if (s === 'offline') return ['Offline', pending ? `${changes} waiting to send` : 'changes send when you’re back'];
+  if (s === 'back') return ['Back online', pending ? `sending ${changes}…` : sent ? 'sent' : ''];
+  return null;
 }
+export const syncText = (sync) => syncParts(sync)?.filter(Boolean).join(' · ') || '';
 
 // Server calls (coins, games, buying, uploads) can't wait offline: they say so.
 export const NEEDS_CONNECTION = 'Needs a connection';

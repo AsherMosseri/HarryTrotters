@@ -81,6 +81,7 @@ const QUIET = new Set([
   'disablePush',
   'refreshPush',
   'forgetDevice',
+  'pushStatus',
 ]);
 // What happens to a store method offline: 'refuse', 'count' (a change that
 // waits to send) or 'pass'.

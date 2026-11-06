@@ -22,6 +22,7 @@ import { confirmDialog, promptDialog } from './Dialogs.jsx';
 import { PetsShelf } from './PetFamily.jsx';
 import { Icon } from './shell/icons.jsx';
 import ServerButton from './ServerButton.jsx';
+import { useNeedsConnection } from '../connection.js';
 
 // The market (F1): spend Jackson coins on pet care, real perks team
 // management adds, short-lived chat extras, and game tournaments. Every buy
@@ -58,6 +59,7 @@ export default function MarketView({ actor, balance, onToast, onPlay, onOpenCoin
   const pending = isManager && market ? market.purchases.filter((p) => p.kind === 'perk' && p.status === 'pending').length : 0;
   // One buy at a time; the server answers with { ok } or a note to show.
   const [busy, setBusy] = useState('');
+  const offline = useNeedsConnection();
   const buy = async (item, extra = {}, done) => {
     setBusy(item);
     const r = await market.run('buy', { item, ...extra });
@@ -80,6 +82,7 @@ export default function MarketView({ actor, balance, onToast, onPlay, onOpenCoin
         </button>
       </header>
       {!market.coinsOn && <p className="mk-off">Jackson coins are off right now, so the market is closed.</p>}
+      {market.coinsOn && offline && <p className="mk-off">Buying needs a connection. It works again once you’re back online.</p>}
       <div className="segmented mk-shelves" role="tablist" aria-label="Shelves">
         {SHELVES.map(([id, label, icon]) => (
           <button key={id} role="tab" aria-selected={shelf === id} className={`plain-seg${shelf === id ? ' on' : ''}`} onClick={() => setShelf(id)}>

@@ -1,4 +1,4 @@
-import { isSimulatedOffline, simulateOffline, syncText, useNeedsConnection, useSync } from '../../connection.js';
+import { isSimulatedOffline, simulateOffline, syncParts, syncText, useNeedsConnection, useSync } from '../../connection.js';
 import { Icon } from './icons.jsx';
 
 // Shows only when the app can't reach the server ("Offline · 3 changes
@@ -11,6 +11,7 @@ export default function ConnectionPill({ compact = false, className = '' }) {
   if (sync.status === 'online') return null;
   const off = sync.status === 'offline';
   const text = syncText(sync);
+  const [what, more] = syncParts(sync);
   return (
     <div
       className={`conn-pill ${off ? 'off' : 'back'}${compact ? ' compact' : ''} ${className}`}
@@ -25,7 +26,16 @@ export default function ConnectionPill({ compact = false, className = '' }) {
           <span className="sr-only">{text}</span>
         </>
       ) : (
-        <span className="conn-text">{text}</span>
+        // One line on a phone; two in the sidebar.
+        <span className="conn-text">
+          <b>{what}</b>
+          {more && (
+            <span className="conn-more">
+              <span className="conn-dot"> · </span>
+              {more}
+            </span>
+          )}
+        </span>
       )}
     </div>
   );
