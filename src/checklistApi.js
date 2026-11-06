@@ -60,7 +60,7 @@ export function checklistApi({ store, actor, fail, toast, lists, createTask, pin
     },
     // Uncheck all: the run is saved first (History), in the same write.
     uncheckAll: (list, round = '') => {
-      const items = Object.values(list.items || {});
+      const items = Object.values(list.items || {}).filter((i) => i?.id);
       const run = CL.runRecord(list, { by: actor.name, at: Date.now(), reason: 'manual', round });
       const fields = CL.uncheckFields(items);
       const { back } = restoreOf(list, fields);
@@ -116,9 +116,9 @@ export function checklistApi({ store, actor, fail, toast, lists, createTask, pin
       save(list, fields);
       if (!quiet) undoable(`Moved “${clip(sec.title)}”.`, () => save(list, back));
     },
-    // withItems: its items go too; else they move up under no heading (or the section above).
+    // withItems: its items go too; else they stay, with no heading.
     removeChecklistSection: (list, sec, withItems) => {
-      const items = Object.values(list.items || {}).filter((i) => i.section === sec.id);
+      const items = Object.values(list.items || {}).filter((i) => i?.id && i.section === sec.id);
       const fields = {};
       const remove = [`sections.${sec.id}`];
       if (withItems) items.forEach((i) => remove.push(`items.${i.id}`));

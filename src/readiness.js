@@ -17,7 +17,7 @@ export function readiness({ tasks = [], parts = [], checklists = [], runs = [], 
   const blocked = open.filter((t) => t.status === 'blocked');
   const pending = (parts || []).filter((p) => p.status !== 'arrived');
   const lists = (checklists || []).filter(isReadinessList).map((c) => {
-    const items = Object.values(c.items || {});
+    const items = Object.values(c.items || {}).filter((i) => i?.id);
     return { id: c.id, title: c.title, total: items.length, left: items.filter((i) => !i.done).length };
   }).filter((l) => l.total > 0);
   const practice = (runs || [])

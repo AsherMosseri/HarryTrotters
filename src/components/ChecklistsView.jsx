@@ -202,7 +202,7 @@ function ItemRow({ list, item, round, api, canDrag, drop, onDetails, task, onOpe
 // ---------- a section heading ----------
 function SectionHead({ list, sec, round, api, canDrag, drop, index, count }) {
   const { ref, handle, dragging } = useDragRow(`s:${list.id}:${sec.id}`, { type: 'section', listId: list.id, secId: sec.id }, !canDrag);
-  const items = Object.values(list.items || {}).filter((i) => i.section === sec.id);
+  const items = Object.values(list.items || {}).filter((i) => i?.id && i.section === sec.id);
   const done = items.filter((i) => CL.isDone(list, i, round)).length;
   const remove = async () => {
     if (!items.length) return api.removeChecklistSection(list, sec, false);

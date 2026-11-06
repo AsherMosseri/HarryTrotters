@@ -6,6 +6,7 @@ import Debrief from './Debrief.jsx';
 import PinnedChecklists from '../PinnedChecklists.jsx';
 import { BatteryStrip } from '../Batteries.jsx';
 import { QUEUE_CHECKLIST, STARTER_CHECKLISTS, isQueueChecklist, starterItems } from '../../checklists.js';
+import { shownItems } from '../../../functions/shared/checklists.js';
 import { parseDay } from '../../milestones.js';
 import { teamDay } from '../../../functions/shared/coins.js';
 import { rolesFromTeam } from '../../driveRoles.js';
@@ -75,7 +76,8 @@ function QueueCard({ list, next, lead, now, actor, api, onAddList }) {
   const byHand = !!(hand?.at && hand.round === key);
   const left = at ? at - now : null;
   const tone = left == null ? 'idle' : left <= 0 ? 'now' : left <= 2 * 60000 ? 'soon' : 'calm';
-  const items = Object.values(list?.items || {}).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  // In the order the Checklists tab shows them (sections included).
+  const items = list ? shownItems(list) : [];
   const isDone = (i) => i.done && i.doneRound === key;
   const done = items.filter(isDone).length;
   const start = (mins) => api.setChecklistQueue(list, { round: next ? next.id : `hand-${now}`, at: now + mins * 60000, by: actor.name });

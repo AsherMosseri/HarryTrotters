@@ -30,8 +30,10 @@ const clip = (text, n = 140) => (text.length > n ? `${text.slice(0, n - 1)}…` 
 export function checklistFunctions({ db, notify, renamer, personId, storage = () => getStorage().bucket() }) {
   const listsCol = db.collection('checklists');
 
+  // The pit's round (only read when a per-match list has a tick to judge:
+  // the schedule isn't read every 5 minutes for nothing).
   async function roundNow(lists, now) {
-    if (!lists.some((c) => CL.resetMode(c) === 'match')) return 'free';
+    if (!lists.some((c) => CL.resetMode(c) === 'match' && Object.values(c.items || {}).some((i) => i?.done && i.doneRound))) return 'free';
     const [settings, matches] = await Promise.all([db.doc('settings/team').get(), db.collection('matches').get()]);
     return CL.currentRound({
       matches: matches.docs.map((d) => ({ id: d.id, ...d.data() })),
@@ -180,8 +182,16 @@ export function checklistFunctions({ db, notify, renamer, personId, storage = ()
       list = (await listsCol.get()).docs.find((d) => d.get(`items.${ref.item}`)) || null;
     }
     if (!list) return;
-    const all = (await listsCol.get()).docs.map((d) => ({ id: d.id, ...d.data() }));
-    const round = await roundNow(all, now);
+    const mine = { id: list.id, ...list.data() };
+    const round =
+      CL.resetMode(mine) === 'match'
+        ? CL.currentRound({
+            matches: (await db.collection('matches').get()).docs.map((d) => ({ id: d.id, ...d.data() })),
+            settings: (await db.doc('settings/team').get()).data() || {},
+            checklists: (await listsCol.get()).docs.map((d) => ({ id: d.id, ...d.data() })),
+            now,
+          })
+        : '';
     const rename = await renamer();
     const by = rename(after.updatedBy || after.createdBy || '');
     await db.runTransaction(async (tx) => {
