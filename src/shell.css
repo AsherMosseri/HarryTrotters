@@ -1829,6 +1829,23 @@ button.pm-row:hover { background: color-mix(in srgb, var(--text) 4%, transparent
 .ci-skip-help { margin: 0 0 6px; }
 .ci-skip-days { flex-wrap: wrap; }
 .ci-skip-chip.skipped { text-decoration: line-through; color: var(--muted); background: var(--surface-2); border-color: var(--border); }
+/* Times not available (3.2.7): greyed in the answer form, with the reason;
+   a line per time off on the schedule and the card; the editor. */
+.checkin-slot.off { opacity: 0.62; }
+.checkin-slot.off .checkin-slot-label { color: var(--muted); }
+.checkin-off-note { flex: 1 1 200px; min-height: 44px; display: flex; align-items: center; padding: 8px 12px; border-radius: 12px; border: 1px dashed var(--border); background: var(--surface-2); color: var(--muted); font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+.ci-offs { flex-basis: 100%; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; }
+.ci-off-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; font-size: 13.5px; color: var(--muted); overflow-wrap: anywhere; min-width: 0; }
+.ci-off-line b { color: var(--text); font-weight: 600; }
+.checkin-off-cell .ci-off-line { font-size: 13px; }
+.ci-off-editor { flex-basis: 100%; display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; margin: 4px 0 10px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); min-width: 0; }
+.ci-off-editor .ci-off-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.ci-off-editor .field-label { margin: 0; min-width: 92px; }
+.ci-off-editor select.input { width: auto; min-width: 0; max-width: 100%; }
+.dialog .ci-offs .ci-off-editor { margin: 4px 0 0; width: 100%; box-sizing: border-box; }
+.ci-manage { display: inline-flex; gap: 8px; margin-left: auto; }
+.checkin-results .ci-card-off { margin-top: 10px; }
+.checkin-results .ci-off-editor { margin: 12px 0 0; }
 /* Streaks on the profile card; six figures on the full profile. */
 .streak-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; margin: 0; }
 .streak-line b { font-size: 17px; font-weight: 700; }

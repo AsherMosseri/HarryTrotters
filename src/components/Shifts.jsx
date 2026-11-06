@@ -4,11 +4,11 @@ import { SUBTEAMS } from '../config.js';
 import { addDays, mondayOf, parseDay, toISO, todayISO } from '../milestones.js';
 import { firstName } from '../util.js';
 import { Avatar, AvatarStack, CloseIcon, Overlay, PlusIcon } from './common.jsx';
-import { CheckinCard, CheckinDialog, scheduleText } from './Checkin.jsx';
+import { CheckinCard, CheckinDialog, OffEditor, OffLine, SLOTS, scheduleText } from './Checkin.jsx';
 import NotebookExport from './NotebookExport.jsx';
 import { hoursLabel, hoursOf, msByPerson, msOf } from '../../functions/shared/hours.js';
 import { teamDay } from '../../functions/shared/coins.js';
-import { asksOn, cleanSkips, nextSchoolDay, scheduledOn } from '../../functions/shared/checkin.js';
+import { asksOn, cleanOff, cleanSkips, nextSchoolDay, offChanges, offOf, scheduledCheckinFields, scheduledOn, upcomingDays, withOff } from '../../functions/shared/checkin.js';
 import { seasonStats, versusLastWeek } from '../../functions/shared/stats.js';
 import { streaksOf } from '../../functions/shared/streaks.js';
 import { confirmDialog } from './Dialogs.jsx';
@@ -772,14 +772,31 @@ export function SeasonStrip({ stats }) {
 // check-in if it was already asked. Undo asks it again from the start: the
 // old answers went with it, so everyone answers again. When today should be
 // asked and has no check-in (deleted, or the schedule's time window passed),
-// "Ask today" asks it now.
+// "Ask today" asks it now. "Not available…" marks one time (lunch or after
+// school) of an upcoming day as not asked, with a reason or none; a check-in
+// already asked that day follows along (applyOff).
 function ScheduleLine({ schedule, checkins, isManager, api, onEdit }) {
   const today = teamDay(Date.now());
   const skip = schedule.skip || [];
   const [stopping, setStopping] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [addingOff, setAddingOff] = useState(false);
   const removed = useRef(new Map());
   const save = (nextSkip) => api.saveSettings({ checkinSchedule: { ...schedule, skip: cleanSkips(nextSkip, today) } });
+  const off = cleanOff(schedule.off, today);
+  const saveOff = (day, slot, reason) =>
+    run(async () => {
+      const next = cleanOff(withOff(off, day, slot, reason), today);
+      await api.saveSettings({ checkinSchedule: { ...schedule, off: next } });
+      await applyOff(api, checkins, offChanges(off, next));
+    });
+  // Upcoming days it asks on (not skipped), to pick from; the times off on them.
+  const offDays = upcomingDays(schedule, today, 10)
+    .filter((d) => !skip.includes(d))
+    .map((d) => [d, d === today ? 'Today' : d === addDays(today, 1) ? 'Tomorrow' : parseDay(d).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })]);
+  const offList = Object.entries(off).flatMap(([d, v]) =>
+    scheduledOn(schedule, d) && !skip.includes(d) ? (schedule.slots || []).filter((x) => x in v).map((x) => [d, x, v[x]]) : [],
+  );
   const run = async (fn) => {
     setBusy(true);
     await fn();
@@ -808,7 +825,7 @@ function ScheduleLine({ schedule, checkins, isManager, api, onEdit }) {
       id: back?.id || `auto-${today}`,
       date: today,
       question: back?.question || schedule.question || 'Who’s going to the lab today?',
-      slots: back?.slots || schedule.slots,
+      ...(back ? { slots: back.slots, ...(back.off && { off: back.off }) } : scheduledCheckinFields(schedule, today)),
       by: back?.by || schedule.by || 'Team management',
       byUid: '',
       auto: true,
@@ -878,21 +895,61 @@ function ScheduleLine({ schedule, checkins, isManager, api, onEdit }) {
               ),
             )}
           </span>
+          {isManager && !addingOff && offDays.length > 0 && (schedule.slots || []).length > 0 && (
+            <button className="chip" disabled={busy} onClick={() => setAddingOff(true)}>
+              Not available…
+            </button>
+          )}
           {isManager && (
             <>
               <span className="spacer" />
-              <button className="link-btn small" onClick={onEdit}>
-                Edit
-              </button>
-              <button className="link-btn small danger" onClick={() => setStopping(true)}>
-                Stop
-              </button>
+              <span className="ci-manage">
+                <button className="link-btn small" onClick={onEdit}>
+                  Edit
+                </button>
+                <button className="link-btn small danger" onClick={() => setStopping(true)}>
+                  Stop
+                </button>
+              </span>
             </>
+          )}
+          {offList.length > 0 && (
+            <div className="ci-offs">
+              {offList.map(([d, x, why]) => (
+                <OffLine
+                  key={`${d}-${x}`}
+                  label={`${SLOTS.find((s) => s.id === x)?.label || x} ${nameOf(d) === 'today' || nameOf(d) === 'tomorrow' ? nameOf(d) : `on ${shortDay(d)}`}`}
+                  reason={why}
+                  busy={busy}
+                  onBack={isManager ? () => saveOff(d, x, null) : null}
+                />
+              ))}
+            </div>
+          )}
+          {addingOff && (
+            <OffEditor
+              days={offDays}
+              slots={schedule.slots || []}
+              busy={busy}
+              onCancel={() => setAddingOff(false)}
+              onSave={async ({ day, slot, reason }) => {
+                await saveOff(day, slot, reason);
+                setAddingOff(false);
+              }}
+            />
           )}
         </>
       )}
     </div>
   );
+}
+// A check-in already asked on a day follows the schedule's times off (changes
+// from shared/checkin.js offChanges). Its answers stay.
+async function applyOff(api, checkins, changes) {
+  for (const { day, slot, reason } of changes)
+    for (const c of checkins)
+      if (c.date === day && (c.slots || []).includes(slot) && offOf(c)[slot] !== (reason ?? undefined))
+        await api.setCheckinOff(c.id, slot, reason);
 }
 const shortDay = (d) => parseDay(d).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 
@@ -1049,6 +1106,7 @@ export default function ShiftsView({
           rename={rename}
           onAnswer={(a) => api.answerCheckin(c.id, a)}
           onDelete={() => api.deleteCheckin(c.id)}
+          onOff={(slot, reason) => api.setCheckinOff(c.id, slot, reason)}
         />
       ))}
 
@@ -1422,6 +1480,8 @@ export default function ShiftsView({
           }}
           onSchedule={async (sched) => {
             await api.saveSettings({ checkinSchedule: { ...sched, by: actor.name } });
+            // Times off changed in the dialog reach a check-in already asked that day.
+            await applyOff(api, checkins, offChanges(checkinSchedule?.on ? checkinSchedule.off : {}, sched.off));
             setDialog(null);
           }}
         />

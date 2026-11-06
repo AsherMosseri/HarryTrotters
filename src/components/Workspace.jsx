@@ -57,6 +57,7 @@ import { ChannelRequestsDialog, RequestChannelDialog } from './ChannelRequests.j
 import { BottomNav, MoreSheet, Sheet } from './PhoneChrome.jsx';
 import ShiftsView, { ShiftButton } from './Shifts.jsx';
 import { CheckinGate, PollGate, answerOf } from './Checkin.jsx';
+import { answeredAll, openSlots } from '../../functions/shared/checkin.js';
 import ThemeStudio, { AppBackdrop, CUSTOM_DEFAULT, applyThemeVars, themeFromProfile } from './ThemeStudio.jsx';
 import { CHANGELOG, VERSION, versionsSince } from '../changelog.js';
 import { setDraft } from '../drafts.js';
@@ -1228,7 +1229,11 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
   const pendingCheckin =
     controls.isOn('checkins') &&
     checkins.find(
-      (c) => c.date === today && (c.slots || []).length && !answerOf(c, actor.name, rename) && !previewSkipped.includes(`checkin:${c.id}`),
+      (c) =>
+        c.date === today &&
+        openSlots(c).length &&
+        !answeredAll(c, answerOf(c, actor.name, rename)) &&
+        !previewSkipped.includes(`checkin:${c.id}`),
     );
   const upcomingCheckins = checkins
     .filter((c) => c.date >= today)
@@ -1651,6 +1656,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
       addCheckin: (data) => store.addCheckin(data, actor).catch(fail),
       answerCheckin: (id, answer) => store.answerCheckin(id, actor.name, answer).catch(fail),
       deleteCheckin: (id) => store.deleteCheckin(id).catch(fail),
+      setCheckinOff: (id, slot, reason) => store.setCheckinOff(id, slot, reason).catch(fail),
       rsvpShiftPlan: (id, answer, oldKeys) => store.rsvpShiftPlan(id, actor.name, answer, oldKeys).catch(fail),
       deleteShiftPlans: (ids) => store.deleteShiftPlans(ids).catch(fail),
       addRequest: (text, kind) =>
@@ -3400,6 +3406,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
                 {pendingCheckin && (
                   <CheckinGate
                     checkin={pendingCheckin}
+                    initial={answerOf(pendingCheckin, actor.name, rename)}
                     rename={rename}
                     onAnswer={(a) => api.answerCheckin(pendingCheckin.id, a)}
                     onSkip={skipInPreview?.(`checkin:${pendingCheckin.id}`)}

@@ -53,7 +53,7 @@ import {
   seasonOf,
 } from './shared/matches.js';
 import { rankingFromApi, teamFromApi } from './shared/scout.js';
-import { asksOn } from './shared/checkin.js';
+import { asksOn, scheduledCheckinFields } from './shared/checkin.js';
 import { marketFunctions } from './market.js';
 import { coinCheckFunctions } from './coincheck.js';
 import { disputeFunctions } from './disputes.js';
@@ -584,7 +584,7 @@ export const shiftChecks = onSchedule({ schedule: 'every 15 minutes', timeZone: 
 // Lab check-ins on a schedule (Shifts → Lab check-in → Repeat): on the chosen
 // days or every school day (shared/checkin.js, shared/school.js), at the
 // chosen time (New York time), once a day, except days team management
-// skipped. Skipped when the day already has a check-in, and if it's more than
+// skipped (or with every time marked not available that day). Skipped when the day already has a check-in, and if it's more than
 // 6 hours past the time (so a late deploy doesn't ask at night). onCheckin
 // then notifies everyone.
 export const scheduledCheckin = onSchedule({ schedule: 'every 15 minutes', timeZone: TIME_ZONE }, async () => {
@@ -604,7 +604,8 @@ export const scheduledCheckin = onSchedule({ schedule: 'every 15 minutes', timeZ
       .create({
         date: today,
         question: s.question || 'Who’s going to the lab today?',
-        slots: s.slots,
+        // Its times, and any team management marked not available that day.
+        ...scheduledCheckinFields(s, today),
         answers: {},
         by: s.by || 'Team management',
         byUid: '',

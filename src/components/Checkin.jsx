@@ -6,7 +6,7 @@ import { AutoTextarea, Avatar, CloseIcon, Overlay } from './common.jsx';
 import { nameKey, sameName } from '../../functions/shared/team.js';
 import { checkPicks, optionLabel, pickBounds, writeCounts } from '../../functions/shared/polls.js';
 import { teamDay } from '../../functions/shared/coins.js';
-import { cleanSkips, upcomingDays } from '../../functions/shared/checkin.js';
+import { answeredAll, cleanOff, cleanSkips, offOf, offText, openSlots, upcomingDays, withOff, OFF_REASON_MAX } from '../../functions/shared/checkin.js';
 import { confirmDialog } from './Dialogs.jsx';
 
 export const SLOTS = [
@@ -39,42 +39,137 @@ function answersByPerson(checkin, rename, roster) {
   return out;
 }
 
-// Yes / No for each time of day; onDone gets { lunch: true, after: false }.
+// Yes / No for each time of day that's asked; onDone gets { lunch: true,
+// after: false }. A time team management marked not available shows greyed
+// with the reason, and isn't asked; an answer already given for it is kept.
 function AnswerForm({ checkin, initial, submitLabel, onDone }) {
-  const [a, setA] = useState(() => Object.fromEntries((checkin.slots || []).map((s) => [s, initial?.[s] ?? null])));
-  const done = Object.values(a).every((v) => v !== null);
+  const off = offOf(checkin);
+  const open = openSlots(checkin);
+  const [a, setA] = useState(() =>
+    Object.fromEntries((checkin.slots || []).map((s) => [s, typeof initial?.[s] === 'boolean' ? initial[s] : null])),
+  );
+  const done = open.length > 0 && open.every((s) => typeof a[s] === 'boolean');
   return (
     <div className="checkin-form">
-      {(checkin.slots || []).map((s) => (
-        <div key={s} className="checkin-slot">
-          <span className="checkin-slot-label">{slotById[s]?.label || s}</span>
-          <div className="checkin-yn">
-            <button
-              className={`checkin-yes${a[s] === true ? ' on' : ''}`}
-              aria-pressed={a[s] === true}
-              onClick={() => setA({ ...a, [s]: true })}
-            >
-              Yes
-            </button>
-            <button
-              className={`checkin-no${a[s] === false ? ' on' : ''}`}
-              aria-pressed={a[s] === false}
-              onClick={() => setA({ ...a, [s]: false })}
-            >
-              No
-            </button>
+      {(checkin.slots || []).map((s) =>
+        s in off ? (
+          <div key={s} className="checkin-slot off" aria-disabled="true">
+            <span className="checkin-slot-label">{slotById[s]?.label || s}</span>
+            <span className="checkin-off-note">{offText(off[s])}</span>
           </div>
-        </div>
-      ))}
-      <button className="btn primary big-btn" disabled={!done} onClick={() => onDone(a)}>
+        ) : (
+          <div key={s} className="checkin-slot">
+            <span className="checkin-slot-label">{slotById[s]?.label || s}</span>
+            <div className="checkin-yn">
+              <button
+                className={`checkin-yes${a[s] === true ? ' on' : ''}`}
+                aria-pressed={a[s] === true}
+                onClick={() => setA({ ...a, [s]: true })}
+              >
+                Yes
+              </button>
+              <button
+                className={`checkin-no${a[s] === false ? ' on' : ''}`}
+                aria-pressed={a[s] === false}
+                onClick={() => setA({ ...a, [s]: false })}
+              >
+                No
+              </button>
+            </div>
+          </div>
+        ),
+      )}
+      <button
+        className="btn primary big-btn"
+        disabled={!done}
+        onClick={() => {
+          // Only real answers, so a time that's off keeps what was said for it.
+          const { at: _at, ...kept } = initial || {};
+          const picked = Object.fromEntries(Object.entries(a).filter(([s, v]) => typeof v === 'boolean' && !(s in off)));
+          onDone({ ...kept, ...picked });
+        }}
+      >
         {submitLabel}
       </button>
     </div>
   );
 }
 
+// Team management: mark one time not available, with a reason or none. days:
+// [[iso, label]] to pick from (left out for one check-in); slots: the times
+// that can be picked.
+export function OffEditor({ days, slots, onSave, onCancel, busy = false }) {
+  const [day, setDay] = useState(days?.[0]?.[0] || '');
+  const [slot, setSlot] = useState(slots[0] || '');
+  const [reason, setReason] = useState('');
+  return (
+    <div className="ci-off-editor">
+      {days && (
+        <label className="ci-off-row">
+          <span className="field-label">Day</span>
+          <select className="input" value={day} onChange={(e) => setDay(e.target.value)} aria-label="Day">
+            {days.map(([d, label]) => (
+              <option key={d} value={d}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+      <div className="ci-off-row">
+        <span className="field-label">Not available</span>
+        <div className="segmented">
+          {slots.map((s) => (
+            <button key={s} className={`plain-seg${slot === s ? ' on' : ''}`} aria-pressed={slot === s} onClick={() => setSlot(s)}>
+              {slotById[s]?.label || s}
+            </button>
+          ))}
+        </div>
+      </div>
+      <input
+        className="input"
+        value={reason}
+        maxLength={OFF_REASON_MAX}
+        onChange={(e) => setReason(e.target.value)}
+        placeholder="Reason (optional)"
+        aria-label="Reason (optional)"
+      />
+      <div className="row gap">
+        <span className="spacer" />
+        <button className="btn small-btn" onClick={onCancel}>
+          Cancel
+        </button>
+        <button className="btn small-btn primary" disabled={busy || !slot || (days && !day)} onClick={() => onSave({ day, slot, reason: reason.trim() })}>
+          Mark not available
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// "Lunch · Not available: Lab closed", with Turn back on for team management.
+export function OffLine({ label, reason, onBack, busy }) {
+  return (
+    <div className="ci-off-line">
+      <span>
+        {label && (
+          <>
+            <b>{label}</b> ·{' '}
+          </>
+        )}
+        {offText(reason)}
+      </span>
+      {onBack && (
+        <button className="link-btn small" disabled={busy} onClick={onBack}>
+          Turn back on
+        </button>
+      )}
+    </div>
+  );
+}
+
 // Today's check-in, unanswered: blocks the app until it's answered.
-export function CheckinGate({ checkin, rename, onAnswer, onSkip }) {
+export function CheckinGate({ checkin, initial, rename, onAnswer, onSkip }) {
   const [busy, setBusy] = useState(false);
   return (
     <Overlay>
@@ -87,6 +182,7 @@ export function CheckinGate({ checkin, rename, onAnswer, onSkip }) {
           </p>
           <AnswerForm
             checkin={checkin}
+            initial={initial}
             submitLabel={busy ? 'Saving…' : 'Done'}
             onDone={async (a) => {
               setBusy(true);
@@ -126,14 +222,33 @@ function Names({ names }) {
 }
 
 // Results in the Shifts tab: who's going when (lunch split by middle and high
-// school lunch), who isn't, and who hasn't answered.
-export function CheckinCard({ checkin, roster, gradeOf, me, isManager, rename, onAnswer, onDelete }) {
+// school lunch), who isn't, and who hasn't answered. A time marked not
+// available shows that (and the reason) instead of who's going; answers
+// given for it are kept but don't count while it's off. Team management can
+// mark a time not available here, or turn it back on (onOff).
+export function CheckinCard({ checkin, roster, gradeOf, me, isManager, rename, onAnswer, onDelete, onOff }) {
   const [changing, setChanging] = useState(false);
+  const [editingOff, setEditingOff] = useState(false);
+  const [busy, setBusy] = useState(false);
   const answers = answersByPerson(checkin, rename, roster);
   const mine = answers.get(me);
-  const yes = (slot) => [...answers].filter(([, a]) => a[slot]).map(([n]) => n);
-  const no = [...answers].filter(([, a]) => (checkin.slots || []).every((s) => !a[s])).map(([n]) => n);
-  const waiting = roster.filter((n) => !answers.has(n));
+  const off = offOf(checkin);
+  const open = openSlots(checkin);
+  const done = (n) => answeredAll(checkin, answers.get(n));
+  const yes = (slot) => [...answers].filter(([, a]) => a[slot] === true).map(([n]) => n);
+  const no = open.length ? [...answers].filter(([n, a]) => done(n) && open.every((s) => !a[s])).map(([n]) => n) : [];
+  const waiting = open.length ? roster.filter((n) => !done(n)) : [];
+  const setOff = async (slot, reason) => {
+    setBusy(true);
+    await onOff(slot, reason);
+    setBusy(false);
+  };
+  const offCell = (s) => (
+    <div key={`off-${s}`} className="checkin-off-cell">
+      <h3>{slotById[s]?.label || s}</h3>
+      <OffLine label="" reason={off[s]} busy={busy} onBack={isManager && onOff ? () => setOff(s, null) : null} />
+    </div>
+  );
   return (
     <section className="chart-card checkin-results">
       <div className="shift-sec-head">
@@ -145,7 +260,7 @@ export function CheckinCard({ checkin, roster, gradeOf, me, isManager, rename, o
           )}
         </h2>
         <span className="spacer" />
-        {mine && !changing && (
+        {mine && open.length > 0 && !changing && (
           <button className="btn small-btn" onClick={() => setChanging(true)}>
             Change my answer
           </button>
@@ -164,8 +279,9 @@ export function CheckinCard({ checkin, roster, gradeOf, me, isManager, rename, o
           </button>
         )}
       </div>
-      {(changing || (!mine && checkin.date !== todayISO())) && (
+      {open.length > 0 && (changing || (!done(me) && checkin.date !== todayISO())) && (
         <AnswerForm
+          key={open.join()}
           checkin={checkin}
           initial={mine}
           submitLabel="Save"
@@ -176,33 +292,61 @@ export function CheckinCard({ checkin, roster, gradeOf, me, isManager, rename, o
         />
       )}
       <div className="checkin-grid">
-        {(checkin.slots || []).includes('lunch') && (
+        {(checkin.slots || []).includes('lunch') &&
+          ('lunch' in off ? (
+            offCell('lunch')
+          ) : (
+            <>
+              <div>
+                <h3>Middle school lunch</h3>
+                <Names names={yes('lunch').filter((n) => lunchOf(gradeOf(n)) === 'Middle school lunch')} />
+              </div>
+              <div>
+                <h3>High school lunch</h3>
+                <Names names={yes('lunch').filter((n) => lunchOf(gradeOf(n)) === 'High school lunch')} />
+              </div>
+            </>
+          ))}
+        {(checkin.slots || []).includes('after') &&
+          ('after' in off ? (
+            offCell('after')
+          ) : (
+            <div>
+              <h3>After school</h3>
+              <Names names={yes('after')} />
+            </div>
+          ))}
+        {open.length > 0 && (
           <>
             <div>
-              <h3>Middle school lunch</h3>
-              <Names names={yes('lunch').filter((n) => lunchOf(gradeOf(n)) === 'Middle school lunch')} />
+              <h3>Not going</h3>
+              <Names names={no} />
             </div>
-            <div>
-              <h3>High school lunch</h3>
-              <Names names={yes('lunch').filter((n) => lunchOf(gradeOf(n)) === 'High school lunch')} />
+            <div className="checkin-waiting">
+              <h3>Hasn’t answered ({waiting.length})</h3>
+              <Names names={waiting} />
             </div>
           </>
         )}
-        {(checkin.slots || []).includes('after') && (
-          <div>
-            <h3>After school</h3>
-            <Names names={yes('after')} />
-          </div>
-        )}
-        <div>
-          <h3>Not going</h3>
-          <Names names={no} />
-        </div>
-        <div className="checkin-waiting">
-          <h3>Hasn’t answered ({waiting.length})</h3>
-          <Names names={waiting} />
-        </div>
       </div>
+      {isManager &&
+        onOff &&
+        open.length > 0 &&
+        (editingOff ? (
+          <OffEditor
+            slots={open}
+            busy={busy}
+            onCancel={() => setEditingOff(false)}
+            onSave={async ({ slot, reason }) => {
+              await setOff(slot, reason);
+              setEditingOff(false);
+            }}
+          />
+        ) : (
+          <button className="link-btn small ci-card-off" onClick={() => setEditingOff(true)}>
+            Mark a time not available
+          </button>
+        ))}
     </section>
   );
 }
@@ -239,6 +383,9 @@ export function CheckinDialog({ schedule, onDone, onSchedule, onClose }) {
   // Every school day is asked at midnight unless changed.
   const [time, setTime] = useState(schedule?.time || (repeatOf(schedule) === 'school' ? '00:00' : '07:00'));
   const [skip, setSkip] = useState(() => cleanSkips(schedule?.skip, today));
+  // Single times not asked on a day (shared/checkin.js).
+  const [off, setOff] = useState(() => cleanOff(schedule?.off, today));
+  const [addingOff, setAddingOff] = useState(false);
   const [moreDays, setMoreDays] = useState(false);
   useEffect(() => {
     const esc = (e) => e.key === 'Escape' && onClose();
@@ -255,9 +402,15 @@ export function CheckinDialog({ schedule, onDone, onSchedule, onClose }) {
     question: question.trim(),
     slots,
     skip: cleanSkips(skip, today),
+    off: cleanOff(off, today),
   };
   // The next days it would ask on, to tap the ones to skip.
   const upcoming = repeat === 'once' ? [] : upcomingDays(draft, today, moreDays ? 30 : 10);
+  // Times off on the days it asks (not on skipped ones), in day order.
+  const offList = Object.entries(draft.off).flatMap(([d, v]) =>
+    upcoming.includes(d) && !skip.includes(d) ? slots.filter((x) => x in v).map((x) => [d, x, v[x]]) : [],
+  );
+  const offDays = upcoming.filter((d) => !skip.includes(d)).map((d) => [d, chipDay(d)]);
   return (
     <Overlay>
       <div className="panel-backdrop center" onClick={onClose}>
@@ -355,6 +508,36 @@ export function CheckinDialog({ schedule, onDone, onSchedule, onClose }) {
                     <button className="link-btn small" onClick={() => setMoreDays(true)}>
                       More days
                     </button>
+                  )}
+                </div>
+                <span className="field-label">Not available</span>
+                <div className="ci-offs">
+                  <p className="muted small ci-skip-help">Not asking about lunch or after school on a day, with a reason if you like.</p>
+                  {offList.map(([d, x, why]) => (
+                    <OffLine
+                      key={`${d}-${x}`}
+                      label={`${chipDay(d)}, ${slotById[x]?.label.toLowerCase() || x}`}
+                      reason={why}
+                      onBack={() => setOff(withOff(off, d, x, null))}
+                    />
+                  ))}
+                  {addingOff ? (
+                    <OffEditor
+                      days={offDays}
+                      slots={slots}
+                      onCancel={() => setAddingOff(false)}
+                      onSave={({ day, slot, reason }) => {
+                        setOff(withOff(off, day, slot, reason));
+                        setAddingOff(false);
+                      }}
+                    />
+                  ) : (
+                    offDays.length > 0 &&
+                    slots.length > 0 && (
+                      <button className="link-btn small" onClick={() => setAddingOff(true)}>
+                        Mark a time not available
+                      </button>
+                    )
                   )}
                 </div>
               </>

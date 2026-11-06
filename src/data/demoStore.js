@@ -28,7 +28,7 @@ import * as fun from '../../functions/shared/funGames.js';
 import * as mines from '../../functions/shared/minesweeper.js';
 const MINE_LEVELS = mines.LEVELS;
 import { attemptSeed, newSeed, secureRandom } from '../../functions/shared/rng.js';
-import { asksOn } from '../../functions/shared/checkin.js';
+import { asksOn, scheduledCheckinFields } from '../../functions/shared/checkin.js';
 import * as market from '../../functions/shared/market.js';
 import { PERK_IDEAS } from '../../functions/shared/market.js';
 import { giftAccept, giftEnd, giftOffer, petEdit, petsIn, withPet } from '../../functions/shared/pets.js';
@@ -1082,7 +1082,7 @@ function demoScheduledCheckin() {
   if ((state.checkins || []).some((c) => c.date === today)) return;
   state.checkins = [
     ...(state.checkins || []),
-    { id: `auto-${today}`, date: today, question: s.question || 'Who’s going to the lab today?', slots: s.slots, answers: {}, by: s.by || 'Team management', auto: true, at: Date.now() },
+    { id: `auto-${today}`, date: today, question: s.question || 'Who’s going to the lab today?', ...scheduledCheckinFields(s, today), answers: {}, by: s.by || 'Team management', auto: true, at: Date.now() },
   ];
   commit();
 }
@@ -3784,6 +3784,14 @@ export const demoStore = {
   },
   async deleteCheckin(id) {
     state.checkins = (state.checkins || []).filter((c) => c.id !== id);
+    commit();
+  },
+  async setCheckinOff(id, slot, reason) {
+    state.checkins = (state.checkins || []).map((c) => {
+      if (c.id !== id) return c;
+      const { [slot]: _gone, ...off } = c.off || {};
+      return { ...c, off: reason == null ? off : { ...off, [slot]: reason } };
+    });
     commit();
   },
   subscribeShiftPlans(cb) {

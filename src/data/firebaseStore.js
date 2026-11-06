@@ -1968,6 +1968,11 @@ export const firebaseStore = {
   deleteCheckin(id) {
     return deleteDoc(doc(checkinsCol, id));
   },
+  // Team management: one time of an asked check-in not available (reason, ''
+  // for none) or back on (null). Answers stay (shared/checkin.js offOf).
+  setCheckinOff(id, slot, reason) {
+    return updateDoc(doc(checkinsCol, id), new FieldPath('off', slot), reason == null ? deleteField() : reason);
+  },
   // Undo for "Not today": the check-in asked again (Shifts.jsx clears its answers).
   restoreCheckin(c) {
     const { id, ...data } = c;
