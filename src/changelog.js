@@ -4,6 +4,14 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '3.2.2',
+    date: '2026-11-06',
+    title: 'Lab check-in fix',
+    items: [
+      'Lab check-in: tap Undo after “Not today”, or Ask today if today’s check-in is gone, and everyone is asked again with a fresh notification.',
+    ],
+  },
+  {
     version: '3.2.1',
     date: '2026-11-05',
     title: 'Cards stay put while you play',
@@ -13,7 +21,6 @@ export const CHANGELOG = [
       'Tap Cancel on a challenge right after sending it, or Play on a score as it appears, and it stays where you aimed.',
       'While you play, the “new messages” button sits under the chat instead of over your game.',
       'A finished trivia keeps its answers where they were, and hangman’s keys don’t jump on the first guess.',
-      'Lab check-in: tap Undo after “Not today” and everyone is asked again, with a fresh notification.',
     ],
   },
   {

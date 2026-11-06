@@ -8,7 +8,7 @@ import { CheckinCard, CheckinDialog, scheduleText } from './Checkin.jsx';
 import NotebookExport from './NotebookExport.jsx';
 import { hoursLabel, hoursOf, msByPerson, msOf } from '../../functions/shared/hours.js';
 import { teamDay } from '../../functions/shared/coins.js';
-import { cleanSkips, nextSchoolDay, scheduledOn } from '../../functions/shared/checkin.js';
+import { asksOn, cleanSkips, nextSchoolDay, scheduledOn } from '../../functions/shared/checkin.js';
 import { seasonStats, versusLastWeek } from '../../functions/shared/stats.js';
 import { streaksOf } from '../../functions/shared/streaks.js';
 import { confirmDialog } from './Dialogs.jsx';
@@ -770,7 +770,9 @@ export function SeasonStrip({ stats }) {
 // management's quick skips: "Not today" and "Not tomorrow" (the next school
 // day), each undoable. Skipping today also takes back today's automatic
 // check-in if it was already asked. Undo asks it again from the start: the
-// old answers went with it, so everyone answers again.
+// old answers went with it, so everyone answers again. When today should be
+// asked and has no check-in (deleted, or the schedule's time window passed),
+// "Ask today" asks it now.
 function ScheduleLine({ schedule, checkins, isManager, api, onEdit }) {
   const today = teamDay(Date.now());
   const skip = schedule.skip || [];
@@ -796,11 +798,24 @@ function ScheduleLine({ schedule, checkins, isManager, api, onEdit }) {
     run(async () => {
       await save(skip.filter((d) => d !== day));
       const back = removed.current.get(day);
-      if (back) {
-        removed.current.delete(day);
-        await api.restoreCheckin({ ...back, answers: {}, at: Date.now() });
-      }
+      removed.current.delete(day);
+      if (day === today && (back || !checkins.some((c) => c.date === today))) await askToday(back);
     });
+  // Today's scheduled check-in, asked fresh (no answers): everyone is asked and
+  // notified again. Same id as the server's automatic one, so it can't double up.
+  const askToday = (back) =>
+    api.restoreCheckin({
+      id: back?.id || `auto-${today}`,
+      date: today,
+      question: back?.question || schedule.question || 'Who’s going to the lab today?',
+      slots: back?.slots || schedule.slots,
+      by: back?.by || schedule.by || 'Team management',
+      byUid: '',
+      auto: true,
+      answers: {},
+      at: Date.now(),
+    });
+  const missingToday = asksOn(schedule, today) && (schedule.slots || []).length > 0 && !checkins.some((c) => c.date === today);
   const next = nextSchoolDay(today);
   const nameOf = (d) =>
     d === today ? 'today' : d === addDays(today, 1) ? 'tomorrow' : parseDay(d).toLocaleDateString(undefined, { weekday: 'long' });
@@ -836,6 +851,11 @@ function ScheduleLine({ schedule, checkins, isManager, api, onEdit }) {
             )}
           </span>
           <span className="ci-quick">
+            {isManager && missingToday && (
+              <button className="chip" disabled={busy} onClick={() => run(() => askToday())}>
+                Ask today
+              </button>
+            )}
             {quick.map((d) =>
               skip.includes(d) ? (
                 <span key={d} className="ci-skipped">
