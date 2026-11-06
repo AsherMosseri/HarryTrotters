@@ -133,6 +133,16 @@ service firebase.storage {
         && request.resource.contentType.matches('audio/(mp4|x-m4a|aac|mpeg|webm|ogg)') && request.resource.size < 3 * 1024 * 1024;
     }
 
+    // Photo proof on checklist items (shrunk JPEGs, by the item's id so the
+    // photo follows the item to another list). Removing the item removes it;
+    // deleting the list removes them on the server.
+    match /checklists/{itemId}/{file} {
+      allow get, delete: if isMember();
+      allow create: if isMember()
+        && request.resource.contentType == 'image/jpeg'
+        && request.resource.size < 5 * 1024 * 1024;
+    }
+
     match /tasks/{taskId}/{file} {
       allow read, delete: if isMember();
       allow create: if isMember()

@@ -60,7 +60,15 @@ const SECTIONS = [
   ],
   [
     'Checklists',
-    ['Shared lists for inspection, packing the pit, and competition day.', 'Tick items as you go. Everyone sees the same boxes.'],
+    [
+      'Shared lists for inspection, packing the pit, and competition day. Tick items as you go. Everyone sees the same boxes.',
+      'Tap an item’s text to change it (Return saves, Esc cancels). Drag the dots on the left to move an item, a heading or a whole list, even onto another list. On a keyboard, the arrow keys move it.',
+      '+ Section adds a heading, like Electrical or Mechanical, for items to sit under.',
+      'The ⋯ on an item: who’s doing it (they get a notification), a note, a photo as proof, Make it a task (finishing the task checks the item), and Move to another list.',
+      'Removed something, unchecked a list or moved an item by mistake? Tap Undo.',
+      'The ⋯ on a list: Run it full screen (big rows, the next one lit up, made for the pit), Pin to my Today, History, Duplicate, and Reset on its own (every day at midnight, or before each match like Before queueing). Uncheck all and the resets save what was done in History first.',
+      'Mine shows just the items given to you, on every list.',
+    ],
   ],
   [
     'Shifts',

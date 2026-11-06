@@ -8,6 +8,8 @@ const ICONS = {
   announcement: 'announce',
   mention: 'at',
   assigned: 'tasks',
+  // A checklist item someone gave you.
+  checklist: 'checklists',
   due: 'shifts',
   message: 'chat',
   dm: 'chat',

@@ -50,6 +50,7 @@ import {
 } from './diff.js';
 import { checkPicks, myPicks, usesVoteButton } from '../../functions/shared/polls.js';
 import { API_FNS } from '../../functions/shared/api.js';
+import { RUNS_KEPT } from '../../functions/shared/checklists.js';
 import { NEXT } from '../next.js';
 import { swOptions } from '../offline.js';
 import { browserIsOnline, isOnline, needsInternet, setServerReachable } from '../connection.js';
@@ -1012,6 +1013,50 @@ export const firebaseStore = {
 
   deleteChecklist(id) {
     return deleteDoc(doc(checklistsCol, id));
+  },
+
+  // 3.3: field updates ('items.<id>.order': 2, 'sections.<id>': {…}) and
+  // removals in one write (moves, sections, notes, people, the reset setting).
+  saveChecklistFields(id, fields = {}, remove = []) {
+    const update = { ...fields };
+    for (const k of remove) update[k] = deleteField();
+    return updateDoc(doc(checklistsCol, id), update);
+  },
+  // An item to another list: off one and onto the other in one write.
+  moveChecklistItem(fromId, toId, item, fields = {}) {
+    const batch = writeBatch(db);
+    batch.update(doc(checklistsCol, fromId), { [`items.${item.id}`]: deleteField() });
+    batch.update(doc(checklistsCol, toId), { ...fields, [`items.${item.id}`]: item });
+    return batch.commit();
+  },
+  // The cards' order: { [id]: order }.
+  orderChecklists(orders) {
+    const batch = writeBatch(db);
+    for (const [id, order] of Object.entries(orders)) batch.update(doc(checklistsCol, id), { order });
+    return batch.commit();
+  },
+  // Uncheck all: the run is saved and the ticks cleared in one write. The
+  // run's id comes back at once (for Undo), offline too.
+  saveChecklistRun(listId, run, fields = {}) {
+    const ref = doc(collection(checklistsCol, listId, 'history'));
+    const batch = writeBatch(db);
+    batch.set(ref, run);
+    if (Object.keys(fields).length) batch.update(doc(checklistsCol, listId), fields);
+    return { id: ref.id, done: batch.commit() };
+  },
+  deleteChecklistRun(listId, runId) {
+    return deleteDoc(doc(checklistsCol, listId, 'history', runId));
+  },
+  subscribeChecklistRuns(listId, cb, onError) {
+    const q = query(collection(checklistsCol, listId, 'history'), orderBy('at', 'desc'), limit(RUNS_KEPT));
+    return onSnapshot(q, (snap) => cb(snap.docs.map(readDoc)), onError);
+  },
+  // Photo proof on an item, stored by the item's id (it can move lists).
+  async uploadChecklistPhoto(itemId, { full, thumb, width, height }, actor) {
+    return { ...(await uploadPhoto(`checklists/${itemId}`, { full, thumb })), width, height, by: actor.name, at: Date.now() };
+  },
+  deleteChecklistPhoto(photo) {
+    return deletePhotoFiles(photo);
   },
 
   subscribeRuns(cb, onError) {
