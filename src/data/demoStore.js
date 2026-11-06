@@ -1579,6 +1579,19 @@ export const demoStore = {
     const note = (title, body = '') => ({ note: { title, body } });
     const done = (r) => (commit(), r);
     const myPet = () => (state.pets || []).find((p) => p.person === me);
+    // Turning your own chat extra off or back on (functions/market.js extraSwitch): no coins move.
+    if (fn === 'buy' && data.action === 'extraSwitch') {
+      const p = (state.purchases || []).find((x) => x.id === data.id) || null;
+      const on = data.on === true;
+      const r = market.extraSwitchCheck(p, on, { aliases: [me], now, purchases: (state.purchases || []).filter((x) => x !== p && x.item === p?.item) });
+      if (r.error) return note(r.error, r.body);
+      if (r.patch) {
+        const { pausedAt, ...rest } = r.patch;
+        Object.assign(p, rest, pausedAt == null ? {} : { pausedAt });
+        if (pausedAt == null) delete p.pausedAt;
+      }
+      return done({ ok: true, on, changed: !r.same });
+    }
     if (coinsOff && (fn === 'buy' || fn === 'joinTournament')) return note('🪙 Jackson coins are off right now.');
     // An overdue loan locks buying (functions/market.js does the same).
     const lock = fn === 'buy' || fn === 'joinTournament' ? loans.lockFor(me, balanceOf) : null;

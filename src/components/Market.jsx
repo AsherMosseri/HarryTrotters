@@ -380,15 +380,16 @@ function PerkEditor({ perk, onClose, onToast }) {
 // ---------- chat extras ----------
 function ExtrasShelf({ actor, balance, buy, busy, onToast }) {
   const market = useMarket();
+  // Still running (turned off or not); what's on for everyone is market.extras.
   const live = market.purchases.filter((p) => p.kind === 'extra' && p.status === 'active' && p.until > market.now);
-  const banners = live.filter((p) => p.item === 'extra:banner').sort((a, b) => a.at - b.at);
+  const banners = market.extras.banners;
   return (
     <>
       <section className="mk-sec">
         <div className="sec-head">
           <h2>Chat extras</h2>
         </div>
-        <p className="muted small">Just for fun, and just for a day.</p>
+        <p className="muted small">Just for fun, and just for a day. You can turn yours off and back on any time; its time keeps running while it’s off, and there are no refunds.</p>
         <ul className="mk-grid">
           {CHAT_EXTRAS.map((x) => {
             const item = `extra:${x.id}`;
@@ -401,9 +402,7 @@ function ExtrasShelf({ actor, balance, buy, busy, onToast }) {
                 </div>
                 <p className="muted small">{x.desc}</p>
                 {mine ? (
-                  <p className="mk-on small">
-                    <Icon name="check" size={15} /> On until <span className="mono">{clock(mine.until)}</span>
-                  </p>
+                  <ExtraSwitch p={mine} x={x} onToast={onToast} />
                 ) : (
                   <button
                     className="btn small mk-buy"
@@ -453,6 +452,49 @@ function ExtrasShelf({ actor, balance, buy, busy, onToast }) {
         </section>
       )}
     </>
+  );
+}
+
+// Your own chat extra, while its time runs: on or off, any time. The clock
+// keeps running while it's off, and turning it off refunds nothing (the
+// server's extraSwitch, functions/market.js).
+function ExtraSwitch({ p, x, onToast }) {
+  const market = useMarket();
+  const [busy, setBusy] = useState(false);
+  const on = !p.paused;
+  const flip = async () => {
+    if (
+      on &&
+      !(await confirmDialog({
+        title: `Turn off ${x.name.toLowerCase()}?`,
+        body: `You can turn it back on any time until ${clock(p.until)}. Its time keeps running while it’s off, and turning it off doesn’t give coins back.`,
+        okLabel: 'Turn off',
+      }))
+    )
+      return;
+    setBusy(true);
+    const r = await market.run('buy', { action: 'extraSwitch', id: p.id, on: !on });
+    setBusy(false);
+    if (!r?.ok) onToast(said(r) || 'That didn’t go through.');
+    else onToast(on ? `${x.name}: off.` : `${x.name}: back on.`);
+  };
+  return (
+    <div className="mk-extra-switch">
+      <p className={`small ${on ? 'mk-on' : 'mk-off-now'}`}>
+        {on ? (
+          <>
+            <Icon name="check" size={15} /> On until <span className="mono">{clock(p.until)}</span>
+          </>
+        ) : (
+          <>
+            Off · runs out at <span className="mono">{clock(p.until)}</span>
+          </>
+        )}
+      </p>
+      <button className={`btn small${on ? '' : ' primary'}`} disabled={busy} aria-pressed={on} onClick={flip}>
+        {busy ? '…' : on ? 'Turn off' : 'Turn back on'}
+      </button>
+    </div>
   );
 }
 

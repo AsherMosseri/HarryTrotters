@@ -146,12 +146,18 @@ export function buyCheck(item, ctx) {
   if (kind === 'extra') {
     const x = chatExtra(id);
     if (!x) return { error: 'That isn’t for sale.' };
+    // Yours, still running (turned off or not): one at a time.
     const live = (ctx.purchases || []).filter((p) => p.status === 'active' && p.until > now);
     const myLive = live.find((p) => aliases.includes(p.person));
-    if (myLive) return { error: 'You already have this.', body: `It lasts until ${new Date(myLive.until).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' })}.` };
+    if (myLive)
+      return {
+        error: 'You already have this.',
+        body: `It lasts until ${nyClock(myLive.until)}.${myLive.paused ? ' It’s turned off: turn it back on in the Market.' : ''}`,
+      };
     const msg = x.text ? text(ctx.text, x.text) : '';
     if (x.text && !msg) return { error: 'Write your shout-out first.' };
-    if (id === 'banner' && live.length >= BANNERS_MAX) return { error: 'Today is full of shout-outs.', body: 'Try again in a few hours.' };
+    // A shout-out turned off isn't on Today, so it doesn't take a place.
+    if (id === 'banner' && live.filter((p) => extraOn(p, now)).length >= BANNERS_MAX) return { error: 'Today is full of shout-outs.', body: 'Try again in a few hours.' };
     return (
       afford(x.price) || {
         price: x.price,
@@ -203,29 +209,57 @@ export function decideCheck(purchase, status) {
   return { status, refund: status === 'declined' };
 }
 
-// Chat extras running now: glow (name → { at, until }: their messages sent
-// in that time glow), mega (names whose super reactions burst bigger) and
-// banners (Today's shout-outs). rename: purchases keep the name they were
-// bought under.
+const nyClock = (ms) => new Date(ms).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' });
+
+// A chat extra that's on right now: bought, not taken down, its time not run
+// out, and not turned off by the buyer (3.2.7: paused). Every reader of chat
+// extras goes through this, so one turned off is off everywhere.
+export const extraOn = (p, now = Date.now()) => p?.kind === 'extra' && p.status === 'active' && p.until > now && !p.paused;
+
+// Chat extras running now: glow (name → { at, until, offs }: their messages
+// sent in that time glow, except while it was turned off), mega (names whose
+// super reactions burst bigger) and banners (Today's shout-outs). rename:
+// purchases keep the name they were bought under.
 export function activeExtras(purchases = [], now = Date.now(), rename = (n) => n) {
   const out = { glow: new Map(), mega: new Set(), banners: [] };
   for (const p of purchases) {
-    if (p.kind !== 'extra' || p.status !== 'active' || !(p.until > now)) continue;
+    if (!extraOn(p, now)) continue;
     const id = p.item.slice('extra:'.length);
     const who = rename(p.person);
     if (id === 'banner') out.banners.push({ ...p, person: who });
-    else if (id === 'glow') out.glow.set(who, { at: p.at, until: p.until });
+    else if (id === 'glow') out.glow.set(who, { at: p.at, until: p.until, offs: p.offs || [] });
     else if (id === 'mega') out.mega.add(who);
   }
   out.banners.sort((a, b) => a.at - b.at);
   return out;
 }
 // Does this chat message glow (its author bought glowing messages, and sent
-// it while they were on)?
+// it while they were on, not while they were turned off)?
 export const glows = (extras, m) => {
   const g = extras?.glow.get(m.by);
-  return !!g && m.at >= g.at && m.at <= g.until;
+  return !!g && m.at >= g.at && m.at <= g.until && !(g.offs || []).some((o) => m.at >= o.from && m.at < o.to);
 };
+
+// Turning your own chat extra off or back on (3.2.7), while its time hasn't
+// run out. The clock keeps running while it's off, and there's no refund.
+// p: the purchase; on: true to turn it back on. ctx: { aliases (every name
+// the caller has gone by), now, purchases (every live purchase of the same
+// item, for the shout-out limit) }.
+// Returns { patch } to write, { same: true } when it's already that way (so
+// asking twice is fine), or { error }.
+export const OFFS_MAX = 50;
+export function extraSwitchCheck(p, on, { aliases = [], now = Date.now(), purchases = [] } = {}) {
+  if (!p || p.kind !== 'extra') return { error: 'That chat extra is gone.' };
+  if (!aliases.includes(p.person)) return { error: 'That isn’t yours.' };
+  if (p.status !== 'active') return { error: 'Team management took that one down.' };
+  if (!(p.until > now)) return { error: 'It already ran out.' };
+  if (on === !p.paused) return { same: true };
+  if (!on) return { patch: { paused: true, pausedAt: now } };
+  if (p.item === 'extra:banner' && purchases.filter((x) => extraOn(x, now)).length >= BANNERS_MAX)
+    return { error: 'Today is full of shout-outs.', body: 'Try again in a few hours.' };
+  const from = Number(p.pausedAt) || now;
+  return { patch: { paused: false, pausedAt: null, offs: [...(p.offs || []), { from, to: now }].slice(-OFFS_MAX) } };
+}
 // What the market's Play button types in #arcade for a tournament (the game
 // command reads it to play that tournament's seed).
 export const playLine = (t) => `/${TOURNAMENT_GAMES[t.game]?.cmd || t.game} tournament ${t.id}`;

@@ -6,6 +6,8 @@
 //
 // Callables:
 //   buy({ item, text })            pet items, perks, chat extras
+//   buy({ action: 'extraSwitch', id, on })  turn your own chat extra off or
+//                                  back on (no coins move)
 //   joinTournament({ id })         pay the entry, join, add it to the pot
 //   marketManage({ action, … })    team management: approve/decline/redeem a
 //                                  perk, take down a shout-out, start or
@@ -86,8 +88,32 @@ export function marketFunctions({ db, coinData, freshCoins, notify, bankRef, per
     return { ref: db.doc(`pets/${personId(aliases[0])}`), snap: null };
   }
 
+  // Turning your own chat extra off or back on (3.2.7): buy({ action:
+  // 'extraSwitch', id, on }). No coins move, so it works even with coins off
+  // or a loan overdue. Only the buyer (under any name they've gone by), and
+  // asking twice changes nothing.
+  async function extraSwitch({ aliases }, d) {
+    const id = String(d?.id || '');
+    if (!/^[\w-]{1,40}$/.test(id)) return note('Which one?');
+    const on = d?.on === true;
+    const ref = db.doc(`purchases/${id}`);
+    return db.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      const p = snap.exists ? snap.data() : null;
+      const now = Date.now();
+      // Other shout-outs on Today, for the limit when one comes back on.
+      const others = p?.item === 'extra:banner' && on ? (await tx.get(db.collection('purchases').where('item', '==', p.item))).docs.filter((x) => x.id !== id).map((x) => x.data()) : [];
+      const r = market.extraSwitchCheck(p, on, { aliases, now, purchases: others });
+      if (r.error) return note(r.error, r.body);
+      if (r.patch) tx.update(ref, { ...r.patch, ...(r.patch.pausedAt === null && { pausedAt: FieldValue.delete() }) });
+      return { ok: true, on, changed: !r.same };
+    });
+  }
+
   const buy = onCall(OPEN, async (req) => {
-    const { me, data, aliases } = await caller(req);
+    const ctx = await caller(req);
+    if (req.data?.action === 'extraSwitch') return extraSwitch(ctx, req.data);
+    const { me, data, aliases } = ctx;
     if (await coinsOff(me)) return note('🪙 Jackson coins are off right now.');
     const lock = await locked(me);
     if (lock) return lock;
