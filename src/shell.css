@@ -5429,3 +5429,11 @@ button.bs-cell:focus-visible { outline: 2px solid var(--accent); outline-offset:
 .arc-timer.over { visibility: hidden; }
 /* The players line is as tall when nobody's turn is lit (the game over) as during it. */
 .arc-vs > span:not(.arc-betpill) { padding-top: 1px; padding-bottom: 1px; }
+
+/* ---------- Controls → GIFs: look up GIFs without sending them ---------- */
+.gif-lookup { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.gif-lookup .gif-lookup-grid { max-height: none; overflow: visible; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
+.gif-lookup-grid button.on { outline: 3px solid var(--accent); outline-offset: -3px; }
+.gif-lookup-big { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start; padding: 10px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); }
+.gif-lookup-big img { display: block; max-width: min(100%, 420px); max-height: 360px; width: auto; height: auto; border-radius: 10px; }
+.gif-lookup-meta { display: flex; flex-direction: column; gap: 6px; flex: 1 1 180px; min-width: 0; overflow-wrap: anywhere; }

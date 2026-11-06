@@ -336,22 +336,18 @@ async function shrinkEmoji(file) {
   return new File([blob], 'emoji.png', { type: 'image/png' });
 }
 
-// GIF picker: GIPHY search (G-rated) when a key is set, plus uploading your own.
-export function GifPicker({ onPick, onUpload, onClose }) {
-  const [q, setQ] = useState('');
+// GIPHY search (every rating up to R, as team management chose), or trending
+// when the box is empty. Shared by the chat picker and Asher's GIF lookup.
+export function useGifSearch(q, limit = 24) {
   const [results, setResults] = useState([]);
   const [status, setStatus] = useState(GIPHY_API_KEY ? 'loading' : 'off');
-  const upload = useRef(null);
-  useEscape(onClose);
-
   useEffect(() => {
     if (!GIPHY_API_KEY) return;
     const ctrl = new AbortController();
     const t = setTimeout(
       async () => {
         setStatus('loading');
-        // Every rating GIPHY has (up to R), as team management chose.
-        const params = new URLSearchParams({ api_key: GIPHY_API_KEY, limit: '24', rating: 'r' });
+        const params = new URLSearchParams({ api_key: GIPHY_API_KEY, limit: String(limit), rating: 'r' });
         if (q.trim()) params.set('q', q.trim());
         try {
           const res = await fetch(`https://api.giphy.com/v1/gifs/${q.trim() ? 'search' : 'trending'}?${params}`, { signal: ctrl.signal });
@@ -369,7 +365,16 @@ export function GifPicker({ onPick, onUpload, onClose }) {
       clearTimeout(t);
       ctrl.abort();
     };
-  }, [q]);
+  }, [q, limit]);
+  return { results, status };
+}
+
+// GIF picker: GIPHY search when a key is set, plus uploading your own.
+export function GifPicker({ onPick, onUpload, onClose }) {
+  const [q, setQ] = useState('');
+  const { results, status } = useGifSearch(q);
+  const upload = useRef(null);
+  useEscape(onClose);
 
   return (
     <div className="gif-picker">

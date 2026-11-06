@@ -5,6 +5,8 @@ import { Switch } from './Ads.jsx';
 import { FEATURE_GROUPS, LAB_LOG_MODES, offCount } from '../controls.js';
 import { useEscape } from '../util.js';
 import { confirmDialog } from './Dialogs.jsx';
+import { useGifSearch } from './chat/Pickers.jsx';
+import { GIPHY_API_KEY } from '../config.js';
 
 // Asher's Controls (controls.js): turn tabs, channels, and features off for
 // everyone but him, preview what they see, and get to Shutdown and Commands.
@@ -117,6 +119,7 @@ export default function ControlsPage({
               ['channels', 'Channels'],
               ['accounts', 'Accounts'],
               ...(loanSettings ? [['loans', 'Loans']] : []),
+              ...(GIPHY_API_KEY ? [['gifs', 'GIFs']] : []),
             ].map(([id, label]) => (
               <button
                 key={id}
@@ -132,6 +135,7 @@ export default function ControlsPage({
           <div className="ads-body">
             {tab === 'accounts' && <Accounts people={people} account={account} me={me} />}
             {tab === 'loans' && loanSettings}
+            {tab === 'gifs' && <GifLookup />}
             {tab === 'features' && (
               <>
                 {FEATURE_GROUPS.map(([g, label, items]) => group('off', label, items))}
@@ -499,6 +503,73 @@ function Accounts({ people, account, me }) {
           </div>
         );
       })}
+    </section>
+  );
+}
+
+// Look up GIFs just to see them: nothing is sent or saved. Tap one to see it
+// big, with its title, size and a link to copy.
+function GifLookup() {
+  const [q, setQ] = useState('');
+  const [open, setOpen] = useState(null);
+  const [copied, setCopied] = useState(false);
+  const { results, status } = useGifSearch(q, 48);
+  const big = open && (open.images.original || open.images.downsized);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(big.url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      setCopied(false);
+    }
+  };
+  return (
+    <section className="gif-lookup">
+      <p className="muted small">Search GIPHY to look at GIFs. Nothing here is sent to anyone.</p>
+      <input
+        className="input"
+        type="search"
+        value={q}
+        onChange={(e) => {
+          setQ(e.target.value);
+          setOpen(null);
+        }}
+        placeholder="Search GIFs"
+        aria-label="Search GIFs"
+      />
+      {open && (
+        <div className="gif-lookup-big">
+          <img src={big.url} alt={open.title || 'GIF'} width={Number(big.width) || undefined} height={Number(big.height) || undefined} />
+          <div className="gif-lookup-meta">
+            <b>{open.title || 'GIF'}</b>
+            <span className="muted small">
+              {big.width} × {big.height}
+              {big.size ? ` · ${(Number(big.size) / 1e6).toFixed(1)} MB` : ''}
+              {open.rating ? ` · rated ${open.rating.toUpperCase()}` : ''}
+            </span>
+            <div className="row gap">
+              <button className="btn small-btn" onClick={copy}>
+                {copied ? 'Copied' : 'Copy link'}
+              </button>
+              <button className="btn small-btn" onClick={() => setOpen(null)}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      <div className="gif-grid gif-lookup-grid">
+        {results.map((g) => (
+          <button key={g.id} className={open?.id === g.id ? 'on' : ''} onClick={() => setOpen(g)} aria-label={g.title || 'GIF'}>
+            <img src={g.images.fixed_width?.url || g.images.fixed_width_small?.url} alt="" loading="lazy" />
+          </button>
+        ))}
+        {status === 'loading' && !results.length && <p className="muted small">Loading…</p>}
+        {status === 'error' && <p className="muted small">Couldn't reach GIPHY. Check the connection.</p>}
+        {status === 'ready' && !results.length && <p className="muted small">No GIFs found.</p>}
+      </div>
+      <p className="giphy-credit">Powered by GIPHY</p>
     </section>
   );
 }
