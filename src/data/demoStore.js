@@ -732,6 +732,26 @@ if (!state.joinSeeded) {
   state.joinSeeded = 1;
 }
 
+// 3.2.8: older shifts for teammates who come now and then, so two of them
+// (Matthew, 26 days ago, and Ira, 45) are inactive: 3 weeks with no lab time
+// (functions/shared/activity.js). Not in the lab log: these are from before.
+if (!state.inactiveSeeded) {
+  const now = Date.now();
+  const h = 3600000;
+  const s = (person, days, hours, subteam) => {
+    const start = now - days * 86400000 - 3 * h;
+    return { id: uid(), person, start, end: start + hours * h, note: '', subteam, taskIds: [], createdBy: person };
+  };
+  state.shifts = [
+    ...(state.shifts || []),
+    s('Katarina Jurasic', 5, 2, 'Programming'),
+    s('Shrey Kumar', 12, 2.5, 'CAD'),
+    s('Matthew Kuehl', 26, 2, 'CAD'),
+    s('Ira Kumar', 45, 1.5, 'Assembly'),
+  ];
+  state.inactiveSeeded = 1;
+}
+
 // Channel requests waiting for team management (the real ones are made and
 // answered by functions/channels.js; the demo runs the same checks).
 if (!state.channelRequestsSeeded) {
@@ -1278,11 +1298,12 @@ export const demoStore = {
     if (new URLSearchParams(location.search).get('demo') === 'newapp-offline')
       throw new Error('Can’t reach the server right now. Try again in a minute.');
     // Letting a new name in puts them on the Roster; turning them away just
-    // drops the request (the way functions/index.js does it).
+    // drops the request (the way functions/index.js does it). addedAt stands
+    // in for the people doc the server writes (when they joined, activity.js).
     if (action === 'approve' || action === 'turnAway') {
       state.joinRequests = (state.joinRequests || []).filter((r) => r.name !== name);
       if (action === 'approve')
-        state.roles = [...(state.roles || []).filter((r) => r.id !== personId(name)), { id: personId(name), name, removed: false, updatedAt: Date.now(), updatedBy: REQUESTS_TO }];
+        state.roles = [...(state.roles || []).filter((r) => r.id !== personId(name)), { id: personId(name), name, removed: false, addedAt: Date.now(), updatedAt: Date.now(), updatedBy: REQUESTS_TO }];
       commit();
       return { ok: true };
     }
@@ -1478,6 +1499,14 @@ export const demoStore = {
   },
   async saveSettings(patch) {
     state.settings = { ...(state.settings || {}), ...patch };
+    commit();
+  },
+  // Like the real store: settings/team.inactive, one entry per person.
+  async setActiveMode(id, entry) {
+    const inactive = { ...(state.settings?.inactive || {}) };
+    if (entry) inactive[id] = entry;
+    else delete inactive[id];
+    state.settings = { ...(state.settings || {}), inactive };
     commit();
   },
   async saveAdSettings(ads) {

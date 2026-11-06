@@ -54,6 +54,7 @@ import {
 } from './shared/matches.js';
 import { rankingFromApi, teamFromApi } from './shared/scout.js';
 import { asksOn, scheduledCheckinFields } from './shared/checkin.js';
+import { inactiveSet, teamActivity } from './shared/activity.js';
 import { marketFunctions } from './market.js';
 import { coinCheckFunctions } from './coincheck.js';
 import { disputeFunctions } from './disputes.js';
@@ -249,10 +250,14 @@ export const onChatMessage = onDocumentCreated('channels/{channelId}/messages/{m
   const body = messagePreview(m);
 
   const people = new Set([...mentioned]);
-  for (const p of (await db.collection('people').get()).docs) people.add(rename(p.get('name') || ''));
+  const peopleDocs = (await db.collection('people').get()).docs;
+  for (const p of peopleDocs) people.add(rename(p.get('name') || ''));
+  // A required poll asks everyone but inactive members (shared/activity.js),
+  // so they aren't nagged about it either.
+  const skip = announce && m.poll?.required && !m.poll.closed ? await inactiveNames(rename, [...people], peopleDocs) : new Set();
   const notes = [];
   for (const to of people) {
-    if (!to || to === sender || (members && !members.has(to))) continue;
+    if (!to || to === sender || (members && !members.has(to)) || skip.has(to)) continue;
     const wants = level(to, channelId, announce ? 'all' : 'mentions');
     if (wants === 'none') continue;
     if (announce) notes.push({ to, type: 'announcement', title: `Announcement from ${first(sender)}`, body, open, by: sender });
@@ -388,17 +393,41 @@ export const onTaskAssigned = onDocumentWritten('tasks/{taskId}', async (event) 
   );
 });
 
+// Inactive members (shared/activity.js, the same rule as the app): 3 weeks
+// with no lab time, or marked inactive on the Roster. Lab check-ins and
+// required polls don't ask them, so they aren't notified about those. Only
+// those nags: everything else (and their coins) stays the same.
+// names: current names; peopleDocs: the people collection if already read.
+async function inactiveNames(rename, names, peopleDocs = null) {
+  const [shifts, people, roles, team] = await Promise.all([
+    db.collection('shifts').get(),
+    peopleDocs || db.collection('people').get().then((q) => q.docs),
+    db.collection('roles').get(),
+    db.doc('settings/team').get(),
+  ]);
+  const activity = teamActivity(names, {
+    shifts: shifts.docs.map((d) => d.data()),
+    people: people.map((d) => d.data()),
+    roles: roles.docs.map((d) => d.data()),
+    overrides: team.get('inactive') || null,
+    rename,
+  });
+  return inactiveSet(activity);
+}
+
 // A new lab check-in: everyone gets a notification to answer it (the app
-// also asks when it opens).
+// also asks when it opens), but inactive members (above), who aren't asked.
 export const onCheckin = onDocumentCreated('checkins/{id}', async (event) => {
   const c = event.data?.data();
   if (!c) return;
   const rename = await renamer();
   const by = rename(c.by || '');
-  const people = new Set((await db.collection('people').get()).docs.map((p) => rename(p.get('name') || '')));
+  const peopleDocs = (await db.collection('people').get()).docs;
+  const people = new Set(peopleDocs.map((p) => rename(p.get('name') || '')));
+  const away = await inactiveNames(rename, [...people], peopleDocs);
   await notify(
     [...people]
-      .filter((to) => to && to !== by)
+      .filter((to) => to && to !== by && !away.has(to))
       .map((to) => ({
         to,
         type: 'checkin',

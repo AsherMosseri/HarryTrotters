@@ -21,6 +21,7 @@ import { Avatar, CloseIcon } from './common.jsx';
 import { relTime, useEscape } from '../util.js';
 import { confirmDialog } from './Dialogs.jsx';
 import { Icon } from './shell/icons.jsx';
+import { lastLabText } from '../../functions/shared/activity.js';
 
 // Team Management sits under the team name with the subteams below it;
 // Secretary is a support role that hangs off to the side of Team Management.
@@ -28,10 +29,53 @@ const LEAD_GROUP = 'Team Management';
 const STAFF_GROUP = 'Secretary';
 const EMPTY_ROLE = { title: '', subteams: [], responsibilities: [] };
 
+// Inactive members (functions/shared/activity.js): team management can keep
+// someone active or mark them inactive; Automatic follows the 3-week rule.
+const MODES = [
+  ['', 'Automatic'],
+  ['active', 'Keep active'],
+  ['inactive', 'Inactive'],
+];
+// The mode a person is in now: a manual "inactive" they've clocked in since
+// no longer counts, so it shows as Automatic.
+const modeOf = (act) => (act?.override === 'active' ? 'active' : act?.why === 'manual' ? 'inactive' : '');
+const whyText = (act) => (act.why === 'manual' ? 'Marked inactive' : act.lastAt ? 'No lab time for 3 weeks' : 'Hasn’t come to the lab yet');
+
+function StatusField({ act, mode, setMode }) {
+  const note =
+    mode === 'active'
+      ? 'Stays active even with no lab time.'
+      : mode === 'inactive'
+        ? 'Off the leaderboards, and lab check-ins and required polls don’t ask them. Nothing is deleted. Clocking in makes them active again.'
+        : `Inactive after 3 weeks with no lab time.${act?.inactive && act.why === 'auto' ? ' Inactive now.' : ''}`;
+  return (
+    <>
+      <span className="field-label">Status</span>
+      <div className="segmented status-modes" role="radiogroup" aria-label="Status">
+        {MODES.map(([id, label]) => (
+          <button
+            type="button"
+            key={id || 'auto'}
+            role="radio"
+            aria-checked={mode === id}
+            className={`plain-seg${mode === id ? ' on' : ''}`}
+            onClick={() => setMode(id)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      <p className="muted small status-note">
+        {note} {lastLabText(act?.lastAt || 0)}.
+      </p>
+    </>
+  );
+}
+
 // person.isNew = adding someone to the team (asks for their name).
 // Managers' names are the team management list (functions/shared/team.js),
 // so they can't be renamed here.
-function PersonDialog({ person, taken, onClose, onSave, onRemove, onPerson }) {
+function PersonDialog({ person, taken, act, onClose, onSave, onRemove, onPerson }) {
   useEscape(onClose);
   const [name, setName] = useState(person.name || '');
   const canRename = !person.isNew && !isManagerName(person.name);
@@ -44,6 +88,8 @@ function PersonDialog({ person, taken, onClose, onSave, onRemove, onPerson }) {
   const [resp, setResp] = useState((person.responsibilities || []).join('\n'));
   const [grade, setGrade] = useState(person.grade || DEFAULT_GRADE);
   const toggle = (s) => setSubteams(subteams.includes(s) ? subteams.filter((x) => x !== s) : [...subteams, s]);
+  // Team management themselves are never inactive, so no status for them.
+  const [mode, setMode] = useState(modeOf(act));
 
   return (
     <Overlay>
@@ -54,17 +100,20 @@ function PersonDialog({ person, taken, onClose, onSave, onRemove, onPerson }) {
           onSubmit={(e) => {
             e.preventDefault();
             if (!name.trim() || nameError) return;
-            onSave({
-              name: person.isNew || canRename ? cleanName(name) : person.name,
-              removed: false,
-              title: title.trim(),
-              grade,
-              subteams: ORG_GROUPS.filter((s) => subteams.includes(s)),
-              responsibilities: resp
-                .split('\n')
-                .map((r) => r.replace(/^[-•*]\s*/, '').trim())
-                .filter(Boolean),
-            });
+            onSave(
+              {
+                name: person.isNew || canRename ? cleanName(name) : person.name,
+                removed: false,
+                title: title.trim(),
+                grade,
+                subteams: ORG_GROUPS.filter((s) => subteams.includes(s)),
+                responsibilities: resp
+                  .split('\n')
+                  .map((r) => r.replace(/^[-•*]\s*/, '').trim())
+                  .filter(Boolean),
+              },
+              act && mode !== modeOf(act) ? mode : null,
+            );
           }}
         >
           <div className="panel-head">
@@ -150,6 +199,7 @@ function PersonDialog({ person, taken, onClose, onSave, onRemove, onPerson }) {
             onChange={(e) => setResp(e.target.value)}
             placeholder={'Builds and maintains the intake\nKeeps the parts inventory'}
           />
+          {act && <StatusField act={act} mode={mode} setMode={setMode} />}
           <div className="row gap end">
             {onRemove && (
               <button type="button" className="link-btn danger" onClick={onRemove}>
@@ -241,7 +291,63 @@ function JoinRequests({ requests, api }) {
   );
 }
 
-export default function TeamView({ roster, joinRequests = [], roles, tasks, api, isManager, rename, onPerson }) {
+// Team management: people who haven't come to the lab for 3 weeks, or who
+// they marked inactive (functions/shared/activity.js), folded at the bottom.
+// Teammates don't see this; for them the Roster stays as it was.
+function InactiveSection({ people, activity, onEdit, onPerson, onKeep }) {
+  const [busy, setBusy] = useState('');
+  return (
+    <details className="roster-inactive">
+      <summary>
+        <h2 className="team-heading">
+          Inactive <span className="mono">{people.length}</span>
+        </h2>
+      </summary>
+      <p className="muted small">
+        No lab time for 3 weeks, or marked inactive. They’re off the leaderboards, and lab check-ins and required polls don’t ask them. Their
+        account, coins, pets and chats stay. Clocking in makes them active again.
+      </p>
+      <ul className="roster-list">
+        {people.map((p) => {
+          const act = activity.get(p.name);
+          return (
+            <li key={p.name} className="roster-row roster-row-inactive">
+              <button className="roster-pic" onClick={() => onPerson?.(p.name)} aria-label={`${p.name}'s profile`}>
+                <Avatar name={p.name} size={34} />
+              </button>
+              <div className="roster-who">
+                <button className="roster-name" onClick={() => onPerson?.(p.name)}>
+                  {p.name}
+                </button>
+                <span>
+                  {lastLabText(act.lastAt)} · {whyText(act)}
+                </span>
+              </div>
+              <div className="roster-inactive-btns">
+                <button
+                  className="btn small-btn"
+                  disabled={busy === p.name}
+                  onClick={async () => {
+                    setBusy(p.name);
+                    await onKeep(p.name);
+                    setBusy('');
+                  }}
+                >
+                  Keep active
+                </button>
+                <button className="link-btn" onClick={() => onEdit(p)}>
+                  Edit
+                </button>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </details>
+  );
+}
+
+export default function TeamView({ roster, activity = new Map(), joinRequests = [], roles, tasks, api, isManager, rename, onPerson }) {
   const [editing, setEditing] = useState(null);
   const today = todayISO();
 
@@ -256,6 +362,7 @@ export default function TeamView({ roster, joinRequests = [], roles, tasks, api,
       const mine = tasks.filter((t) => t.status !== 'done' && (t.assignees || []).includes(name));
       return {
         name,
+        ...(role.addedAt && { addedAt: role.addedAt }),
         title: role.title || '',
         grade: role.grade || grades[name] || DEFAULT_GRADE,
         subteams: role.subteams || [],
@@ -284,6 +391,12 @@ export default function TeamView({ roster, joinRequests = [], roles, tasks, api,
     );
   };
   const unassigned = people.filter((p) => !p.subteams.length);
+  // Team management: inactive people fold away at the bottom.
+  const actOf = (n) => (isManager && !isManagerName(n) ? activity.get(n) : null);
+  const inactivePeople = isManager
+    ? people.filter((p) => actOf(p.name)?.inactive).sort((a, b) => (actOf(b.name).lastAt || 0) - (actOf(a.name).lastAt || 0))
+    : [];
+  const listed = inactivePeople.length ? people.filter((p) => !actOf(p.name)?.inactive) : people;
 
   return (
     <main className="content team">
@@ -340,7 +453,7 @@ export default function TeamView({ roster, joinRequests = [], roles, tasks, api,
         )}
       </div>
       <ul className="roster-list">
-        {people.map((p) => (
+        {listed.map((p) => (
           <li key={p.name} className="roster-row">
             <button className="roster-pic" onClick={() => onPerson?.(p.name)} aria-label={`${p.name}'s profile`}>
               <Avatar name={p.name} size={34} />
@@ -351,6 +464,7 @@ export default function TeamView({ roster, joinRequests = [], roles, tasks, api,
               </button>
               <span>
                 {p.title || 'Team member'} · {gradeLabel(p.grade)}
+                {actOf(p.name)?.kept && ' · Kept active'}
               </span>
             </div>
             <div className="roster-teams">
@@ -374,10 +488,21 @@ export default function TeamView({ roster, joinRequests = [], roles, tasks, api,
         ))}
       </ul>
 
+      {inactivePeople.length > 0 && (
+        <InactiveSection
+          people={inactivePeople}
+          activity={activity}
+          onEdit={setEditing}
+          onPerson={onPerson}
+          onKeep={(name) => api.setActiveMode(name, 'active')}
+        />
+      )}
+
       {editing && (
         <PersonDialog
           person={editing}
           taken={roster}
+          act={editing.isNew ? null : actOf(editing.name)}
           onClose={() => setEditing(null)}
           onPerson={(n) => {
             setEditing(null);
@@ -408,11 +533,15 @@ export default function TeamView({ roster, joinRequests = [], roles, tasks, api,
                   });
                 }
           }
-          onSave={async (data) => {
+          onSave={async (form, mode) => {
             const p = editing;
             setEditing(null);
+            // When they were added (activity.js gives new people 3 weeks to come).
+            const data = { ...form, addedAt: p.isNew ? Date.now() : p.addedAt };
+            if (!data.addedAt) delete data.addedAt;
             if (p.isNew || data.name === p.name) await api.saveRole(data);
             else await api.renamePerson(p.name, data.name, data);
+            if (mode !== null) await api.setActiveMode(data.name, mode);
           }}
         />
       )}

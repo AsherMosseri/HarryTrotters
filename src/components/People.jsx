@@ -26,6 +26,7 @@ import DecorationEditor from './DecorationEditor.jsx';
 import { DEFAULT_DECO } from './decoRender.jsx';
 import { PopupAds } from './Ads.jsx';
 import { Icon } from './shell/icons.jsx';
+import { lastLabText } from '../../functions/shared/activity.js';
 
 const STATUS_IDEAS = [
   ['🔧', 'At the lab'],
@@ -346,7 +347,9 @@ export function StreakLine({ streak }) {
   );
 }
 
-export function ProfileCard({ name, actor, tasks, streak, onClose, onMessage, onEdit, onFull }) {
+// activity: team management only (functions/shared/activity.js), so an
+// inactive teammate shows as that, quietly, to them and nobody else.
+export function ProfileCard({ name, actor, tasks, streak, activity = null, onClose, onMessage, onEdit, onFull }) {
   useEscape(onClose);
   const people = usePeople();
   const me = name === actor.name;
@@ -365,6 +368,11 @@ export function ProfileCard({ name, actor, tasks, streak, onClose, onMessage, on
             <CloseIcon />
           </button>
           <CardBody name={name} actor={actor} tasks={tasks} streak={streak}>
+            {activity?.inactive && (
+              <p className="pp-inactive muted small" title="Only team management sees this">
+                Inactive · {lastLabText(activity.lastAt)}
+              </p>
+            )}
             {onFull && (
               <button className="link-btn small pc-full" onClick={onFull}>
                 View full profile <Icon name="chevron" size={14} />

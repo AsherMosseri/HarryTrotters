@@ -104,6 +104,7 @@ import { hoursOf, mergedMs } from '../../functions/shared/hours.js';
 import { teamDay } from '../../functions/shared/coins.js';
 import { hasLabel, newBattery, putOnRobot, statusPatch } from '../batteries.js';
 import { streaksOf } from '../../functions/shared/streaks.js';
+import { inactiveSet, overrideEntry, teamActivity } from '../../functions/shared/activity.js';
 import { confirmDialog } from './Dialogs.jsx';
 import { LoanSettings, loanLines, useLoans } from './Loans.jsx';
 import { openLoanForm } from '../loanCommand.js';
@@ -1145,6 +1146,20 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
     const timer = setTimeout(() => setNow(Date.now()), Math.max(250, next - t + 50));
     return () => clearTimeout(timer);
   }, [presence, now]);
+  // Inactive members (functions/shared/activity.js, the same rule as the
+  // server): 3 weeks with no lab time, or marked on the Roster. They drop off
+  // the leaderboards and the check-in's "hasn't answered", and check-ins and
+  // required polls don't ask them. Rechecked each minute.
+  const minute = Math.floor(now / 60000) * 60000;
+  const activity = useMemo(
+    () => teamActivity(roster, { shifts, people, roles, overrides: settings.inactive, rename, now: minute }),
+    [roster, shifts, people, roles, settings.inactive, rename, minute],
+  );
+  const inactiveKey = [...inactiveSet(activity)].sort().join('\n');
+  const inactive = useMemo(() => new Set(inactiveKey ? inactiveKey.split('\n') : []), [inactiveKey]);
+  const meInactive = inactive.has(actor.name);
+  // The people the leaderboards rank (you're always on your own).
+  const ranked = useMemo(() => roster.filter((n) => !inactive.has(n) || n === actor.name), [roster, inactive, actor.name]);
   const online = useMemo(() => {
     const out = new Set();
     for (const p of presence) if (p.name && (p.at || 0) > now - ONLINE_MS) out.add(rename(p.name));
@@ -1228,6 +1243,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
   const skipInPreview = actor.preview ? (key) => () => setPreviewSkipped((list) => [...list, key]) : null;
   const pendingCheckin =
     controls.isOn('checkins') &&
+    !meInactive &&
     checkins.find(
       (c) =>
         c.date === today &&
@@ -1314,7 +1330,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
   // A required poll in #announcements this person hasn't voted on yet (asked
   // when they open the app, like a lab check-in).
   const pendingPoll = useMemo(() => {
-    if (!controls.isOn('requiredPolls') || !controls.isOn('polls') || !controls.channelOn('announcements')) return null;
+    if (meInactive || !controls.isOn('requiredPolls') || !controls.isOn('polls') || !controls.channelOn('announcements')) return null;
     return (chat.announcements || []).find(
       (m) =>
         m.poll?.required &&
@@ -1324,7 +1340,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
         !hasAnswered(m, actor.name, rename) &&
         !previewSkipped.includes(`poll:${m.id}`),
     );
-  }, [chat, actor.name, rename, controls, previewSkipped]);
+  }, [chat, actor.name, rename, controls, previewSkipped, meInactive]);
 
   // Mark the open channel read while it's on screen.
   useEffect(() => {
@@ -1423,6 +1439,8 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
           )
           .catch(fail),
       saveRole: (data) => store.saveRole(personId(data.name), data, actor).catch(fail),
+      // Roster: 'inactive', 'active' (keep active), or '' (back to the 3-week rule).
+      setActiveMode: (name, mode) => store.setActiveMode(personId(name), overrideEntry(name, mode, actor.name), actor).catch(fail),
       // Team management: let a new name in, or turn it away (the account function).
       answerJoin: async (name, approve) => {
         try {
@@ -2342,8 +2360,10 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
       const b = coinData.bank[name];
       return { balance: w.balance, earned: w.earned, casino: b?.net || 0, stats: b?.stats || {} };
     },
+    // Inactive members aren't on it (functions/shared/activity.js).
     richest: () =>
       roster
+        .filter((n) => !inactive.has(n))
         .map((n) => ({ name: n, coins: walletOf(n).balance }))
         .sort((a, b) => b.coins - a.coins)
         .slice(0, 10),
@@ -3087,6 +3107,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
                     onOpenMine={() => setShiftPanel(true)}
                     onOpenTask={setOpenId}
                     checkins={upcomingCheckins}
+                    inactive={inactive}
                     checkinSchedule={settings.checkinSchedule}
                     gradeOf={gradeOf}
                     requests={shiftRequests}
@@ -3160,6 +3181,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
                 ) : view === 'team' ? (
                   <TeamView
                     roster={roster}
+                    activity={activity}
                     joinRequests={joinRequests}
                     roles={roles}
                     tasks={tasks}
@@ -3442,6 +3464,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
                     actor={actor}
                     tasks={tasks || []}
                     streak={streaksOf(profileFor, namedShifts)}
+                    activity={actor.admin ? activity.get(profileFor) : null}
                     onClose={() => {
                       const n = profileFor;
                       setProfileFor(null);
@@ -3495,6 +3518,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
                     actor={actor}
                     tasks={tasks || []}
                     shifts={namedShifts}
+                    activity={actor.admin ? activity.get(fullProfileFor) : null}
                     joinedAt={TEAM_STARTED}
                     lastSeen={lastSeenOf(fullProfileFor)}
                     notes={notes}
@@ -3595,6 +3619,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
               actor={actor}
               wallet={myWallet}
               roster={roster}
+              ranked={ranked}
               data={coinData}
               cfg={coinCfg}
               onGift={(g) => api.play({ action: 'gift', ...g })}

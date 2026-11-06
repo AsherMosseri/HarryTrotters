@@ -226,7 +226,7 @@ function Names({ names }) {
 // available shows that (and the reason) instead of who's going; answers
 // given for it are kept but don't count while it's off. Team management can
 // mark a time not available here, or turn it back on (onOff).
-export function CheckinCard({ checkin, roster, gradeOf, me, isManager, rename, onAnswer, onDelete, onOff }) {
+export function CheckinCard({ checkin, roster, inactive = null, gradeOf, me, isManager, rename, onAnswer, onDelete, onOff }) {
   const [changing, setChanging] = useState(false);
   const [editingOff, setEditingOff] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -237,7 +237,9 @@ export function CheckinCard({ checkin, roster, gradeOf, me, isManager, rename, o
   const done = (n) => answeredAll(checkin, answers.get(n));
   const yes = (slot) => [...answers].filter(([, a]) => a[slot] === true).map(([n]) => n);
   const no = open.length ? [...answers].filter(([n, a]) => done(n) && open.every((s) => !a[s])).map(([n]) => n) : [];
-  const waiting = open.length ? roster.filter((n) => !done(n)) : [];
+  // Inactive members (functions/shared/activity.js) aren't asked, so they
+  // aren't waited on either. Their answer still shows if they give one.
+  const waiting = open.length ? roster.filter((n) => !done(n) && !inactive?.has(n)) : [];
   const setOff = async (slot, reason) => {
     setBusy(true);
     await onOff(slot, reason);

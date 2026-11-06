@@ -953,6 +953,8 @@ async function applyOff(api, checkins, changes) {
 }
 const shortDay = (d) => parseDay(d).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 
+const NO_ONE = new Set();
+
 export default function ShiftsView({
   shifts,
   plans,
@@ -966,6 +968,9 @@ export default function ShiftsView({
   onOpenMine,
   onOpenTask,
   checkins = [],
+  // Inactive members (functions/shared/activity.js): off the hours board and
+  // the check-in's "hasn't answered".
+  inactive = NO_ONE,
   checkinSchedule,
   gradeOf,
   requests = [],
@@ -998,8 +1003,8 @@ export default function ShiftsView({
   const totals = useMemo(() => {
     const m = msByPerson(all, now, (s) => inPeriod(s, hoursPeriod === 'all' ? 'all' : 'week'));
     if (!m.has(me)) m.set(me, 0);
-    return [...m].sort((a, b) => b[1] - a[1]);
-  }, [all, hoursPeriod, now, me]);
+    return [...m].filter(([n]) => n === me || !inactive.has(n)).sort((a, b) => b[1] - a[1]);
+  }, [all, hoursPeriod, now, me, inactive]);
   const goalMs = (Number(goal) || 0) * HOUR;
   const barMax = hoursPeriod === 'all' && goalMs ? goalMs : Math.max(...totals.map(([, v]) => v), HOUR);
   const myAll = msOf(me, all, now);
@@ -1100,6 +1105,7 @@ export default function ShiftsView({
           key={c.id}
           checkin={c}
           roster={roster}
+          inactive={inactive}
           gradeOf={gradeOf}
           me={me}
           isManager={isManager}
