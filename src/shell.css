@@ -5681,3 +5681,7 @@ button.bs-cell:focus-visible { outline: 2px solid var(--accent); outline-offset:
   display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 8px 12px; margin: 4px 0; border-radius: 10px; border: 1px solid var(--border);
   background: var(--surface-2); color: var(--text); font: inherit; font-weight: 600; text-align: left; cursor: pointer;
 }
+
+/* Checklists (3.2.8): the item's words are a tap target that checks it. */
+.cl-text-btn { display: block; text-align: left; white-space: pre-wrap; overflow-wrap: anywhere; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.cl-text-btn:focus { background: none; border-color: transparent; box-shadow: none; }
