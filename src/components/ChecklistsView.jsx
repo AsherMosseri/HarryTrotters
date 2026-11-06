@@ -97,6 +97,22 @@ function Grip({ id, handle, label, onKey, hidden }) {
   );
 }
 
+// Item text boxes keep their height right when their width changes (a
+// badge appears, the screen turns): one observer for all of them.
+const fitBox = (el) => {
+  el.style.height = 'auto';
+  el.style.height = `${el.scrollHeight}px`;
+};
+const sizer = typeof ResizeObserver === 'function' ? new ResizeObserver((entries) => entries.forEach((e) => fitBox(e.target))) : null;
+function useFit(ref) {
+  useEffect(() => {
+    const el = ref.current?.querySelector('textarea');
+    if (!el || !sizer) return;
+    sizer.observe(el);
+    return () => sizer.unobserve(el);
+  });
+}
+
 // ---------- one item ----------
 function ItemRow({ list, item, round, api, canDrag, drop, onDetails, task, onOpenTask, flash }) {
   const { ref, handle, dragging } = useDragRow(`i:${list.id}:${item.id}`, { type: 'item', listId: list.id, itemId: item.id, secId: item.section || '' }, !canDrag);
@@ -107,9 +123,14 @@ function ItemRow({ list, item, round, api, canDrag, drop, onDetails, task, onOpe
     if (await confirmDialog({ title: 'Remove this item?', body: 'You cleared its text.', okLabel: 'Remove', danger: true })) api.removeChecklistItem(list, item);
     else setVer((v) => v + 1);
   };
+  const box = useRef(null);
+  useFit(box);
   return (
     <li
-      ref={ref}
+      ref={(el) => {
+        box.current = el;
+        ref(el);
+      }}
       data-flip={item.id}
       data-item={item.id}
       data-drop={`i:${list.id}:${item.id}`}
