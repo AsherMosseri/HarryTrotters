@@ -4,6 +4,20 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '3.2.9',
+    date: '2026-11-07',
+    title: 'Works offline, and inactive teammates',
+    items: [
+      'Works offline at the venue: checklists, check-ins, polls, chat messages, the match log, tasks and more save on your phone and send by themselves when the Wi-Fi is back.',
+      'A small strip shows when you’re offline and how many changes are waiting (“Offline · 3 changes waiting to send”), then “Back online · sent”.',
+      'The app opens with no connection at all, showing the last schedule, checklists and chat you had. Open it once on good Wi-Fi before the event.',
+      'Coins, games, the Market and loans say “Needs a connection” when you’re offline instead of spinning.',
+      'A chat photo sent with no connection stays in the message box until you’re back online, so it isn’t lost.',
+      'Teammates who haven’t been to the lab in 3 weeks are now inactive: they drop off the coin and hours leaderboards, and lab check-ins and required polls don’t ask them. Nothing of theirs is deleted. Clock in and you’re active again right away.',
+      'Team management: the Roster folds inactive people away at the bottom with when they last came, and Edit has a Status to keep someone active or mark them inactive.',
+    ],
+  },
+  {
     version: '3.2.8',
     date: '2026-11-06',
     title: 'Checklists, rebuilt',
