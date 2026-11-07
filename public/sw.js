@@ -183,7 +183,7 @@ async function page(event) {
   const cache = await current();
   if (!cache) return fetch(req); // no copy (kill switch, or still installing)
   event.waitUntil(killCheck(false));
-  const saved = () => cache.match(SCOPE, { ignoreSearch: true });
+  const saved = () => cache.match(SCOPE, { ignoreSearch: true, ignoreVary: true });
   // A plain update (?v=) is asked for by hand: give the network longer.
   const wait = new URL(req.url).searchParams.has('v') ? SLOW * 2 : SLOW;
   try {
@@ -202,7 +202,9 @@ async function page(event) {
 async function file(req, url) {
   const cache = await current();
   if (!cache) return fetch(req);
-  const hit = await cache.match(req, { ignoreSearch: true });
+  // ignoreVary: a host that answers "Vary: Origin" (vite preview does) would
+  // otherwise never match the page's own script requests, which carry an Origin.
+  const hit = await cache.match(req, { ignoreSearch: true, ignoreVary: true });
   if (hit) return hit;
   const res = await fetch(req);
   // Something from this build that wasn't in the list: keep it for next time.
