@@ -394,6 +394,10 @@ const PATHS = {
     </>
   ),
   play: <path d="M6.5 4.2v11.6l9.3-5.8z" />,
+  // A drag handle (Checklists): two columns of dots.
+  grip: <path d="M7.5 5h.01M12.5 5h.01M7.5 10h.01M12.5 10h.01M7.5 15h.01M12.5 15h.01" strokeWidth="2.6" />,
+  // History (Checklists): a clock with an arrow going back.
+  history: <path d="M3.5 10a6.5 6.5 0 1 0 1.9-4.6M3.5 3.8v2.7h2.7M10 6.5V10l2.3 1.5" />,
   pause: <path d="M7 4.5v11M13 4.5v11" />,
   mic: (
     <>

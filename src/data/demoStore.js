@@ -11,6 +11,7 @@ import {
 } from './diff.js';
 import { STARTER_CHECKLISTS, isQueueChecklist, starterItems } from '../checklists.js';
 import { matchId, matchLabel } from '../../functions/shared/matches.js';
+import * as CL from '../../functions/shared/checklists.js';
 import { REQUESTS_TO } from '../config.js';
 import { deliver } from '../adOrders.js';
 import * as casino from '../../functions/shared/casino.js';
@@ -717,6 +718,85 @@ function seedDemoBatteries() {
   ];
 }
 
+// ---------- checklists 3.3: what the server does on the real board ----------
+// (functions/checklists.js): a note to someone given an item, the run saved
+// and ticks cleared by auto-reset, runs trimmed to RUNS_KEPT, and an item
+// ticked when the task made from it is done.
+function editChecklist(id, fields = {}, remove = []) {
+  const before = (state.checklists || []).find((c) => c.id === id);
+  if (!before) return;
+  const after = CL.applyFields(before, fields, remove);
+  state.checklists = state.checklists.map((c) => (c.id === id ? after : c));
+  const keys = new Set(state.checklistAssigns || []);
+  for (const { item, who, by } of CL.newAssignees(before, after)) {
+    const key = `${item.id}_${who}_${item.assignedAt || 0}`;
+    if (keys.has(key)) continue;
+    keys.add(key);
+    if (who === by) continue;
+    state.inbox = [
+      {
+        id: uid(),
+        type: 'checklist',
+        title: `${(by || 'Someone').split(' ')[0]} gave you a checklist item`,
+        body: `${item.text} · ${after.title}`,
+        open: `checklist:${id}/${item.id}`,
+        at: Date.now(),
+        read: false,
+        to: who,
+      },
+      ...(state.inbox || []),
+    ];
+  }
+  state.checklistAssigns = [...keys].slice(-500);
+  commit();
+}
+function addDemoRun(listId, run) {
+  const runs = [run, ...(state.checklistRuns?.[listId] || []).filter((r) => r.id !== run.id)].sort((a, b) => b.at - a.at);
+  state.checklistRuns = { ...state.checklistRuns, [listId]: runs.slice(0, CL.RUNS_KEPT) };
+}
+let demoTickTimer = null;
+function demoChecklistTick() {
+  if (!demoTickTimer && typeof setInterval === 'function') demoTickTimer = setInterval(demoChecklistTick, 60000);
+  const now = Date.now();
+  const today = teamDay(now);
+  const lists = state.checklists || [];
+  const round = CL.currentRound({ matches: state.matches || [], settings: state.settings || {}, checklists: lists, now });
+  let changed = false;
+  state.checklists = lists.map((c) => {
+    const due = CL.dailyDue(c, today);
+    if (due === 'stamp') return (changed = true), { ...c, lastReset: today };
+    if (due === 'reset') {
+      changed = true;
+      const items = Object.values(c.items || {});
+      if (items.some((i) => i.done)) addDemoRun(c.id, { id: CL.dayRunId(c.lastReset), ...CL.runRecord(c, { at: now, reason: 'daily' }) });
+      return { ...CL.applyFields(c, CL.uncheckFields(items)), lastReset: today };
+    }
+    let next = c;
+    for (const [r, items] of Object.entries(CL.staleRounds(c, round, now))) {
+      changed = true;
+      const m = (state.matches || []).find((x) => x.id === r);
+      addDemoRun(c.id, { id: CL.roundRunId(r, items), ...CL.runRecord(next, { at: now, reason: 'match', round: r, label: m?.label || '' }) });
+      next = CL.applyFields(next, CL.uncheckFields(items));
+    }
+    return next;
+  });
+  if (changed) commit();
+}
+function demoTaskDone(task, by) {
+  const ref = task?.fromList;
+  if (!ref?.item) return;
+  const list = (state.checklists || []).find((c) => c.items?.[ref.item]);
+  const item = list?.items[ref.item];
+  const round = CL.currentRound({ matches: state.matches || [], settings: state.settings || {}, checklists: state.checklists, now: Date.now() });
+  if (!item || CL.isDone(list, item, round)) return;
+  editChecklist(list.id, {
+    [`items.${item.id}.done`]: true,
+    [`items.${item.id}.doneBy`]: by,
+    [`items.${item.id}.doneAt`]: Date.now(),
+    [`items.${item.id}.doneRound`]: round,
+  });
+}
+
 let state;
 try {
   state = JSON.parse(localStorage.getItem(KEY)) || seed();
@@ -1394,6 +1474,8 @@ export const demoStore = {
     const log = (state.activity[id] ||= []);
     for (const c of changes) log.push({ id: uid(), ...c, by: actor.name, at: now });
     commit();
+    // The server ticks the checklist item a task was made from (onTaskChecklist).
+    if (patch.status === 'done' && prev?.status !== 'done') demoTaskDone(state.tasks.find((t) => t.id === id), actor.name);
   },
 
   async trashTask(id, actor, restore = false) {
@@ -3127,6 +3209,7 @@ export const demoStore = {
     commit();
   },
   subscribeChecklists(cb) {
+    demoChecklistTick();
     return listen(() => cb((state.checklists || []).map((c) => ({ ...c, items: { ...c.items } }))));
   },
   async createChecklist(data, actor) {
@@ -3140,31 +3223,56 @@ export const demoStore = {
     commit();
   },
   async setChecklistItem(id, item) {
-    state.checklists = state.checklists.map((c) => (c.id === id ? { ...c, items: { ...c.items, [item.id]: item } } : c));
-    commit();
+    editChecklist(id, { [`items.${item.id}`]: item });
   },
   async patchChecklistItems(id, patches) {
-    state.checklists = state.checklists.map((c) => {
-      if (c.id !== id) return c;
-      const items = { ...c.items };
-      for (const [itemId, patch] of Object.entries(patches)) items[itemId] = { ...items[itemId], ...patch };
-      return { ...c, items };
-    });
-    commit();
+    const fields = {};
+    for (const [itemId, patch] of Object.entries(patches)) for (const [k, v] of Object.entries(patch)) fields[`items.${itemId}.${k}`] = v;
+    editChecklist(id, fields);
   },
   async removeChecklistItem(id, itemId) {
-    state.checklists = state.checklists.map((c) => {
-      if (c.id !== id) return c;
-      const items = { ...c.items };
-      delete items[itemId];
-      return { ...c, items };
-    });
-    commit();
+    editChecklist(id, {}, [`items.${itemId}`]);
   },
   async deleteChecklist(id) {
     state.checklists = state.checklists.filter((c) => c.id !== id);
+    if (state.checklistRuns) delete state.checklistRuns[id];
     commit();
   },
+  // 3.3 (the same writes as the real store; the server's parts are in
+  // demoChecklistTick and editChecklist below).
+  async saveChecklistFields(id, fields = {}, remove = []) {
+    editChecklist(id, fields, remove);
+  },
+  async moveChecklistItem(fromId, toId, item, fields = {}) {
+    state.checklists = state.checklists.map((c) => (c.id === fromId ? CL.applyFields(c, {}, [`items.${item.id}`]) : c));
+    editChecklist(toId, { ...fields, [`items.${item.id}`]: item });
+  },
+  async orderChecklists(orders) {
+    state.checklists = state.checklists.map((c) => (orders[c.id] !== undefined ? { ...c, order: orders[c.id] } : c));
+    commit();
+  },
+  saveChecklistRun(listId, run, fields = {}) {
+    const id = uid();
+    addDemoRun(listId, { id, ...run });
+    editChecklist(listId, fields);
+    return { id, done: Promise.resolve() };
+  },
+  async deleteChecklistRun(listId, runId) {
+    state.checklistRuns = { ...state.checklistRuns, [listId]: (state.checklistRuns?.[listId] || []).filter((r) => r.id !== runId) };
+    commit();
+  },
+  subscribeChecklistRuns(listId, cb) {
+    return listen(() => cb([...(state.checklistRuns?.[listId] || [])].sort((a, b) => b.at - a.at)));
+  },
+  async uploadChecklistPhoto(itemId, { thumb, width, height }, actor) {
+    const dataUrl = await new Promise((resolve) => {
+      const r = new FileReader();
+      r.onload = () => resolve(r.result);
+      r.readAsDataURL(thumb);
+    });
+    return { id: uid(), path: `checklists/${itemId}/demo`, url: dataUrl, thumbUrl: dataUrl, width, height, by: actor.name, at: Date.now() };
+  },
+  async deleteChecklistPhoto() {},
 
   subscribeRuns(cb) {
     return listen(() => cb([...(state.runs || [])]));

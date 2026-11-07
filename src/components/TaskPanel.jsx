@@ -236,7 +236,7 @@ function Activity({ items, milestoneName }) {
   );
 }
 
-export default function TaskPanel({ task, api, roster, milestones = [], parts = [], onClose }) {
+export default function TaskPanel({ task, api, roster, milestones = [], parts = [], onClose, onOpenChecklist }) {
   const myParts = parts.filter((p) => p.taskId === task.id);
   const milestoneName = (id) => milestones.find((m) => m.id === id)?.title || 'a deleted milestone';
   const [activity, setActivity] = useState([]);
@@ -413,6 +413,17 @@ export default function TaskPanel({ task, api, roster, milestones = [], parts = 
               placeholder="Details, steps, measurements… (saves when you tap away)"
               onSave={(description) => set({ description })}
             />
+
+            {/* Made from a checklist item (Checklists, Make it a task): finishing the task checks it. */}
+            {task.fromList?.item && (
+              <button className="task-from-list" onClick={() => onOpenChecklist?.(task.fromList)}>
+                <Icon name="checklists" size={16} />
+                <span className="grow">
+                  From the “{task.fromList.title || 'checklist'}” checklist
+                  <span className="muted small"> · done here checks it there</span>
+                </span>
+              </button>
+            )}
 
             <TaskChecklist items={task.checklist || []} onChange={(checklist) => set({ checklist })} />
 

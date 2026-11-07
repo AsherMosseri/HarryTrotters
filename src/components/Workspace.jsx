@@ -111,6 +111,7 @@ import { openLoanForm } from '../loanCommand.js';
 import { RequestForms } from './RequestForms.jsx';
 import { CoinFormatSetting } from './CoinNum.jsx';
 import { coinStyled } from '../coinFormat.js';
+import { checklistApi } from '../checklistApi.js';
 
 // Versions were renumbered once (2.0 became 1.9, 2.1 became 2.0, and so
 // on). Move this device's "last seen" version along so What's new doesn't
@@ -506,6 +507,7 @@ function matchesFilters(t, filters, me, view) {
 const TRASH_DAYS = 30;
 const CHAT_PAGE = 60;
 
+const EMPTY_PINS = [];
 const EMPTY_FILTERS = { q: '', person: '', subteam: '', priority: '', statuses: [], hideDone: false, dueBefore: '' };
 
 // What components deep in the app read: people (profiles, who's online) and the lab log.
@@ -537,6 +539,8 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
   const [roles, setRoles] = useState([]);
   const [parts, setParts] = useState([]);
   const [checklists, setChecklists] = useState([]);
+  const checklistsRef = useRef(checklists);
+  checklistsRef.current = checklists;
   const [rawRuns, setRuns] = useState([]);
   const [robot, setRobot] = useState({ versions: [], pins: [], layouts: [] });
   const [rawChat, setChat] = useState({}); // { [channelId]: newest messages }
@@ -684,7 +688,12 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
       .catch((e) => console.warn('move hidden tabs', e));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [exempt, settings.hiddenTabs]);
-  const tabOrder = profileDocs.find((d) => d.id === personId(actor.name))?.tabOrder;
+  const myProfileDoc = profileDocs.find((d) => d.id === personId(actor.name));
+  const tabOrder = myProfileDoc?.tabOrder;
+  // Checklists pinned to your Today (Checklists tab), like your tab order.
+  const pinnedChecklists = myProfileDoc?.pinnedChecklists || EMPTY_PINS;
+  const pinsRef = useRef(pinnedChecklists);
+  pinsRef.current = pinnedChecklists;
   // Phones: Today is always the first tab; then your order (Edit tabs), or
   // Board, Chat, Shifts, Parts when you haven't set one.
   const order = phone ? [...new Set(['today', ...(tabOrder || ['board', 'chat', 'shifts', 'parts'])])] : tabOrder || [];
@@ -1508,15 +1517,6 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
       saveDiagram: (data) => store.saveDiagram('electrical', data, actor),
       renameChecklist: (list, title) => store.renameChecklist(list.id, title).catch(fail),
       setChecklistItem: (list, item) => store.setChecklistItem(list.id, item).catch(fail),
-      toggleChecklistItem: (list, item, done) =>
-        store
-          .patchChecklistItems(list.id, { [item.id]: { done, doneBy: done ? actor.name : '', doneAt: done ? Date.now() : null } })
-          .catch(fail),
-      uncheckAll: (list, items) =>
-        store
-          .patchChecklistItems(list.id, Object.fromEntries(items.map((i) => [i.id, { done: false, doneBy: '', doneAt: null }])))
-          .catch(fail),
-      removeChecklistItem: (list, item) => store.removeChecklistItem(list.id, item.id).catch(fail),
       deleteChecklist: (list) => store.deleteChecklist(list.id).catch(fail),
       createRun: (data) => store.createRun(data, actor).catch(fail),
       uploadRobotVersion: (file, meta, onProgress) =>
@@ -1805,9 +1805,22 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
       autoRun: (req) => store.autoRun(req, actor),
       subscribeQuizReports: (cb) => store.subscribeQuizReports(cb),
       handleQuizReport: (id, status) => store.handleQuizReport(id, status, actor).catch(fail),
+      // Checklists 3.3: moves, sections, people, photos, runs, pins (checklistApi.js).
+      ...checklistApi({
+        store,
+        actor,
+        fail,
+        toast: setToast,
+        lists: checklistsRef,
+        createTask: (data) => apiRef.current.create(data),
+        pins: pinsRef,
+        savePins: (ids) => store.saveProfile(actor.name, { pinnedChecklists: ids }).catch(fail),
+      }),
     }),
     [store, actor, fail, ok, quiet, setFilters, renames, rename, privateDocs],
   );
+  const apiRef = useRef(api);
+  apiRef.current = api;
 
   const filtered = useMemo(
     () => (tasks || []).filter((t) => matchesFilters(t, filters, actor.name, view)),
@@ -1988,6 +2001,8 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
   const [coinsTab, setCoinsTab] = useState('wallet');
   // Which loan a notification or Today line opened (Loans.jsx scrolls to it).
   const [loanFocus, setLoanFocus] = useState(null);
+  // The checklist item a notification or a task opened (ChecklistsView scrolls to it).
+  const [checklistFocus, setChecklistFocus] = useState(null);
   useEffect(() => (store.subscribeDisputes ? store.subscribeDisputes(actor, setDisputes) : undefined), [store, actor.name, actor.admin]);
   const openDisputes = ownsReports ? disputes.filter((x) => x.status === 'open').length : 0;
   const myDisputes = useMemo(() => disputes.filter((x) => x.by === actor.name), [disputes, actor.name]);
@@ -2012,6 +2027,11 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
         setChatChannel(id);
         setView('chat');
       } else if (kind === 'view') setView(id);
+      // A checklist item someone gave you: 'checklist:<list>/<item>'.
+      else if (kind === 'checklist') {
+        setChecklistFocus({ id, at: Date.now() });
+        setView('checklists');
+      }
       else if (kind === 'loans') {
         setLoanFocus(id || null);
         setCoinsTab('loans');
@@ -2931,6 +2951,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
                     matches={matches}
                     batteries={batteries}
                     checklists={checklists}
+                    pinned={pinnedChecklists}
                     roster={roster}
                     joinRequests={joinRequests}
                     chanWaiting={requestsOn ? chanWaiting : 0}
@@ -3033,7 +3054,19 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
                     )}
                   </div>
                 ) : view === 'checklists' ? (
-                  <ChecklistsView checklists={checklists} api={api} isManager={actor.admin} />
+                  <ChecklistsView
+                    checklists={checklists}
+                    api={api}
+                    actor={actor}
+                    isManager={actor.admin}
+                    roster={roster}
+                    tasks={tasks || []}
+                    matches={matches}
+                    settings={settings}
+                    pinned={pinnedChecklists}
+                    focus={checklistFocus}
+                    onOpenTask={setOpenId}
+                  />
                 ) : view === 'chat' && !currentConv ? (
                   <main className="content">
                     <p className="muted empty-note">No channels right now.</p>
@@ -3218,6 +3251,10 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
                     onClose={() => {
                       setOpenId(null);
                       goBack('task', openTask.id);
+                    }}
+                    onOpenChecklist={(ref) => {
+                      setOpenId(null);
+                      goTo(`checklist:${ref.list}/${ref.item}`);
                     }}
                   />
                 )}

@@ -498,9 +498,39 @@ service cloud.firestore {
     match /parts/{id} {
       allow read, write: if isMember();
     }
+    // Anyone on the team edits checklists. Team management deletes them, and
+    // whoever made one can delete it in its first 10 minutes (the Undo after
+    // Duplicate, or a list made by mistake).
     match /checklists/{id} {
       allow read, create, update: if isMember();
-      allow delete: if isManager();
+      allow delete: if isManager() || (isMember() && isMe(resource.data.get('createdBy', ''))
+        && resource.data.get('createdAt', null) is timestamp
+        && request.time < resource.data.createdAt + duration.value(10, 'm'));
+
+      // Past runs (Uncheck all saves one first; the server saves the daily
+      // and per-match ones). Nobody edits a run. Team management deletes
+      // them, and the person who saved one can take it back for 10 minutes
+      // (the Undo after Uncheck all).
+      match /history/{runId} {
+        function validRun(d) {
+          return d.keys().hasOnly(['title', 'at', 'by', 'reason', 'round', 'label', 'total', 'done', 'items'])
+            && isMe(d.by) && d.reason == 'manual'
+            && d.at is int && d.at <= request.time.toMillis() + 300000
+            && d.title is string && d.title.size() <= 120
+            && d.round is string && d.round.size() <= 120 && d.label is string && d.label.size() <= 40
+            && d.total is int && d.done is int && d.done >= 0 && d.done <= d.total
+            && d.items is list && d.items.size() == d.total && d.items.size() <= 300;
+        }
+        allow read: if isMember();
+        allow create: if isMember() && validRun(request.resource.data);
+        allow update: if false;
+        allow delete: if isManager()
+          || (isMember() && isMe(resource.data.by) && request.time.toMillis() < resource.data.at + 600000);
+      }
+    }
+    // Who's been told about a checklist item given to them: the server only.
+    match /checklistAssigns/{id} {
+      allow read, write: if false;
     }
 
     // Resources tab. Team links: anyone adds; the person who added one, or

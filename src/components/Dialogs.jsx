@@ -29,7 +29,8 @@ function settle(item, value) {
   item.resolve(value);
 }
 
-// { title, body, okLabel = 'OK', cancelLabel = 'Cancel', danger } → true / false
+// { title, body, okLabel = 'OK', cancelLabel = 'Cancel', danger, altLabel } → true / false
+// (or 'alt' for a third choice, shown when altLabel is given)
 export const confirmDialog = (opts) => open('confirm', opts);
 // { title, body, okLabel = 'OK' } → resolves when closed
 export const alertDialog = (opts) => open('alert', opts);
@@ -125,7 +126,12 @@ function AskDialog({ item }) {
               />
             </label>
           )}
-          <div className="ask-actions">
+          <div className={`ask-actions${item.altLabel ? ' three' : ''}`}>
+            {kind === 'confirm' && item.altLabel && (
+              <button className="btn danger" onClick={() => settle(item, 'alt')}>
+                {item.altLabel}
+              </button>
+            )}
             {kind !== 'alert' && (
               <button className="btn" onClick={cancel}>
                 {cancelLabel}

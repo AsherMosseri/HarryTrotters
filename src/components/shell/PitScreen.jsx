@@ -3,8 +3,10 @@ import { Avatar } from '../common.jsx';
 import { Icon } from './icons.jsx';
 import { PitGuess } from '../Life.jsx';
 import Debrief from './Debrief.jsx';
+import PinnedChecklists from '../PinnedChecklists.jsx';
 import { BatteryStrip } from '../Batteries.jsx';
 import { QUEUE_CHECKLIST, STARTER_CHECKLISTS, isQueueChecklist, starterItems } from '../../checklists.js';
+import { shownItems } from '../../../functions/shared/checklists.js';
 import { parseDay } from '../../milestones.js';
 import { teamDay } from '../../../functions/shared/coins.js';
 import { rolesFromTeam } from '../../driveRoles.js';
@@ -74,7 +76,8 @@ function QueueCard({ list, next, lead, now, actor, api, onAddList }) {
   const byHand = !!(hand?.at && hand.round === key);
   const left = at ? at - now : null;
   const tone = left == null ? 'idle' : left <= 0 ? 'now' : left <= 2 * 60000 ? 'soon' : 'calm';
-  const items = Object.values(list?.items || {}).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  // In the order the Checklists tab shows them (sections included).
+  const items = list ? shownItems(list) : [];
   const isDone = (i) => i.done && i.doneRound === key;
   const done = items.filter(isDone).length;
   const start = (mins) => api.setChecklistQueue(list, { round: next ? next.id : `hand-${now}`, at: now + mins * 60000, by: actor.name });
@@ -596,7 +599,7 @@ function SyncButton({ settings, api }) {
   );
 }
 
-export default function PitScreen({ actor, settings, matches, batteries = [], checklists, roster, competition, api, predictions = [], onPerson, onUsual }) {
+export default function PitScreen({ actor, settings, matches, batteries = [], checklists, pinned = [], roster, competition, api, predictions = [], onPerson, onUsual }) {
   const now = useNow(1000);
   const isManager = !!actor.admin;
   const event = settings.compEvent || {};
@@ -689,6 +692,8 @@ export default function PitScreen({ actor, settings, matches, batteries = [], ch
         <div className="today-col">
           <BatteryStrip batteries={batteries} matches={ours} api={api} isManager={isManager} />
           <QueueCard list={list} next={next} lead={lead} now={now} actor={actor} api={api} onAddList={addList} />
+          {/* Your pinned checklists (the queue list is already right above). */}
+          <PinnedChecklists pinned={pinned} checklists={checklists} matches={matches} settings={settings} api={api} skip={list?.id} />
           <ScorePad matches={ours} now={now} driveTeam={team} api={api} />
           <PitGuess predictions={predictions} next={next} actor={actor} api={api} now={now} />
         </div>

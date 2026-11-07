@@ -4,6 +4,22 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '3.2.8',
+    date: '2026-11-06',
+    title: 'Checklists, rebuilt',
+    items: [
+      'Drag checklist items to reorder them, even onto another list. On a phone, hold the dots on the left and drag. You can drag whole checklists into the order you like too.',
+      'Sections: add headings like Electrical or Mechanical and drag items under them.',
+      'Tap ⋯ on an item to change its words, give it to someone (they get a notification), add a note or a photo as proof, or turn it into a task. Finishing the task checks the item.',
+      'Mine shows just the items given to you, across every list.',
+      'Oops? Removing, moving, unchecking or duplicating now has an Undo.',
+      'Duplicate a checklist to start a fresh copy, and see its History: Uncheck all saves what was done, and who did it, first.',
+      'Checklists can reset on their own every day at midnight or before each match.',
+      'Pin checklists to your Today and check them off from there.',
+      'Run a checklist full screen with big buttons, made for the pit.',
+    ],
+  },
+  {
     version: '3.2.7',
     date: '2026-11-06',
     title: 'Check-in times off, extras switch, tournament fixes',

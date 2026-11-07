@@ -69,6 +69,7 @@ import { buddyFunctions } from './buddy.js';
 import { buddyBlocks, lockNote } from './shared/buddy.js';
 import { moveArcadeFunctions } from './moveArcade.js';
 import { apiFunction } from './api.js';
+import { checklistFunctions } from './checklists.js';
 import { coinsText } from './shared/coinText.js';
 
 // Functions run next to the database. The deploy workflow writes location.json
@@ -2588,6 +2589,11 @@ export const { claimBingo, bingoSweep, predict, onRunLogged, lockPredictions, on
   db,
   renamer,
 });
+
+// ---------- checklists 3.3 (functions/checklists.js) ----------
+// Notes to people given an item, daily and per-match resets (each saving a
+// run first), trimming old runs, and ticking an item when its task is done.
+export const { onChecklist, onChecklistRun, checklistResets, onTaskChecklist } = checklistFunctions({ db, notify, renamer, personId });
 
 // ---------- the educational games and the daily question (functions/learn.js) ----------
 export const { quizNext, quizAnswer, quizProgress, quizReport, autoRun, dailyAnswer, postDailyQuestion } = learnFunctions({

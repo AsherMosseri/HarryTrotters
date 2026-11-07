@@ -1,9 +1,9 @@
 import { itemId } from './data/diff.js';
 
 // The checklist Today's pit screen runs before each match (found by name, so
-// renaming it on the Checklists tab unhooks it).
-export const QUEUE_CHECKLIST = 'Before queueing';
-export const isQueueChecklist = (c) => (c?.title || '').trim().toLowerCase() === QUEUE_CHECKLIST.toLowerCase();
+// renaming it on the Checklists tab unhooks it). Shared with the server.
+import { QUEUE_CHECKLIST, isQueueChecklist } from '../functions/shared/checklists.js';
+export { QUEUE_CHECKLIST, isQueueChecklist };
 
 // Starting points for the Checklists tab. Inspection rules change each season,
 // so the team should compare the inspection list with this season's
