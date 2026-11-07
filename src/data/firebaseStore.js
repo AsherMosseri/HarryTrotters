@@ -665,6 +665,11 @@ export const firebaseStore = {
   saveSettings(patch, actor) {
     return setDoc(settingsDoc, { ...patch, updatedAt: serverTimestamp(), updatedBy: actor.name }, { merge: true });
   },
+  // Team management marks someone inactive or keeps them active (Roster);
+  // entry null clears it, back to the 3-week rule (functions/shared/activity.js).
+  setActiveMode(id, entry, actor) {
+    return setDoc(settingsDoc, { inactive: { [id]: entry || deleteField() }, updatedAt: serverTimestamp(), updatedBy: actor.name }, { merge: true });
+  },
   // The whole ads setup at once (mergeFields, so turned-off overrides go away).
   saveAdSettings(ads, actor) {
     return setDoc(

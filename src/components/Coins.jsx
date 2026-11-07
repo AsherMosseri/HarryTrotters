@@ -30,7 +30,7 @@ const WHO = (n) => n.split(' ')[0];
 // The exact day and time of a history line (casino lines come in quick runs).
 const whenAt = (at) => new Date(at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
-export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onMarket, onClose, isManager = false, onCheck, stale, onRefresh, disputes = [], initialTab = 'wallet', onAdjust, onFix, loans = null, loanFocus = null, onToast, everyone = true, buddy = null }) {
+export function CoinsDialog({ actor, wallet, roster, ranked = roster, data, cfg, onGift, onMarket, onClose, isManager = false, onCheck, stale, onRefresh, disputes = [], initialTab = 'wallet', onAdjust, onFix, loans = null, loanFocus = null, onToast, everyone = true, buddy = null }) {
   useEscape(onClose);
   const f = useCoinFormat();
   // What one task and one lab hour pay this person now (3.2: the bigger of
@@ -46,7 +46,8 @@ export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onMarket
   useEffect(() => setTab(initialTab), [initialTab]);
   const [range, setRange] = useState('week');
   // Two boards: what everyone has now (matches balances and /leaderboard),
-  // and what they earned by working (tasks, lab hours, grants).
+  // and what they earned by working (tasks, lab hours, grants). ranked: the
+  // roster without inactive members (functions/shared/activity.js).
   const [kind, setKind] = useState('coins');
   const [to, setTo] = useState('');
   const [amount, setAmount] = useState('');
@@ -59,11 +60,11 @@ export function CoinsDialog({ actor, wallet, roster, data, cfg, onGift, onMarket
   const board = useMemo(
     () =>
       kind === 'coins'
-        ? roster
+        ? ranked
             .map((name) => ({ name, coins: walletOf(name, data).balance }))
             .sort((a, b) => b.coins - a.coins)
-        : leaderboard(roster, data, range === 'week' ? monday : 0),
-    [kind, roster, data, range, monday],
+        : leaderboard(ranked, data, range === 'week' ? monday : 0),
+    [kind, ranked, data, range, monday],
   );
   const n = Math.floor(Number(amount));
   const canSend = to && n > 0 && n <= wallet.balance && n <= GIFT_MAX && !sending;

@@ -9,6 +9,7 @@ import { Avatar, CloseIcon, DisplayName, Overlay, StatusDot, usePeople } from '.
 import { ProfileEffect, SubteamBadges, SubteamIcon } from './People.jsx';
 import { hoursOf, mergedMs } from '../../functions/shared/hours.js';
 import { streaksOf } from '../../functions/shared/streaks.js';
+import { lastLabText } from '../../functions/shared/activity.js';
 import CountUp from './CountUp.jsx';
 import { PetCard } from './Pet.jsx';
 import { PetSticker, usePetPhoto } from './PetPhoto.jsx';
@@ -25,6 +26,9 @@ export default function ProfilePage({
   actor,
   tasks,
   shifts,
+  // Team management only (Workspace passes null to everyone else): whether
+  // they're inactive (functions/shared/activity.js).
+  activity = null,
   joinedAt,
   lastSeen,
   notes,
@@ -166,6 +170,12 @@ export default function ProfilePage({
                   </span>
                 )}
               </p>
+              {activity?.inactive && (
+                <p className="pp-inactive muted small" title="Only team management sees this">
+                  Inactive · {lastLabText(activity.lastAt)}
+                  {activity.why === 'manual' ? ' · marked on the Roster' : ''}
+                </p>
+              )}
               {status && (
                 <p className="profile-status pp-status-inline">
                   {status.emoji} {status.text}

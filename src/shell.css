@@ -298,6 +298,21 @@ button.sb-head-row { width: 100%; border: 0; background: none; color: var(--mute
   .roster-row { grid-template-columns: 34px minmax(0, 1fr) auto; row-gap: 4px; }
   .roster-teams, .roster-resp, .roster-tasks { grid-column: 2 / -1; }
 }
+/* Inactive members (team management only): folded at the bottom of the Roster. */
+.roster-inactive { margin-top: 24px; }
+.roster-inactive summary { display: flex; align-items: center; gap: 10px; padding-bottom: 8px; border-bottom: 1px solid var(--border); cursor: pointer; list-style: none; min-height: 44px; }
+.roster-inactive summary::-webkit-details-marker { display: none; }
+.roster-inactive summary::after { content: ''; width: 8px; height: 8px; margin-left: auto; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(45deg) translateY(-2px); }
+.roster-inactive[open] summary::after { transform: rotate(-135deg) translateY(-2px); }
+.roster-inactive summary .team-heading { margin: 0; }
+.roster-inactive summary .mono { color: var(--muted); font-weight: 500; margin-left: 4px; }
+.roster-inactive > p { margin: 10px 0 2px; }
+.roster-row.roster-row-inactive { grid-template-columns: 34px minmax(0, 1fr) auto; }
+.roster-row-inactive .roster-pic { opacity: 0.6; }
+.roster-inactive-btns { display: flex; align-items: center; gap: 12px; }
+.status-modes { margin-top: 2px; }
+.status-note { margin: 6px 0 0; }
+.pp-inactive { margin: 2px 0 0; }
 
 /* Checklists: plain lists under a title rule. */
 .shell .checklist-grid { gap: 8px 44px; }
@@ -5696,3 +5711,7 @@ button.bs-cell:focus-visible { outline: 2px solid var(--accent); outline-offset:
   display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 8px 12px; margin: 4px 0; border-radius: 10px; border: 1px solid var(--border);
   background: var(--surface-2); color: var(--text); font: inherit; font-weight: 600; text-align: left; cursor: pointer;
 }
+
+/* Checklists (3.2.8): the item's words are a tap target that checks it. */
+.cl-text-btn { display: block; text-align: left; white-space: pre-wrap; overflow-wrap: anywhere; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.cl-text-btn:focus { background: none; border-color: transparent; box-shadow: none; }

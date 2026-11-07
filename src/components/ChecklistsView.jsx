@@ -97,34 +97,11 @@ function Grip({ id, handle, label, onKey, hidden }) {
   );
 }
 
-// Item text boxes keep their height right when their width changes (a
-// badge appears, the screen turns): one observer for all of them.
-const fitBox = (el) => {
-  el.style.height = 'auto';
-  el.style.height = `${el.scrollHeight}px`;
-};
-const sizer = typeof ResizeObserver === 'function' ? new ResizeObserver((entries) => entries.forEach((e) => fitBox(e.target))) : null;
-function useFit(ref) {
-  useEffect(() => {
-    const el = ref.current?.querySelector('textarea');
-    if (!el || !sizer) return;
-    sizer.observe(el);
-    return () => sizer.unobserve(el);
-  });
-}
-
 // ---------- one item ----------
 function ItemRow({ list, item, round, api, canDrag, drop, onDetails, task, onOpenTask, flash }) {
   const { ref, handle, dragging } = useDragRow(`i:${list.id}:${item.id}`, { type: 'item', listId: list.id, itemId: item.id, secId: item.section || '' }, !canDrag);
   const on = CL.isDone(list, item, round);
-  // Bumped to put the text back when clearing it doesn't end in removing it.
-  const [ver, setVer] = useState(0);
-  const remove = async () => {
-    if (await confirmDialog({ title: 'Remove this item?', body: 'You cleared its text.', okLabel: 'Remove', danger: true })) api.removeChecklistItem(list, item);
-    else setVer((v) => v + 1);
-  };
   const box = useRef(null);
-  useFit(box);
   return (
     <li
       ref={(el) => {
@@ -144,26 +121,17 @@ function ItemRow({ list, item, round, api, canDrag, drop, onDetails, task, onOpe
         aria-label={item.text}
         onChange={(e) => api.toggleChecklistItem(list, item, e.target.checked, round)}
       />
-      <DraftInput
-        key={ver}
-        multiline
-        rows={1}
-        value={item.text}
-        className="cl-text"
-        aria-label="Item text (tap to edit)"
-        maxLength={CL.MAX_TEXT}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
-            e.preventDefault();
-            e.currentTarget.blur();
-          }
-        }}
-        onSave={(t) => {
-          const text = t.replace(/\s+/g, ' ').trim();
-          if (!text) remove();
-          else if (text !== item.text) api.editChecklistItem(list, item, { text });
-        }}
-      />
+      {/* Tapping the words checks it (people check far more than they edit);
+          changing the words is in the item's details (the ⋯). */}
+      <button
+        type="button"
+        className="cl-text cl-text-btn"
+        tabIndex={-1}
+        aria-hidden="true"
+        onClick={() => api.toggleChecklistItem(list, item, !on, round)}
+      >
+        {item.text}
+      </button>
       <span className="cl-badges">
         {on && item.doneBy && (
           <span className="cl-by" title={fullTime(item.doneAt)}>
