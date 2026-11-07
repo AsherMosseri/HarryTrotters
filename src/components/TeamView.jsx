@@ -39,7 +39,8 @@ const MODES = [
 // The mode a person is in now: a manual "inactive" they've clocked in since
 // no longer counts, so it shows as Automatic.
 const modeOf = (act) => (act?.override === 'active' ? 'active' : act?.why === 'manual' ? 'inactive' : '');
-const whyText = (act) => (act.why === 'manual' ? 'Marked inactive' : act.lastAt ? 'No lab time for 3 weeks' : 'Hasn’t come to the lab yet');
+// "Last at the lab 26 days ago", plus why when that alone doesn't say it.
+const whyText = (act) => [lastLabText(act.lastAt), act.why === 'manual' && 'Marked inactive'].filter(Boolean).join(' · ');
 
 function StatusField({ act, mode, setMode }) {
   const note =
@@ -319,9 +320,7 @@ function InactiveSection({ people, activity, onEdit, onPerson, onKeep }) {
                 <button className="roster-name" onClick={() => onPerson?.(p.name)}>
                   {p.name}
                 </button>
-                <span>
-                  {lastLabText(act.lastAt)} · {whyText(act)}
-                </span>
+                <span>{whyText(act)}</span>
               </div>
               <div className="roster-inactive-btns">
                 <button
