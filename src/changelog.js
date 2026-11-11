@@ -4,6 +4,15 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '3.2.10',
+    date: '2026-11-11',
+    title: 'Short names all the way to a googol',
+    items: [
+      'Short coin numbers now name every -illion past decillion, all the way to a googol: Ud, Dd, Td, Qad, Qid, Sxd, Spd, Ocd, Nod, Vg, Uvg, Dvg, Tvg, Qavg, Qivg, Sxvg, Spvg, Ocvg, Novg, Tg, Utg and Dtg, instead of switching to 1.2e36.',
+      'You can type them too, in any case: 5Qad, 2.5vg, 1dtg.',
+    ],
+  },
+  {
     version: '3.2.9',
     date: '2026-11-07',
     title: 'Works offline, and inactive teammates',

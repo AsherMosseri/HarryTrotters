@@ -203,5 +203,30 @@ eq(g(2e100, Infinity).error, 'That’s more than a googol.', 'gift number over a
 eq(g(2.5).error, 'Send at least 1 coin.', 'gift 2.5 refused, as before');
 eq(g(0).error, 'Send at least 1 coin.', 'gift 0 refused');
 
+// 3.2.10: every -illion on up to a googol, typed in any case, and the
+// formatter's short text reads back as the same number.
+{
+  const NAMES = [['ud', 36], ['dd', 39], ['td', 42], ['qad', 45], ['qid', 48], ['sxd', 51], ['spd', 54], ['ocd', 57], ['nod', 60],
+    ['vg', 63], ['uvg', 66], ['dvg', 69], ['tvg', 72], ['qavg', 75], ['qivg', 78], ['sxvg', 81], ['spvg', 84], ['ocvg', 87], ['novg', 90],
+    ['tg', 93], ['utg', 96], ['dtg', 99]];
+  for (const [n, e] of NAMES) {
+    eq(parseAmount(`1${n}`), Number(`1e${e}`), `1${n}`);
+    eq(parseAmount(`2.5${n.toUpperCase()}`), Number(`2.5e${e}`), `2.5${n.toUpperCase()}`);
+    eq(parseAmount(n), null, `${n} alone is not an amount`);
+    eq(looksLikeAmount(`3${n}`), true, `looks like: 3${n}`);
+  }
+  eq(parseAmount('10Dtg'), 1e100, '10Dtg is a googol');
+  eq(readAmount('10.1Dtg')?.over, true, '10.1Dtg is over a googol');
+  eq(readAmount('11dtg')?.over, true, '11dtg is over a googol');
+  eq(parseAmount('1.5Qavg'), 1.5e75, '1.5Qavg');
+  eq(parseAmount('7Nod'), 7e60, '7Nod (not 7No then d)');
+  eq(parseAmount('3Tg'), 3e93, '3Tg (not 3T then g)');
+  eq(parseAmount('5qad'), 5e45, '5qad');
+  eq(parseAmount('5qa'), 5e15, '5qa still quadrillion');
+  eq(parseAmount('2dc'), 2e33, '2dc still decillion');
+  for (const w of ['vg', 'Tg', 'nod', 'ud', 'dd', 'td'])
+    eq(looksLikeAmount(w), false, `${w} on its own is a word`);
+}
+
 console.log(failures ? `${failures} FAILED, ${passes} passed` : `ALL PASSED (${passes})`);
 process.exit(failures ? 1 : 0);

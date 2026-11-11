@@ -3,10 +3,11 @@
 //   commas                1,234,567
 //   plain                 1234567
 //   short (the default)   1.2m   (999 · 1k · 1.1k · 82.2k · 2.3m · 1.5b · 2t
-//                                · 11Qa · 3Qi · 1Sx · 1Sp · 1Oc · 1No · 1Dc · 1.2e36)
-// Coins go up to a googol (3.1.5): Short names every -illion up to decillion
-// (Dc, 1e33), then scientific with one decimal ("1.2e36"), and a googol or
-// more is "1 googol". Commas and plain write every digit below 1e21 and
+//                                · 11Qa · 3Qi · 1Sx · 1Sp · 1Oc · 1No · 1Dc
+//                                · 1.2Ud · 3Vg · 5Tg · 1Dtg · 1 googol)
+// Coins go up to a googol (3.1.5): Short names every -illion, decillion (Dc,
+// 1e33) and since 3.2.10 on up to duotrigintillion (Dtg, 1e99), and a googol
+// or more is "1 googol". Commas and plain write every digit below 1e21 and
 // scientific from there (toLocaleString gets silly). Past 2^53 (about 9
 // quadrillion) numbers are approximate, so the note under a confirm says
 // "About …" instead of "Exactly …".
@@ -46,12 +47,34 @@ const UNITS = [
   [1e27, 'Oc'],
   [1e30, 'No'],
   [1e33, 'Dc'],
+  [1e36, 'Ud'],
+  [1e39, 'Dd'],
+  [1e42, 'Td'],
+  [1e45, 'Qad'],
+  [1e48, 'Qid'],
+  [1e51, 'Sxd'],
+  [1e54, 'Spd'],
+  [1e57, 'Ocd'],
+  [1e60, 'Nod'],
+  [1e63, 'Vg'],
+  [1e66, 'Uvg'],
+  [1e69, 'Dvg'],
+  [1e72, 'Tvg'],
+  [1e75, 'Qavg'],
+  [1e78, 'Qivg'],
+  [1e81, 'Sxvg'],
+  [1e84, 'Spvg'],
+  [1e87, 'Ocvg'],
+  [1e90, 'Novg'],
+  [1e93, 'Tg'],
+  [1e96, 'Utg'],
+  [1e99, 'Dtg'],
 ];
-// Past the last unit (999.95Dc rounds to 1000Dc): scientific.
-const SHORT_SCI = 1e36;
+// A googol or more: "1 googol" (the most anyone can hold).
+const SHORT_SCI = 1e100;
 // One decimal, rounded to nearest, without a trailing ".0". Rounding that
 // reaches 1000 of a unit moves up a unit: 999,950 is "1m", never "1000k";
-// and past decillions, to scientific ("1e36", "1.2e40"), then "1 googol".
+// and from a googol up, "1 googol".
 function short(v) {
   if (v < 1000) return String(v);
   if (v >= SHORT_SCI) return sciText(v);

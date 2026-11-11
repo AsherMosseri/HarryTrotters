@@ -6,7 +6,11 @@
 // - Suffixes (any case): k thousand, m million, b billion, t trillion,
 //   qa (or q) quadrillion 1e15, qi quintillion 1e18, sx sextillion 1e21,
 //   sp septillion 1e24, oc octillion 1e27, no nonillion 1e30, dc decillion
-//   1e33 (all but k–t since 3.1.5, when coins went up to a googol).
+//   1e33 (all but k–t since 3.1.5, when coins went up to a googol), and
+//   (3.2.10) on to a googol: ud undecillion 1e36, dd 1e39, td 1e42, qad 1e45,
+//   qid 1e48, sxd 1e51, spd 1e54, ocd 1e57, nod 1e60, vg vigintillion 1e63,
+//   uvg 1e66, dvg 1e69, tvg 1e72, qavg 1e75, qivg 1e78, sxvg 1e81, spvg 1e84,
+//   ocvg 1e87, novg 1e90, tg trigintillion 1e93, utg 1e96, dtg 1e99.
 // - Scientific: "1e40", "2.5e50", "1E6" (3.1.5), and the word "googol"
 //   (1e100). Nothing over a googol: that's the most anyone can hold.
 // - Commas only separate thousands: "1,000" and "200,000", never "1,00".
@@ -19,9 +23,11 @@
 // Limits (bet caps, balances, the ceiling) are the caller's, checked after
 // this, the same as for the number typed out.
 
-const SUFFIX = 'qa|qi|sx|sp|oc|no|dc|[kmbtq]';
+// Longest first, so "5qavg" is read whole.
+const SUFFIX = 'qavg|qivg|sxvg|spvg|ocvg|novg|qad|qid|sxd|spd|ocd|nod|uvg|dvg|tvg|utg|dtg|ud|dd|td|vg|tg|qa|qi|sx|sp|oc|no|dc|[kmbtq]';
 const RE = new RegExp(`^(\\d{1,3}(?:,\\d{3})+|\\d+)(?:\\.(\\d+))?(?:e\\+?(\\d{1,3})|(${SUFFIX}))?$`, 'i');
-const POWER = { '': 0, k: 3, m: 6, b: 9, t: 12, q: 15, qa: 15, qi: 18, sx: 21, sp: 24, oc: 27, no: 30, dc: 33 };
+const POWER = { '': 0, k: 3, m: 6, b: 9, t: 12, q: 15, qa: 15, qi: 18, sx: 21, sp: 24, oc: 27, no: 30, dc: 33,
+  ud: 36, dd: 39, td: 42, qad: 45, qid: 48, sxd: 51, spd: 54, ocd: 57, nod: 60, vg: 63, uvg: 66, dvg: 69, tvg: 72, qavg: 75, qivg: 78, sxvg: 81, spvg: 84, ocvg: 87, novg: 90, tg: 93, utg: 96, dtg: 99 };
 // Exact whole numbers stop here (2^53, Number.MAX_SAFE_INTEGER + 1).
 const EXACT = 2n ** 53n;
 export const GOOGOL = 10n ** 100n;
