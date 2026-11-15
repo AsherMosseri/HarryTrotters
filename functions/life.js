@@ -15,6 +15,7 @@ import { addDay } from './shared/streaks.js';
 import { memberOk, nameKey } from './shared/team.js';
 import { bingoAwards, bingoCard, bingoWeek, dailyAnswersIn } from './shared/bingo.js';
 import { buildRecap, recapWeek } from './shared/recap.js';
+import { recapCompetition } from './shared/competitions.js';
 import { cleanScore, guessProblem, isLive, matchRoundId, predictKey, ROUND_TTL, runTotal, settle } from './shared/predict.js';
 import { streakAwards } from './shared/streakRewards.js';
 
@@ -24,8 +25,6 @@ const TIME_ZONE = 'America/New_York';
 export const lifeClock = { now: () => Date.now() };
 const clock = lifeClock;
 const toMs = (v) => (v && typeof v.toMillis === 'function' ? v.toMillis() : typeof v === 'number' ? v : 0);
-// Same as COMPETITION in src/config.js (settings/team.competitionDate overrides it).
-const COMPETITION_DATE = '2026-11-14';
 
 export function lifeFunctions({ db, renamer }) {
   // The signed-in teammate (a device with a password), under their current name.
@@ -408,7 +407,8 @@ export function lifeFunctions({ db, renamer }) {
       logs: list(logs).map((l) => ({ ...l, person: rename(l.person || '') })),
       runs: list(runs),
       roster: [...new Set(people.docs.map((d) => rename(d.get('name') || '')).filter(Boolean))],
-      competition: { name: team.get('compEvent')?.name || 'the competition', date: team.get('competitionDate') || COMPETITION_DATE },
+      // The next competition on the list (none: the recap skips the countdown).
+      competition: recapCompetition(team.data() || {}, teamDay(now)),
     };
   }
 

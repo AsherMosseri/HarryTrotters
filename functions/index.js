@@ -41,10 +41,9 @@ import * as mines from './shared/minesweeper.js';
 import { newSeed, secureRandom } from './shared/rng.js';
 import { MANAGER_NAMES, PASSWORD_MIN, ROSTER, SUBTEAMS, cleanName, isManagerName, knownName, memberOk, nameKey, onTeam, sameName } from './shared/team.js';
 import {
-  DEFAULT_COMPETITION_DATE,
   TEAM_NUMBER,
   alreadyAlerted,
-  competitionOn,
+  competitionOnFor,
   fromSchedule,
   queueAlertText,
   queueAlertsDue,
@@ -762,7 +761,7 @@ export const queueAlert = onSchedule({ schedule: 'every 1 minutes', timeZone: TI
   const now = Date.now();
   const settings = (await db.doc('settings/team').get()).data() || {};
   // Cheap exit: competition mode off, so no need to read the schedule.
-  if (!competitionOn(settings.compMode, teamDay(now), settings.competitionDate || DEFAULT_COMPETITION_DATE, settings.compModeAt, now)) return;
+  if (!competitionOnFor(settings, teamDay(now), now)) return;
   const matches = (await db.collection('matches').get()).docs.map((d) => ({ id: d.id, ...d.data() }));
   const due = queueAlertsDue({ matches, settings, now, today: teamDay(now) });
   if (!due.length) return;
@@ -2463,6 +2462,7 @@ export const ftcEvents = onCall(
         code: String(e.code || ''),
         name: String(e.name || ''),
         start: String(e.dateStart || '').slice(0, 10),
+        end: String(e.dateEnd || '').slice(0, 10),
         tz: String(e.timezone || ''),
         city: [e.city, e.stateprov].filter(Boolean).join(', '),
       }));

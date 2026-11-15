@@ -7,7 +7,8 @@ import { bingoAwards, bingoCard, bingoWeek, dailyAnswersIn } from '../../functio
 import { buildRecap, recapWeek } from '../../functions/shared/recap.js';
 import { cleanScore, guessProblem, isLive, matchRoundId, predictKey, ROUND_TTL, runTotal, settle } from '../../functions/shared/predict.js';
 import { streakAwards } from '../../functions/shared/streakRewards.js';
-import { ROSTER, COMPETITION } from '../config.js';
+import { ROSTER } from '../config.js';
+import { recapCompetition } from '../../functions/shared/competitions.js';
 
 export function demoLife({ get, commit, uid }) {
   const S = () => get();
@@ -210,7 +211,7 @@ export function demoLife({ get, commit, uid }) {
   }
 
   // ---------- the weekly recap ----------
-  const recapData = () => {
+  const recapData = (now = Date.now()) => {
     const s = S();
     return {
       shifts: s.shifts || [],
@@ -218,7 +219,7 @@ export function demoLife({ get, commit, uid }) {
       logs: s.labLogs || [],
       runs: s.runs || [],
       roster: ROSTER.map((p) => p.name || p),
-      competition: { name: s.settings?.compEvent?.name || 'the competition', date: s.settings?.competitionDate || COMPETITION.date },
+      competition: recapCompetition(s.settings || {}, teamDay(now)),
     };
   };
   function postRecap(now, by) {
@@ -226,7 +227,7 @@ export function demoLife({ get, commit, uid }) {
     const week = recapWeek(now);
     const state = (s.recaps || {})[week];
     if (state?.status === 'posted' || state?.status === 'skipped') return { status: state.status };
-    const recap = buildRecap(recapData(), now, week);
+    const recap = buildRecap(recapData(now), now, week);
     const id = `recap-${week}`;
     const general = ((s.chat || {}).general || []).filter((m) => m.id !== id);
     const post = {
@@ -253,7 +254,7 @@ export function demoLife({ get, commit, uid }) {
     const week = recapWeek(now);
     const s = S();
     const state = (s.recaps || {})[week] || null;
-    if (req.action === 'preview') return { recap: buildRecap(recapData(), now, week), state };
+    if (req.action === 'preview') return { recap: buildRecap(recapData(now), now, week), state };
     if (req.action === 'post') return postRecap(now, actor.name);
     if (req.action === 'skip' || req.action === 'unskip') {
       if (state?.status === 'posted') return { status: 'posted' };
@@ -278,7 +279,7 @@ export function demoLife({ get, commit, uid }) {
     const lastSunday = addDay(recapWeek(now), -1);
     const at = Date.parse(`${lastSunday}T23:00:00Z`);
     // Built as of now so the sample has the demo's recent days in it.
-    const sample = buildRecap(recapData(), now, recapWeek(now));
+    const sample = buildRecap(recapData(now), now, recapWeek(now));
     const id = `recap-sample`;
     const general = ((s.chat || {}).general || []).filter((m) => m.id !== id);
     s.chat = {

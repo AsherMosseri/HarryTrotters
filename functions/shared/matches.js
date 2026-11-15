@@ -1,6 +1,7 @@
 // Competition matches (Today's pit screen): the same ids and labels on the
 // site and in the ftcEvents function, so a match typed in at the event and the
 // same match pulled from FTC Events end up as one doc.
+import { DEFAULT_COMPETITION_DATE, competitionList, lastDay, nextCompetition } from './competitions.js';
 
 export const TEAM_NUMBER = 32313;
 export const TEAM_TZ = 'America/New_York';
@@ -193,16 +194,22 @@ export function roundKey(match, hand = null) {
   return hand?.round?.startsWith('hand-') ? hand.round : 'free';
 }
 
-// Competition mode: on during the competition day (team time), off by hand,
+// Competition mode: on during a competition's days (team time), off by hand,
 // or "On now" by hand, which lasts a day (onAt is when it was switched on) so
 // a test can't be left on by accident. An "On now" that ran out, or was saved
-// without a time, goes back to following the competition day.
+// without a time, goes back to following the competition days. `comp` is the
+// next competition ({ start, end? }, shared/competitions.js) or a plain day.
 export const COMP_ON_FOR = 24 * 3600000;
-export function competitionOn(mode, today, competitionDate, onAt = 0, now = Date.now()) {
+export function competitionOn(mode, today, comp, onAt = 0, now = Date.now()) {
   if (mode === 'off') return false;
   if (mode === 'on' && onAt && now - onAt < COMP_ON_FOR) return true;
-  return !!competitionDate && today === competitionDate;
+  if (!comp) return false;
+  if (typeof comp === 'string') return today === comp;
+  return !!comp.start && today >= comp.start && today <= lastDay(comp);
 }
+// The same from settings/team: its competitions (or the old single date).
+export const competitionOnFor = (settings = {}, today, now = Date.now()) =>
+  competitionOn(settings.compMode, today, nextCompetition(competitionList(settings), today), settings.compModeAt, now);
 // The mode as it stands now: "on" only while its day lasts, else "auto".
 export const compModeNow = (settings = {}, now = Date.now()) =>
   settings.compMode === 'on' && !(settings.compModeAt && now - settings.compModeAt < COMP_ON_FOR) ? 'auto' : settings.compMode || 'auto';
@@ -219,8 +226,8 @@ export function eventMatches(matches, code) {
 // The queue alert is sent once per match per person. If the match then moves
 // by this much (a delay at the field), the new time gets its own alert.
 export const ALERT_MOVED = 5 * 60000;
-// Same as COMPETITION in src/config.js (settings/team.competitionDate overrides it).
-export const DEFAULT_COMPETITION_DATE = '2026-11-14';
+// The old single date's fallback (shared/competitions.js).
+export { DEFAULT_COMPETITION_DATE };
 
 // Minutes before the match to queue, as team management set it (1-60).
 export const queueLeadOf = (settings) => Math.max(1, Math.min(60, Number(settings?.queueLead) || QUEUE_LEAD));
@@ -231,7 +238,7 @@ export const queueLeadOf = (settings) => Math.max(1, Math.min(60, Number(setting
 // (the same rule that turns Today into the pit screen), and nothing without
 // a match time. `today` is the team's day for `now`.
 export function queueAlertsDue({ matches, settings = {}, now, today }) {
-  if (!competitionOn(settings.compMode, today, settings.competitionDate || DEFAULT_COMPETITION_DATE, settings.compModeAt, now)) return [];
+  if (!competitionOnFor(settings, today, now)) return [];
   const lead = queueLeadOf(settings);
   return sortMatches(eventMatches(matches, settings.compEvent?.code))
     .filter((m) => m.time && !m.ours && !m.result && !m.score && m.time > now && queueTime(m, lead) <= now)
