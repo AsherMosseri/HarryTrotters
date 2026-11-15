@@ -106,7 +106,8 @@ export const GIPHY_API_KEY = 'vWoP1yFu6olIEx05kHqPgD3PIWSfZR0P';
 // certificates. Empty uses Firebase's built-in key.
 export const VAPID_KEY = '';
 
-export const COMPETITION = { name: 'Competition', date: '2026-11-14' };
+// The season's competitions are on settings/team.competitions, edited on the
+// Competitions screen (functions/shared/competitions.js).
 
 // Starting org chart (functions/shared/team.js, so the server can tell who's
 // in a subteam too). Anything edited on the Team tab overrides these.

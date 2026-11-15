@@ -1,7 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   CHANNELS,
-  COMPETITION,
   RENAMED,
   ROBOT_TAB_PEOPLE,
   ROSTER,
@@ -102,6 +101,8 @@ import { buddyView, setBuddyLock } from '../buddy.js';
 import { useCoinSync } from '../coinSync.js';
 import { hoursOf, mergedMs } from '../../functions/shared/hours.js';
 import { teamDay } from '../../functions/shared/coins.js';
+import { compDates, competitionList, countdownDay, daysUntil, nextCompetition } from '../competitions.js';
+import CompetitionsDialog from './Competitions.jsx';
 import { hasLabel, newBattery, putOnRobot, statusPatch } from '../batteries.js';
 import { streaksOf } from '../../functions/shared/streaks.js';
 import { inactiveSet, overrideEntry, teamActivity } from '../../functions/shared/activity.js';
@@ -932,7 +933,6 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
   // Lab check-ins: today's unanswered one blocks the app until it's answered.
   const [checkins, setCheckins] = useState([]);
   useEffect(() => store.subscribeCheckins(setCheckins, quiet('lab check-ins')), [store, quiet]);
-  const competitionDate = settings.competitionDate || COMPETITION.date;
 
   // Notifications: the bell's list, and phone notifications on this device.
   const [allInbox, setInbox] = useState([]);
@@ -1155,6 +1155,15 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
     const timer = setTimeout(() => setNow(Date.now()), Math.max(250, next - t + 50));
     return () => clearTimeout(timer);
   }, [presence, now]);
+  // The season's competitions (functions/shared/competitions.js). The next one
+  // by the team's day drives the countdowns, "Before the event", the pit
+  // screen, the competition ads and /countdown; null when none is coming up.
+  const compDay = teamDay(now);
+  const competitions = useMemo(() => competitionList(settings), [settings]);
+  const nextComp = useMemo(() => nextCompetition(competitions, compDay), [competitions, compDay]);
+  // The day the competition ad pack counts to ('' with none coming up).
+  const competitionDate = countdownDay(nextComp, compDay);
+  const [compsOpen, setCompsOpen] = useState(false);
   // Inactive members (functions/shared/activity.js, the same rule as the
   // server): 3 weeks with no lab time, or marked on the Roster. They drop off
   // the leaderboards and the check-in's "hasn't answered", and check-ins and
@@ -2406,8 +2415,8 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
       };
     },
     countdown: () => {
-      if (!competitionDate) return null;
-      const days = Math.max(0, daysBetween(todayISO(), competitionDate));
+      if (!nextComp) return null;
+      const days = daysUntil(nextComp, teamDay(Date.now()));
       const hype =
         days === 0
           ? 'GO GO GO. Charge everything. 🔋'
@@ -2421,8 +2430,8 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
       return {
         days,
         hype,
-        label: COMPETITION.name,
-        date: parseDay(competitionDate).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' }),
+        label: nextComp.name,
+        date: compDates(nextComp, 'long'),
       };
     },
   };
@@ -2464,10 +2473,11 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
       lastEndText: ended ? new Date(ended.end).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '',
       onShift: myShifts.some((x) => !x.end),
       daysSinceLab: latest ? Math.floor((now - (latest.end || now)) / 86400000) : 999,
-      daysToComp: daysBetween(today, competitionDate),
+      // -1 with nothing coming up (the countdown ad stays away).
+      daysToComp: nextComp ? daysUntil(nextComp, compDay) : -1,
       subteams: peopleInfo.get(name)?.subteams || [],
     };
-  }, [actor.name, tasks, namedShifts, myWallet.balance, competitionDate, peopleInfo]);
+  }, [actor.name, tasks, namedShifts, myWallet.balance, nextComp, compDay, peopleInfo]);
   const trackOrder = trackId ? adOrders.find((o) => o.id === trackId) : null;
   const activeOrders = useMemo(() => adOrders.filter((o) => orderActive(o, Date.now())).length, [adOrders]);
   // Ads switched off (Controls): as if they were paused.
@@ -2947,7 +2957,9 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
                     actor={actor}
                     tasks={tasks}
                     milestones={milestones}
-                    competition={{ name: COMPETITION.name, date: competitionDate }}
+                    competition={nextComp}
+                    compDay={compDay}
+                    onCompetitions={() => setCompsOpen(true)}
                     settings={settings}
                     matches={matches}
                     batteries={batteries}
@@ -2984,7 +2996,10 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
                 ) : view === 'milestones' ? (
                   <MilestonesView
                     milestones={milestones}
-                    competitionDate={competitionDate}
+                    competitions={competitions}
+                    next={nextComp}
+                    compDay={compDay}
+                    onCompetitions={() => setCompsOpen(true)}
                     isManager={actor.admin}
                     tasks={tasks}
                     roster={roster}
@@ -3631,6 +3646,16 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
               onPay={controls.isOn('coins') ? ads.payBlock : null}
               onWatch={ads.watchBlock}
               onClose={ads.closeBlock}
+            />
+          )}
+          {compsOpen && (
+            <CompetitionsDialog
+              list={competitions}
+              today={compDay}
+              isManager={!!actor.admin}
+              api={api}
+              onToast={(text) => setToast({ text })}
+              onClose={() => setCompsOpen(false)}
             />
           )}
           {disputesOpen && ownsReports && (

@@ -7,7 +7,7 @@ import PinnedChecklists from '../PinnedChecklists.jsx';
 import { BatteryStrip } from '../Batteries.jsx';
 import { QUEUE_CHECKLIST, STARTER_CHECKLISTS, isQueueChecklist, starterItems } from '../../checklists.js';
 import { shownItems } from '../../../functions/shared/checklists.js';
-import { parseDay } from '../../milestones.js';
+import { compDates, compStatus } from '../../competitions.js';
 import { teamDay } from '../../../functions/shared/coins.js';
 import { rolesFromTeam } from '../../driveRoles.js';
 import {
@@ -472,14 +472,20 @@ function Schedule({ matches, next, now, isManager, event, api, onSync }) {
 }
 
 // ---------- Team management's setup ----------
-function Setup({ settings, competitionDate, roster, api }) {
+function Setup({ settings, comp, roster, api }) {
   const event = settings.compEvent || {};
-  const [code, setCode] = useState(event.code || '');
-  const [name, setName] = useState(event.name || '');
+  // Today's competition (Competitions): its event code fills in the event
+  // when the saved one is empty or another event's, until it's saved (Use
+  // it) or typed over. Nothing is saved without a tap or typing.
+  const [touched, setTouched] = useState(false);
+  const todays = comp && compStatus(comp, teamDay(Date.now())) === 'today' ? comp : null;
+  const fill = !touched && todays?.code && todays.code !== (event.code || '') ? todays : null;
+  const [code, setCode] = useState(fill ? fill.code : event.code || '');
+  const [name, setName] = useState(fill ? fill.name : event.name || '');
   useEffect(() => {
-    setCode(event.code || '');
-    setName(event.name || '');
-  }, [event.code, event.name]);
+    setCode(fill ? fill.code : event.code || '');
+    setName(fill ? fill.name : event.name || '');
+  }, [event.code, event.name, fill?.code, fill?.name]);
   const mode = compModeNow(settings);
   const team = settings.driveTeam || {};
   const lead = Number(settings.queueLead) || QUEUE_LEAD;
@@ -493,7 +499,7 @@ function Setup({ settings, competitionDate, roster, api }) {
     else next[key] = who;
     api.saveSettings({ driveTeam: next });
   };
-  const dateLabel = competitionDate ? parseDay(competitionDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '';
+  const autoLabel = comp ? `On ${compDates(comp, 'short')}` : 'On competition days';
   return (
     <section className="today-sec pit-sec pm-setup">
       <div className="sec-head">
@@ -503,7 +509,7 @@ function Setup({ settings, competitionDate, roster, api }) {
         <span className="mf-label">Competition mode</span>
         <div className="segmented" role="radiogroup" aria-label="Competition mode">
           {[
-            ['auto', `On ${dateLabel}`],
+            ['auto', autoLabel],
             ['on', 'On for a day'],
             ['off', 'Off'],
           ].map(([id, label]) => (
@@ -516,12 +522,20 @@ function Setup({ settings, competitionDate, roster, api }) {
       <div className="mf-row">
         <label className="mf-field small">
           <span>Event code</span>
-          <input className="input mono" value={code} onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))} onBlur={saveEvent} placeholder="USNYNYQ1" maxLength={20} />
+          <input className="input mono" value={code} onChange={(e) => (setTouched(true), setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '')))} onBlur={() => touched && saveEvent()} placeholder="USNYNYQ1" maxLength={20} />
         </label>
         <label className="mf-field">
           <span>Event name</span>
-          <input className="input" value={name} onChange={(e) => setName(e.target.value)} onBlur={saveEvent} placeholder="e.g. NYC Qualifier" maxLength={120} />
+          <input className="input" value={name} onChange={(e) => (setTouched(true), setName(e.target.value))} onBlur={() => touched && saveEvent()} placeholder="e.g. NYC Qualifier" maxLength={120} />
         </label>
+        {fill && (
+          <p className="pm-sync-note pm-fill" role="status">
+            <span>Filled in from today’s competition.</span>
+            <button className="btn" onClick={saveEvent}>
+              Use it
+            </button>
+          </p>
+        )}
       </div>
       <div className="mf-row">
         <label className="mf-field small">
@@ -627,7 +641,7 @@ export default function PitScreen({ actor, settings, matches, batteries = [], ch
         <div className="pit-main">
           <p className="pit-date">
             {new Date(now).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
-            <span> · {event.name || event.code || competition.name}</span>
+            <span> · {event.name || event.code || competition?.name || 'Competition'}</span>
           </p>
           {next ? (
             <>
@@ -729,7 +743,7 @@ export default function PitScreen({ actor, settings, matches, batteries = [], ch
             api={api}
             onSync={<SyncButton settings={settings} api={api} />}
           />
-          {isManager && <Setup settings={settings} competitionDate={competition.date} roster={roster} api={api} />}
+          {isManager && <Setup settings={settings} comp={competition} roster={roster} api={api} />}
           <button className="text-btn pm-usual" onClick={onUsual}>
             Show the usual Today
           </button>

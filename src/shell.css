@@ -5715,3 +5715,55 @@ button.bs-cell:focus-visible { outline: 2px solid var(--accent); outline-offset:
 /* Checklists (3.2.8): the item's words are a tap target that checks it. */
 .cl-text-btn { display: block; text-align: left; white-space: pre-wrap; overflow-wrap: anywhere; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .cl-text-btn:focus { background: none; border-color: transparent; box-shadow: none; }
+
+/* Competitions (3.2.11): the season's events, from Milestones and Today. */
+.cm-dialog { width: min(560px, 100%); }
+.cm-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.cm-sync { margin-top: 2px; }
+.cm-sec { margin: 4px 0 -4px; font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.cm-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.cm-card { display: flex; align-items: flex-start; gap: 12px; padding: 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); min-width: 0; }
+.cm-card.today { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 7%, var(--surface)); }
+.cm-card.past { background: var(--surface-2); }
+.cm-date {
+  flex: none; width: 48px; display: flex; flex-direction: column; align-items: center; padding: 4px 0 5px; border-radius: 10px;
+  background: var(--accent-soft); color: var(--accent); line-height: 1.1;
+}
+.cm-card.past .cm-date { background: color-mix(in srgb, var(--text) 8%, transparent); color: var(--muted); }
+.cm-date small { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+.cm-date b { font-size: 21px; font-weight: 750; font-variant-numeric: tabular-nums; }
+.cm-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.cm-name { font-weight: 700; font-size: 15.5px; line-height: 1.3; overflow-wrap: anywhere; }
+.cm-when { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: 13.5px; color: var(--muted); }
+.cm-left { font-size: 12px; font-weight: 700; padding: 1px 8px; border-radius: 999px; background: var(--surface-2); color: var(--text); white-space: nowrap; }
+.cm-left.today { background: var(--accent); color: #fff; }
+.cm-left.past { background: transparent; color: var(--muted); padding: 0; font-weight: 600; }
+.cm-sub { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: 13.5px; color: var(--muted); overflow-wrap: anywhere; }
+.cm-code { font-size: 12px; padding: 1px 6px; border-radius: 6px; border: 1px solid var(--border); color: var(--text); }
+.cm-note { font-size: 13.5px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.cm-edit { flex: none; margin: -4px -4px 0 0; }
+.cm-empty { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 12px; border: 1px dashed var(--border); border-radius: 12px; }
+.cm-empty p { margin: 0; }
+.cm-past { border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); }
+.cm-past summary {
+  cursor: pointer; padding: 0 12px; min-height: 44px; display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 14px; list-style: none;
+}
+.cm-past summary::-webkit-details-marker { display: none; }
+.cm-past summary::after { content: ''; margin-left: auto; width: 8px; height: 8px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(45deg) translateY(-2px); }
+.cm-past[open] summary::after { transform: rotate(-135deg) translateY(-2px); }
+.cm-past .mono { color: var(--muted); }
+.cm-past .cm-list { padding: 0 8px 8px; }
+.cm-form { display: flex; flex-direction: column; gap: 10px; }
+.cm-form-title { margin: 4px 0 0; font-size: 16px; }
+.cm-form .fields { grid-template-columns: 100px minmax(0, 1fr); }
+.cm-end { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; min-width: 0; }
+.cm-end .input { flex: 1 1 160px; min-width: 0; }
+.cm-note-input { resize: vertical; min-height: 60px; }
+.cm-form-actions { flex-wrap: wrap; }
+@media (max-width: 760px) {
+  .cm-form .fields { grid-template-columns: minmax(0, 1fr); }
+}
+/* The countdown on Today opens Competitions. */
+.pit-count-btn { border: 0; background: none; padding: 0; margin: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; border-radius: 12px; }
+.pit-count-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+.pm-fill { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; }

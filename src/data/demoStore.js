@@ -47,6 +47,7 @@ import { buddyBlocks, lockNote } from '../../functions/shared/buddy.js';
 import { PHOTO_ACTIONS } from '../../functions/shared/petphotos.js';
 import { earnedIds } from '../../functions/shared/events.js';
 import { coinsText } from '../../functions/shared/coinText.js';
+import { addDay } from '../../functions/shared/streaks.js';
 
 const KEY = 'ftc32313-demo-v13';
 const listeners = new Set();
@@ -811,6 +812,32 @@ if (!state.joinSeeded) {
   state.joinRequests = [{ id: 'riley-chen', name: 'Riley Chen', at: Date.now() - 25 * 60000 }];
   state.joinSeeded = 1;
 }
+
+// 3.2.11: the season's competitions (settings/team.competitions): one that
+// already happened and three coming up, around the day the demo starts.
+// DEMO_FTC_EVENTS is what "Add from FTC Events" gets here: two already on
+// the list (same code) and two new ones.
+function demoCompDay(n) {
+  return addDay(teamDay(Date.now()), n);
+}
+if (!state.compsSeeded) {
+  state.settings = {
+    ...(state.settings || {}),
+    competitions: [
+      { id: 'demo-scrim', name: 'Fall Scrimmage', kind: 'scrimmage', start: demoCompDay(-23), place: 'Brooklyn Tech, Brooklyn, NY', note: 'Practice matches, no awards.' },
+      { id: 'demo-lm2', name: 'League Meet 2', kind: 'league', start: demoCompDay(12), place: 'Queens, NY', code: 'DEMOLM2' },
+      { id: 'demo-q1', name: 'NYC Qualifier', kind: 'qualifier', start: demoCompDay(40), end: demoCompDay(41), place: 'New York, NY', code: 'DEMOQ1', note: 'Two days. Load-in at 7:30 on the first day.' },
+      { id: 'demo-champ', name: 'State Championship', kind: 'championship', start: demoCompDay(96), end: demoCompDay(97), place: 'Albany, NY' },
+    ],
+  };
+  state.compsSeeded = 1;
+}
+const demoFtcEvents = () => [
+  { code: 'DEMOLM2', name: 'League Meet 2', start: demoCompDay(12), city: 'Queens, NY' },
+  { code: 'DEMOLM3', name: 'League Meet 3', start: demoCompDay(26), city: 'Queens, NY' },
+  { code: 'DEMOQ1', name: 'NYC Qualifier', start: demoCompDay(40), end: demoCompDay(41), city: 'New York, NY' },
+  { code: 'DEMOLT', name: 'League Tournament', start: demoCompDay(61), city: 'The Bronx, NY' },
+];
 
 // 3.2.8: older shifts for teammates who come now and then, so two of them
 // (Matthew, 26 days ago, and Ira, 45) are inactive: 3 weeks with no lab time
@@ -3367,8 +3394,11 @@ export const demoStore = {
     life.tick();
     return listen(() => cb([...(state.predictions || [])]));
   },
-  async ftcEvents() {
+  // FTC Events: the team's events this season (action 'events', for
+  // Competitions) are samples; the schedule and scouting need the real key.
+  async ftcEvents(req) {
     await new Promise((r) => setTimeout(r, 400));
+    if (req?.action === 'events') return { events: demoFtcEvents() };
     return { notSetUp: true };
   },
 

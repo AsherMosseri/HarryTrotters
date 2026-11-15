@@ -45,9 +45,10 @@ const SECTIONS = [
   [
     'Milestones',
     [
-      'The big steps to get the robot ready, on a timeline to the competition.',
+      'The big steps to get the robot ready, on a timeline to the next competition. Flags mark competition days.',
       'Pick a milestone in a task’s details, and the milestone’s bar fills in as those tasks get done.',
       'Status: Not started, On track, At risk (tasks behind schedule), Late (past its end date), Done.',
+      'Competitions (next to the countdown at the top here, or tap the countdown on Today): every competition this season, with the dates, place and days to go. Past ones are folded at the bottom.',
     ],
   ],
   [
@@ -95,7 +96,7 @@ const SECTIONS = [
   [
     'Competition',
     [
-      'On competition day Today becomes the pit screen: our next match, alliance color, partners and a countdown.',
+      'On competition day (every day of a multi-day event) Today becomes the pit screen: our next match, alliance color, partners and a countdown. The rest of the time, Today counts down to the next competition.',
       'Before queueing: a checklist with a big countdown for the drive team. It starts from the match time (or by hand) and resets every match.',
       'After a match, tap in our score on the number pad; it goes straight into the Match Log.',
       'Guess the score: before a practice run or match, guess our total (in the Match Log or on the pit screen). The closest guess wins coins. Whoever logs the run can’t win it.',
@@ -227,9 +228,10 @@ const MANAGER_TIPS = [
   'Roster: Edit anyone’s role, subteams, responsibilities, and name. Add or remove people. Removing someone signs them out everywhere and deletes their password; their messages, tasks, shifts and coins stay. Someone new (or removed) who signs in waits at the top under Waiting to join until you tap Approve (or Turn away).',
   'Inactive members: anyone with no lab time for 3 weeks is inactive (someone new gets 3 weeks to come first). They fold away under Inactive at the bottom of the Roster, with when they last came, and only team management sees that, there and on their profile. They’re off the coin and hours leaderboards, and lab check-ins and required polls don’t ask them or wait on them. Nothing else changes, and nothing is deleted. On the Roster, Keep active or Edit, Status sets Automatic, Keep active or Inactive. Clocking in makes anyone active again, a manual Inactive too.',
   'Market: add perks (or pick from the ideas), approve or decline purchases, and start tournaments (the entry takes short amounts like 2.5k). Cancelling one refunds every entry, and can delete it from the list too; finished ones can be deleted. In a tournament’s results you can void anyone’s result, and Clear or Void runs that need a check.',
-  'Competition mode (on Today): turn it on for an event or scrimmage, pick the event and drive team, and type in the match schedule or pull it from FTC Events.',
+  'Competition mode (on Today): turn it on for an event or scrimmage, pick the event and drive team, and type in the match schedule or pull it from FTC Events. On a competition day, that competition’s event code is filled in for you: tap Use it.',
   'Weekly recap: Trotbot posts it in #general on Sundays at 6 PM. Preview it on Today, post it early, or skip a week. Questions people report are listed on Learn for you to check.',
-  'Milestones: Change the competition date, and delete milestones.',
+  'Competitions (Milestones, Competitions, or tap the countdown on Today): Add, edit or delete the season’s competitions: name, kind, first and last day, place, FTC event code and a note. Add from FTC Events brings in every event the team is registered for at once, skipping ones already on the list. With nothing coming up, Today and Milestones say Add the next competition.',
+  'Milestones: delete milestones.',
   'Delete checklists, and permanently delete tasks from Recently deleted.',
   'Chat: post in #announcements (everyone gets a notification), use @everyone, delete any message, and remove reactions (the crossed-out face on a message).',
   'Channels: ＋ next to Channels adds one; ⋯ on a channel in the sidebar (⚙ in Chat on a phone) renames it, sets its topic and subteam color, moves it up or down, or deletes it.',

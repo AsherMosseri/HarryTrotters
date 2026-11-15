@@ -677,7 +677,8 @@ export const WINTER_ADS = [
   ),
 ];
 
-// md is month-day; competition week runs up to the competition date.
+// md is month-day; competition week runs up to the next competition (and
+// through it, for a multi-day event).
 export const PACKS = [
   { id: 'classic', label: 'Classic', ads: MORE_ADS, note: 'The 20 originals plus 30 more' },
   { id: 'halloween', label: '🎃 Halloween', ads: HALLOWEEN_ADS, from: '10-15', to: '11-02', note: 'Oct 15 to Nov 2' },
@@ -686,6 +687,8 @@ export const PACKS = [
 ];
 
 // Is a pack running? mode is 'on', 'off', or 'auto' (in season).
+// competitionDate: the day the next competition counts to (countdownDay in
+// functions/shared/competitions.js), '' with none coming up: the pack is off.
 export function packOn(pack, mode, today, competitionDate) {
   if (mode === 'on') return true;
   if (mode === 'off' || !mode) return false;

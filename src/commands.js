@@ -447,8 +447,8 @@ export function parseRemind(text, now = Date.now()) {
 
 // ---------- running one ----------
 
-// What happens when you send "/name args". ctx: { actor, roster, competitionDate,
-// countdown(), whois(name), ping(), setAfk(reason), addReminder(at, text),
+// What happens when you send "/name args". ctx: { actor, roster,
+// countdown() (the next competition, or null), whois(name), ping(), setAfk(reason), addReminder(at, text),
 // everyoneCoins() (before showing someone else's coins: true once everyone's
 // are loaded, false if they can't be right now) },
 // and for groups (src/groups.js): subteamsOf(name), isDm, isManager,
@@ -666,7 +666,7 @@ export async function runCommand({ cmd, args }, ctx) {
     }
     case 'countdown': {
       const c = ctx.countdown();
-      if (!c) return { note: { title: 'No competition date yet', body: 'Team management can set it on the Team tab.' } };
+      if (!c) return { note: { title: 'No competition coming up', body: 'Team management adds competitions on the Competitions screen (Milestones, Competitions).' } };
       return card(c);
     }
     case 'afk': {

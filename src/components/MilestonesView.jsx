@@ -15,6 +15,7 @@ import {
 import { Avatar, AvatarStack, CloseIcon, DraftInput, Overlay, PlusIcon, StatusDot } from './common.jsx';
 import { useEscape } from '../util.js';
 import { confirmDialog } from './Dialogs.jsx';
+import { compDates, daysUntil, lastDay } from '../competitions.js';
 
 const colorOf = (subteam) => SUBTEAM_COLORS[subteam] || 'var(--accent)';
 
@@ -47,14 +48,20 @@ function OwnerPicker({ roster, value, onChange }) {
   );
 }
 
-function Timeline({ items, competitionDate, onOpen }) {
+// The chart runs from the Monday before the first milestone (or today) to the
+// last milestone's end or the next competition, whichever is later. Every
+// competition day in that span gets a flag; each competition's first day a
+// dashed line.
+function Timeline({ items, competitions = [], next, onOpen }) {
   const today = todayISO();
-  const comp = competitionDate;
   const starts = items.map((i) => i.m.start).filter(Boolean);
   const ends = items.map((i) => i.m.end).filter(Boolean);
   const first = mondayOf([today, ...starts].sort()[0]);
-  const last = [comp, ...ends].sort().at(-1);
+  const last = [today, next ? lastDay(next) : '', ...ends].sort().at(-1);
   const days = daysBetween(first, last) + 1;
+  const shown = competitions.filter((c) => lastDay(c) >= first && c.start <= last);
+  const compOn = new Map();
+  for (const c of shown) for (let d = c.start; d <= lastDay(c); d = addDays(d, 1)) if (!compOn.has(d)) compOn.set(d, c);
   const dayList = Array.from({ length: days }, (_, i) => addDays(first, i));
   const pos = (iso) => (daysBetween(first, iso) / days) * 100;
   const weeks = [];
@@ -73,13 +80,12 @@ function Timeline({ items, competitionDate, onOpen }) {
             ))}
             {dayList.map((d, i) => {
               const dow = parseDay(d).getDay();
-              const cls = ['tl-day', dow === 0 || dow === 6 ? 'weekend' : '', d === today ? 'today' : '', d === comp ? 'comp' : ''].join(
-                ' ',
-              );
+              const comp = compOn.get(d);
+              const cls = ['tl-day', dow === 0 || dow === 6 ? 'weekend' : '', d === today ? 'today' : '', comp ? 'comp' : ''].join(' ');
               return (
-                <div key={d} className={cls} style={{ gridColumn: i + 1 }} title={shortDate(d)}>
+                <div key={d} className={cls} style={{ gridColumn: i + 1 }} title={comp ? `${comp.name} · ${shortDate(d)}` : shortDate(d)}>
                   <span>{'SMTWTFS'[dow]}</span>
-                  <b>{d === comp ? <Icon name="flag" size={14} /> : parseDay(d).getDate()}</b>
+                  <b>{comp ? <Icon name="flag" size={14} /> : parseDay(d).getDate()}</b>
                 </div>
               );
             })}
@@ -125,7 +131,11 @@ function Timeline({ items, competitionDate, onOpen }) {
               // No "Today" label: it covered the first row's bar, and the header already rings today's date.
               <span className="tl-today" style={{ left: `${pos(today) + 50 / days}%` }} title="Today" />
             )}
-            <span className="tl-comp" style={{ left: `${pos(comp) + 50 / days}%` }} />
+            {shown
+              .filter((c) => c.start >= first)
+              .map((c) => (
+                <span key={c.id} className="tl-comp" style={{ left: `${pos(c.start) + 50 / days}%` }} title={c.name} />
+              ))}
           </div>
         </div>
       </div>
@@ -354,10 +364,11 @@ function MilestonePanel({ item, roster, api, isManager, onClose, onOpenTask, onA
   );
 }
 
-export default function MilestonesView({ milestones, competitionDate, isManager, tasks, roster, api, onOpenTask, onAddTask }) {
+// competitions: the season's list; next: the next one (or null) by the
+// team's day, compDay. The header counts down to it and opens Competitions.
+export default function MilestonesView({ milestones, competitions = [], next = null, compDay, onCompetitions, isManager, tasks, roster, api, onOpenTask, onAddTask }) {
   const [openId, setOpenId] = useState(null);
   const [creating, setCreating] = useState(false);
-  const [editingDate, setEditingDate] = useState(false);
   const today = todayISO();
 
   const items = useMemo(
@@ -376,39 +387,29 @@ export default function MilestonesView({ milestones, competitionDate, isManager,
     return c;
   }, [items]);
   const open = items.find((i) => i.m.id === openId);
-  const left = daysBetween(today, competitionDate);
+  const left = next ? daysUntil(next, compDay || today) : null;
 
   return (
     <main className="content milestones">
       <div className="ms-header">
         <div>
           <h1>Milestones</h1>
-          <p className="muted">
-            {left > 0
-              ? `${left} day${left === 1 ? '' : 's'} until the competition`
-              : left === 0
-                ? 'Competition day'
-                : 'Competition is over'}
-            {' · '}
-            {parseDay(competitionDate).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
-            {isManager && !editingDate && (
-              <button className="link-btn" onClick={() => setEditingDate(true)}>
-                Change date
+          <p className="muted ms-comp">
+            {next ? (
+              <>
+                {left > 0 ? `${left} day${left === 1 ? '' : 's'} until ${next.name}` : `${next.name} is ${next.end && (compDay || today) > next.start ? 'on' : 'today'}`}
+                {' · '}
+                {compDates(next, left > 0 ? 'long' : 'medium')}
+              </>
+            ) : (
+              'No competition coming up'
+            )}
+            {onCompetitions && (
+              <button className="link-btn" onClick={onCompetitions}>
+                {!next && isManager ? 'Add the next competition' : 'Competitions'}
               </button>
             )}
           </p>
-          {editingDate && (
-            <input
-              className="input date-edit"
-              type="date"
-              autoFocus
-              defaultValue={competitionDate}
-              onBlur={() => setEditingDate(false)}
-              onChange={(e) => {
-                if (e.target.value) api.saveSettings({ competitionDate: e.target.value });
-              }}
-            />
-          )}
         </div>
         <span className="spacer" />
         <button className="btn primary" onClick={() => setCreating(true)}>
@@ -431,7 +432,7 @@ export default function MilestonesView({ milestones, competitionDate, isManager,
       )}
 
       {items.length ? (
-        <Timeline items={items} competitionDate={competitionDate} onOpen={setOpenId} />
+        <Timeline items={items} competitions={competitions} next={next} onOpen={setOpenId} />
       ) : (
         <div className="empty-card">
           <h2>No milestones yet</h2>

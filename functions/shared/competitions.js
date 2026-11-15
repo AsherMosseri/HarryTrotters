@@ -143,8 +143,6 @@ export function withCompetition(list, id, c) {
   return sortCompetitions(clean ? [...rest, clean] : rest);
 }
 
-export const newCompetitionId = (rand = Math.random) => `c${Date.now().toString(36)}${Math.floor(rand() * 1e6).toString(36)}`;
-
 // A kind from the event's name ("NYC Qualifier" is a qualifier).
 export function kindFromName(name = '') {
   if (/champ/i.test(name)) return 'championship';

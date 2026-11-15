@@ -8,6 +8,7 @@ import { daysBetween, milestoneProgress, parseDay, todayISO } from '../../milest
 import { useLocalStorage } from '../../util.js';
 import { teamDay } from '../../../functions/shared/coins.js';
 import { competitionOn } from '../../../functions/shared/matches.js';
+import { compDates, daysUntil } from '../../competitions.js';
 import PitScreen from './PitScreen.jsx';
 import { hoursOf } from '../../../functions/shared/hours.js';
 import { seasonStats } from '../../../functions/shared/stats.js';
@@ -72,7 +73,11 @@ export default function Today({
   actor,
   tasks,
   milestones,
-  competition,
+  // The next competition (functions/shared/competitions.js), or null when
+  // none is coming up; compDay is the team's day it goes by.
+  competition = null,
+  compDay,
+  onCompetitions,
   settings = {},
   matches = [],
   batteries = [],
@@ -108,10 +113,10 @@ export default function Today({
 }) {
   const people = usePeople();
   const today = todayISO();
-  // Competition mode (on the competition day, team time, or switched on by
+  // Competition mode (on a competition's days, team time, or switched on by
   // team management) turns this page into the pit screen. Anyone can step
   // back to the usual page on their own device for the rest of the day.
-  const compOn = competitionOn(settings.compMode, teamDay(Date.now()), competition.date, settings.compModeAt);
+  const compOn = competitionOn(settings.compMode, teamDay(Date.now()), competition, settings.compModeAt);
   const [usualOn, setUsualOn] = useLocalStorage('pit-usual-day', '');
   const usual = usualOn === teamDay(Date.now());
   if (compOn && !usual)
@@ -133,7 +138,7 @@ export default function Today({
     );
   return (
     <UsualToday
-      {...{ actor, tasks, milestones, competition, shifts, runs, myShift, convs, unread, chat, on, onOpenTask, onOpenConv, onPage, onNewTask, roster, joinRequests, chanWaiting, onChannelRequests }}
+      {...{ actor, tasks, milestones, competition, compDay: compDay || teamDay(Date.now()), onCompetitions, shifts, runs, myShift, convs, unread, chat, on, onOpenTask, onOpenConv, onPage, onNewTask, roster, joinRequests, chanWaiting, onChannelRequests }}
       {...{ settings, checklists, parts, onShowTasks, onShowParts, pinned, matches }}
       {...{ onStartShift, onOpenShift, onPerson, onEditProfile, people, today, api, disputes, onDisputes, extraLines }}
       pitButton={
@@ -156,6 +161,8 @@ function UsualToday({
   tasks,
   milestones,
   competition,
+  compDay,
+  onCompetitions,
   settings = {},
   checklists = [],
   pinned = [],
@@ -226,9 +233,10 @@ function UsualToday({
     .slice(0, 5);
   const nextMs = milestones.filter((m) => !m.done && m.end && m.end >= today).sort((a, b) => a.end.localeCompare(b.end))[0];
   const msProgress = nextMs ? milestoneProgress(nextMs, all) : null;
-  const left = competition.date ? daysBetween(today, competition.date) : -1;
-  // "Before the event": from now until the competition day (D4).
-  const ready = readiness({ tasks: all, parts, checklists, runs, goal: settings.runGoal, today, eventDate: competition.date });
+  // Days to the next competition (0 while it's on), -1 with none coming up.
+  const left = competition ? daysUntil(competition, compDay) : -1;
+  // "Before the event": from now until the next competition starts (D4).
+  const ready = readiness({ tasks: all, parts, checklists, runs, goal: settings.runGoal, today, eventDate: competition?.start || '' });
   const showReady = ready.show && tasks != null && !ready.ready;
 
   // The board's lines: short notes in plain words, each one tappable.
@@ -290,6 +298,10 @@ function UsualToday({
         text: `${unreadCount} unread in ${waiting.length === 1 ? (waiting[0].c.kind === 'dm' ? first(waiting[0].c.short) + '’s DM' : `#${waiting[0].c.name}`) : `${waiting.length} chats`}`,
         go: () => onOpenConv(waiting[0].c.key),
       },
+    // Team management, with nothing on the calendar: a nudge to add the next one.
+    actor.admin &&
+      !competition &&
+      onCompetitions && { tone: 'calm', text: 'Add the next competition', go: onCompetitions },
     // Nothing left before the event (the card hides itself).
     ready.show &&
       tasks != null &&
@@ -313,13 +325,14 @@ function UsualToday({
             <span> · {first(actor.name)}</span>
           </p>
           {left >= 0 ? (
-            <div className="pit-count">
+            // Tap for every competition this season.
+            <button className="pit-count pit-count-btn" onClick={onCompetitions} disabled={!onCompetitions} aria-label={`${left === 0 ? `${competition.name} is on` : `${left} ${left === 1 ? 'day' : 'days'} to ${competition.name}`}. All competitions`}>
               <CountUp className="pit-num" value={left} />
               <span className="pit-num-label">
-                {left === 0 ? `${competition.name} is today` : `${left === 1 ? 'day' : 'days'} to ${competition.name}`}
-                <small>{parseDay(competition.date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</small>
+                {left === 0 ? `${competition.name} is ${competition.end && compDay > competition.start ? 'on' : 'today'}` : `${left === 1 ? 'day' : 'days'} to ${competition.name}`}
+                <small>{compDates(competition)}</small>
               </span>
-            </div>
+            </button>
           ) : (
             <h1 className="pit-title">Harry Trotters</h1>
           )}
@@ -397,7 +410,7 @@ function UsualToday({
             <Readiness
               r={ready}
               on={on}
-              eventDate={competition.date}
+              eventDate={competition.start}
               isManager={!!actor.admin}
               api={api}
               onShowTasks={onShowTasks}
