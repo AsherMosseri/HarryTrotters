@@ -176,7 +176,7 @@ function FtcImport({ listRef, api, save }) {
       const events = r?.events || [];
       if (!events.length) return setState({ text: 'FTC Events has no events for us this season yet. Add them by hand, or try again once we’re registered.', tone: 'warn' });
       const { list, added, skipped } = mergeFtcEvents(listRef.current, events);
-      if (added.length) await save(list);
+      if (added.length) save(list);
       const already = skipped ? ` ${skipped} ${skipped === 1 ? 'was' : 'were'} already on the list.` : '';
       setState({
         text: added.length ? `Added ${added.length} ${added.length === 1 ? 'competition' : 'competitions'} from FTC Events.${already}` : `Everything from FTC Events is already on the list.`,
@@ -206,6 +206,8 @@ export default function CompetitionsDialog({ list, today, isManager, api, onToas
   const listRef = useRef(list);
   listRef.current = list;
   const { upcoming, past } = splitCompetitions(list, today);
+  // Not waited on: offline, the change shows at once and sends later (like
+  // every settings change), so the form closes right away.
   const save = (next) => api.saveSettings({ competitions: next });
   const remove = async (c) => {
     if (
@@ -217,7 +219,7 @@ export default function CompetitionsDialog({ list, today, isManager, api, onToas
       }))
     )
       return;
-    await save(withCompetition(listRef.current, c.id, null));
+    save(withCompetition(listRef.current, c.id, null));
     setEditing(null);
     onToast?.(`Deleted ${c.name}.`);
   };
@@ -240,9 +242,9 @@ export default function CompetitionsDialog({ list, today, isManager, api, onToas
               initial={editing}
               onCancel={() => setEditing(null)}
               onDelete={editing.id ? () => remove(editing) : null}
-              onSave={async (f) => {
+              onSave={(f) => {
                 const id = editing.id || newCompetitionId();
-                await save(withCompetition(listRef.current, id, { ...f, end: f.end && f.end > f.start ? f.end : '' }));
+                save(withCompetition(listRef.current, id, { ...f, end: f.end && f.end > f.start ? f.end : '' }));
                 setEditing(null);
                 onToast?.(editing.id ? `Saved ${f.name.trim()}.` : `Added ${f.name.trim()}.`);
               }}
