@@ -5767,3 +5767,4 @@ button.bs-cell:focus-visible { outline: 2px solid var(--accent); outline-offset:
 .pit-count-btn { border: 0; background: none; padding: 0; margin: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; border-radius: 12px; }
 .pit-count-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
 .pm-fill { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; }
+.ms-comp .link-btn { display: block; padding: 6px 0 0; text-align: left; }
