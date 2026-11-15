@@ -4,6 +4,18 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '3.2.11',
+    date: '2026-11-15',
+    title: 'Every competition of the season',
+    items: [
+      'A new Competitions screen holds every competition of the season, not just one. Tap the countdown on Today, or Competitions in Milestones.',
+      'Team management can add, edit and delete competitions, including events that run more than one day, with the place, event code and a note.',
+      'Add from FTC Events brings in all the events we’re registered for at once.',
+      'Today, Milestones and /countdown count down to the next competition, and when nothing’s coming up they say so instead of “Competition is over.”',
+      'Competition mode works on every day of a multi-day event and fills in that event’s code for you.',
+    ],
+  },
+  {
     version: '3.2.10',
     date: '2026-11-11',
     title: 'Short names all the way to a googol',
