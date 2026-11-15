@@ -80,7 +80,7 @@ service cloud.firestore {
       allow delete: if isManager();
     }
 
-    // Org chart and team settings (competition date): manager only.
+    // Org chart and team settings (the season's competitions, ...): manager only.
     match /roles/{id} {
       allow read: if isMember();
       allow write: if isManager();
