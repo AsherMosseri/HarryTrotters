@@ -4,6 +4,14 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '3.2.12',
+    date: '2026-11-23',
+    title: 'Your real pet as your pet',
+    items: [
+      'Added a photo of your real pet? Tick “Show the photo as …” under your pet in Market, Pets, and the photo becomes your pet: on your pet card, your profile, the pet park and next to your name in chat, instead of sitting beside the drawing. Untick it to bring the drawing back. Thanks, Kasha!',
+    ],
+  },
+  {
     version: '3.2.11',
     date: '2026-11-15',
     title: 'Every competition of the season',

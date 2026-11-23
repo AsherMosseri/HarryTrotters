@@ -4190,6 +4190,11 @@ html.kb-open .report-note { min-height: 56px; }
 .pp-sticker.mini img { padding: 2px; }
 .park.compact .pp-sticker.mini { right: -10px; bottom: 6px; }
 .pp-caption { margin: 0; text-align: center; color: var(--muted); font-size: 13px; font-weight: 600; }
+/* The photo shown as the pet itself (3.2.12): the cut-out alone, no frame,
+   as tall as the drawing would be. Fixed size, never animated. */
+.photo-pet { --pp: 92px; --ar: 1; display: inline-grid; place-items: end center; flex: none; height: var(--pp); width: auto; aspect-ratio: var(--ar); }
+.photo-pet img { display: block; width: 100%; height: 100%; object-fit: contain; user-select: none; -webkit-user-drag: none; filter: drop-shadow(0 2px 3px rgb(0 0 0 / 0.22)); }
+.pet-badge .photo-pet img { filter: none; border-radius: 4px; }
 
 .pp-row { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin: 6px 0 2px; }
 .pp-row p { margin: 0; }

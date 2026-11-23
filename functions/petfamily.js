@@ -48,7 +48,7 @@ export function petFamily({ db, notify, personId }) {
     const action = input?.action;
     const now = Date.now();
 
-    if (['adopt', 'rename', 'inChat', 'release', 'style', 'hatch'].includes(action)) {
+    if (['adopt', 'rename', 'inChat', 'photoAsPet', 'release', 'style', 'hatch'].includes(action)) {
       return db.runTransaction(async (tx) => {
         const mine = await docOf(tx, aliases);
         const earned = action === 'style' ? await earnedGear(tx, aliases) : [];

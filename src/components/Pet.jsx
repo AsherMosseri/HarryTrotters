@@ -7,7 +7,7 @@ import { Icon } from './shell/icons.jsx';
 import { confirmDialog, promptDialog } from './Dialogs.jsx';
 import { PetWithGear } from './PetGear.jsx';
 import { RequestPetLink } from './PetRequest.jsx';
-import { PetSticker, usePetPhoto } from './PetPhoto.jsx';
+import { PetSticker, PhotoPet, photoPetOf, usePetPhoto } from './PetPhoto.jsx';
 
 // Pets (H3): the art lives in PetArt.jsx. They breathe, hop when happy and
 // droop when sad, only while "Moving things" plays (shell.css), with
@@ -22,9 +22,11 @@ export function PetBadge({ name }) {
   // A ring around it from level 10 (bronze) up to 100 (All-Star); its fur tint too.
   const ring = ringOf(mine.st.level);
   const tint = cleanGear(mine.pet.gear).palette;
+  const drawn = <PetArt species={mine.pet.species} mood={mine.st.mood} stage={mine.st.stage} size={18} still className={tint ? `pet-tint-${tint}` : ''} />;
+  const photo = photoPetOf(market, name, mine.pet);
   return (
     <span className={`pet-badge${ring ? ` ring-${ring}` : ''}`} title={`${mine.pet.name}, level ${mine.st.level}, ${titleOf(mine.st.level)}`}>
-      <PetArt species={mine.pet.species} mood={mine.st.mood} stage={mine.st.stage} size={18} still className={tint ? `pet-tint-${tint}` : ''} />
+      {photo ? <PhotoPet photo={photo} size={18} fallback={drawn} /> : drawn}
     </span>
   );
 }
@@ -64,6 +66,7 @@ export function PetCard({ name, big = false, owner = false, onCare }) {
   const photo = usePetPhoto(name);
   if (!mine) return null;
   const { pet, st } = mine;
+  const asPet = photoPetOf(market, name, pet);
   const act = async (data) => {
     setBusy(true);
     await market.run('pet', data);
@@ -73,9 +76,12 @@ export function PetCard({ name, big = false, owner = false, onCare }) {
     <div className={`pet-card${big ? ' big' : ''} mood-${st.mood}`}>
       <div className="pp-pair">
         <div className="pet-stage">
-          <PetWithGear species={pet.species} mood={st.mood} stage={st.stage} size={big ? 148 : 92} title={`${pet.name} the ${pet.species}`} gear={pet.gear} />
+          {(() => {
+            const drawn = <PetWithGear species={pet.species} mood={st.mood} stage={st.stage} size={big ? 148 : 92} title={`${pet.name} the ${pet.species}`} gear={pet.gear} />;
+            return asPet ? <PhotoPet photo={asPet} size={big ? 148 : 92} title={pet.name} fallback={drawn} /> : drawn;
+          })()}
         </div>
-        <PetSticker photo={photo} size={big ? 96 : 64} />
+        {!asPet && <PetSticker photo={photo} size={big ? 96 : 64} />}
       </div>
       <div className="pet-info">
         <div className="pet-name-row">

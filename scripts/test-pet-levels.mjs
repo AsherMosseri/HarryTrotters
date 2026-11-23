@@ -150,5 +150,25 @@ check(P.nextUnlock(80, 'goat')?.id === 'jersey', 'a level 80 goat’s next unloc
 check(P.levelPath().find((r) => r.level === 100).unlocks.find((u) => u.name === 'Number 12 jersey')?.only === 'Goats only', 'the level path says Goats only');
 check(!P.levelPath('cat').find((r) => r.level === 100).unlocks.some((u) => u.name === 'Number 12 jersey'), 'a cat’s level path leaves it out');
 
+// 3.2.12: the photo as the pet (photoAsPet), only on the first pet, and a
+// gifted pet doesn't bring the giver's choice along.
+{
+  const two = P.docOf('Ira', [P.newPet('goat', 'Clover', 1), P.newPet('cat', 'Mochi', 2)]);
+  let e = P.petEdit('photoAsPet', { on: true }, { me: 'Ira', doc: two, now: 10 });
+  check(e.ok && P.petsIn(e.doc)[0].photoAsPet === true, 'photo as the first pet: on');
+  check(P.petsIn(e.doc)[1].photoAsPet !== true, 'the second pet is untouched');
+  const off = P.petEdit('photoAsPet', { on: false }, { me: 'Ira', doc: e.doc, now: 11 });
+  check(off.ok && P.petsIn(off.doc)[0].photoAsPet === false, 'photo as the pet: off again');
+  const notString = P.petEdit('photoAsPet', { on: 'yes' }, { me: 'Ira', doc: two, now: 12 });
+  check(P.petsIn(notString.doc)[0].photoAsPet === false, 'only on: true turns it on');
+  const second = P.petEdit('photoAsPet', { on: true, born: 2 }, { me: 'Ira', doc: two, now: 13 });
+  check(!!second.note, 'the second pet can’t show the photo');
+  check(!!P.petEdit('photoAsPet', { on: true }, { me: 'Ira', doc: null, now: 14 }).note, 'no pet: refused');
+  const giver = P.docOf('Ira', [{ ...P.newPet('goat', 'Clover', 1), photoAsPet: true }]);
+  const gift = { from: 'Ira', to: 'Sam', pet: { adoptedAt: 1, name: 'Clover' }, at: 100, status: 'pending' };
+  const got = P.giftAccept(gift, { me: 'Sam', doc: null, giverDoc: giver, giver: 'Ira', now: 200 });
+  check(got.ok && P.petsIn(got.doc)[0].photoAsPet === undefined, 'a gifted pet comes without the giver’s photo choice');
+}
+
 console.log(`${failures ? 'FAILED' : 'OK'}: ${passes} passed, ${failures} failed`);
 process.exit(failures ? 1 : 0);

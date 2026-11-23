@@ -1894,7 +1894,7 @@ export const demoStore = {
       const first = (n) => (n || '').split(' ')[0];
       const gifts = state.petGifts || (state.petGifts = []);
       const action = data.action;
-      if (['adopt', 'rename', 'inChat', 'release', 'style', 'hatch'].includes(action)) {
+      if (['adopt', 'rename', 'inChat', 'photoAsPet', 'release', 'style', 'hatch'].includes(action)) {
         // Event gear counts only for whoever earned it (petUnlocks, like the server).
         const earned = earnedIds((state.petUnlocks || []).find((u) => u.person === me));
         const r = petEdit(action, data, { me, doc: docOfName(me), shifts: state.shifts || [], earned, now });

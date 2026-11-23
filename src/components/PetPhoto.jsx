@@ -5,7 +5,9 @@ import { Icon } from './shell/icons.jsx';
 
 // Photos of real pets beside their drawn ones (3.0.9). A person adds one
 // cut-out photo of their real pet; it shows as a framed sticker beside their
-// pet once team management approves it. It never replaces the drawn pet.
+// pet once team management approves it. Since 3.2.12 its owner can choose to
+// show the photo as the pet itself instead (photoAsPet on their first pet):
+// then the photo stands where the drawing was, and no sticker is added.
 // The cut-out happens on the device (PetPhotoDialog.jsx, loaded only when
 // someone opens it); the checks are on the server (functions/petphotos.js).
 
@@ -49,6 +51,36 @@ export function PetSticker({ photo, size = 96, mini = false, pending = false, cl
 export function usePetPhoto(name) {
   const market = useMarket();
   return market?.photos?.of(name) || null;
+}
+
+// The approved photo when its owner shows it as their pet (only their first,
+// lead pet), else null: then the drawn pet shows as usual.
+export function photoPetOf(market, owner, pet, lead = true) {
+  if (!lead || pet?.photoAsPet !== true) return null;
+  return market?.photos?.of(owner) || null;
+}
+
+// The photo standing in for the drawn pet: the cut-out itself, no frame, as
+// tall as the drawing would be. If it fails to load, the drawing shows instead.
+export function PhotoPet({ photo, size = 92, title, className = '', fallback = null }) {
+  const [bad, setBad] = useState(false);
+  useEffect(() => setBad(false), [photo?.url]);
+  if (!photo?.url || bad) return fallback;
+  const ar = photo.w > 0 && photo.h > 0 ? Math.min(1.5, Math.max(0.55, photo.w / photo.h)) : 1;
+  return (
+    <span className={`photo-pet${className ? ` ${className}` : ''}`} style={{ '--pp': `${size}px`, '--ar': ar }} title={title}>
+      <img
+        src={photo.url}
+        alt={title || (photo.caption ? `${photo.caption}, the real pet` : 'The real pet')}
+        width={Math.round(size * ar)}
+        height={size}
+        loading="lazy"
+        decoding="async"
+        draggable={false}
+        onError={() => setBad(true)}
+      />
+    </span>
+  );
 }
 
 // Beside the pet on its own card: the approved photo; or, when there is none
@@ -103,8 +135,25 @@ export function PetPhotoRow({ pet, onToast }) {
       </div>
       {live?.caption && !waiting && (
         <p className="muted tiny">
-          {pet ? `Shown beside ${pet.name}` : 'Shown on your profile'}: {live.caption}
+          {pet ? (pet.photoAsPet ? `Shown as ${pet.name}` : `Shown beside ${pet.name}`) : 'Shown on your profile'}: {live.caption}
         </p>
+      )}
+      {pet && live && (
+        <label className="pet-toggle">
+          <input
+            type="checkbox"
+            checked={pet.photoAsPet === true}
+            disabled={busy}
+            onChange={async (e) => {
+              const on = e.target.checked;
+              setBusy(true);
+              const r = await market.run('pet', { action: 'photoAsPet', on });
+              setBusy(false);
+              if (!r?.ok) onToast(said(r) || 'That didn’t go through.');
+            }}
+          />
+          Show the photo as {pet.name}, instead of the drawing
+        </label>
       )}
       {waiting && (
         <p className="pp-badge" role="status">

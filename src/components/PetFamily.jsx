@@ -30,7 +30,7 @@ import { AdoptPet, FavoriteFood, Meter, nextLevelLine } from './Pet.jsx';
 import { RequestPetLink } from './PetRequest.jsx';
 import { PetWithGear } from './PetGear.jsx';
 import { EventsAdmin, ParkSection } from './PetPark.jsx';
-import { OwnSticker, PetPhotoReview, PetPhotoRow } from './PetPhoto.jsx';
+import { OwnSticker, PetPhotoReview, PetPhotoRow, PhotoPet, photoPetOf } from './PetPhoto.jsx';
 import { PetGamesHost, PetGamesSection } from './petgames/PetGamesCard.jsx';
 import { Icon } from './shell/icons.jsx';
 import ServerButton from './ServerButton.jsx';
@@ -243,9 +243,13 @@ function OwnedPet({ entry, lead, levels, roster, actor, offered, onToast, onPlay
     <div className={`pet-card big pf-pet mood-${st.mood}`} ref={card}>
       <div className="pp-pair">
         <div className="pet-stage">
-          <PetWithGear species={pet.species} mood={st.mood} stage={st.stage} size={148} title={`${pet.name} the ${pet.species}`} gear={gear} />
+          {(() => {
+            const drawn = <PetWithGear species={pet.species} mood={st.mood} stage={st.stage} size={148} title={`${pet.name} the ${pet.species}`} gear={gear} />;
+            const asPet = photoPetOf(market, market?.me, pet, lead);
+            return asPet ? <PhotoPet photo={asPet} size={148} title={pet.name} fallback={drawn} /> : drawn;
+          })()}
         </div>
-        {lead && <OwnSticker />}
+        {lead && !photoPetOf(market, market?.me, pet, lead) && <OwnSticker />}
       </div>
       <div className="pet-info">
         <div className="pet-name-row">

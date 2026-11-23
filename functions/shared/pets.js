@@ -468,7 +468,9 @@ export function hatchBlock(pet, level, levels = []) {
 // Each of a person's pets with its level now, for roomBlock and hatchBlock.
 export const levelsOf = (list, shifts = [], now = Date.now()) => list.map((p) => ({ name: p.name, level: levelAt(p, shifts, now) }));
 
-// The moves on your own pets: adopt, rename, inChat, release, style, hatch.
+// The moves on your own pets: adopt, rename, inChat, photoAsPet, release,
+// style, hatch. photoAsPet (3.2.12): the approved photo of your real pet shows
+// in place of the drawn one (only the first pet has a photo).
 // doc: your pets doc (or null). earned: the event gear you have earned.
 // Returns { note }, { unknown } or
 // { ok, doc } (doc: what to save, or null to delete it), plus `born` for a baby.
@@ -483,7 +485,7 @@ export function petEdit(action, input = {}, { me, doc, shifts = [], earned = [],
     const born = Math.max(now, ...list.map((p) => (p.adoptedAt || 0) + 1));
     return { ok: true, doc: docOf(me, [...list, newPet(input.species, name, born)]), born };
   }
-  if (!['rename', 'inChat', 'release', 'style', 'hatch'].includes(action)) return { unknown: true };
+  if (!['rename', 'inChat', 'photoAsPet', 'release', 'style', 'hatch'].includes(action)) return { unknown: true };
   if (!list.length) return note('You don’t have a pet.');
   const i = pickPet(list, input.born);
   if (i < 0) return note('That pet isn’t yours anymore.');
@@ -494,6 +496,8 @@ export function petEdit(action, input = {}, { me, doc, shifts = [], earned = [],
   });
   if (action === 'rename') return name ? swap({ name }) : note('Give your pet a name.');
   if (action === 'inChat') return swap({ inChat: input.on === true });
+  // The photo belongs to the first pet (the one on your profile).
+  if (action === 'photoAsPet') return i === 0 ? swap({ photoAsPet: input.on === true }) : note('Only your first pet can show the photo.');
   // Releasing the first pet moves the next one up to the top of the doc.
   if (action === 'release') return { ok: true, doc: docOf(me, list.filter((_, k) => k !== i)) };
   const level = levelAt(pet, shifts, now);
@@ -563,7 +567,9 @@ export function giftAccept(gift, { me, doc, giverDoc, giver, shifts = [], now = 
   const { person: _p, ...kept } = theirs[j];
   // It keeps its name, needs and whether it had a baby; its level starts over
   // with the new owner's lab time, and its gear was for the level it had.
-  const pet = { ...kept, adoptedAt: Math.max(now, ...list.map((p) => (p.adoptedAt || 0) + 1)), gear: emptyGear(), cared: 0, inChat: true };
+  // The giver's photo was of their real pet, so it doesn't come along.
+  const { photoAsPet: _photo, ...pet0 } = kept;
+  const pet = { ...pet0, adoptedAt: Math.max(now, ...list.map((p) => (p.adoptedAt || 0) + 1)), gear: emptyGear(), cared: 0, inChat: true };
   return { ok: true, doc: docOf(me, [...list, pet]), giverDoc: docOf(giver, theirs.filter((_, k) => k !== j)), pet };
 }
 

@@ -9,7 +9,7 @@ import { CloseIcon, Overlay } from './common.jsx';
 import { confirmDialog } from './Dialogs.jsx';
 import CountUp from './CountUp.jsx';
 import { PetWithGear } from './PetGear.jsx';
-import { PetSticker, usePetPhoto } from './PetPhoto.jsx';
+import { PetSticker, PhotoPet, photoPetOf, usePetPhoto } from './PetPhoto.jsx';
 import { Icon } from './shell/icons.jsx';
 
 // The pet park and team events (3.0.4). The park is a calm scene with every
@@ -104,8 +104,18 @@ export function ParkScene({ ev = null, compact = false, moving = 12, initial = 2
               onClick={() => onPick?.(e)}
               aria-label={`${e.pet.name}, ${e.owner}’s ${e.pet.species}, level ${e.st.level}`}
             >
-              <PetWithGear species={e.pet.species} mood={party ? 'happy' : e.st.mood} stage={e.st.stage} size={size} gear={e.pet.gear} still={i >= moving} />
-              {e.lead && <PetSticker photo={market.photos?.of(e.owner)} size={compact ? 28 : 38} mini />}
+              {(() => {
+                const drawn = <PetWithGear species={e.pet.species} mood={party ? 'happy' : e.st.mood} stage={e.st.stage} size={size} gear={e.pet.gear} still={i >= moving} />;
+                const asPet = photoPetOf(market, e.owner, e.pet, e.lead);
+                return asPet ? (
+                  <PhotoPet photo={asPet} size={size} fallback={drawn} />
+                ) : (
+                  <>
+                    {drawn}
+                    {e.lead && <PetSticker photo={market.photos?.of(e.owner)} size={compact ? 28 : 38} mini />}
+                  </>
+                );
+              })()}
               {!compact && <span className="park-name">{e.pet.name}</span>}
             </button>
           );
@@ -126,6 +136,7 @@ export function ParkCard({ entry, onClose }) {
   useEscape(onClose);
   const { pet, st, owner } = entry;
   const photo = usePetPhoto(owner);
+  const asPet = photoPetOf(useMarket(), owner, pet, entry.lead);
   const worn = Object.values(cleanGear(pet.gear, pet.species))
     .filter(Boolean)
     .map((id) => (gearItem(id) || eventGearItem(id))?.name)
@@ -144,9 +155,13 @@ export function ParkCard({ entry, onClose }) {
           <div className="park-card-body">
             <div className="pp-pair">
               <div className="pet-stage">
-                <PetWithGear species={pet.species} mood={st.mood} stage={st.stage} size={120} gear={pet.gear} title={`${pet.name} the ${pet.species}`} />
+                {asPet ? (
+                  <PhotoPet photo={asPet} size={120} title={pet.name} fallback={<PetWithGear species={pet.species} mood={st.mood} stage={st.stage} size={120} gear={pet.gear} title={`${pet.name} the ${pet.species}`} />} />
+                ) : (
+                  <PetWithGear species={pet.species} mood={st.mood} stage={st.stage} size={120} gear={pet.gear} title={`${pet.name} the ${pet.species}`} />
+                )}
               </div>
-              {entry.lead && <PetSticker photo={photo} size={84} />}
+              {entry.lead && !asPet && <PetSticker photo={photo} size={84} />}
             </div>
             {entry.lead && photo?.caption && <p className="pp-caption">{photo.caption}, the real pet</p>}
             <dl className="park-facts">
