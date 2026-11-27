@@ -11,6 +11,7 @@ import { celebrate } from './motion.js';
 import { noteFor } from './connection.js';
 import { usePetPhotos } from './petPhotos.js';
 import { usePetDeath } from './petDeath.js';
+import { recordFor } from '../functions/shared/battles.js';
 
 export const MarketContext = createContext(null);
 export const useMarket = () => useContext(MarketContext);
@@ -49,6 +50,9 @@ export function useMarketData(store, { actor, rename, renames, shifts, balanceOf
   useEffect(() => store.subscribePetGifts?.(actor.name, setGifts), [store, actor.name]);
   useEffect(() => store.subscribePetEvents?.(setEvents), [store]);
   useEffect(() => store.subscribePetUnlocks?.(setUnlocks), [store]);
+  // Pet battle records (petBattles: one small doc per person, written by the server).
+  const [battleDocs, setBattleDocs] = useState([]);
+  useEffect(() => store.subscribePetBattles?.(setBattleDocs), [store]);
   // A minute clock: needs run down and chat extras run out while you watch.
   const [minute, setMinute] = useState(() => Math.floor(Date.now() / 60000));
   useEffect(() => {
@@ -210,12 +214,15 @@ export function useMarketData(store, { actor, rename, renames, shifts, balanceOf
   // games are open, so the listener isn't on all the time.
   const watchGames = useCallback((cb) => store.subscribePetGames?.(cb) || (() => {}), [store]);
 
+  // A pet's battle record ({ w, l, d } or null), by its owner and when it came to them.
+  const battleRecord = useCallback((owner, born) => recordFor(battleDocs, owner, born, rename), [battleDocs, rename]);
+
   // Perks: team management writes them directly (the rules check who).
   const savePerk = useCallback((id, data) => store.savePerk(id, data, actor), [store, actor]);
   const deletePerk = useCallback((id) => store.deletePerk(id), [store]);
 
   return useMemo(
-    () => ({ perks, purchases, pets, tournaments, extras, petOf, petsOf, gifts, run, now, coinsOn, savePerk, deletePerk, events, allEvents: rawEvents, unlocks, askEvents: ask, petEvent, photos, death, watchGames, me: actor.name, rename }),
-    [perks, purchases, pets, tournaments, extras, petOf, petsOf, gifts, run, now, coinsOn, savePerk, deletePerk, events, rawEvents, unlocks, ask, petEvent, photos, death, watchGames, actor.name, rename],
+    () => ({ perks, purchases, pets, tournaments, extras, petOf, petsOf, gifts, run, now, coinsOn, savePerk, deletePerk, events, allEvents: rawEvents, unlocks, askEvents: ask, petEvent, photos, death, watchGames, battleDocs, battleRecord, me: actor.name, rename }),
+    [perks, purchases, pets, tournaments, extras, petOf, petsOf, gifts, run, now, coinsOn, savePerk, deletePerk, events, rawEvents, unlocks, ask, petEvent, photos, death, watchGames, battleDocs, battleRecord, actor.name, rename],
   );
 }

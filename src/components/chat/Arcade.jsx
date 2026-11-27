@@ -14,12 +14,14 @@ import { exactCoins } from '../../coinFormat.js';
 import { FlipCoin, ensureCasinoDefs } from './casinoArt.jsx';
 import { useMove } from './useMove.js';
 import { KINDS } from '../../../functions/shared/challenge.js';
+import { GRACE_MS } from '../../../functions/shared/battles.js';
+import { PetBattleCard } from './PetBattleCard.jsx';
 
 // Multiplayer game cards in #arcade (the play function runs the games; see
 // functions/shared/arcade.js). Buttons send moves; timers ask the server to
 // move things along ("peek") when a countdown runs out.
 
-export const ARCADE_CARDS = ['rps', 'tictactoe', 'connect4', 'duel', 'trivia', 'hangman', 'typerace', 'heist', 'battleship', 'tetris', 'minesweep', 'challenge'];
+export const ARCADE_CARDS = ['rps', 'tictactoe', 'connect4', 'duel', 'trivia', 'hangman', 'typerace', 'heist', 'battleship', 'tetris', 'minesweep', 'challenge', 'battle'];
 const coins = (n) => <Amt n={n} />;
 
 // Prizes the daily game limit cut short (the server puts what it paid in g.paid).
@@ -763,7 +765,10 @@ export function ArcadeBody({ m, me, Name, onMove, conv, view = false, onRun }) {
   const at = {
     open: c.name === 'typerace' ? g.startAt : c.name === 'heist' ? g.endsAt : g.expiresAt,
     playing:
-      c.name === 'typerace' || c.name === 'trivia' || RACES.includes(c.name)
+      // A pet battle's round: the server waits a moment past the time for a late pick.
+      c.name === 'battle'
+        ? (g.roundEnds || 0) + GRACE_MS + 150
+        : c.name === 'typerace' || c.name === 'trivia' || RACES.includes(c.name)
         ? g.endsAt
         : c.name === 'duel' && g.b !== BOT
           ? (g.drawAt || 0) + TIMES.duelIdle
@@ -794,6 +799,7 @@ export function ArcadeBody({ m, me, Name, onMove, conv, view = false, onRun }) {
     tetris: <RaceCard {...props} name="tetris" conv={conv} msgId={m.id} />,
     minesweep: <RaceCard {...props} name="minesweep" conv={conv} msgId={m.id} />,
     challenge: <Challenge {...props} />,
+    battle: <PetBattleCard {...props} />,
   }[c.name];
   return (
     <>

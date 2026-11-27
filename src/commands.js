@@ -97,6 +97,7 @@ export const COMMANDS = [
   { name: 'tetris', bare: true, group: 'arcade', args: '@person | bot [beginner…insane] | sprint', desc: 'Tetris: alone, race someone live, race Trotbot (5 levels), or a tournament', server: true },
   { name: 'minesweep', bare: true, group: 'arcade', args: '@person | bot [beginner…insane] | expert', desc: 'Minesweeper: alone, race someone on the same board, Trotbot (5 levels), or a tournament', server: true },
   { name: 'battleship', group: 'arcade', args: '@person bet hitagain', desc: 'Battleship (anyone, or @Trotbot). Add hitagain: a hit gets another turn', server: true },
+  { name: 'battle', group: 'arcade', args: '@person bet', desc: 'Pet battle: your pet against a teammate’s, move by move (a bet is optional)', server: true },
 
   { name: 'task', group: 'team', args: 'title @person friday !high', desc: 'Make a task' },
   { name: 'mytasks', group: 'team', args: '', desc: 'Your open tasks (check them off right here)' },

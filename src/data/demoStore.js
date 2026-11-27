@@ -42,6 +42,8 @@ import { demoLearn } from './demoLearn.js';
 import { demoEvents } from './demoEvents.js';
 import { demoPetPhotos } from './demoPetPhotos.js';
 import { demoPetDeath } from './demoPetDeath.js';
+import { demoBattles } from './demoBattles.js';
+import * as battleRules from '../../functions/shared/battles.js';
 import { demoLoans } from './demoLoans.js';
 import { demoBuddy } from './demoBuddy.js';
 import { buddyBlocks, lockNote } from '../../functions/shared/buddy.js';
@@ -1131,6 +1133,10 @@ if (!state.pets32Seeded) {
 const petDeath = demoPetDeath({ get: () => state, commit: () => commit(), uid });
 petDeath.seedSamples();
 petDeath.sweep();
+// Pet battles (demoBattles.js): the server's checks on the demo's pets, and a
+// demo teammate who answers a battle on their own.
+const petBattles = demoBattles({ get: () => state, commit: () => commit(), play: (...a) => demoStore.play(...a) });
+petBattles.seed();
 // Loans (demoLoans.js): the same checks as functions/loans.js.
 const loans = demoLoans({ get: () => state, commit: () => commit(), uid });
 // Gambling buddy (demoBuddy.js): the same decisions as functions/buddy.js.
@@ -1711,6 +1717,10 @@ export const demoStore = {
   async petEvent(req, actor) {
     return events.petEvent(req, actor);
   },
+  // Pet battle records (petBattles on the server).
+  subscribePetBattles(cb) {
+    return petBattles.subscribe(listen, cb);
+  },
   // Best scores in the pet games (functions/petgames.js does the same).
   subscribePetGames(cb) {
     return listen(() => cb((state.petGames || []).map((d) => ({ ...d }))));
@@ -2242,12 +2252,18 @@ export const demoStore = {
       return m;
     };
     const done = (r) => (commit(), r);
-    // An overdue loan locks gifts and bets, the same check as play on the server.
+    // An overdue loan locks gifts and bets, the same check as play on the
+    // server (a pet battle only with a bet).
+    const joining = action === 'move' && ['accept', 'join'].includes(String(move)) ? ((state.chat || {})[conv] || []).find((x) => x.id === msgId)?.cmd || null : null;
+    const battleBet = (c) => c?.name === 'battle' && c.game?.bet > 0;
     const betting =
       action === 'gift' ||
       (action === 'move'
-        ? ['accept', 'join', 'double', 'rock', 'paper', 'scissors'].includes(String(move))
-        : action !== 'prize' && (casino.CASINO.includes(game) || (arcade.MULTI.includes(game) && !['trivia', 'hangman', 'typerace'].includes(game))));
+        ? ['accept', 'join', 'double', 'rock', 'paper', 'scissors'].includes(String(move)) && !(joining?.name === 'battle' && !battleBet(joining))
+        : action !== 'prize' &&
+          (game === 'battle'
+            ? battleRules.hasBet(words)
+            : casino.CASINO.includes(game) || (arcade.MULTI.includes(game) && !['trivia', 'hangman', 'typerace'].includes(game))));
     const lock = betting ? loans.lockFor(me, balanceOf) : null;
     if (lock) return note(lock.title, lock.body);
     // A gambling buddy's lock refuses new casino bets, like the server's play.
@@ -2313,10 +2329,15 @@ export const demoStore = {
       const secret = (state.gameSecrets || {})[msgId];
       if (!m?.cmd || !secret) return note('That game is gone.');
       const c = m.cmd;
-      // Gambling buddy: accepting a challenge is a bet too, like the server.
-      if (String(move) === 'accept' && c.name === 'challenge') {
+      // Gambling buddy: accepting a challenge (or a pet battle with a bet) is a bet too, like the server.
+      if (String(move) === 'accept' && (c.name === 'challenge' || battleBet(c))) {
         const bl = buddies.lockFor(me);
         if (bl) return note(lockNote(bl).title, lockNote(bl).body);
+      }
+      // Pet battles off (Controls), or coins off for one with a bet: no accepting.
+      if (String(move) === 'accept' && c.name === 'battle' && me !== REQUESTS_TO) {
+        if ((state.controls?.off || []).includes(battleRules.FEATURE)) return note(...battleRules.OFF_NOTE);
+        if (battleBet(c) && (state.controls?.off || []).includes('coins')) return note('🪙 Jackson coins are off right now.', 'A pet battle with a bet can’t start while they’re off.');
       }
       // Controls: Casino and games during shifts off: no accepting or joining while clocked in.
       if (
@@ -2339,10 +2360,13 @@ export const demoStore = {
           balance: balanceOf(me),
           now,
           verified,
+          // A pet battle: both pets still with their owners (like the server).
+          ...(c.name === 'battle' && { alive: petBattles.alive(c.game) }),
         });
         if (r.error) return note(r.error);
         if (!r.write) return { ok: true, serverNow: now };
         const capped = payOut(r.money, { game: c.name, id: msgId });
+        if (c.name === 'battle') petBattles.record({ ...r.pub }, now);
         const cut = payDemoAwards(r.awards, msgId, now);
         const { status, ...g } = withCapped(r.pub, capped);
         if (Object.keys(cut).length) g.paid = cut;
@@ -2404,14 +2428,22 @@ export const demoStore = {
           hasOpen: old?.name === 'challenge' && old.status === 'open' && old.game.expiresAt > now,
         };
       }
+      // A pet battle: the pets and the switches, like the server (Asher is never switched off).
+      if (game === 'battle') {
+        const off = me === REQUESTS_TO ? [] : state.controls?.off || [];
+        if (off.includes(battleRules.FEATURE)) return note(...battleRules.OFF_NOTE);
+        more = { ...petBattles.context({ me, words, roster, balanceOf, bank: mine, now }), coinsOff: off.includes('coins') };
+      }
       const r = arcade.start(game, { me, words, roster, balance, bank: mine, now, content: DEMO_ARCADE, ...more });
       if (r.error) return note(r.error);
       const { status, ...g } = r.pub;
       const m = post({ game: g, status, bet: g.bet || 0 }, r.mentions);
       const capped = payOut(r.money, { game, id: m.id });
       if (Object.keys(capped).length) setCard({ conv, id: m.id }, { game: withCapped(g, capped) });
-      if (r.open) setBank(me, { ...bank(me), chOpen: { conv, id: m.id } });
+      if (r.open) setBank(me, { ...bank(me), [game === 'battle' ? 'btOpen' : 'chOpen']: { conv, id: m.id } });
       state.gameSecrets = { ...(state.gameSecrets || {}), [m.id]: r.secret };
+      // The demo teammate answers a battle on their own.
+      if (game === 'battle') petBattles.drive({ conv, msgId: m.id, opp: g.b, ctx: { balanceOf, roster, subteamsOf } });
       return done({ ok: true, serverNow: now });
     }
 

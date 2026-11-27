@@ -113,6 +113,8 @@ import { RequestForms } from './RequestForms.jsx';
 import { CoinFormatSetting } from './CoinNum.jsx';
 import { coinStyled } from '../coinFormat.js';
 import { checklistApi } from '../checklistApi.js';
+import { onAskBattle } from '../battles.js';
+import { BattleAsk } from './PetBattle.jsx';
 
 // Versions were renumbered once (2.0 became 1.9, 2.1 became 2.0, and so
 // on). Move this device's "last seen" version along so What's new doesn't
@@ -1196,6 +1198,9 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
   );
   const [profileFor, setProfileFor] = useState(null);
   const [editProfileFor, setEditProfileFor] = useState(null);
+  // Pet battles (3.3): the Battle sheet, from a pet's Battle button anywhere (battles.js).
+  const [battleAsk, setBattleAsk] = useState(null);
+  useEffect(() => onAskBattle(setBattleAsk), []);
   // What everyone sees of a profile: Controls can switch looks off (profileView).
   const shownProfiles = useMemo(
     () => (controls.exempt ? profiles : new Map([...profiles].map(([n, p]) => [n, profileView(p, controls.isOn)]))),
@@ -3512,6 +3517,22 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
                       )}
                     </div>
                   </Overlay>
+                )}
+                {battleAsk && (
+                  <BattleAsk
+                    target={battleAsk}
+                    actor={actor}
+                    play={api.play}
+                    coinsOn={controls.isOn('coins')}
+                    onClose={() => setBattleAsk(null)}
+                    onSent={(text) => {
+                      setBattleAsk(null);
+                      setProfileFor(null);
+                      setFullProfileFor(null);
+                      setToast({ text });
+                      goTo('chat:arcade');
+                    }}
+                  />
                 )}
                 {profileFor && (
                   <ProfileCard

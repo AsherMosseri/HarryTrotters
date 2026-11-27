@@ -4,6 +4,7 @@ import { rallyCleared } from '../../../functions/shared/petgames.js';
 import { readLocal } from '../../petgames/bests.js';
 import { Overlay } from '../common.jsx';
 import { Icon } from '../shell/icons.jsx';
+import { useControls } from '../../controls.js';
 import './petgames.css';
 
 // The way into the pet games (3.2), on the Pets shelf under the park: Pet Hop
@@ -28,6 +29,7 @@ export function PetGamesSection({ actor, petName, onOpen }) {
   // Read again each time the shelf shows (a game just ended, say).
   const b = readLocal(actor.name);
   const cleared = rallyCleared(b.rally);
+  const battlesOn = useControls().isOn('petBattles');
   return (
     <section className="mk-sec" id="pet-games">
       <div className="sec-head">
@@ -59,8 +61,20 @@ export function PetGamesSection({ actor, petName, onOpen }) {
           </span>
           <Icon name="play" size={18} />
         </button>
+        {battlesOn && (
+          <button className="pg-tile battles" onClick={() => onOpen({ game: 'battles' })}>
+            <span className="pg-tile-art" aria-hidden="true">
+              <BattleArt />
+            </span>
+            <span className="pg-tile-text">
+              <b>Pet battles</b>
+              <span className="muted small">Your moves, the board, and how to battle a teammate’s pet.</span>
+            </span>
+            <Icon name="chevron" size={18} />
+          </button>
+        )}
       </div>
-      <p className="muted small">Just for fun: no coins, and your pet still grows with your lab time.</p>
+      <p className="muted small">Just for fun: no coins (a pet battle can have a bet), and your pet still grows with your lab time.</p>
     </section>
   );
 }
@@ -78,6 +92,22 @@ function HopArt() {
       <circle cx="18" cy="22" r="7" fill="#f6a85c" stroke="#a85a26" strokeWidth="1.2" />
       <circle cx="20.5" cy="20.5" r="1.3" fill="#2a2730" />
       <path d="M10 27 q-4 3 -2 6" stroke="#fff" strokeWidth="1.6" fill="none" strokeLinecap="round" opacity="0.9" />
+    </svg>
+  );
+}
+// Two pets facing off on a little field: red alliance and blue.
+function BattleArt() {
+  return (
+    <svg viewBox="0 0 64 48" width="64" height="48">
+      <rect width="64" height="48" rx="8" fill="#d9dde4" />
+      <path d="M0 0 H8 V48 H0 Z" fill="#e0475b" opacity="0.85" />
+      <path d="M56 0 H64 V48 H56 Z" fill="#3b82f6" opacity="0.85" />
+      <path d="M32 6 V42" stroke="#fff" strokeWidth="1.4" strokeDasharray="3 3" />
+      <circle cx="20" cy="27" r="8" fill="#f6a85c" stroke="#a85a26" strokeWidth="1.2" />
+      <circle cx="23" cy="25" r="1.3" fill="#2a2730" />
+      <circle cx="44" cy="27" r="8" fill="#b9c2ce" stroke="#5b6475" strokeWidth="1.2" />
+      <circle cx="41" cy="25" r="1.3" fill="#2a2730" />
+      <path d="M29 14 l3 4 l3 -4" stroke="#f59e0b" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }

@@ -75,6 +75,7 @@ function FloatingPicker({ anchor, onClose, children }) {
 // Whether a message still has something to show with some features switched
 // off (Controls): a GIF-only message disappears when GIFs are off.
 export function messageShows(m, feat) {
+  if (m.cmd?.name === 'battle') return feat('petBattles');
   if (m.cmd && isCoinCommand(m.cmd.name)) return feat('coins');
   if (m.deleted || m.cmd || (m.text && !m.poll)) return true;
   return !!(

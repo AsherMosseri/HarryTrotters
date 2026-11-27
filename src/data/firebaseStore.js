@@ -839,6 +839,15 @@ export const firebaseStore = {
       (e) => console.warn('petGames', e),
     );
   },
+  // Pet battle records (petBattles, written by the play function when a
+  // battle ends): each pet's wins, losses and draws.
+  subscribePetBattles(cb) {
+    return onSnapshot(
+      collection(db, 'petBattles'),
+      (snap) => cb(snap.docs.map(readDoc)),
+      (e) => console.warn('petBattles', e),
+    );
+  },
   // Photos of real pets (functions/petphotos.js). The approved ones everyone
   // sees; the waiting and answered ones are yours (or all of them, for team
   // management). The device uploads its own small PNG sticker; the pet

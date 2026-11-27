@@ -117,7 +117,7 @@ const loanCmd = COMMANDS.find((c) => c.name === 'loan');
 eq(!!loanCmd, true, '/loan is a command');
 eq(loanCmd?.bare, true, '/loan sends on one Return');
 eq(loanCmd?.group, 'economy', '/loan is with the coin commands');
-eq(COMMANDS.length, 112, '112 commands');
+eq(COMMANDS.length, 113, '113 commands (3.3: /battle)');
 eq(matchCommands('loa', {})[0]?.name, 'loan', '/loa suggests /loan');
 const run = (text, extra = {}) =>
   runCommand(parseCommand(text), { conv: 'arcade', commandCfg: {}, ...ctx(), ...extra });

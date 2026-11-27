@@ -9,6 +9,7 @@ import { PetWithGear } from './PetGear.jsx';
 import { RequestPetLink } from './PetRequest.jsx';
 import { PetSticker, PhotoPet, photoPetOf, usePetPhoto } from './PetPhoto.jsx';
 import { AdoptWaitNote, PetNeglect } from './PetDeath.jsx';
+import { BattleButton, BattleRecord } from './PetBattle.jsx';
 
 // Pets (H3): the art lives in PetArt.jsx. They breathe, hop when happy and
 // droop when sad, only while "Moving things" plays (shell.css), with
@@ -95,12 +96,19 @@ export function PetCard({ name, big = false, owner = false, onCare }) {
         <p className="pet-mood">{moodLine(pet.name, st)}</p>
         <PetNeglect owner={name} pet={pet} mine={name === market.me} />
         <FavoriteFood species={pet.species} />
+        <BattleRecord owner={name} born={pet.adoptedAt} />
         <div className="pet-xp" title={nextLevelLine(st)}>
           <span style={{ transform: `scaleX(${Math.max(0.02, st.progress)})` }} />
         </div>
         <p className="muted tiny">{nextLevelLine(st)}</p>
         <Meter label="Food" value={st.food} />
         <Meter label="Fun" value={st.fun} />
+        {/* A teammate's pet: challenge it (Battle opens the sheet; Workspace sends it). */}
+        {!owner && name !== market.me && (
+          <div className="pet-actions">
+            <BattleButton owner={name} born={pet.adoptedAt} small />
+          </div>
+        )}
         {owner && (
           <div className="pet-actions">
             {onCare && (

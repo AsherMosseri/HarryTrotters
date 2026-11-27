@@ -47,6 +47,7 @@ export const FEATURE_GROUPS = [
       ['profileColors', 'Profile colors', 'Custom colors on profile cards'],
       ['coins', 'Jackson coins', 'Coins, the casino, games, and coin commands'],
       ['hiddenCoins', 'Hidden coins', 'Little coins that now and then show up around the app to tap'],
+      ['petBattles', 'Pet battles', 'Battling a teammate’s pet (with Jackson coins off, battles still work, just with no bets)'],
       ['casinoOnShift', 'Casino and games during shifts', 'Off: nobody can start, accept or join a casino or arcade game while they’re clocked in'],
       ['ads', 'Ads', 'Every ad in the app'],
       ['themes', 'Themes', 'Color themes (everyone gets the standard look)'],
@@ -103,9 +104,13 @@ export const offCount = (d = {}) =>
 export { COIN_GROUPS };
 // loansOn: Controls, Loans is on (or it's the owner); off hides /loan, and
 // loansOff says that's the only reason, so /loan pay still runs (commands.js).
+// Pet battles (/battle) aren't a coin command here: with coins off they still
+// work, with no bets (the play function refuses a bet); they have their own switch.
 export function commandCfgFor(cfg = {}, controls, { loansOn = true } = {}) {
   const extra = COMMANDS.filter(
-    (c) => (c.name === 'poll' && !controls.isOn('polls')) || (COIN_GROUPS.includes(c.group) && !controls.isOn('coins')),
+    (c) =>
+      (c.name === 'poll' && !controls.isOn('polls')) ||
+      (c.name === 'battle' ? !controls.isOn('petBattles') : COIN_GROUPS.includes(c.group) && !controls.isOn('coins')),
   ).map((c) => c.name);
   const out = extra.length ? { ...cfg, off: [...new Set([...(cfg.off || []), ...extra])] } : cfg;
   if (loansOn || (out.off || []).includes('loan')) return out;
@@ -152,5 +157,6 @@ export function profileView(p, isOn) {
 }
 
 // Coin commands' cards in chat (casino, economy, games) hide with the coins.
-const COIN_COMMANDS = new Set(COMMANDS.filter((c) => COIN_GROUPS.includes(c.group)).map((c) => c.name));
+// Pet battle cards follow their own switch instead (Message.jsx messageShows).
+const COIN_COMMANDS = new Set(COMMANDS.filter((c) => COIN_GROUPS.includes(c.group) && c.name !== 'battle').map((c) => c.name));
 export const isCoinCommand = (name) => COIN_COMMANDS.has(name);

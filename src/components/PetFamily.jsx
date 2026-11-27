@@ -33,6 +33,7 @@ import { PetWithGear } from './PetGear.jsx';
 import { EventsAdmin, ParkSection } from './PetPark.jsx';
 import { OwnSticker, PetPhotoReview, PetPhotoRow, PhotoPet, photoPetOf } from './PetPhoto.jsx';
 import { PetGamesHost, PetGamesSection } from './petgames/PetGamesCard.jsx';
+import { BattleMoves, BattleRecord } from './PetBattle.jsx';
 import { AdoptWaitNote, DeathOffRow, InMemory, PetDeathReview, PetNeglect } from './PetDeath.jsx';
 import { Icon } from './shell/icons.jsx';
 import ServerButton from './ServerButton.jsx';
@@ -302,6 +303,8 @@ function OwnedPet({ entry, lead, levels, roster, actor, offered, onToast, onPlay
         )}
         <Meter label="Food" value={st.food} />
         <Meter label="Fun" value={st.fun} />
+        <BattleMoves species={pet.species} level={st.level} />
+        <BattleRecord owner={actor.name} born={pet.adoptedAt} />
         <div className="pet-actions">
           <button className="btn small" onClick={onPlay}>
             <Icon name="play" size={16} /> Play

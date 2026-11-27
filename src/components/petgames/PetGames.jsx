@@ -10,6 +10,8 @@ import { PhotoPet, photoPetOf } from '../PetPhoto.jsx';
 import { Icon } from '../shell/icons.jsx';
 import HopGame from './HopGame.jsx';
 import RallyGame from './RallyGame.jsx';
+import { useControls } from '../../controls.js';
+import { BattleBoard, BattleMoves, BattleRecord } from '../PetBattle.jsx';
 
 // The pet games screen (3.2): pick Pet Hop or Pet Rally, play with your own
 // pet, and see your bests and the team's. Loaded only when it opens.
@@ -31,7 +33,9 @@ export default function PetGames({ actor, start = {}, onClose }) {
   const entry = list.find((e) => e.pet.adoptedAt === born) || list[0];
   // Your real pet's photo plays instead of the drawing when you chose that (first pet only).
   const photo = entry ? photoPetOf(market, me, entry.pet, entry === list[0]) : null;
-  const [tab, setTab] = useState(start.game === 'rally' ? 'rally' : 'hop');
+  const [tab, setTab] = useState(start.game === 'rally' ? 'rally' : start.game === 'battles' ? 'battles' : 'hop');
+  // Pet battles (3.3) have their own board here, unless they're switched off.
+  const battlesOn = useControls().isOn('petBattles');
   const [playing, setPlaying] = useState(start.game === 'hop' ? { game: 'hop' } : null);
   useEscape(() => (playing ? setPlaying(null) : onClose()));
 
@@ -114,7 +118,7 @@ export default function PetGames({ actor, start = {}, onClose }) {
     );
   }
 
-  const board = docs ? boardOf(docs, tab, { rename: market.rename }) : null;
+  const board = docs && tab !== 'battles' ? boardOf(docs, tab, { rename: market.rename }) : null;
   return (
     <div className="panel-backdrop center pg-backdrop" onClick={onClose}>
       <div className="dialog pg-dialog" role="dialog" aria-label="Pet games" onClick={(e) => e.stopPropagation()}>
@@ -146,13 +150,21 @@ export default function PetGames({ actor, start = {}, onClose }) {
           )}
         </div>
         <div className="segmented pg-tabs" role="tablist">
-          {['hop', 'rally'].map((g) => (
+          {['hop', 'rally', ...(battlesOn ? ['battles'] : [])].map((g) => (
             <button key={g} role="tab" aria-selected={tab === g} className={`plain-seg${tab === g ? ' on' : ''}`} onClick={() => setTab(g)}>
-              <Icon name={g === 'hop' ? 'sparkle' : 'car'} size={16} /> {GAME_INFO[g].name}
+              <Icon name={g === 'hop' ? 'sparkle' : g === 'rally' ? 'car' : 'bolt'} size={16} /> {g === 'battles' ? 'Battles' : GAME_INFO[g].name}
             </button>
           ))}
         </div>
-        {tab === 'hop' ? (
+        {tab === 'battles' && battlesOn ? (
+          <section className="pg-sec">
+            <p className="muted small">
+              Battle a teammate’s pet: tap their pet in the pet park or on their profile, or type /battle @name in #arcade. Each round you both pick a move. A battle never changes your pet.
+            </p>
+            <BattleMoves species={pet.species} level={st.level} />
+            <BattleRecord owner={me} born={pet.adoptedAt} />
+          </section>
+        ) : tab === 'hop' ? (
           <section className="pg-sec">
             <p className="muted small">{GAME_INFO.hop.line} Each gap is a point.</p>
             <div className="pg-best-row">
@@ -187,10 +199,13 @@ export default function PetGames({ actor, start = {}, onClose }) {
         )}
         <section className="pg-sec">
           <div className="pg-board-head">
-            <h3 className="fun-cap">Team board, for fun</h3>
+            <h3 className="fun-cap">{tab === 'battles' ? 'Battles board' : 'Team board, for fun'}</h3>
             {tab === 'rally' && <span className="muted tiny">Levels cleared, then total time</span>}
+            {tab === 'battles' && <span className="muted tiny">Wins–losses–draws</span>}
           </div>
-          {!board ? (
+          {tab === 'battles' ? (
+            <BattleBoard me={me} />
+          ) : !board ? (
             <p className="muted small">Loading…</p>
           ) : !board.length ? (
             <p className="muted small">Nobody on the board yet. Be the first!</p>

@@ -11,6 +11,7 @@ import CountUp from './CountUp.jsx';
 import { PetWithGear } from './PetGear.jsx';
 import { PetSticker, PhotoPet, photoPetOf, usePetPhoto } from './PetPhoto.jsx';
 import { Icon } from './shell/icons.jsx';
+import { BattleButton, BattleRecord } from './PetBattle.jsx';
 
 // The pet park and team events (3.0.4). The park is a calm scene with every
 // teammate's pets in it; an event is a meter the whole team's lab time fills,
@@ -178,6 +179,10 @@ export function ParkCard({ entry, onClose }) {
             </dl>
           </div>
           <p className="muted small park-mood">{moodLine(pet.name, st)}</p>
+          <BattleRecord owner={owner} born={pet.adoptedAt} className="park-record" />
+          <div className="park-card-btns">
+            <BattleButton owner={owner} born={pet.adoptedAt} onOpen={onClose} />
+          </div>
         </div>
       </div>
     </Overlay>

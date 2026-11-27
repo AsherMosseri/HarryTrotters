@@ -1,0 +1,151 @@
+/* Pet battles (3.3): the battle card in #arcade, the Battle sheet, the record
+   line, a pet's moves and the Battles board. The field is our own: a small
+   practice field with foam tiles, red alliance on the left and blue on the
+   right. Movement plays only with Moving things on (data-anim~='move'). */
+
+.arc-battle {
+  --bt-red: #d9374b;
+  --bt-blue: #2f6fdb;
+  --bt-tile: #e6e9ef;
+  --bt-tile-line: rgb(16 24 40 / 7%);
+  --bt-ok: #16a34a;
+  --bt-mid: #d97706;
+  --bt-low: #dc2626;
+  display: flex; flex-direction: column; gap: 8px; min-width: 0;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .arc-battle { --bt-tile: #262b37; --bt-tile-line: rgb(255 255 255 / 6%); --bt-red: #f0627a; --bt-blue: #6a9cf5; --bt-ok: #4ade80; --bt-mid: #fbbf24; --bt-low: #f87171; }
+}
+:root[data-theme='dark'] .arc-battle { --bt-tile: #262b37; --bt-tile-line: rgb(255 255 255 / 6%); --bt-red: #f0627a; --bt-blue: #6a9cf5; --bt-ok: #4ade80; --bt-mid: #fbbf24; --bt-low: #f87171; }
+
+.bt-top { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; }
+.bt-round { font-size: 12.5px; font-weight: 700; color: var(--muted); }
+.bt-top .arc-betpill { margin-left: auto; }
+
+/* The field. */
+.bt-field {
+  position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: stretch; gap: 4px;
+  padding: 10px 8px 12px; border-radius: 14px; overflow: hidden;
+  background:
+    linear-gradient(90deg, var(--bt-red) 0 5px, transparent 5px calc(100% - 5px), var(--bt-blue) calc(100% - 5px)),
+    repeating-linear-gradient(0deg, var(--bt-tile-line) 0 1px, transparent 1px 34px),
+    repeating-linear-gradient(90deg, var(--bt-tile-line) 0 1px, transparent 1px 34px),
+    var(--bt-tile);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+.bt-side { min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 4px 2px 6px; border-radius: 12px; border: 1.5px solid transparent; text-align: center; }
+.bt-owner { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; font-weight: 650; }
+.bt-side.red .bt-owner { color: var(--bt-red); }
+.bt-side.blue .bt-owner { color: var(--bt-blue); }
+.bt-owner .name-btn { color: inherit; }
+.bt-stage { position: relative; display: grid; place-items: end center; min-height: 72px; line-height: 0; }
+.bt-side.blue .bt-stage .bt-pet { transform: scaleX(-1); }
+.bt-name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; }
+.bt-side.won { border-color: rgb(245 180 0 / 70%); background: rgb(255 211 77 / 14%); }
+.bt-side.lost { opacity: 0.75; }
+.bt-vs { align-self: center; font-weight: 800; font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); padding: 0 2px; }
+.bt-dazed { position: absolute; top: -2px; left: 50%; translate: -50% 0; font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 999px; color: #3b2a00; background: #fde68a; line-height: 1.5; }
+
+/* Health. */
+.bt-hp { width: 100%; display: flex; flex-direction: column; align-items: stretch; gap: 2px; }
+.bt-hp-bar { position: relative; height: 8px; border-radius: 999px; background: rgb(16 24 40 / 12%); overflow: hidden; }
+.bt-hp-bar > span { position: absolute; inset: 0; border-radius: inherit; background: var(--bt-ok); transition: transform 0.6s cubic-bezier(0.3, 0.7, 0.3, 1); }
+.bt-hp.mid .bt-hp-bar > span { background: var(--bt-mid); }
+.bt-hp.low .bt-hp-bar > span { background: var(--bt-low); }
+.bt-hp-num { font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* What floats over a pet after a round. */
+.bt-pops { position: absolute; inset: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 2px; pointer-events: none; line-height: 1.2; }
+.bt-pop { font-weight: 800; font-size: 15px; padding: 0 6px; border-radius: 999px; background: var(--surface); box-shadow: 0 1px 3px rgb(0 0 0 / 22%); opacity: 0; animation: bt-pop-show 2.4s calc(0.35s + var(--i) * 0.12s) both; }
+.bt-pop.dmg { color: var(--bt-low); }
+.bt-pop.crit { color: #fff; background: var(--bt-low); }
+.bt-pop.heal { color: var(--bt-ok); }
+.bt-pop.note { font-size: 12px; color: var(--text); }
+@keyframes bt-pop-show { 0% { opacity: 0; } 10% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; } }
+:root[data-anim~='move'] .bt-pop { animation-name: bt-pop-float; }
+@keyframes bt-pop-float { 0% { opacity: 0; transform: translateY(10px) scale(0.8); } 12% { opacity: 1; transform: translateY(0) scale(1.08); } 20% { transform: scale(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: translateY(-14px); } }
+
+/* The round playing out: an attacker lunges, a pet that's hit shakes, a
+   shield glows, a dodge hops aside, a heal glows green. */
+:root[data-anim~='move'] .bt-side.red.lunge .bt-stage { animation: bt-lunge-r 0.5s cubic-bezier(0.3, 0.8, 0.4, 1.2) both; }
+:root[data-anim~='move'] .bt-side.blue.lunge .bt-stage { animation: bt-lunge-b 0.5s cubic-bezier(0.3, 0.8, 0.4, 1.2) both; }
+:root[data-anim~='move'] .bt-side.shake .bt-stage { animation: bt-shake 0.45s 0.3s ease both; }
+:root[data-anim~='move'] .bt-side.red.lunge.shake .bt-stage { animation: bt-lunge-r 0.5s cubic-bezier(0.3, 0.8, 0.4, 1.2) both, bt-shake 0.45s 0.5s ease; }
+:root[data-anim~='move'] .bt-side.blue.lunge.shake .bt-stage { animation: bt-lunge-b 0.5s cubic-bezier(0.3, 0.8, 0.4, 1.2) both, bt-shake 0.45s 0.5s ease; }
+:root[data-anim~='move'] .bt-side.dodge .bt-stage { animation: bt-dodge 0.55s 0.2s ease both; }
+.bt-side.shield .bt-stage::after { content: ''; position: absolute; inset: -4px 8px 0; border-radius: 50% 50% 40% 40%; border: 2px solid rgb(59 130 246 / 70%); background: rgb(59 130 246 / 10%); pointer-events: none; }
+:root[data-anim~='move'] .bt-side.shield .bt-stage::after { animation: bt-shield 1.6s ease both; }
+.bt-side.heal .bt-stage::after { content: ''; position: absolute; inset: 6px 14px 0; border-radius: 50%; background: radial-gradient(circle, rgb(34 197 94 / 30%), transparent 70%); pointer-events: none; }
+@keyframes bt-lunge-r { 0% { transform: none; } 40% { transform: translateX(18px); } 100% { transform: none; } }
+@keyframes bt-lunge-b { 0% { transform: none; } 40% { transform: translateX(-18px); } 100% { transform: none; } }
+@keyframes bt-shake { 0%, 100% { transform: none; } 20% { transform: translateX(-5px) rotate(-3deg); } 45% { transform: translateX(5px) rotate(3deg); } 70% { transform: translateX(-3px); } }
+@keyframes bt-dodge { 0%, 100% { transform: none; } 40% { transform: translateY(-14px); } }
+@keyframes bt-shield { 0% { opacity: 0; transform: scale(0.85); } 20% { opacity: 1; transform: scale(1.04); } 70% { opacity: 1; } 100% { opacity: 0.35; transform: none; } }
+
+/* The round in words. */
+.bt-lines { display: flex; flex-direction: column; gap: 3px; padding: 8px 10px; border-radius: 10px; background: var(--surface-2); }
+.bt-lines-cap { font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.bt-line { margin: 0; font-size: 14px; line-height: 1.35; padding-left: 9px; border-left: 3px solid var(--bt-red); }
+.bt-line.blue { border-left-color: var(--bt-blue); }
+:root[data-anim~='move'] .bt-line.in { animation: bt-line-in 0.35s calc(0.25s + var(--i) * 0.25s) ease both; }
+@keyframes bt-line-in { from { opacity: 0; transform: translateY(4px); } }
+
+/* Picking a move. */
+.bt-controls { display: flex; flex-direction: column; gap: 6px; }
+.bt-moves { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.bt-move {
+  min-height: 52px; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 1px; text-align: left;
+  padding: 6px 10px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit;
+}
+.bt-move:not(:disabled):hover { border-color: var(--accent); }
+.bt-move:disabled { opacity: 0.55; }
+.bt-move.is-pending { border-color: var(--accent); background: var(--accent-soft); opacity: 1; }
+.bt-move-name { display: inline-flex; align-items: center; gap: 5px; font-weight: 700; font-size: 14px; line-height: 1.2; }
+.bt-move-name .icon { flex: none; color: var(--accent); }
+.bt-move.k-guard .bt-move-name .icon, .bt-move.k-dodge .bt-move-name .icon { color: var(--bt-blue); }
+.bt-move.k-heal .bt-move-name .icon { color: var(--bt-ok); }
+.bt-move-tip { font-size: 12px; color: var(--muted); line-height: 1.25; }
+.bt-wait { margin: 0; padding: 10px; border-radius: 10px; background: var(--surface-2); text-align: center; }
+.bt-clock { display: flex; flex-wrap: wrap; align-items: center; gap: 0 2px; }
+.bt-clock .link-btn { padding: 0 2px; }
+.bt-end { font-weight: 800; }
+.bt-log-list { margin: 4px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; }
+.bt-log-list li { display: flex; gap: 8px; align-items: baseline; }
+.bt-log-r { flex: none; min-width: 18px; color: var(--muted); }
+
+/* Small screens: smaller pets so two fit with room for their names. */
+@media (max-width: 380px) {
+  .bt-moves { grid-template-columns: minmax(0, 1fr); }
+  .bt-move { min-height: 46px; }
+}
+
+/* ---------- around the app ---------- */
+.bt-record { display: flex; align-items: center; gap: 5px; margin: 2px 0; color: var(--muted); font-weight: 600; }
+.bt-record .icon { color: #d4a106; }
+.park-card-btns { display: flex; justify-content: center; padding: 0 16px 14px; }
+.park-card-btns:empty { display: none; }
+.park-record { justify-content: center; }
+.bt-btn .icon { color: var(--accent); }
+.btn.primary.bt-btn .icon { color: inherit; }
+.bt-moves-own { margin: 6px 0 2px; }
+.bt-moves-cap { margin: 0 0 4px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); }
+.bt-move-chips { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 5px; }
+.bt-move-chips li { display: inline-flex; align-items: center; gap: 4px; padding: 2px 9px; border-radius: 999px; font-size: 12.5px; font-weight: 600; background: var(--surface-2); border: 1px solid var(--border); }
+.bt-move-chips li .icon { color: var(--accent); }
+.bt-move-chips li.locked { color: var(--muted); border-style: dashed; background: transparent; }
+.bt-move-chips li.locked .icon { color: var(--muted); }
+
+/* The Battle sheet. */
+.dialog.bt-ask { width: min(520px, calc(100vw - 24px)); display: flex; flex-direction: column; gap: 10px; }
+.bt-ask-pair { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 6px; align-items: start; }
+.bt-ask-side { min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 3px; text-align: center; padding: 8px 4px; border-radius: 12px; background: var(--surface-2); }
+.bt-ask-side .bt-stage { min-height: 0; }
+.bt-ask-name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 16px; }
+.bt-ask-vs { align-self: center; font-weight: 800; color: var(--muted); text-transform: uppercase; font-size: 13px; }
+.bt-ask-moves { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 3px; align-items: stretch; width: 100%; }
+.bt-ask-moves li { display: flex; align-items: center; gap: 5px; font-size: 12.5px; font-weight: 600; padding: 2px 6px; border-radius: 7px; background: var(--surface); text-align: left; min-width: 0; overflow-wrap: anywhere; }
+.bt-ask-moves li .icon { flex: none; color: var(--accent); }
+.bt-ask-bet { display: flex; flex-direction: column; gap: 4px; }
+.bt-ask-bet .input { max-width: 220px; }
+.bt-ask-pick { align-self: flex-start; }
+.bt-ask-btns { flex-wrap: wrap; }
