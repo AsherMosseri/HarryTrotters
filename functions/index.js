@@ -58,6 +58,8 @@ import { marketFunctions } from './market.js';
 import { coinCheckFunctions } from './coincheck.js';
 import { disputeFunctions } from './disputes.js';
 import * as challenge from './shared/challenge.js';
+import * as battles from './shared/battles.js';
+import { levelOf, petXp, petsIn } from './shared/pets.js';
 import { petEventFunctions } from './petevents.js';
 import { petDeathFunctions } from './petdeath.js';
 import { lifeFunctions } from './life.js';
@@ -1371,7 +1373,7 @@ export const { buddy } = buddies;
 
 // Pets can die (functions/petdeath.js, 3.3): petCare checks every pet a
 // few times a day; its callable actions ride on `pet` below.
-const petDeath = petDeathFunctions({ db, notify, personId, renamer, coinData, inactiveNames, owner: REQUESTS_TO, timeZone: TIME_ZONE });
+const petDeath = petDeathFunctions({ db, notify, personId, renamer, coinData, inactiveNames, owner: REQUESTS_TO, timeZone: TIME_ZONE, petGone: (n) => battlesGone(n) });
 export const { petCare } = petDeath;
 
 // The market and pets (functions/market.js): buying, tournaments, pet care.
@@ -1519,8 +1521,11 @@ async function runMove({ conv, msgId, me, move, data, now, house = false, verifi
       if (move === 'mine') return { ok: true, mine: arcade.myFleet(c.name, secret.data(), me) };
       if (!arcade.isLive(c.status)) return { ok: true };
       const myBank = house ? null : (await tx.get(bankRef(me))).data() || {};
-      // A challenge made before someone was renamed still has their old name on it.
-      const as = c.name === 'challenge' && me ? [c.game?.a, c.game?.b].find((n) => data.rename(n || '') === me) || me : me;
+      // A challenge or battle made before someone was renamed still has their old name on it.
+      const as = (c.name === 'challenge' || c.name === 'battle') && me ? [c.game?.a, c.game?.b].find((n) => data.rename(n || '') === me) || me : me;
+      // A pet battle: are both pets still with their owners, and their
+      // records (read now: a transaction reads everything before it writes).
+      const fight = c.name === 'battle' ? await battleReads(tx, c.game, data) : null;
       const r = arcade.move(c.name, {
         pub: { ...c.game, status: c.status },
         secret: secret.data(),
@@ -1529,10 +1534,12 @@ async function runMove({ conv, msgId, me, move, data, now, house = false, verifi
         balance: house ? 0 : await balanceOf(me, myBank, data),
         now,
         verified,
+        ...(fight && { alive: fight.alive }),
       });
       if (r.error) return note(r.error);
       if (!r.write) return { ok: true, serverNow: now };
       const capped = await payOut(tx, r.money, house ? {} : { [me]: myBank }, now, { game: c.name, id: msgId, conv }, data);
+      if (fight) writeBattleRecords(tx, fight, { ...r.pub }, now);
       const { status, ...game } = withCapped(r.pub, capped);
       if (arcade.isLive(status)) tx.set(secretRef, secretWith(r.secret, conv, now, playersOf(r.pub)));
       else tx.delete(secretRef);
@@ -1631,6 +1638,82 @@ async function challengeContext(tx, { me, words, roster, myBank, now, data }) {
   return { peer, hasOpen };
 }
 
+// ---- Pet battles (shared/battles.js) ----
+// A person's pets doc, under any name they've gone by (read in the transaction).
+async function petsDocOf(tx, name, data) {
+  for (const n of data.rename.aliases(name).slice(0, 30)) {
+    const snap = await tx.get(db.doc(`pets/${personId(n)}`));
+    if (snap.exists) return snap.data();
+  }
+  return null;
+}
+// Each of a person's pets, alive and with them now, with its level (from
+// their lab time, the same as their pet cards). Pets that died are no longer
+// in the doc (petdeath.js moves them to petMemorials), so they can't battle.
+const petsWithLevels = (doc, owner, data, now) =>
+  petsIn(doc).map((pet) => ({ pet, level: levelOf(petXp(owner, data.shifts, Number(pet.adoptedAt) || 0, now)).level }));
+
+// What /battle needs that the person's own data doesn't say: the person they
+// asked (on the team, their coins, their pets), your pets, and whether a
+// battle of yours is already waiting. All read fresh in the transaction.
+async function battleContext(tx, { me, words, roster, myBank, now, data }) {
+  const { them, known } = battles.parseWords(words, roster);
+  const myPets = petsWithLevels(await petsDocOf(tx, me, data), me, data, now);
+  let peer = null;
+  if (known && them !== me && them !== arcade.BOT) {
+    const aliases = data.rename.aliases(them).slice(0, 30);
+    const devices = await db.collection('members').where('name', 'in', aliases).get();
+    const theirBank = (await tx.get(bankRef(them))).data() || {};
+    const theirPets = petsWithLevels(await petsDocOf(tx, them, data), them, data, now);
+    peer = { name: them, active: devices.docs.some((d) => memberOk(d.data())), balance: await balanceOf(them, theirBank, data), pets: theirPets };
+  }
+  let hasOpen = false;
+  if (myBank.btOpen?.conv && myBank.btOpen?.id) {
+    const old = await tx.get(db.doc(`channels/${myBank.btOpen.conv}/messages/${myBank.btOpen.id}`));
+    const c = old.get('cmd');
+    hasOpen = c?.name === 'battle' && c.status === 'open' && (c.game?.expiresAt || 0) > now && data.rename(c.game?.a) === me;
+  }
+  return { peer, myPets, hasOpen };
+}
+
+// Inside a battle's move: whether each pet is still with its owner (died,
+// given away or released: the battle is off), and both records.
+async function battleReads(tx, g, data) {
+  const owners = [data.rename(g?.a || ''), data.rename(g?.b || '')];
+  const docs = await Promise.all(owners.map((n) => (n ? petsDocOf(tx, n, data) : null)));
+  const has = (doc, side) => petsIn(doc).some((p) => Number(p.adoptedAt) === Number(side?.born));
+  const refs = owners.map((n) => db.doc(`petBattles/${personId(n || 'nobody')}`));
+  const recs = await Promise.all(refs.map((ref) => tx.get(ref)));
+  return { owners, refs, recs: recs.map((x) => (x.exists ? x.data() : null)), alive: { a: has(docs[0], g?.pa), b: has(docs[1], g?.pb) } };
+}
+// When a battle ends for real (a knockout, 12 rounds, someone gave up), each
+// pet's win, loss or draw goes on its owner's record (petBattles), once: the
+// card's status is read in the same transaction, so a finished battle never
+// counts twice. Nothing about the pets themselves changes.
+function writeBattleRecords(tx, fight, pub, now) {
+  const rec = battles.recordOf(pub);
+  if (!rec) return;
+  [
+    [0, pub.pa, rec.a],
+    [1, pub.pb, rec.b],
+  ].forEach(([k, side, result]) => {
+    const person = fight.owners[k];
+    if (person) tx.set(fight.refs[k], battles.recordAfter(fight.recs[k], { person, side, result, now }));
+  });
+}
+// A pet died (petdeath.js): every live battle of its owner's gets a look
+// from the house, which ends the ones whose pet is gone (bets back).
+async function battlesGone(person) {
+  const data = await coinData();
+  const live = await db.collection('gameSecrets').where('where.players', 'array-contains-any', data.rename.aliases(person).slice(0, 10)).get();
+  for (const d of live.docs) {
+    const where = d.get('where');
+    const msg = await db.doc(`channels/${where.conv}/messages/${d.id}`).get();
+    if (msg.get('cmd.name') !== 'battle') continue;
+    await runMove({ conv: where.conv, msgId: d.id, me: '', move: 'peek', data, now: Date.now(), house: true }).catch((e) => logger.warn('battle gone', d.id, e.message));
+  }
+}
+
 // /give to a group (/give @Programming 10, /give @everyone 1), and any /give
 // that comes with a key (the app sends one with every /give now).
 // - Who it goes to comes from the server's own team (functions/groups.js):
@@ -1724,11 +1807,21 @@ export const play = onCall({ maxInstances: 5, invoker: 'public' }, withBalance(a
 
   // Loans (functions/loans.js): an overdue loan locks gifts, bets and moves
   // that put coins in, until it's paid. Free games and earning still work.
+  // The card someone is accepting or joining, read once: what it is decides
+  // the checks below (a pet battle with no bet puts no coins in).
+  const ids = /^[\w-]{1,40}$/.test(conv) && /^[\w-]{1,40}$/.test(msgId || '');
+  const joining = action === 'move' && ['accept', 'join'].includes(String(move)) && ids ? (await db.doc(`channels/${conv}/messages/${msgId}`).get()).get('cmd') || null : null;
+  const battleBet = (c) => c?.name === 'battle' && c.game?.bet > 0;
+  const freeBattle = joining?.name === 'battle' && !battleBet(joining);
+  // A pet battle puts coins in only with a bet.
   const betting =
     action === 'gift' ||
     (action === 'move'
-      ? ['accept', 'join', 'double', 'rock', 'paper', 'scissors'].includes(String(move))
-      : action !== 'prize' && (casino.CASINO.includes(game) || (arcade.MULTI.includes(game) && !['trivia', 'hangman', 'typerace'].includes(game))));
+      ? ['accept', 'join', 'double', 'rock', 'paper', 'scissors'].includes(String(move)) && !freeBattle
+      : action !== 'prize' &&
+        (game === 'battle'
+          ? battles.hasBet(words)
+          : casino.CASINO.includes(game) || (arcade.MULTI.includes(game) && !['trivia', 'hangman', 'typerace'].includes(game))));
   const lock = betting ? await loans.lockOf(me) : null;
   if (lock) return note(lock.title, lock.body);
   // Gambling buddy (functions/buddy.js): a lock that's on refuses every new
@@ -1773,24 +1866,24 @@ export const play = onCall({ maxInstances: 5, invoker: 'public' }, withBalance(a
     if (!/^[\w-]{1,40}$/.test(conv) || !/^[\w-]{1,40}$/.test(msgId || '')) throw new HttpsError('invalid-argument', 'Which game?');
     // Accepting a challenge puts coins in: not while coins are off (Controls).
     // Accepting or joining any game: not on shift when Casino and games during shifts is off.
+    // Pet battles switched off (Controls): no accepting (one already going can finish).
     if ((String(move) === 'accept' || String(move) === 'join') && me !== REQUESTS_TO) {
-      const card = await db.doc(`channels/${conv}/messages/${msgId}`).get();
-      const name = card.get('cmd')?.name;
-      if (name === 'challenge' || casino.shiftLocked(name)) {
+      const name = joining?.name;
+      if (name === 'challenge' || name === 'battle' || casino.shiftLocked(name)) {
         const controls = (await db.doc('settings/controls').get()).data() || {};
-        if (name === 'challenge' && String(move) === 'accept' && (controls.off || []).includes('coins')) return note('🪙 Jackson coins are off right now.');
+        const coinsOff = (controls.off || []).includes('coins');
+        if (name === 'challenge' && String(move) === 'accept' && coinsOff) return note('🪙 Jackson coins are off right now.');
+        if (name === 'battle' && (controls.off || []).includes('petBattles')) return note(...battles.OFF_NOTE);
+        if (battleBet(joining) && coinsOff) return note('🪙 Jackson coins are off right now.', 'A pet battle with a bet can’t start while they’re off.');
         if (casino.shiftLocked(name) && (controls.off || []).includes('casinoOnShift') && (await workContext(me, data)).onShift)
           return note(...casino.SHIFT_NOTE);
       }
     }
-    // Gambling buddy: accepting a challenge is a bet too (starting one is
-    // refused above, as a locked game).
-    if (String(move) === 'accept') {
-      const card = await db.doc(`channels/${conv}/messages/${msgId}`).get();
-      if (card.get('cmd')?.name === 'challenge') {
-        const b = await buddies.lockOf(me);
-        if (b) return note(lockNote(b).title, lockNote(b).body);
-      }
+    // Gambling buddy: accepting a challenge, or a pet battle with a bet, is a
+    // bet too (starting one is refused above, as a locked game).
+    if (String(move) === 'accept' && (joining?.name === 'challenge' || battleBet(joining))) {
+      const b = await buddies.lockOf(me);
+      if (b) return note(lockNote(b).title, lockNote(b).body);
     }
     return runMove({ conv, msgId, me, move: String(move), data, now });
   }
@@ -1813,10 +1906,15 @@ export const play = onCall({ maxInstances: 5, invoker: 'public' }, withBalance(a
   const whole = casino.wholeCoinsNote(words);
   if (whole) return note(...whole);
   // Asher's Controls (src/controls.js): coins or this channel switched off for everyone but him.
+  // A pet battle works with coins off (just for fun, no bet: battles.start
+  // says so), unless battles themselves are off.
+  let coinsOff = false;
   if (me !== REQUESTS_TO) {
     const controls = (await db.doc('settings/controls').get()).data() || {};
     if ((controls.channelsOff || []).includes(conv)) return note('Not here.', 'This channel is off right now.');
-    if ((controls.off || []).includes('coins')) return note('🪙 Jackson coins are off right now.');
+    coinsOff = (controls.off || []).includes('coins');
+    if (game === 'battle' && (controls.off || []).includes('petBattles')) return note(...battles.OFF_NOTE);
+    if (coinsOff && game !== 'battle') return note('🪙 Jackson coins are off right now.');
     if (casino.shiftLocked(game) && (controls.off || []).includes('casinoOnShift') && (await workContext(me, data)).onShift)
       return note(...casino.SHIFT_NOTE);
   }
@@ -1869,11 +1967,16 @@ export const play = onCall({ maxInstances: 5, invoker: 'public' }, withBalance(a
 
     if (isArcade) {
       const content = { trivia: arcadeBank.TRIVIA, words: arcadeBank.WORDS };
-      const more = game === 'challenge' ? await challengeContext(tx, { me, words, roster, myBank, now, data }) : {};
+      const more =
+        game === 'challenge'
+          ? await challengeContext(tx, { me, words, roster, myBank, now, data })
+          : game === 'battle'
+            ? { ...(await battleContext(tx, { me, words, roster, myBank, now, data })), coinsOff }
+            : {};
       const r = arcade.start(game, { me, words, roster, balance, bank: myBank, now, content, ...more });
       if (r.error) return note(r.error);
-      // Where this card is, so "one challenge waiting at a time" can be checked later.
-      if (r.open) r.money[0].extra = { ...r.money[0].extra, chOpen: { conv, id: msgRef.id } };
+      // Where this card is, so "one challenge (or battle) waiting at a time" can be checked later.
+      if (r.open) r.money[0].extra = { ...r.money[0].extra, [game === 'battle' ? 'btOpen' : 'chOpen']: { conv, id: msgRef.id } };
       const capped = await payOut(tx, r.money, { [me]: myBank }, now, { game, id: msgRef.id, conv }, data);
       tx.set(db.doc(`gameSecrets/${msgRef.id}`), secretWith(r.secret, conv, now, [me, ...playersOf(r.pub)]));
       const { status, ...g } = withCapped(r.pub, capped);

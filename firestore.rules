@@ -243,6 +243,13 @@ service cloud.firestore {
       allow read: if isMember();
       allow write: if false;
     }
+    // Pet battle records (3.3): each person's pets' wins, losses and draws,
+    // written only by the play function when a battle ends. The battles
+    // themselves are game cards in #arcade (gameSecrets keeps the picks).
+    match /petBattles/{id} {
+      allow read: if isMember();
+      allow write: if false;
+    }
     // Photos of real pets (functions/petphotos.js): petPhotos holds the
     // approved ones everyone sees; petPhotoRequests holds each person's latest
     // photo and where it stands (read by them and team management only). The
@@ -628,7 +635,7 @@ service cloud.firestore {
       return 'cmd' in m && m.cmd is map && (m.cmd.get('name', '') in
         ['slots', 'dice', 'coinflip', 'roulette', 'blackjack', 'crash', 'mines', 'highlow', 'lottery', 'daily', 'work', 'beg', 'rob',
          'rps', 'tictactoe', 'connect4', 'duel', 'challenge', 'trivia', 'hangman', 'typerace', 'heist', 'labday', 'recap',
-         'battleship', 'tetris', 'minesweep', 'funeral']
+         'battleship', 'tetris', 'minesweep', 'funeral', 'battle']
         || (m.cmd.get('name', '') == 'request' && m.cmd.get('kind', '') != 'idea'));
     }
     // Coins and games only in #arcade (3.2): the coin cards the app posts

@@ -37,7 +37,9 @@ import {
   warnNote,
 } from './shared/petdeath.js';
 
-export function petDeathFunctions({ db, notify, personId, renamer, coinData, inactiveNames, owner, timeZone, clock = { now: () => Date.now() } }) {
+// petGone(person): called after one of their pets died, so a pet battle
+// waiting for it or running with it (functions/index.js) ends and its bets go back.
+export function petDeathFunctions({ db, notify, personId, renamer, coinData, inactiveNames, owner, timeZone, clock = { now: () => Date.now() }, petGone = null }) {
   const note = (title, body = '') => ({ note: { title, body } });
   const first = (n) => (n || 'Someone').split(' ')[0];
   const say = (n) => (n.length ? notify(n).catch((e) => logger.warn('pet death notify', e.message)) : null);
@@ -56,6 +58,7 @@ export function petDeathFunctions({ db, notify, personId, renamer, coinData, ina
   async function checkDoc(ref, { rename, shifts, asleepSet, offSet, now }) {
     let notes = [];
     let deaths = [];
+    let snapPerson = '';
     await db.runTransaction(async (tx) => {
       notes = [];
       deaths = [];
@@ -64,6 +67,7 @@ export function petDeathFunctions({ db, notify, personId, renamer, coinData, ina
       const doc = snap.data();
       const person = rename(doc.person || '');
       if (!person) return;
+      snapPerson = person;
       const list = petsIn(doc);
       const ctx = { now, asleep: asleepSet.has(person), off: offSet.has(person) };
       const fates = list.map((p) => petFate(p, ctx));
@@ -109,7 +113,11 @@ export function petDeathFunctions({ db, notify, personId, renamer, coinData, ina
       if (next) tx.set(ref, next);
       else tx.delete(ref);
     });
-    if (deaths.length) logger.info('pets died', deaths.join(', '));
+    if (deaths.length) {
+      logger.info('pets died', deaths.join(', '));
+      // A battle with a pet that died is off (bets back). Never holds up the check.
+      if (petGone) await petGone(rename(snapPerson)).catch((e) => logger.warn('pet battles after a death', e.message));
+    }
     return notes;
   }
 
