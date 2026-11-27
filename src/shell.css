@@ -3555,7 +3555,7 @@ button.pm-row:hover { background: color-mix(in srgb, var(--text) 4%, transparent
    pop-ups take the theme's tinted page instead of staying the plain surface color
    (which showed as a navy band over a crimson page, and a navy Appearance screen). */
 :root[data-palette] .phone-top { background: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; }
-:root[data-palette] .status-bar-band { background: color-mix(in srgb, var(--p1) var(--tint, 16%), var(--bg)); }
+:root[data-palette] .status-bar-band, :root[data-palette] .status-band-probe { background: color-mix(in srgb, var(--p1) var(--tint, 16%), var(--bg)); }
 @media (max-width: 760px) {
   :root[data-palette] .panel-backdrop.center:not(:has(> .dialog.profile-card)) {
     background: var(--theme-grad, linear-gradient(160deg, color-mix(in srgb, var(--p1) var(--tint, 16%), var(--bg)), color-mix(in srgb, var(--p2) var(--tint, 16%), var(--bg))));

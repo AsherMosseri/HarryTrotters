@@ -10,12 +10,14 @@ import { installEmojiKeyFix } from './emojiKeyFix.js';
 import { installKeyboardFit, installNoPageZoom } from './keyboard.js';
 import { installAnim } from './motion.js';
 import { registerOffline } from './offline.js';
+import { installStatusBand } from './statusBand.js';
 
 installEmojiKeyFix();
 installKeyboardFit();
 installNoPageZoom();
 installAnim();
 registerOffline();
+installStatusBand();
 
 window.addEventListener('vite:preloadError', (e) => {
   if (reloadOnceForNewVersion()) e.preventDefault();

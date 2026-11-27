@@ -4,6 +4,14 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '3.2.13',
+    date: '2026-11-27',
+    title: 'Sharp top on iPad',
+    items: [
+      'On iPad, the top of the app (the header, the sidebar and your coin balance) no longer goes blurry when you use a color theme. Close the app all the way and open it again once after updating.',
+    ],
+  },
+  {
     version: '3.2.12',
     date: '2026-11-23',
     title: 'Your real pet as your pet',

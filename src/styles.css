@@ -1528,8 +1528,12 @@ h3.md-h { font-size: 16.5px; }
    under dialogs). The saved light/dark theme is applied before the first
    paint (inline script in index.html) so the color it reads is right. It
    covers just the header's top padding. */
-.status-bar-band { position: fixed; top: 0; left: 0; right: 0; height: 11px; z-index: 2147483647; background: var(--surface); }
-:root[data-demo] .status-bar-band { background: #fef3c7; }
+.status-bar-band { position: fixed; top: 0; left: 0; right: 0; height: 11px; z-index: 2147483647; }
+/* Its color (and the hidden probe's, which statusBand.js reads to save it for
+   the next launch; index.html pins the live strip to the saved color). */
+.status-bar-band, .status-band-probe { background: var(--surface); }
+:root[data-demo] .status-bar-band, :root[data-demo] .status-band-probe { background: #fef3c7; }
+.status-band-probe { position: absolute; left: -9999px; top: 0; width: 1px; height: 1px; pointer-events: none; visibility: hidden; }
 
 /* custom profile effect */
 .profile-effect img { width: 22px; height: 22px; object-fit: contain; display: block; }

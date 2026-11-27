@@ -59,6 +59,21 @@
          reload, and it keeps the first color it reads. It's the header's
          color, so it looks like part of the header and status bar. -->
     <div class="status-bar-band" aria-hidden="true"></div>
+    <script>
+      // Pin the strip's color for this whole visit: the color saved last time
+      // for this kind of launch (src/statusBand.js), else the one it has now.
+      // A theme loading later must not change it, or iPadOS blurs the top.
+      (function () {
+        var band = document.querySelector('.status-bar-band');
+        try {
+          var root = document.documentElement;
+          var theme = root.getAttribute('data-theme');
+          var dark = theme ? theme === 'dark' : !!(window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
+          var saved = localStorage.getItem('status-band:' + (root.hasAttribute('data-demo') ? 'demo' : 'app') + ':' + (dark ? 'dark' : 'light'));
+          band.style.backgroundColor = saved || getComputedStyle(band).backgroundColor;
+        } catch (e) {}
+      })();
+    </script>
     <div id="root">
       <div class="gate splash" role="status" aria-label="Loading">
         <div class="splash-mark">
