@@ -152,10 +152,15 @@ export function AdoptPet({ more = false, onDone }) {
   const [name, setName] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  const waiting = !!market?.death?.wait;
+  // A pet that died holds back a new one for a while: just say how long.
+  if (market?.death?.wait)
+    return (
+      <div className="adopt">
+        <AdoptWaitNote />
+      </div>
+    );
   return (
     <div className="adopt">
-      <AdoptWaitNote />
       {!more && (
         <p className="muted small">
           A pet is optional. It grows with your time at the lab, shows on your profile, and gets hungry and bored if nobody looks after it. Left
@@ -180,7 +185,7 @@ export function AdoptPet({ more = false, onDone }) {
         <input className="input grow" maxLength={24} value={name} placeholder="Its name" onChange={(e) => setName(e.target.value)} aria-label="Pet name" />
         <button
           className="btn primary"
-          disabled={!species || !name.trim() || busy || waiting}
+          disabled={!species || !name.trim() || busy}
           onClick={async () => {
             setBusy(true);
             setError('');

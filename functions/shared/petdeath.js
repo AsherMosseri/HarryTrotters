@@ -236,7 +236,8 @@ export function adoptWait(memorials, { me, now = Date.now(), rename = (n) => n }
 export function untilText(until, now = Date.now()) {
   const h = Math.max(1, Math.ceil((until - now) / 3600000));
   if (h < 24) return `in ${plural(h, 'hour')}`;
-  const d = Math.ceil(h / 24);
+  // Rounded, so a wait of 3 days and a minute still says 3 days.
+  const d = Math.max(1, Math.round(h / 24));
   return d === 1 ? 'tomorrow' : `in ${d} days`;
 }
 // The words for it (the adopt screen, the server's answer).

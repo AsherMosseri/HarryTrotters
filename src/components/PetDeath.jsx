@@ -64,7 +64,7 @@ export function DeathOffRow({ onToast }) {
       body: death.owner
         ? 'Your pets still get hungry and bored, but they can’t die.'
         : 'If Asher says yes, your pets still get hungry and bored, but they can’t die. A reason helps (optional).',
-      placeholder: death.owner ? '' : 'For example: away for two weeks with no phone',
+      placeholder: death.owner ? '' : 'For example: a trip with no phone',
       maxLength: 140,
       okLabel: death.owner ? 'Turn off' : 'Ask',
     });

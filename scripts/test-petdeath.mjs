@@ -331,6 +331,8 @@ eq(petFate(watched, { now: Math.ceil(both0) + 7 * D - 1 }).status, 'neglected', 
   eq(memorialLine(m3, { me: 'Shrey Kumar', now: T0 + H }), 'You can adopt a new pet whenever you’re ready.', 'owner: 3 respects frees it');
   eq(memorialLine(m3, { me: 'Cooper Mlezcko', now: T0 + H }), '', 'teammate: nothing to say once free');
   eq(memorialLine({ ...m, respects: [] }, { me: 'Shrey Kumar', now: T0 + 3 * D }), 'You can adopt a new pet whenever you’re ready.', 'owner: 3 days frees it');
+  eq(memorialLine(m, { me: 'Shrey Kumar', now: T0 - 59000 }).endsWith('or in 3 days.'), true, 'a minute over 3 days still says 3 days');
+  eq(memorialLine(m, { me: 'Shrey Kumar', now: T0 + 2 * D }).endsWith('or tomorrow.'), true, 'one day left: tomorrow');
   eq(memorialLine({ ...m, respects: [{ name: 'A' }, { name: 'B' }] }, { me: 'Cooper Mlezcko', now: T0 + 2 * D + 20 * H }), 'Shrey can adopt again once 1 more teammate pays respects, or in 4 hours.', 'one more, hours left');
 }
 
