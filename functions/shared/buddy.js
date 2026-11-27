@@ -21,6 +21,7 @@
 // The secret (buddySecrets/{same id}, nobody reads it): { salt, hash, tries }.
 
 import { CASINO } from './casino.js';
+import { hasBet } from './battles.js';
 import { BOT } from './groups.js';
 import { cleanName, nameKey } from './team.js';
 
@@ -30,10 +31,11 @@ export const BUDDY = {
   tries: 5, // wrong passwords allowed per lock in a rolling hour
   window: 3600000,
 };
-// The games a buddy lock stops: the casino, the lottery and /challenge
-// (starting or accepting one; the play function checks accepts). Other arcade
+// The games a buddy lock stops: the casino, the lottery, /challenge and pet
+// battles with a bet (starting or accepting one; the play function checks
+// accepts). A pet battle with no bet is just for fun and isn't stopped. Other arcade
 // games (heists, races), gifts, loans and requests still work.
-export const LOCKED_GAMES = [...CASINO, 'challenge'];
+export const LOCKED_GAMES = [...CASINO, 'challenge', 'battle'];
 export const lockId = (name) => nameKey(name);
 const first = (n) => String(n || 'Someone').split(' ')[0];
 
@@ -45,6 +47,7 @@ export function buddyBlocks({ action, game, move, args = [] } = {}) {
   if (action === 'move') return String(move) === 'double';
   if (action === 'gift' || action === 'prize') return false;
   if (game === 'lottery' && !String((Array.isArray(args) ? args : [])[0] ?? '').trim()) return false;
+  if (game === 'battle') return hasBet(args);
   return LOCKED_GAMES.includes(game);
 }
 
@@ -52,7 +55,7 @@ export function buddyBlocks({ action, game, move, args = [] } = {}) {
 export function lockNote(lock) {
   return {
     title: '🔒 Gambling is locked by your buddy',
-    body: `${first(lock?.buddy)} is your gambling buddy, so casino games are paused until they unlock them. Challenges are paused too; other arcade games, gifts and loans still work.`,
+    body: `${first(lock?.buddy)} is your gambling buddy, so casino games are paused until they unlock them. Challenges and pet battles with a bet are paused too; other arcade games, gifts and loans still work.`,
   };
 }
 
@@ -152,7 +155,7 @@ export function buddyAction(lock, req = {}, ctx = {}) {
     return out(
       next,
       'set',
-      [{ to: person, title: `${first(me)} is your gambling buddy now`, body: 'Casino games are locked until they unlock them. Challenges are paused too; other arcade games, gifts and loans still work.', open }],
+      [{ to: person, title: `${first(me)} is your gambling buddy now`, body: 'Casino games are locked until they unlock them. Challenges and pet battles with a bet are paused too; other arcade games, gifts and loans still work.', open }],
       `You’re ${first(person)}’s gambling buddy. Their casino games are locked.`,
     );
   }

@@ -17,7 +17,7 @@ export const ECONOMY = ['daily', 'work', 'beg', 'rob'];
 // Controls, "Casino and games during shifts" off (id casinoOnShift): someone
 // clocked in can't start, accept or join these until their shift ends (games
 // already going can be finished).
-export const SHIFT_GAMES = ['rps', 'tictactoe', 'connect4', 'duel', 'trivia', 'hangman', 'typerace', 'heist', 'battleship', 'tetris', 'minesweep', 'challenge'];
+export const SHIFT_GAMES = ['rps', 'tictactoe', 'connect4', 'duel', 'trivia', 'hangman', 'typerace', 'heist', 'battleship', 'tetris', 'minesweep', 'challenge', 'battle'];
 export const shiftLocked = (game) => CASINO.includes(game) || SHIFT_GAMES.includes(game);
 export const SHIFT_NOTE = ['🎰 No casino or games on shift.', 'They open again when your shift ends.'];
 // Commands only the server may post (the rules refuse them from phones).
@@ -36,6 +36,7 @@ export const SERVER_COMMANDS = [
   'battleship',
   'tetris',
   'minesweep',
+  'battle',
 ];
 
 const rint = (rng, a, b) => a + Math.floor(rng() * (b - a + 1));

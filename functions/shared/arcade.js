@@ -16,12 +16,13 @@ import * as bs from './battleship.js';
 import { RACE_COUNTDOWN, RACE_PRIZE, rank, raceLimit } from './funGames.js';
 import { LEVELS } from './minesweeper.js';
 import * as challenge from './challenge.js';
+import * as battles from './battles.js';
 import { secureRandom } from './rng.js';
 import { CAPPED, holdEntry } from './casino.js';
 import { capWin } from './coins.js';
 import { coinsText } from './coinText.js';
 
-export const MULTI = ['rps', 'tictactoe', 'connect4', 'duel', 'trivia', 'hangman', 'typerace', 'heist', 'battleship', 'tetris', 'minesweep', 'challenge'];
+export const MULTI = ['rps', 'tictactoe', 'connect4', 'duel', 'trivia', 'hangman', 'typerace', 'heist', 'battleship', 'tetris', 'minesweep', 'challenge', 'battle'];
 export const CHALLENGES = ['rps', 'tictactoe', 'connect4', 'duel', 'battleship', 'tetris', 'minesweep'];
 // Tetris and Minesweeper races: both play the same pieces or board on their
 // own screens; the card keeps score (funGame sends in each verified result).
@@ -40,6 +41,7 @@ export const ICON = {
   tetris: '🧱',
   minesweep: '💣',
   challenge: '🎲',
+  battle: battles.ICON,
 };
 export const LABEL = {
   rps: 'Rock paper scissors',
@@ -54,6 +56,7 @@ export const LABEL = {
   tetris: 'Tetris race',
   minesweep: 'Minesweeper race',
   challenge: 'Challenge',
+  battle: battles.LABEL,
 };
 // Coins for winning Battleship (the 'game' award, capped per day).
 export const BATTLESHIP_PRIZE = { bot: 2, person: 3 };
@@ -343,10 +346,12 @@ const cooldownLeft = (bank, game, now) => Math.max(0, (bank.cooldowns?.[game] ||
 // { trivia, words }, the questions and hangman words to pick from.
 export function start(
   game,
-  { me, words = [], roster = [], balance = 0, bank = {}, now = Date.now(), rng = secureRandom, content = {}, peer = null, hasOpen = false },
+  { me, words = [], roster = [], balance = 0, bank = {}, now = Date.now(), rng = secureRandom, content = {}, peer = null, hasOpen = false, myPets = [], coinsOff = false },
 ) {
   // A coin flip or dice roll for the same bet, head to head (challenge.js).
   if (game === 'challenge') return challenge.start({ me, words, roster, balance, bank, now, peer, hasOpen });
+  // A pet battle (battles.js): peer and myPets carry the pets, as the server found them.
+  if (game === 'battle') return battles.start({ me, words, roster, balance, bank, now, peer, myPets, hasOpen, coinsOff });
   if (CHALLENGES.includes(game)) {
     // A Minesweeper race's board size: "/minesweep @Cooper expert 10".
     const level = game === 'minesweep' ? words.map((w) => w.toLowerCase()).find((w) => LEVELS[w]) || 'beginner' : '';
@@ -452,7 +457,7 @@ function startDuel(p, secret, now, rng) {
 // { pub, secret, money, awards } (write: false when nothing changed, like an
 // early peek). awards: coins the server pays through awardCoins ('game').
 // verified: a race result the server replayed (funGame); never from the app.
-export function move(game, { pub, secret = {}, me, move: mv, balance = 0, now = Date.now(), rng = secureRandom, verified = null }) {
+export function move(game, { pub, secret = {}, me, move: mv, balance = 0, now = Date.now(), rng = secureRandom, verified = null, alive }) {
   const p = { ...pub };
   const s = { ...secret };
   const m = String(mv || '').slice(0, 400);
@@ -460,6 +465,8 @@ export function move(game, { pub, secret = {}, me, move: mv, balance = 0, now = 
   const out = (money = [], awards = []) => ({ write: true, pub: p, secret: s, money, awards });
   if (!isLive(p.status)) return nothing;
   if (game === 'challenge') return challenge.move({ pub, me, move: mv, balance, now, rng });
+  // alive: { a, b }, whether each pet is still with its owner (battles.js).
+  if (game === 'battle') return battles.move({ pub, secret, me, move: mv, balance, now, rng, ...(alive && { alive }) });
 
   if (CHALLENGES.includes(game)) {
     const player = me === p.a || me === p.b;

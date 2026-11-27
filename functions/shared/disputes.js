@@ -146,9 +146,9 @@ export const refundEntry = (person, amount, game, disputeId, now, reverses = '')
 // (refundKeyId, shared with reports).
 
 // Cards with coins on them: the casino games, /challenge, the arcade's
-// head-to-head games (their bets) and heists. Prizes from the free games are
-// awards and aren't refunded here.
-export const FIXABLE = [...DISPUTABLE, ...CHALLENGES, 'heist'];
+// head-to-head games (their bets), heists and pet battles (their bets).
+// Prizes from the free games are awards and aren't refunded here.
+export const FIXABLE = [...DISPUTABLE, ...CHALLENGES, 'heist', 'battle'];
 export const gameLabel = (game) => GAME_LABEL[game] || ARCADE_LABEL[game] || 'Game';
 
 // What each person in the game ended up with, as the card shows it:
@@ -163,11 +163,13 @@ export function cardNets(cmd, by, rename = (n) => n) {
   // A win the ceiling cut (g.capped: { name: net paid }, 3.1.4) is what was paid.
   const cut = Object.fromEntries(Object.entries(g.capped || {}).map(([n, v]) => [rename(n), Math.max(0, Math.floor(v || 0))]));
   const won = (name, net) => (net > 0 && name in cut ? Math.min(net, cut[name]) : net);
-  if (cmd.name === 'challenge' || CHALLENGES.includes(cmd.name)) {
+  if (cmd.name === 'challenge' || cmd.name === 'battle' || CHALLENGES.includes(cmd.name)) {
     // The winner takes the other's bet (Trotbot's house pays too); no winner
     // (a tie, or it was declined, cancelled or ran out) gives the bets back.
     const final = cmd.status === 'done';
-    const played = cmd.name !== 'challenge' || g.how === 'rolled';
+    // A pet battle was played when it ended by a knockout, after 12 rounds or
+    // when someone gave up (not declined, cancelled, expired or a pet gone).
+    const played = cmd.name === 'challenge' ? g.how === 'rolled' : cmd.name === 'battle' ? ['ko', 'rounds', 'resigned'].includes(g.how) : true;
     const winner = final && played && g.winner ? rename(g.winner) : '';
     return { final, nets: people([g.a, g.b]).map((name) => ({ name, net: !winner || !bet ? 0 : name === winner ? won(name, bet) : -bet })) };
   }
