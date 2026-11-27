@@ -200,7 +200,7 @@ export function PetsShelf({ actor, balance, buy, busy, onToast, roster = [] }) {
                   >
                     {full ? `${pet.name} is full` : it.price > balance ? 'Not enough coins' : busy === item ? 'Buying…' : 'Buy'}
                   </ServerButton>
-                  {/* Overfeeding (3.2.14): food on a full pet makes it chubby for a few days. */}
+                  {/* Overfeeding (3.3): food on a full pet makes it chubby for a few days. */}
                   {full && it.food > 0 && st.food < STUFFED - 5 && (
                     <ServerButton
                       className="link-btn small"

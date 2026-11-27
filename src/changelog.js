@@ -4,21 +4,21 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
-    version: '3.2.14',
+    version: '3.3',
     date: '2026-11-27',
-    title: 'Chubby pets, and your pet’s photo in the games',
+    title: 'Pet battles, and pets need you now',
     items: [
+      'Pet battles: tap a teammate’s pet in the pet park or on their profile and tap Battle, or type /battle @name in #arcade. Each round you both pick a move in secret, then watch it play out. Thanks, Cooper!',
+      'Every kind of pet has its own four battle moves: two to start, one at level 10 and one at level 25. They’re on your pet’s card.',
+      'Bets in battles are optional. You both put in the same, the winner takes both, and a draw, a no, or nobody answering gives it back.',
+      'Battles never change your pet: food, fun and level stay the same. Each pet’s wins and losses show on its card, and there’s a Battles board in Pet games.',
+      'Pets can now die if they’re left with no food and no fun for a whole week. You’ll get a warning on days 3, 5 and 6, and a snack or a toy saves it.',
+      'When a pet dies, a funeral card goes up in #general so the team can pay respects. Its owner can adopt again once 3 teammates paid respects, or after 3 days. Pets that died are remembered under In memory on the Pets shelf.',
+      'Pets sleep while their owner is inactive, so they can’t die while you’re away.',
+      'Don’t want your pets to be able to die? Tap “Ask to turn off pet death” under your pets and Asher will answer.',
       'Your pet is full but you want to spoil it? Feed anyway (under the food in Market, Pets) and it gets chubby for a few days, until it runs back down. Thanks, Cooper!',
-      'If you show your real pet’s photo as your pet, it now plays Pet Hop and Pet Rally too, and shows on the games’ boards. Thanks, Kasha!',
-      'On iPad, the app installed on your Home Screen now starts a little lower, so iPadOS’s blur at the top no longer covers the header, the sidebar or your coin balance.',
-    ],
-  },
-  {
-    version: '3.2.13',
-    date: '2026-11-27',
-    title: 'Sharp top on iPad',
-    items: [
-      'On iPad, the top of the app (the header, the sidebar and your coin balance) no longer goes blurry when you use a color theme. Close the app all the way and open it again once after updating.',
+      'If you show your real pet’s photo as your pet, it now plays Pet Hop, Pet Rally and battles too, and shows on the games’ boards. Thanks, Kasha!',
+      'On iPad, the app on your Home Screen starts a little lower and keeps one color at the very top, so the blur no longer covers the header, the sidebar or your coin balance. Close the app all the way and open it again once after updating.',
     ],
   },
   {
