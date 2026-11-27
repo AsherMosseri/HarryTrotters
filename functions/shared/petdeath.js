@@ -1,4 +1,4 @@
-// Pets can die (3.2.15). The rule Asher chose, as plain functions the server
+// Pets can die (3.3). The rule Asher chose, as plain functions the server
 // (functions/petdeath.js), the demo (src/data/demoPetDeath.js) and the app
 // (the warning on a pet's card) all run, so they always agree:
 //
@@ -81,7 +81,7 @@ export function streakStart(pet, from, now = Date.now()) {
 export function petFate(pet, { now = Date.now(), asleep = false, off = false } = {}) {
   const was = kept(pet?.neglect);
   const n = { ...was };
-  // Not watched yet (a pet from before 3.2.15, or a new one): from now on.
+  // Not watched yet (a pet from before 3.3, or a new one): from now on.
   if (!pet?.neglect || !was.from) n.from = now;
   if (asleep) n.asleep = true;
   else if (was.asleep) Object.assign(n, { asleep: false, from: now });

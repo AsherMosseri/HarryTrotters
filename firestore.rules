@@ -255,7 +255,7 @@ service cloud.firestore {
       allow read: if isMember() && !featureOff('photos') && (isManager() || isMe(resource.data.by));
       allow write: if false;
     }
-    // Pets that died (3.2.15, functions/petdeath.js): everyone reads the
+    // Pets that died (3.3, functions/petdeath.js): everyone reads the
     // memorials ("In memory", the funeral card's respects); paying respects
     // goes through the pet function, which writes them.
     match /petMemorials/{id} {

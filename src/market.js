@@ -10,6 +10,7 @@ import { earnedIds, shownEvents, unseenIds } from '../functions/shared/events.js
 import { celebrate } from './motion.js';
 import { noteFor } from './connection.js';
 import { usePetPhotos } from './petPhotos.js';
+import { usePetDeath } from './petDeath.js';
 
 export const MarketContext = createContext(null);
 export const useMarket = () => useContext(MarketContext);
@@ -31,7 +32,8 @@ const saveNum = (key, n) => {
 
 // shifts: under current names. balanceOf(name): coins from the app's wallet
 // (only demo mode uses it; the server reads balances itself).
-export function useMarketData(store, { actor, rename, renames, shifts, balanceOf, coinsOn, photosOn = true, onToast, onBalance }) {
+// inactive: the Set of inactive names (a sleeping pet can't die).
+export function useMarketData(store, { actor, rename, renames, shifts, balanceOf, coinsOn, photosOn = true, inactive = null, onToast, onBalance }) {
   const [perks, setPerks] = useState([]);
   const [rawPurchases, setPurchases] = useState([]);
   const [rawPets, setPets] = useState([]);
@@ -200,6 +202,9 @@ export function useMarketData(store, { actor, rename, renames, shifts, balanceOf
   // Photos of real pets beside their drawn ones (petPhotos.js).
   const photos = usePetPhotos(store, { actor, rename, renames, on: photosOn, run });
 
+  // Pets that died, respects, and asking to turn pet death off (petDeath.js).
+  const death = usePetDeath(store, { actor, rename, renames, run, inactive, now });
+
   // The pet games' team boards (functions/petgames.js): read only while the
   // games are open, so the listener isn't on all the time.
   const watchGames = useCallback((cb) => store.subscribePetGames?.(cb) || (() => {}), [store]);
@@ -209,7 +214,7 @@ export function useMarketData(store, { actor, rename, renames, shifts, balanceOf
   const deletePerk = useCallback((id) => store.deletePerk(id), [store]);
 
   return useMemo(
-    () => ({ perks, purchases, pets, tournaments, extras, petOf, petsOf, gifts, run, now, coinsOn, savePerk, deletePerk, events, allEvents: rawEvents, unlocks, askEvents: ask, petEvent, photos, watchGames, me: actor.name, rename }),
-    [perks, purchases, pets, tournaments, extras, petOf, petsOf, gifts, run, now, coinsOn, savePerk, deletePerk, events, rawEvents, unlocks, ask, petEvent, photos, watchGames, actor.name, rename],
+    () => ({ perks, purchases, pets, tournaments, extras, petOf, petsOf, gifts, run, now, coinsOn, savePerk, deletePerk, events, allEvents: rawEvents, unlocks, askEvents: ask, petEvent, photos, death, watchGames, me: actor.name, rename }),
+    [perks, purchases, pets, tournaments, extras, petOf, petsOf, gifts, run, now, coinsOn, savePerk, deletePerk, events, rawEvents, unlocks, ask, petEvent, photos, death, watchGames, actor.name, rename],
   );
 }

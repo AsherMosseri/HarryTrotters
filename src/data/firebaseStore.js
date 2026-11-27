@@ -871,6 +871,36 @@ export const firebaseStore = {
     );
     return () => offs.forEach((off) => off());
   },
+  // Pets that died (functions/petdeath.js): everyone reads the memorials.
+  subscribePetMemorials(cb) {
+    return onSnapshot(
+      collection(db, 'petMemorials'),
+      (snap) => cb(snap.docs.map(readDoc)),
+      (e) => console.warn('petMemorials', e),
+    );
+  },
+  // Asking Asher to turn pet death off: your own ask (one listener a name you've
+  // gone by, like the photos), or every one of them for Asher.
+  subscribePetDeathOff(actor, names, cb) {
+    if (actor.admin && actor.name === REQUESTS_TO)
+      return onSnapshot(
+        collection(db, 'petDeathOff'),
+        (snap) => cb(snap.docs.map(readDoc)),
+        (e) => console.warn('petDeathOff', e),
+      );
+    const parts = {};
+    const offs = names.map((n) =>
+      onSnapshot(
+        query(collection(db, 'petDeathOff'), where('by', '==', n)),
+        (snap) => {
+          parts[n] = snap.docs.map(readDoc);
+          cb(Object.values(parts).flat());
+        },
+        (e) => console.warn('petDeathOff', e),
+      ),
+    );
+    return () => offs.forEach((off) => off());
+  },
   async uploadPetPhoto(blob, actor) {
     const path = `petphotos/${actor.uid}/${itemId()}.png`;
     await uploadBytes(fileRef(storage, path), blob, { contentType: 'image/png' });

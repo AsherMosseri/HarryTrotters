@@ -41,10 +41,12 @@ import { demoLife } from './demoLife.js';
 import { demoLearn } from './demoLearn.js';
 import { demoEvents } from './demoEvents.js';
 import { demoPetPhotos } from './demoPetPhotos.js';
+import { demoPetDeath } from './demoPetDeath.js';
 import { demoLoans } from './demoLoans.js';
 import { demoBuddy } from './demoBuddy.js';
 import { buddyBlocks, lockNote } from '../../functions/shared/buddy.js';
 import { PHOTO_ACTIONS } from '../../functions/shared/petphotos.js';
+import { DEATH_ACTIONS, adoptWait, adoptWaitNote } from '../../functions/shared/petdeath.js';
 import { earnedIds } from '../../functions/shared/events.js';
 import { coinsText } from '../../functions/shared/coinText.js';
 import { addDay } from '../../functions/shared/streaks.js';
@@ -1124,6 +1126,11 @@ if (!state.pets32Seeded) {
     ];
   state.pets32Seeded = 1;
 }
+// Pets can die (demoPetDeath.js): its samples, then the same check the
+// server runs, as of now (and every minute while the pets are shown).
+const petDeath = demoPetDeath({ get: () => state, commit: () => commit(), uid });
+petDeath.seedSamples();
+petDeath.sweep();
 // Loans (demoLoans.js): the same checks as functions/loans.js.
 const loans = demoLoans({ get: () => state, commit: () => commit(), uid });
 // Gambling buddy (demoBuddy.js): the same decisions as functions/buddy.js.
@@ -1676,7 +1683,20 @@ export const demoStore = {
     return listen(() => cb([...(state.purchases || [])]));
   },
   subscribePets(cb) {
-    return listen(() => cb([...(state.pets || [])]));
+    const tick = () => petDeath.sweep() && commit();
+    const t = setInterval(tick, 60000);
+    const off = listen(() => cb([...(state.pets || [])]));
+    return () => {
+      clearInterval(t);
+      off();
+    };
+  },
+  // Pets that died and asking to turn pet death off (demoPetDeath.js).
+  subscribePetMemorials(cb) {
+    return petDeath.subscribeMemorials(listen, cb);
+  },
+  subscribePetDeathOff(actor, names, cb) {
+    return petDeath.subscribeAsks(listen, actor, cb);
   },
   subscribePetGifts(name, cb) {
     return listen(() => cb((state.petGifts || []).filter((g) => g.from === name || g.to === name).map((g) => ({ ...g }))));
@@ -1867,6 +1887,7 @@ export const demoStore = {
     }
 
     if (fn === 'pet' && PHOTO_ACTIONS.includes(data.action)) return petPhotos.run(data, actor);
+    if (fn === 'pet' && DEATH_ACTIONS.includes(data.action)) return petDeath.run(data, actor);
 
     // A best score in the pet games: the same checks as functions/petgames.js.
     if (fn === 'pet' && data.action === 'gameScore') {
@@ -1898,6 +1919,9 @@ export const demoStore = {
       if (['adopt', 'rename', 'inChat', 'photoAsPet', 'release', 'style', 'hatch'].includes(action)) {
         // Event gear counts only for whoever earned it (petUnlocks, like the server).
         const earned = earnedIds((state.petUnlocks || []).find((u) => u.person === me));
+        // A pet that died holds back a new one (3 respects or 3 days), like the server.
+        const wait = action === 'adopt' ? adoptWait(state.petMemorials || [], { me, now }) : null;
+        if (wait) return adoptWaitNote(wait, now);
         const r = petEdit(action, data, { me, doc: docOfName(me), shifts: state.shifts || [], earned, now });
         if (r.unknown) return note('Unknown action.');
         if (r.note) return r;

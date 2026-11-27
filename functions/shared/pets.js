@@ -9,7 +9,7 @@
 //   from the market fill them; the server records each one on the pet's doc
 //   (pets/{personId}, written only by the server), so a phone can't fake them.
 // - Its mood comes from those needs and from showing up: it misses you after
-//   a few school days away. Since 3.2.15 a pet left with no food and no fun
+//   a few school days away. Since 3.3 a pet left with no food and no fun
 //   for a week dies (shared/petdeath.js has that rule).
 //
 // The mascot (the team's robot on Today) runs on the whole team's last seven

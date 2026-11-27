@@ -1,4 +1,4 @@
-// Pets can die (3.2.15) on the server. The rule itself is in
+// Pets can die (3.3) on the server. The rule itself is in
 // shared/petdeath.js (the demo runs the same one); this file reads and
 // writes the docs:
 //   pets/{personId}            each pet's `neglect` (the clock and the warnings

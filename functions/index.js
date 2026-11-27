@@ -1369,7 +1369,7 @@ export const { loanRequest, loanRespond, loanRepay, loanManage, loanTick, loanRe
 const buddies = buddyFunctions({ db, coinData, notify, owner: REQUESTS_TO });
 export const { buddy } = buddies;
 
-// Pets can die (functions/petdeath.js, 3.2.15): petCare checks every pet a
+// Pets can die (functions/petdeath.js, 3.3): petCare checks every pet a
 // few times a day; its callable actions ride on `pet` below.
 const petDeath = petDeathFunctions({ db, notify, personId, renamer, coinData, inactiveNames, owner: REQUESTS_TO, timeZone: TIME_ZONE });
 export const { petCare } = petDeath;

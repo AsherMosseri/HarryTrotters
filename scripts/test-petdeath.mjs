@@ -1,4 +1,4 @@
-// Pets can die (functions/shared/petdeath.js, 3.2.15): the 7-day streak with
+// Pets can die (functions/shared/petdeath.js, 3.3): the 7-day streak with
 // the real decay math, warnings on days 3, 5 and 6 (once each), care that
 // resets it, sleeping while the owner is inactive, people with pet death
 // turned off, several pets, renamed owners, the decision function run again
@@ -209,7 +209,7 @@ eq(petFate(watched, { now: Math.ceil(both0) + 7 * D - 1 }).status, 'neglected', 
   const g = petFate({ ...r.pet, neglect: f.patch }, { now: T0 + 22 * D + 7 * D + H });
   eq(g.status, 'dies', '...but if nobody feeds it, 7 days after the new owner got it');
   eq(petFate({ ...r.pet, neglect: f.patch }, { now: T0 + 22 * D + 6 * D }).status, 'neglected', 'not before');
-  // Not watched yet (before 3.2.15): a long-starving pet gets its full week.
+  // Not watched yet (before 3.3): a long-starving pet gets its full week.
   const old = petFate({ ...starving, neglect: undefined }, { now: T0 + 60 * D });
   eq([old.status, old.day, old.patch.from], ['neglected', 0, T0 + 60 * D], 'first check after the update: the week starts now, no sudden death');
 }
