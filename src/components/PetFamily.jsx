@@ -3,6 +3,7 @@ import { PET_ITEMS } from '../../functions/shared/market.js';
 import {
   EVENT_GEAR,
   FULL,
+  STUFFED,
   GEAR,
   gearFits,
   GEAR_SLOTS,
@@ -193,6 +194,23 @@ export function PetsShelf({ actor, balance, buy, busy, onToast, roster = [] }) {
                   >
                     {full ? `${pet.name} is full` : it.price > balance ? 'Not enough coins' : busy === item ? 'Buying…' : 'Buy'}
                   </ServerButton>
+                  {/* Overfeeding (3.2.14): food on a full pet makes it chubby for a few days. */}
+                  {full && it.food > 0 && st.food < STUFFED - 5 && (
+                    <ServerButton
+                      className="link-btn small"
+                      disabled={!market.coinsOn || it.price > balance || !!busy}
+                      onClick={async () => {
+                        const ok = await confirmDialog({
+                          title: `Feed ${pet.name} anyway?`,
+                          body: `${pet.name} is already full. It’ll eat it and get chubby for a few days, until it runs back down. It still costs ${it.price} coins.`,
+                          okLabel: 'Feed anyway',
+                        });
+                        if (ok) buy(item, { born: pet.adoptedAt, extra: true }, () => onToast(`${pet.name} ate it all. Look at that belly!`));
+                      }}
+                    >
+                      Feed anyway
+                    </ServerButton>
+                  )}
                 </li>
               );
             })}
@@ -244,7 +262,7 @@ function OwnedPet({ entry, lead, levels, roster, actor, offered, onToast, onPlay
       <div className="pp-pair">
         <div className="pet-stage">
           {(() => {
-            const drawn = <PetWithGear species={pet.species} mood={st.mood} stage={st.stage} size={148} title={`${pet.name} the ${pet.species}`} gear={gear} />;
+            const drawn = <PetWithGear species={pet.species} mood={st.mood} stage={st.stage} size={148} title={`${pet.name} the ${pet.species}`} gear={gear} chubby={st.chubby} />;
             const asPet = photoPetOf(market, market?.me, pet, lead);
             return asPet ? <PhotoPet photo={asPet} size={148} title={pet.name} fallback={drawn} /> : drawn;
           })()}
@@ -647,7 +665,7 @@ export function PetExtras({ name }) {
     <div className="pf-minis">
       {rest.map(({ pet, st }) => (
         <div key={pet.adoptedAt} className="pet-card pf-mini">
-          <PetWithGear species={pet.species} mood={st.mood} stage={st.stage} size={56} title={`${pet.name} the ${pet.species}`} gear={pet.gear} />
+          <PetWithGear species={pet.species} mood={st.mood} stage={st.stage} size={56} title={`${pet.name} the ${pet.species}`} gear={pet.gear} chubby={st.chubby} />
           <div className="pet-info">
             <div className="pet-name-row">
               <b className="pet-name">{pet.name}</b>

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import * as Hop from '../../petgames/hop.js';
 import { PetWithGear } from '../PetGear.jsx';
+import { PhotoPet } from '../PetPhoto.jsx';
 import { Icon } from '../shell/icons.jsx';
 import { movingOn, sceneColors, useFitCanvas, useFrames, useNoScroll, useOnHide } from './kit.js';
 
@@ -11,7 +12,7 @@ import { movingOn, sceneColors, useFitCanvas, useFrames, useNoScroll, useOnHide 
 
 const SPRITE = 13; // the pet's size in world units
 
-export default function HopGame({ pet, stage, best, onEnd, onQuit }) {
+export default function HopGame({ pet, photo, stage, best, onEnd, onQuit }) {
   const wrap = useRef(null);
   const canvas = useRef(null);
   const sprite = useRef(null);
@@ -139,7 +140,10 @@ export default function HopGame({ pet, stage, best, onEnd, onQuit }) {
       >
         <canvas ref={canvas} className="pg-canvas" aria-label="Pet Hop" role="img" />
         <div ref={sprite} className="pg-sprite" style={{ width: px, height: px }} aria-hidden="true">
-          <PetWithGear species={pet.species} gear={pet.gear} stage={stage} mood={hud.status === 'over' ? 'sad' : 'happy'} size={px} still={!movingOn()} />
+          {(() => {
+            const drawn = <PetWithGear species={pet.species} gear={pet.gear} stage={stage} mood={hud.status === 'over' ? 'sad' : 'happy'} size={px} still={!movingOn()} />;
+            return photo ? <PhotoPet photo={photo} size={px} fit fallback={drawn} className="pg-photo" /> : drawn;
+          })()}
         </div>
         <div className="pg-hud">
           <button className="pg-hud-btn" onClick={() => (hud.status === 'go' ? pause(true) : onQuit())} aria-label={hud.status === 'go' ? 'Pause' : 'Back to the games'}>

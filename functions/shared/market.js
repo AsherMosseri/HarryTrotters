@@ -108,7 +108,7 @@ export function buyCheck(item, ctx) {
   if (kind === 'pet') {
     const it = petItem(id);
     if (!it) return { error: 'That isn’t for sale.' };
-    const after = careAfter(ctx.pet, it, now);
+    const after = careAfter(ctx.pet, it, now, { extra: ctx.extra === true });
     if (after.error) return after;
     return afford(it.price) || { price: it.price, label: `${it.name} for ${ctx.pet.name}`, pet: after };
   }

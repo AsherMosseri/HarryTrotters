@@ -4,6 +4,16 @@
 // Plain JS (no imports) so vite.config.js can publish it in version.json.
 export const CHANGELOG = [
   {
+    version: '3.2.14',
+    date: '2026-11-27',
+    title: 'Chubby pets, and your pet’s photo in the games',
+    items: [
+      'Your pet is full but you want to spoil it? Feed anyway (under the food in Market, Pets) and it gets chubby for a few days, until it runs back down. Thanks, Cooper!',
+      'If you show your real pet’s photo as your pet, it now plays Pet Hop and Pet Rally too, and shows on the games’ boards. Thanks, Kasha!',
+      'On iPad, the app installed on your Home Screen now starts a little lower, so iPadOS’s blur at the top no longer covers the header, the sidebar or your coin balance.',
+    ],
+  },
+  {
     version: '3.2.13',
     date: '2026-11-27',
     title: 'Sharp top on iPad',

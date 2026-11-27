@@ -3,6 +3,7 @@ import { RALLY_COUNT, buildLevel } from '../../../functions/shared/petRally.js';
 import { rallyTime } from '../../../functions/shared/petgames.js';
 import * as Rally from '../../petgames/rally.js';
 import { PetWithGear } from '../PetGear.jsx';
+import { PhotoPet } from '../PetPhoto.jsx';
 import { Icon } from '../shell/icons.jsx';
 import { movingOn, sceneColors, useFitCanvas, useFrames, useNoScroll, useOnHide } from './kit.js';
 
@@ -18,7 +19,7 @@ const FAIL = {
   stuck: ['Stuck!', (n) => `${n} can’t get going from there. Try it again.`],
 };
 
-export default function RallyGame({ pet, stage, level: n, best, onEnd, onQuit, onLevel }) {
+export default function RallyGame({ pet, photo, stage, level: n, best, onEnd, onQuit, onLevel }) {
   const level = useMemo(() => buildLevel(n), [n]);
   const wrap = useRef(null);
   const canvas = useRef(null);
@@ -180,7 +181,10 @@ export default function RallyGame({ pet, stage, level: n, best, onEnd, onQuit, o
         >
           <CarBack />
           <div className="pr-pet" style={{ left: (140 - 12 - PET / 2) * k, top: (175 - PET_Y - PET / 2) * k, width: PET * k, height: PET * k }}>
-            <PetWithGear species={pet.species} gear={pet.gear} stage={stage} mood={failed ? 'sad' : 'happy'} size={PET * k} still={!movingOn()} />
+            {(() => {
+              const drawn = <PetWithGear species={pet.species} gear={pet.gear} stage={stage} mood={failed ? 'sad' : 'happy'} size={PET * k} still={!movingOn()} />;
+              return photo ? <PhotoPet photo={photo} size={PET * k} fit fallback={drawn} className="pg-photo" /> : drawn;
+            })()}
           </div>
           <CarFront />
         </div>

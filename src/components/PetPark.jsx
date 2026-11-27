@@ -105,7 +105,7 @@ export function ParkScene({ ev = null, compact = false, moving = 12, initial = 2
               aria-label={`${e.pet.name}, ${e.owner}’s ${e.pet.species}, level ${e.st.level}`}
             >
               {(() => {
-                const drawn = <PetWithGear species={e.pet.species} mood={party ? 'happy' : e.st.mood} stage={e.st.stage} size={size} gear={e.pet.gear} still={i >= moving} />;
+                const drawn = <PetWithGear species={e.pet.species} mood={party ? 'happy' : e.st.mood} stage={e.st.stage} size={size} gear={e.pet.gear} still={i >= moving} chubby={e.st.chubby} />;
                 const asPet = photoPetOf(market, e.owner, e.pet, e.lead);
                 return asPet ? (
                   <PhotoPet photo={asPet} size={size} fallback={drawn} />
@@ -156,9 +156,9 @@ export function ParkCard({ entry, onClose }) {
             <div className="pp-pair">
               <div className="pet-stage">
                 {asPet ? (
-                  <PhotoPet photo={asPet} size={120} title={pet.name} fallback={<PetWithGear species={pet.species} mood={st.mood} stage={st.stage} size={120} gear={pet.gear} title={`${pet.name} the ${pet.species}`} />} />
+                  <PhotoPet photo={asPet} size={120} title={pet.name} fallback={<PetWithGear species={pet.species} mood={st.mood} stage={st.stage} size={120} gear={pet.gear} title={`${pet.name} the ${pet.species}`} chubby={st.chubby} />} />
                 ) : (
-                  <PetWithGear species={pet.species} mood={st.mood} stage={st.stage} size={120} gear={pet.gear} title={`${pet.name} the ${pet.species}`} />
+                  <PetWithGear species={pet.species} mood={st.mood} stage={st.stage} size={120} gear={pet.gear} title={`${pet.name} the ${pet.species}`} chubby={st.chubby} />
                 )}
               </div>
               {entry.lead && !asPet && <PetSticker photo={photo} size={84} />}

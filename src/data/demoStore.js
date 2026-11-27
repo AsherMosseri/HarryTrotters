@@ -1753,6 +1753,7 @@ export const demoStore = {
         perk: kind === 'perk' ? (state.perks || []).find((p) => p.id === id) || null : null,
         purchases: (state.purchases || []).filter((p) => p.item === item),
         text: data.text,
+        extra: data.extra === true,
       });
       if (r.error) return note(r.error, r.body);
       state.coins = [...(state.coins || []), { id: `c${uid()}`, ...market.spendEntry(me, item, r.price, r.label, now) }];

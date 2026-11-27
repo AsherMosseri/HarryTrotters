@@ -33,10 +33,10 @@ export function PetBadge({ name }) {
 
 export function Meter({ label, value, tone }) {
   return (
-    <div className={`pet-meter ${tone || (value < 30 ? 'low' : value < 60 ? 'mid' : 'high')}`}>
+    <div className={`pet-meter ${tone || (value < 30 ? 'low' : value < 60 ? 'mid' : 'high')}${value > 100 ? ' over' : ''}`}>
       <span className="pet-meter-label">{label}</span>
       <span className="pet-meter-bar" role="meter" aria-valuenow={value} aria-valuemin={0} aria-valuemax={100} aria-label={label}>
-        <span style={{ transform: `scaleX(${Math.max(0.02, value / 100)})` }} />
+        <span style={{ transform: `scaleX(${Math.min(1, Math.max(0.02, value / 100))})` }} />
       </span>
       <span className="pet-meter-num mono">{value}</span>
     </div>
@@ -77,7 +77,7 @@ export function PetCard({ name, big = false, owner = false, onCare }) {
       <div className="pp-pair">
         <div className="pet-stage">
           {(() => {
-            const drawn = <PetWithGear species={pet.species} mood={st.mood} stage={st.stage} size={big ? 148 : 92} title={`${pet.name} the ${pet.species}`} gear={pet.gear} />;
+            const drawn = <PetWithGear species={pet.species} mood={st.mood} stage={st.stage} size={big ? 148 : 92} title={`${pet.name} the ${pet.species}`} gear={pet.gear} chubby={st.chubby} />;
             return asPet ? <PhotoPet photo={asPet} size={big ? 148 : 92} title={pet.name} fallback={drawn} /> : drawn;
           })()}
         </div>

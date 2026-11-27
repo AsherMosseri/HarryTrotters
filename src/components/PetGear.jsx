@@ -346,7 +346,8 @@ export function GearOverlay({ species, gear, stage = 'young', mood = 'ok', size 
 }
 
 // A pet with what it wears. Takes PetArt's props plus `gear`.
-export function PetWithGear({ gear, size = 64, ...art }) {
+// chubby: 0, 1 or 2 (an overfed pet, petState's chubby) draws it rounder.
+export function PetWithGear({ gear, size = 64, chubby = 0, ...art }) {
   const g = cleanGear(gear, art.species);
   const anchor = PET_ANCHORS[art.species] || PET_ANCHORS.cat;
   // A pet with something hanging over its neck (anchor.under: the monkey's
@@ -372,7 +373,7 @@ export function PetWithGear({ gear, size = 64, ...art }) {
     </>
   );
   return (
-    <span className="pet-geared" style={{ width: size, height: size }} role={outfit && art.title ? 'img' : undefined} aria-label={outfit ? art.title : undefined}>
+    <span className={`pet-geared${chubby ? ` chubby-${chubby}` : ''}`} style={{ width: size, height: size }} role={outfit && art.title ? 'img' : undefined} aria-label={outfit ? art.title : undefined}>
       {outfit || <PetArt {...art} neck={neck} size={size} className={tint} />}
       {worn && <GearOverlay species={art.species} stage={art.stage} mood={art.mood} size={size} still={art.still} gear={g} />}
     </span>

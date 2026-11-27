@@ -141,6 +141,7 @@ export function marketFunctions({ db, coinData, freshCoins, notify, bankRef, per
         perk: perkSnap?.exists ? perkSnap.data() : null,
         purchases: bought ? bought.docs.map((d) => d.data()) : [],
         text: req.data?.text,
+        extra: req.data?.extra === true,
       });
       if (r.error) return note(r.error, r.body);
       tx.set(db.collection('coins').doc(), market.spendEntry(me, item, r.price, r.label, now));

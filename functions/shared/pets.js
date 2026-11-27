@@ -57,29 +57,47 @@ export const petItem = (id) => PET_ITEMS.find((x) => x.id === id) || null;
 // How much each need runs down a day, and where a new pet starts.
 export const DECAY = { food: 15, fun: 12 };
 export const START_NEED = 80;
-// Over this, a need is full: the market won't sell more of what fills it.
+// Over this, a need is full: the market won't sell more of what fills it
+// (unless you feed a full pet anyway, below).
 export const FULL = 95;
+// Overfeeding (3.2.14): a full pet can be fed anyway, and food then goes past
+// 100, up to STUFFED. Past CHUBBY it looks rounder, past VERY_CHUBBY rounder
+// still, until it runs back down (15 a day). Fun still stops at 100.
+export const STUFFED = 160;
+export const CHUBBY = 105;
+export const VERY_CHUBBY = 130;
 const DAY = 86400000;
-const clamp = (n) => Math.max(0, Math.min(100, n));
+const TOP = { food: STUFFED, fun: 100 };
+const clamp = (n, top = 100) => Math.max(0, Math.min(top, n));
 
 // A need right now: stored as { v, at } and running down since then.
 export function needNow(pet, key, now = Date.now()) {
   const n = pet?.[key];
   if (!n || !Number.isFinite(n.v)) return 0;
-  return Math.round(clamp(n.v - (DECAY[key] * Math.max(0, now - (n.at || now))) / DAY));
+  return Math.round(clamp(n.v - (DECAY[key] * Math.max(0, now - (n.at || now))) / DAY, TOP[key] || 100));
 }
+// 0 (normal), 1 (chubby) or 2 (very chubby), from food right now.
+export const chubbyOf = (food) => (food >= VERY_CHUBBY ? 2 : food >= CHUBBY ? 1 : 0);
 
 // A pet after an item: { food, fun } as stored ({ v, at }), or { error }.
-export function careAfter(pet, item, now = Date.now()) {
+// extra: feed it anyway when it's full (food goes past 100, up to STUFFED).
+export function careAfter(pet, item, now = Date.now(), { extra = false } = {}) {
   if (!pet) return { error: 'Adopt a pet first.' };
   if (!item) return { error: 'That isn’t a pet item.' };
   const food = needNow(pet, 'food', now);
   const fun = needNow(pet, 'fun', now);
   const fills = (k, have) => (item[k] || 0) > 0 && have < FULL;
-  if (!fills('food', food) && !fills('fun', fun))
-    return { error: `${pet.name || 'Your pet'} is full.`, body: 'Save your coins for when it needs something.' };
+  if (!fills('food', food) && !fills('fun', fun)) {
+    if (!extra || !(item.food > 0)) return { error: `${pet.name || 'Your pet'} is full.`, body: 'Save your coins for when it needs something.' };
+    if (food >= STUFFED - 5) return { error: `${pet.name || 'Your pet'} can’t eat another bite.`, body: 'Wait a day or two.' };
+    return {
+      food: { v: clamp(food + item.food, STUFFED), at: now },
+      fun: { v: clamp(fun + (item.fun || 0)), at: now },
+    };
+  }
+  // Ordinary feeding fills up to 100 (a pet already past it keeps what it has).
   return {
-    food: { v: clamp(food + (item.food || 0)), at: now },
+    food: { v: Math.max(food, clamp(food + (item.food || 0))), at: now },
     fun: { v: clamp(fun + (item.fun || 0)), at: now },
   };
 }
@@ -164,13 +182,13 @@ export function petState(pet, { shifts = [], now = Date.now() } = {}) {
   const fun = needNow(pet, 'fun', now);
   const away = schoolDaysAway(person, shifts, pet.adoptedAt, now);
   const lv = levelOf(petXp(person, shifts, pet.adoptedAt || 0, now));
-  const score = Math.round((food + fun) / 2 - Math.max(0, away - 2) * 15);
+  const score = Math.round((Math.min(food, 100) + fun) / 2 - Math.max(0, away - 2) * 15);
   const mood = score >= 60 ? 'happy' : score >= 30 ? 'ok' : 'sad';
   const needs = [];
   if (food < 30) needs.push('hungry');
   if (fun < 30) needs.push('bored');
   if (away >= 3) needs.push('misses you');
-  return { ...lv, stage: stageOf(lv.level), food, fun, away, score, mood, needs };
+  return { ...lv, stage: stageOf(lv.level), food, fun, away, score, mood, needs, chubby: chubbyOf(food) };
 }
 
 // "Biscuit is hungry and bored", "Biscuit misses you", for the profile.
@@ -179,7 +197,8 @@ export function moodLine(name, st) {
   const wants = [st.food < 30 && 'hungry', st.fun < 30 && 'bored'].filter(Boolean);
   const line = wants.length ? `${name} is ${wants.join(' and ')}` : '';
   if (st.away >= 3) return line ? `${line}, and misses you` : `${name} misses you`;
-  return line || (st.mood === 'happy' ? `${name} is happy` : `${name} is doing OK`);
+  const plump = st.chubby === 2 ? ' and very chubby' : st.chubby === 1 ? ' and a little chubby' : '';
+  return line || (st.mood === 'happy' ? `${name} is happy${plump}` : `${name} is doing OK${plump}`);
 }
 
 // The mascot: how the team's last seven days went, against weekly goals.

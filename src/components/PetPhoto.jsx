@@ -62,18 +62,21 @@ export function photoPetOf(market, owner, pet, lead = true) {
 
 // The photo standing in for the drawn pet: the cut-out itself, no frame, as
 // tall as the drawing would be. If it fails to load, the drawing shows instead.
-export function PhotoPet({ photo, size = 92, title, className = '', fallback = null }) {
+// fit: stay inside a size x size square (the games' pet box), so a wide photo
+// is shorter instead of wider.
+export function PhotoPet({ photo, size = 92, title, className = '', fallback = null, fit = false }) {
   const [bad, setBad] = useState(false);
   useEffect(() => setBad(false), [photo?.url]);
   if (!photo?.url || bad) return fallback;
   const ar = photo.w > 0 && photo.h > 0 ? Math.min(1.5, Math.max(0.55, photo.w / photo.h)) : 1;
+  const h = fit ? Math.round(size / Math.max(1, ar)) : size;
   return (
-    <span className={`photo-pet${className ? ` ${className}` : ''}`} style={{ '--pp': `${size}px`, '--ar': ar }} title={title}>
+    <span className={`photo-pet${className ? ` ${className}` : ''}`} style={{ '--pp': `${h}px`, '--ar': ar }} title={title}>
       <img
         src={photo.url}
         alt={title || (photo.caption ? `${photo.caption}, the real pet` : 'The real pet')}
-        width={Math.round(size * ar)}
-        height={size}
+        width={Math.round(h * ar)}
+        height={h}
         loading="lazy"
         decoding="async"
         draggable={false}

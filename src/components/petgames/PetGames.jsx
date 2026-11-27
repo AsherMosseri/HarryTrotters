@@ -6,6 +6,7 @@ import { useMarket } from '../../market.js';
 import { useEscape } from '../../util.js';
 import { CloseIcon } from '../common.jsx';
 import { PetWithGear } from '../PetGear.jsx';
+import { PhotoPet, photoPetOf } from '../PetPhoto.jsx';
 import { Icon } from '../shell/icons.jsx';
 import HopGame from './HopGame.jsx';
 import RallyGame from './RallyGame.jsx';
@@ -28,6 +29,8 @@ export default function PetGames({ actor, start = {}, onClose }) {
   const list = market.petsOf(me);
   const [born, setBorn] = useState(start.born ?? list[0]?.pet.adoptedAt);
   const entry = list.find((e) => e.pet.adoptedAt === born) || list[0];
+  // Your real pet's photo plays instead of the drawing when you chose that (first pet only).
+  const photo = entry ? photoPetOf(market, me, entry.pet, entry === list[0]) : null;
   const [tab, setTab] = useState(start.game === 'rally' ? 'rally' : 'hop');
   const [playing, setPlaying] = useState(start.game === 'hop' ? { game: 'hop' } : null);
   useEscape(() => (playing ? setPlaying(null) : onClose()));
@@ -92,11 +95,12 @@ export default function PetGames({ actor, start = {}, onClose }) {
       <div className="panel-backdrop center pg-backdrop playing">
         <div className="dialog pg-dialog playing" role="dialog" aria-label={GAME_INFO[playing.game].name}>
           {playing.game === 'hop' ? (
-            <HopGame pet={pet} stage={st.stage} best={bests.hop} onQuit={quit} onEnd={(score) => score > 0 && record('hop', 0, score)} />
+            <HopGame pet={pet} photo={photo} stage={st.stage} best={bests.hop} onQuit={quit} onEnd={(score) => score > 0 && record('hop', 0, score)} />
           ) : (
             <RallyGame
               key={playing.level}
               pet={pet}
+              photo={photo}
               stage={st.stage}
               level={playing.level}
               best={bests.rally[String(playing.level)]}
@@ -122,7 +126,11 @@ export default function PetGames({ actor, start = {}, onClose }) {
           </button>
         </div>
         <div className="pg-who">
-          <PetWithGear species={pet.species} gear={pet.gear} stage={st.stage} mood="happy" size={64} />
+          {photo ? (
+            <PhotoPet photo={photo} size={64} fit title={pet.name} fallback={<PetWithGear species={pet.species} gear={pet.gear} stage={st.stage} mood="happy" size={64} />} />
+          ) : (
+            <PetWithGear species={pet.species} gear={pet.gear} stage={st.stage} mood="happy" size={64} />
+          )}
           <div className="pg-who-text">
             <b>Playing with {pet.name}</b>
             <span className="muted small">Just for fun: no coins, and {pet.name} still grows with your lab time.</span>
@@ -193,7 +201,14 @@ export default function PetGames({ actor, start = {}, onClose }) {
                 return (
                   <li key={r.name} className={r.name === me ? 'me' : ''}>
                     <span className="pg-rank mono">{i + 1}</span>
-                    <span className="pg-board-pet">{theirs && <PetWithGear species={theirs.pet.species} gear={theirs.pet.gear} stage={theirs.st.stage} mood="happy" size={26} still />}</span>
+                    <span className="pg-board-pet">
+                      {theirs &&
+                        (() => {
+                          const drawn = <PetWithGear species={theirs.pet.species} gear={theirs.pet.gear} stage={theirs.st.stage} mood="happy" size={26} still />;
+                          const shot = photoPetOf(market, r.name, theirs.pet);
+                          return shot ? <PhotoPet photo={shot} size={26} fit fallback={drawn} /> : drawn;
+                        })()}
+                    </span>
                     <span className="pg-board-name">{r.name}</span>
                     <span className="pg-board-val mono">{tab === 'hop' ? r.best : `${r.cleared}/${RALLY_COUNT} · ${rallyTime(r.total)}`}</span>
                   </li>

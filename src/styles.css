@@ -1,3 +1,12 @@
+/* The top inset everything clears (instead of env(safe-area-inset-top)).
+   On an iPad Home Screen app, iPadOS 26 blurs about the top 2rem below the
+   status bar too (its "scroll edge" fade), whatever is painted there, so
+   the app starts below it: the header, sidebar top and coin balance stay
+   sharp. Phones and browsers are unchanged. */
+:root { --sat: env(safe-area-inset-top); }
+@media (display-mode: standalone) and (min-width: 761px) and (min-height: 600px) and (pointer: coarse) {
+  :root { --sat: calc(env(safe-area-inset-top) + 32px); }
+}
 :root {
   --bg: #f5f6fa;
   --surface: #ffffff;
@@ -186,7 +195,7 @@ a { color: var(--accent); }
      header. With one, iPad Safari put the header over What's new. */
   position: relative; flex: none;
   display: flex; align-items: center; gap: 16px;
-  padding: 10px 16px; padding-top: max(11px, env(safe-area-inset-top)); /* clear of .status-bar-band */
+  padding: 10px 16px; padding-top: max(11px, var(--sat)); /* clear of .status-bar-band */
   /* Solid, not a frosted-glass blur: Safari on iPad renders parts of a
      backdrop-filter header at low resolution, so its text looks blurry. */
   background: var(--surface);
@@ -1758,7 +1767,7 @@ h3.md-h { font-size: 16.5px; }
 .border-sample { align-self: stretch; padding: 8px 12px; }
 
 /* ---------- phone layout (≤ 760px): slim top bar, bottom tabs, sheets ---------- */
-.phone-top { gap: 6px; padding: max(11px, env(safe-area-inset-top)) 12px 8px; flex-wrap: nowrap; }
+.phone-top { gap: 6px; padding: max(11px, var(--sat)) 12px 8px; flex-wrap: nowrap; }
 .phone-top .brand { flex: none; }
 .phone-title { margin: 0 0 0 4px; font-size: 19px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .me-btn { position: relative; flex: none; }
@@ -1894,8 +1903,8 @@ body:has(.bottom-nav):has(.composer) .toast { bottom: calc(150px + env(safe-area
 @media (max-width: 760px) {
   /* Chat pickers (emoji, stickers, GIFs, reactions) open near the top, so the keyboard never hides them. */
   .composer :is(.composer-emoji, .sticker-picker, .gif-picker), .msg-actions .reaction-picker {
-    position: fixed; top: calc(env(safe-area-inset-top) + 64px); bottom: auto; left: 8px; right: 8px; width: auto; margin: 0;
-    max-height: min(480px, calc(var(--vvh, 100dvh) - env(safe-area-inset-top) - 160px)); overflow-y: auto; overscroll-behavior: contain; z-index: 45;
+    position: fixed; top: calc(var(--sat) + 64px); bottom: auto; left: 8px; right: 8px; width: auto; margin: 0;
+    max-height: min(480px, calc(var(--vvh, 100dvh) - var(--sat) - 160px)); overflow-y: auto; overscroll-behavior: contain; z-index: 45;
   }
 }
 
@@ -1931,7 +1940,7 @@ body:has(.bottom-nav):has(.composer) .toast { bottom: calc(150px + env(safe-area
 /* ---------- electrical diagram editor ---------- */
 .dg-screen {
   position: fixed; inset: 0; z-index: 46; display: flex; flex-direction: column; background: var(--bg);
-  padding-top: max(0px, env(safe-area-inset-top)); animation: fade 0.15s ease;
+  padding-top: max(0px, var(--sat)); animation: fade 0.15s ease;
 }
 .dg-bar { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--border); background: var(--surface); flex-wrap: wrap; }
 .dg-bar h2 { margin: 0 6px 0 0; font-size: 17px; white-space: nowrap; }
@@ -2220,11 +2229,11 @@ body:has(.bottom-nav):has(.composer) .toast { bottom: calc(150px + env(safe-area
 
 /* Full-screen pop-ups start below the status bar strip (and the iPhone's
    status bar), so nothing at their top edge is covered. */
-.dg-screen { padding-top: max(11px, env(safe-area-inset-top)); }
-.panel { padding-top: max(11px, env(safe-area-inset-top)); }
-.photo-viewer { padding-top: max(16px, calc(env(safe-area-inset-top) + 8px)); }
+.dg-screen { padding-top: max(11px, var(--sat)); }
+.panel { padding-top: max(11px, var(--sat)); }
+.photo-viewer { padding-top: max(16px, calc(var(--sat) + 8px)); }
 @media (max-width: 760px) {
-  .panel-backdrop.center:not(:has(> .dialog.profile-card)) { padding-top: max(11px, env(safe-area-inset-top)); background: var(--surface); }
+  .panel-backdrop.center:not(:has(> .dialog.profile-card)) { padding-top: max(11px, var(--sat)); background: var(--surface); }
 }
 
 /* ---------- calmer header (tablet / desktop) ---------- */
@@ -2436,7 +2445,7 @@ body:has(.bottom-nav):has(.composer) .toast { bottom: calc(150px + env(safe-area
 /* Full-screen */
 .ad-full {
   position: fixed; inset: 0; z-index: 300; border-radius: 0; display: flex; flex-direction: column;
-  padding: max(14px, env(safe-area-inset-top)) 16px max(10px, env(safe-area-inset-bottom)); animation: ad-shift 5s ease-in-out infinite, ad-enter 0.45s cubic-bezier(0.2, 1.4, 0.4, 1);
+  padding: max(14px, var(--sat)) 16px max(10px, env(safe-area-inset-bottom)); animation: ad-shift 5s ease-in-out infinite, ad-enter 0.45s cubic-bezier(0.2, 1.4, 0.4, 1);
 }
 @keyframes ad-enter { from { transform: scale(0.6); opacity: 0; } }
 .ad-full-top { display: flex; align-items: center; gap: 8px; z-index: 2; }
@@ -2645,7 +2654,7 @@ body:has(.bottom-nav):has(.composer) .toast { bottom: calc(150px + env(safe-area
   transition: transform 4.5s cubic-bezier(0.15, 0.7, 0.15, 1);
 }
 .wheel-label { position: absolute; left: 50%; top: 50%; width: 92px; margin: -10px 0 0 -46px; text-align: center; font-weight: 900; font-size: 14px; color: #fff; text-shadow: 0 1px 3px rgb(0 0 0 / 50%); transform-origin: 50% 50%; }
-.ad-video { position: fixed; inset: 0; z-index: 300; background: #000; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: max(14px, env(safe-area-inset-top)) 12px max(10px, env(safe-area-inset-bottom)); }
+.ad-video { position: fixed; inset: 0; z-index: 300; background: #000; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: max(14px, var(--sat)) 12px max(10px, env(safe-area-inset-bottom)); }
 .ad-video-stage {
   position: relative; width: min(960px, 100%, calc((var(--vvh, 100dvh) - 80px) * 16 / 9)); aspect-ratio: 16 / 9; overflow: hidden; border-radius: 6px; color: #fff;
   background: linear-gradient(120deg, var(--ad-a), var(--ad-b), var(--ad-a)); background-size: 220% 220%; animation: ad-shift 5s ease-in-out infinite;
@@ -2917,8 +2926,8 @@ html.kb-open .toast { bottom: auto; top: calc(var(--vvt) + var(--vvh) - 64px); }
    (--vvb), so they add those. Both are 0 (unset) when there's no keyboard. */
 @media (max-width: 760px) {
   html.kb-open .composer :is(.composer-emoji, .sticker-picker, .gif-picker),
-  html.kb-open .msg-actions .reaction-picker { top: calc(var(--vvt, 0px) + env(safe-area-inset-top) + 64px); }
-  html.kb-open .floating-picker { top: calc(var(--vvt, 0px) + env(safe-area-inset-top) + 64px); }
+  html.kb-open .msg-actions .reaction-picker { top: calc(var(--vvt, 0px) + var(--sat) + 64px); }
+  html.kb-open .floating-picker { top: calc(var(--vvt, 0px) + var(--sat) + 64px); }
   html.kb-open .emoji-picker:not(.composer-emoji) { bottom: calc(90px + var(--vvb, 0px)); }
   html.kb-open .inbox-pop, html.kb-open .shift-pop { top: calc(var(--vvt, 0px) + 58px); }
   html.kb-open .notify-menu { top: calc(var(--vvt, 0px) + 120px); }
@@ -2933,7 +2942,7 @@ html.kb-open .toast { bottom: auto; top: calc(var(--vvt) + var(--vvh) - 64px); }
 /* With the keyboard up on a phone, the page title row gives its room to the
    chat; the channel bar takes over the strip under the status bar. */
 html.kb-open .app:has(.chat-mobile-bar) .phone-top { display: none; }
-html.kb-open .phone-shell .chat-mobile-bar { padding-top: max(8px, env(safe-area-inset-top)); }
+html.kb-open .phone-shell .chat-mobile-bar { padding-top: max(8px, var(--sat)); }
 /* iPad with a keyboard attached (just the suggestion bar): pop-ups that sit
    at the bottom of the screen stay above it. */
 html.kb-bar .panel { padding-bottom: calc(env(safe-area-inset-bottom) + var(--kb-bar, 0px)); }
@@ -3235,7 +3244,7 @@ html.kb-bar .sc-table { padding-bottom: calc(max(20px, env(safe-area-inset-botto
 .lablog-blockers { color: var(--danger); white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; }
 .lablog-next { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; }
 .shutdown-banner { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 6px 12px; padding: 6px 16px; font-size: 13px; font-weight: 700; background: color-mix(in srgb, var(--danger) 14%, var(--surface)); color: var(--text); border-bottom: 1px solid color-mix(in srgb, var(--danger) 30%, var(--border)); flex: none; }
-.shutdown-gate { position: relative; min-height: 100dvh; padding-top: calc(max(12px, env(safe-area-inset-top)) + 52px); padding-bottom: max(24px, env(safe-area-inset-bottom)); }
+.shutdown-gate { position: relative; min-height: 100dvh; padding-top: calc(max(12px, var(--sat)) + 52px); padding-bottom: max(24px, env(safe-area-inset-bottom)); }
 .shutdown-card { gap: 12px; }
 .shutdown-icon { font-size: 44px; line-height: 1; }
 .shutdown-msg { font-size: 17px; white-space: pre-wrap; overflow-wrap: anywhere; }
@@ -3268,13 +3277,13 @@ html.kb-bar .sc-table { padding-bottom: calc(max(20px, env(safe-area-inset-botto
 .sd-compose textarea { flex: 1; min-width: 0; font-weight: 400; }
 .sd-compose .btn { flex: none; min-height: 40px; }
 .sd-picker { width: auto; max-width: 46%; min-height: 34px; padding: 4px 8px; font-size: 14px; margin-right: 4px; }
-.shutdown-switch { position: absolute; top: max(12px, env(safe-area-inset-top)); right: max(16px, env(safe-area-inset-right)); z-index: 1; }
+.shutdown-switch { position: absolute; top: max(12px, var(--sat)); right: max(16px, env(safe-area-inset-right)); z-index: 1; }
 .ctl-quick, .ctl-preview { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .ctl-quick .btn { flex: 1 1 160px; justify-content: center; }
 .ctl-preview select { flex: 1 1 140px; width: auto; min-height: 40px; }
 .ctl-title { min-width: 0; font-size: 14px; flex: none; max-width: 45%; }
 .ctl-lablog { margin: 4px 0 2px; }
-.preview-strip { flex: none; display: flex; align-items: center; justify-content: center; gap: 12px; padding: 6px 16px; padding-top: max(14px, env(safe-area-inset-top)); background: #111827; color: #fff; font-size: 13px; font-weight: 700; }
+.preview-strip { flex: none; display: flex; align-items: center; justify-content: center; gap: 12px; padding: 6px 16px; padding-top: max(14px, var(--sat)); background: #111827; color: #fff; font-size: 13px; font-weight: 700; }
 .preview-strip span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .preview-strip .btn { flex: none; background: #fff; color: #111827; border-color: #fff; }
 .app.previewing .topbar { padding-top: 10px; }

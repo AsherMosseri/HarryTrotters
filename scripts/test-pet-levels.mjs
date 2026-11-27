@@ -170,5 +170,30 @@ check(!P.levelPath('cat').find((r) => r.level === 100).unlocks.some((u) => u.nam
   check(got.ok && P.petsIn(got.doc)[0].photoAsPet === undefined, 'a gifted pet comes without the giver’s photo choice');
 }
 
+// 3.2.14: feeding a full pet anyway makes it chubby, up to STUFFED, and it
+// runs back down like any food.
+{
+  const now = 1e12;
+  const full = { name: 'Bolt', food: { v: 96, at: now }, fun: { v: 50, at: now } };
+  const meal = P.petItem('meal');
+  check(!!P.careAfter(full, meal, now).error, 'a full pet: Buy is refused as before');
+  const fed = P.careAfter(full, meal, now, { extra: true });
+  check(fed.food?.v === 156 && fed.fun.v === 50, 'feed anyway: food goes past 100');
+  check(P.chubbyOf(156) === 2 && P.chubbyOf(110) === 1 && P.chubbyOf(100) === 0, 'chubby levels');
+  const stuffed = { ...full, food: { v: 157, at: now } };
+  check(!!P.careAfter(stuffed, P.petItem('snack'), now, { extra: true }).error, 'stuffed: can’t eat another bite');
+  const toy = P.PET_ITEMS.find((i) => i.fun && !i.food);
+  if (toy) check(!!P.careAfter({ ...full, fun: { v: 99, at: now } }, toy, now, { extra: true }).error, 'feed anyway only for food');
+  const later = { ...full, food: { v: 156, at: now } };
+  check(P.needNow(later, 'food', now) === 156 && P.needNow(later, 'food', now + 4 * 86400000) === 96, 'it slims back down 15 a day');
+  const st = P.petState({ ...later, person: 'Ira', adoptedAt: now - 1 }, { now });
+  check(st.chubby === 2 && st.mood === 'happy' || st.chubby === 2, 'petState says how chubby');
+  check(P.moodLine('Bolt', { ...st, food: 156, fun: 80, mood: 'happy', away: 0 }).includes('chubby'), 'the mood line mentions it');
+  const normal = P.careAfter({ ...full, food: { v: 40, at: now } }, meal, now);
+  check(normal.food.v === 100, 'ordinary feeding still stops at 100');
+  const keep = P.careAfter({ ...full, food: { v: 120, at: now }, fun: { v: 10, at: now } }, P.petItem('treat'), now);
+  check(keep.food.v === 120, 'a treat for fun doesn’t slim a chubby pet');
+}
+
 console.log(`${failures ? 'FAILED' : 'OK'}: ${passes} passed, ${failures} failed`);
 process.exit(failures ? 1 : 0);

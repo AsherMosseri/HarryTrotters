@@ -21,7 +21,7 @@
   width: 250px; flex: none; display: flex; flex-direction: column; min-height: 0;
   background: var(--sidebar); border-right: 1px solid var(--border);
 }
-.sb-top { display: flex; align-items: center; gap: 4px; padding: max(12px, env(safe-area-inset-top)) 8px 6px 10px; }
+.sb-top { display: flex; align-items: center; gap: 4px; padding: max(12px, var(--sat)) 8px 6px 10px; }
 .sb-team { display: flex; align-items: center; gap: 10px; min-width: 0; border: 0; background: none; padding: 4px; border-radius: 8px; color: var(--text); text-align: left; }
 .sb-mark { font-size: 19px; font-weight: 900; font-style: italic; letter-spacing: -0.06em; color: var(--accent); line-height: 1; padding-right: 2px; }
 .sb-team-name { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
@@ -84,7 +84,7 @@ button.sb-head-row { width: 100%; border: 0; background: none; color: var(--mute
 /* ---------- page header ---------- */
 .page-head {
   display: flex; align-items: center; flex-wrap: wrap; gap: 6px 14px;
-  padding: max(20px, env(safe-area-inset-top)) 28px 8px;
+  padding: max(20px, var(--sat)) 28px 8px;
 }
 .page-head h1 { margin: 0; font-size: 30px; font-weight: 750; letter-spacing: -0.022em; line-height: 1.15; }
 .page-sub { margin: 6px 0 0; align-self: center; color: var(--muted); font-size: 15px; }
@@ -110,10 +110,10 @@ button.sb-head-row { width: 100%; border: 0; background: none; color: var(--mute
 .shell .content.chat.no-list { grid-template-columns: minmax(0, 1fr); }
 .shell .content.chat.no-list.with-side { grid-template-columns: minmax(0, 1fr) 290px; }
 .shell .chat-main { border: 0; border-radius: 0; box-shadow: none; }
-.shell .chat-head { padding: max(14px, env(safe-area-inset-top)) 20px 12px; align-items: center; }
+.shell .chat-head { padding: max(14px, var(--sat)) 20px 12px; align-items: center; }
 .shell .chat-head h2 { font-size: 20px; font-weight: 700; }
 .shell .chat-side { border-radius: 0; border-width: 0 0 0 1px; box-shadow: none; }
-.shell .content.robot { padding-top: max(16px, env(safe-area-inset-top)); }
+.shell .content.robot { padding-top: max(16px, var(--sat)); }
 
 /* ---------- tasks ---------- */
 .shell .board { gap: 18px; }
@@ -149,7 +149,7 @@ button.sb-head-row { width: 100%; border: 0; background: none; color: var(--mute
 .shell .prio-medium, .shell .prio-low { color: var(--muted); }
 
 /* ---------- Today ---------- */
-.content.today { max-width: 1120px; padding: max(28px, env(safe-area-inset-top)) 32px 48px; }
+.content.today { max-width: 1120px; padding: max(28px, var(--sat)) 32px 48px; }
 .today-head { margin-bottom: 30px; }
 .today-date { margin: 0; color: var(--muted); font-size: 14px; font-weight: 600; }
 .today-head h1 { margin: 2px 0 6px; font-size: 34px; font-weight: 760; letter-spacing: -0.026em; line-height: 1.15; }
@@ -204,7 +204,7 @@ button.sb-head-row { width: 100%; border: 0; background: none; color: var(--mute
 .ms-bar span { display: block; height: 100%; background: var(--accent); border-radius: 2px; }
 
 /* Pages that bring their own title row (Milestones, Shifts, Parts, …). */
-.shell .ms-header { margin-top: max(12px, calc(env(safe-area-inset-top) - 8px)); margin-bottom: 14px; align-items: center; }
+.shell .ms-header { margin-top: max(12px, calc(var(--sat) - 8px)); margin-bottom: 14px; align-items: center; }
 .shell .ms-header h1 { font-size: 30px; font-weight: 750; letter-spacing: -0.022em; line-height: 1.15; }
 .shell .ms-header p { font-size: 15px; margin-top: 4px; }
 .shell .ms-header .btn { border-radius: 8px; }
@@ -402,7 +402,7 @@ button.sb-head-row { width: 100%; border: 0; background: none; color: var(--mute
 .phone-shell .chat-mobile-bar { padding: 6px 12px 0; gap: 8px; }
 .phone-shell .channel-select { border: 0; background: var(--surface-2); font-weight: 600; }
 /* Header: the page's name, big, with the shift, bell, and you on the right. */
-.phone-top { background: var(--surface); border-bottom: 0; padding: max(10px, env(safe-area-inset-top)) 10px 2px 16px; }
+.phone-top { background: var(--surface); border-bottom: 0; padding: max(10px, var(--sat)) 10px 2px 16px; }
 .phone-title { font-size: 28px; font-weight: 760; letter-spacing: -0.024em; margin: 0; }
 .phone-top .icon-btn { color: var(--text); }
 /* Tab bar: line icons; the current tab in the accent color, no pill. */
@@ -479,7 +479,7 @@ button.sb-head-row { width: 100%; border: 0; background: none; color: var(--mute
 .sb-fold { display: inline-grid; place-items: center; width: 32px; height: 32px; border: 0; border-radius: 7px; background: none; color: var(--muted); padding: 0; flex: none; }
 .sb-fold:hover { background: color-mix(in srgb, var(--text) 7%, transparent); color: var(--text); }
 .sidebar.rail { width: 62px; align-items: center; }
-.sidebar.rail .sb-top { padding: max(12px, env(safe-area-inset-top)) 0 4px; justify-content: center; }
+.sidebar.rail .sb-top { padding: max(12px, var(--sat)) 0 4px; justify-content: center; }
 .sb-rail-tools { display: flex; flex-direction: column; align-items: center; gap: 2px; padding-bottom: 6px; border-bottom: 1px solid var(--hairline); width: 44px; }
 .sidebar.rail .sb-scroll { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 0; width: 100%; }
 .sb-rail-btn { position: relative; display: grid; place-items: center; width: 42px; height: 40px; border: 0; border-radius: 9px; background: none; color: var(--muted); padding: 0; }
@@ -592,8 +592,8 @@ button.sb-head-row { width: 100%; border: 0; background: none; color: var(--mute
 .floating-picker { position: fixed; z-index: 60; }
 .floating-picker .emoji-picker { position: static; width: 320px; max-height: calc(var(--vvh, 100dvh) - 16px); overflow-y: auto; overscroll-behavior: contain; }
 @media (max-width: 760px) {
-  .floating-picker { top: calc(env(safe-area-inset-top) + 64px); left: 8px; right: 8px; }
-  .floating-picker .emoji-picker { width: auto; max-height: min(480px, calc(var(--vvh, 100dvh) - env(safe-area-inset-top) - 160px)); }
+  .floating-picker { top: calc(var(--sat) + 64px); left: 8px; right: 8px; }
+  .floating-picker .emoji-picker { width: auto; max-height: min(480px, calc(var(--vvh, 100dvh) - var(--sat) - 160px)); }
 }
 .super-title { display: inline-flex; align-items: center; gap: 6px; }
 .msg-actions > button.on { background: var(--accent-soft); color: var(--accent); }
@@ -757,7 +757,7 @@ button.sb-head-row { width: 100%; border: 0; background: none; color: var(--mute
 /* One top band across the app on iPad: the sidebar's team block and the chat
    header are the same height and share one dividing line, so the two halves
    line up. */
-.shell { --top-pad: max(12px, env(safe-area-inset-top)); --top-h: calc(var(--top-pad) + 52px); }
+.shell { --top-pad: max(12px, var(--sat)); --top-h: calc(var(--top-pad) + 52px); }
 .sb-top, .sidebar.rail .sb-top {
   box-sizing: border-box; min-height: var(--top-h); padding-top: var(--top-pad); padding-bottom: 0;
   border-bottom: 1px solid rgb(255 255 255 / 10%); align-content: center;
@@ -1072,7 +1072,7 @@ button, [role='button'] { -webkit-user-select: none; user-select: none; -webkit-
    labels instead of big headings, and numbers in a monospace face. */
 .today { --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace; }
 .today .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
-.content.today { padding-top: max(20px, env(safe-area-inset-top)); }
+.content.today { padding-top: max(20px, var(--sat)); }
 .pit {
   position: relative; display: flex; align-items: flex-end; gap: 12px; margin-bottom: 22px; padding: 22px 0 22px 26px;
   border-radius: 14px; color: #fff; overflow: hidden; min-height: 232px;
@@ -1784,7 +1784,7 @@ button.pm-row:hover { background: color-mix(in srgb, var(--text) 4%, transparent
 @media (max-width: 760px) {
   .panel-backdrop.center.ll-backdrop { padding: 0; align-items: stretch; }
   .panel-backdrop.center > .dialog.ll-sheet:not(.ll-quick) { width: 100%; height: var(--vvh, 100dvh); border-radius: 0; box-shadow: none; }
-  .ll-sheet:not(.ll-quick) .ll-head { padding-top: max(14px, env(safe-area-inset-top)); }
+  .ll-sheet:not(.ll-quick) .ll-head { padding-top: max(14px, var(--sat)); }
   .panel-backdrop.center.ll-backdrop:has(> .ll-quick, > .ll-payoff) { align-items: flex-end; background: rgb(10 12 20 / 40%); }
   .panel-backdrop.center > .dialog.ll-quick, .panel-backdrop.center > .dialog.ll-payoff {
     width: 100%; height: auto; max-height: 100%; border-radius: 20px 20px 0 0; padding-bottom: max(20px, env(safe-area-inset-bottom));
@@ -1958,7 +1958,7 @@ button.pm-row:hover { background: color-mix(in srgb, var(--text) 4%, transparent
    team robot and shout-outs on Today, glowing messages and mega super
    reactions in chat. Loops only play with "Moving things" on (data-anim),
    and animate transform/opacity only, with fixed keyframes, for iPads. */
-.content.market { max-width: 980px; display: flex; flex-direction: column; gap: 22px; padding-top: max(24px, env(safe-area-inset-top)); }
+.content.market { max-width: 980px; display: flex; flex-direction: column; gap: 22px; padding-top: max(24px, var(--sat)); }
 .mk-head { display: flex; align-items: flex-end; gap: 16px; justify-content: space-between; flex-wrap: wrap; }
 .mk-title { margin: 0 0 2px; font-size: 30px; font-weight: 780; letter-spacing: -0.028em; }
 .mk-head p { margin: 0; }
@@ -2107,6 +2107,8 @@ button.pm-row:hover { background: color-mix(in srgb, var(--text) 4%, transparent
 }
 .pet-meter { display: grid; grid-template-columns: 44px 1fr 28px; align-items: center; gap: 8px; font-size: 13px; }
 .pet-meter-label { color: var(--muted); font-weight: 600; }
+/* Food past 100 (overfed): a full bar in a warm color. */
+.pet-meter.over .pet-meter-bar > span { background: #f59e0b; }
 .pet-meter-num { text-align: right; }
 .pet-meter.high .pet-meter-bar > span { background: var(--st-done); }
 .pet-meter.mid .pet-meter-bar > span { background: #f59e0b; }
@@ -2750,7 +2752,7 @@ button.pm-row:hover { background: color-mix(in srgb, var(--text) 4%, transparent
 @media (max-width: 640px) {
   .fun-backdrop.playing { padding: 0; }
   .fun-dialog.playing { width: 100%; height: 100dvh; max-height: none; border-radius: 0; padding: 0 10px max(10px, env(safe-area-inset-bottom)); }
-  .fun-dialog.playing .panel-head { margin: 0 -10px; padding-top: max(10px, env(safe-area-inset-top)); }
+  .fun-dialog.playing .panel-head { margin: 0 -10px; padding-top: max(10px, var(--sat)); }
 }
 .fun-pick { display: flex; flex-direction: column; gap: 14px; }
 .fun-pick .fun-games button { display: inline-flex; align-items: center; gap: 6px; }
@@ -3205,7 +3207,7 @@ button.pm-row:hover { background: color-mix(in srgb, var(--text) 4%, transparent
    the pick list drags by its grip (touch-action: none there only, so the
    rest of the page still scrolls) and "At the table" is big type. Numbers
    are mono. Drag motion is a transform only, and only with "Moving things" on. */
-.content.scout { max-width: 980px; display: flex; flex-direction: column; gap: 16px; padding-top: max(24px, env(safe-area-inset-top)); }
+.content.scout { max-width: 980px; display: flex; flex-direction: column; gap: 16px; padding-top: max(24px, var(--sat)); }
 .sc-head p { margin: 0; }
 .sc-title { margin: 0 0 2px; font-size: 30px; font-weight: 780; letter-spacing: -0.028em; }
 .phone-shell .sc-title { display: none; }
@@ -3413,7 +3415,7 @@ button.pm-row:hover { background: color-mix(in srgb, var(--text) 4%, transparent
 /* At the table: the whole screen, big type. */
 .sc-table {
   position: fixed; inset: 0; z-index: 35; background: var(--surface); overflow-y: auto; overscroll-behavior: contain;
-  padding: max(14px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
+  padding: max(14px, var(--sat)) max(20px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
   display: flex; flex-direction: column; gap: 14px;
 }
 .sc-table-top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
@@ -3549,7 +3551,7 @@ button.pm-row:hover { background: color-mix(in srgb, var(--text) 4%, transparent
    of the screen, and a decorated profile picture (ears, hats, comets) and its badge
    reach up to about 19px above the picture, so they were cut off under the strip.
    Leave room for both. */
-.phone-top { padding-top: max(30px, env(safe-area-inset-top)); }
+.phone-top { padding-top: max(30px, var(--sat)); }
 
 /* Color themes on a phone: the top bar, the strip above it, and the full-screen
    pop-ups take the theme's tinted page instead of staying the plain surface color
@@ -3579,6 +3581,10 @@ button.pm-row:hover { background: color-mix(in srgb, var(--text) 4%, transparent
 .pet-geared > .pet-gear { position: absolute; left: 0; top: 0; pointer-events: none; }
 /* A pet in an outfit is drawn in layers (PetGear.jsx): body, outfit, head, all in the same box. */
 .pet-geared > .pet-layer { position: absolute; left: 0; top: 0; }
+/* An overfed pet (3.2.14): wider and a touch shorter, standing on the same
+   spot. The whole drawing and its gear stretch together. */
+.pet-geared.chubby-1 { transform: scale(1.13, 0.96); transform-origin: 50% 92%; }
+.pet-geared.chubby-2 { transform: scale(1.26, 0.93); transform-origin: 50% 92%; }
 /* Star-nosed mole: its star wiggles now and then. */
 .pet-art .pet-star { transform-box: fill-box; transform-origin: 50% 50%; }
 :root[data-anim~='move'] .pet-art.anim .pet-star { animation: pet-star 3.8s ease-in-out infinite; }
@@ -3821,10 +3827,10 @@ html.kb-open .gif-picker .gif-grid { flex: 1 1 260px; max-height: none; min-heig
 @media (max-width: 760px) {
   html.kb-open .composer :is(.composer-emoji, .sticker-picker, .gif-picker),
   html.kb-open .msg-actions .reaction-picker,
-  html.kb-open .floating-picker { top: calc(var(--vvt, 0px) + env(safe-area-inset-top) + 8px); }
+  html.kb-open .floating-picker { top: calc(var(--vvt, 0px) + var(--sat) + 8px); }
   html.kb-open .composer :is(.composer-emoji, .sticker-picker, .gif-picker),
   html.kb-open .msg-actions .reaction-picker,
-  html.kb-open .floating-picker .emoji-picker { max-height: calc(var(--vvh) - env(safe-area-inset-top) - 16px); }
+  html.kb-open .floating-picker .emoji-picker { max-height: calc(var(--vvh) - var(--sat) - 16px); }
 }
 @media (max-width: 760px) {
   /* The emoji picker inside a pop-up (profile effects, theme studio) is a sheet fixed above the bottom: fill what's visible. */
@@ -3860,12 +3866,12 @@ html.kb-open .ads-settings .ads-body { min-height: var(--kb-list-min); }
 html.kb-short .page-head:not(:focus-within) { display: none; }
 html.kb-short .composer :is(.composer-emoji, .sticker-picker, .gif-picker),
 html.kb-short .msg-actions .reaction-picker {
-  position: fixed; top: calc(var(--vvt, 0px) + env(safe-area-inset-top) + 8px); bottom: auto; right: 10px; left: auto; margin: 0;
-  width: min(440px, calc(100vw - 20px)); max-height: calc(var(--vvh) - env(safe-area-inset-top) - 16px); z-index: 45;
+  position: fixed; top: calc(var(--vvt, 0px) + var(--sat) + 8px); bottom: auto; right: 10px; left: auto; margin: 0;
+  width: min(440px, calc(100vw - 20px)); max-height: calc(var(--vvh) - var(--sat) - 16px); z-index: 45;
 }
 html.kb-short .composer .gif-picker { left: 10px; width: auto; }
-html.kb-short .floating-picker { top: calc(var(--vvt, 0px) + env(safe-area-inset-top) + 8px) !important; }
-html.kb-short .floating-picker .emoji-picker { max-height: calc(var(--vvh) - env(safe-area-inset-top) - 16px); }
+html.kb-short .floating-picker { top: calc(var(--vvt, 0px) + var(--sat) + 8px) !important; }
+html.kb-short .floating-picker .emoji-picker { max-height: calc(var(--vvh) - var(--sat) - 16px); }
 html.kb-short .suggest-cmds { max-height: calc(var(--vvh) - 100px); }
 html.kb-short .dialog .panel-head { padding-top: 6px; padding-bottom: 6px; }
 html.kb-short .dialog .panel-head h2 { font-size: 16px; }
@@ -4080,7 +4086,7 @@ html.kb-bar .chat-side-body { padding-bottom: calc(8px + var(--kb-bar, 0px)); }
   padding-right: max(16px, env(safe-area-inset-right)); pointer-events: none;
 }
 /* Clear of the status bar on an iPad home-screen app (the page runs up under it), not touching its edge. */
-.coin-slot .coin-pill { pointer-events: auto; margin-top: max(10px, calc(env(safe-area-inset-top) + 8px)); }
+.coin-slot .coin-pill { pointer-events: auto; margin-top: max(10px, calc(var(--sat) + 8px)); }
 .phone-top .coin-pill { height: 32px; padding: 0 9px 0 6px; gap: 5px; font-size: 12.5px; }
 /* Crowded bar (on a shift, or a small phone): the page title steps down so it isn't cut off. */
 .phone-top:has(.shift-pill) .phone-title { font-size: 22px; }
@@ -4097,7 +4103,7 @@ html.kb-bar .chat-side-body { padding-bottom: calc(8px + var(--kb-bar, 0px)); }
 .app-scroll:has(> .coin-slot) .chat-head { padding-right: 112px; }
 @media (max-width: 899px) { .app-scroll:has(> .coin-slot) .content.chat:not(.embedded) .chat-head .chat-topic { display: none; } }
 /* The chat beside the parts list is a narrow column: its header goes below the pill instead. */
-.app-scroll:has(> .coin-slot) .content.chat.embedded .chat-head { padding-right: 20px; padding-top: calc(max(14px, env(safe-area-inset-top)) + 28px); }
+.app-scroll:has(> .coin-slot) .content.chat.embedded .chat-head { padding-right: 20px; padding-top: calc(max(14px, var(--sat)) + 28px); }
 /* Z 26: over a docked Members/Search/Pins panel (25), under pop-ups (40+). Its Close button moves left of the pill. */
 .app-scroll:has(> .coin-slot) .content.chat.with-side > .chat-side .chat-side-head { padding-right: 112px; }
 /* ---------- Challenge a teammate, and casino reports ---------- */
@@ -5203,7 +5209,7 @@ button.bs-cell:focus-visible { outline: 2px solid var(--accent); outline-offset:
   .panel-backdrop.center > .dialog.game-sheet {
     width: 100%; height: var(--vvh, 100dvh); border-radius: 0; box-shadow: none; padding: 0 12px max(10px, env(safe-area-inset-bottom));
   }
-  .game-sheet .gv-head { margin: 0 -12px; padding-top: max(10px, env(safe-area-inset-top)); }
+  .game-sheet .gv-head { margin: 0 -12px; padding-top: max(10px, var(--sat)); }
 }
 
 /* Battleship in the view. Sizes come from the room the view has (gv-body is
@@ -5650,7 +5656,7 @@ button.bs-cell:focus-visible { outline: 2px solid var(--accent); outline-offset:
 /* Run mode: one list, full screen, rows you can't miss. */
 .runmode {
   position: fixed; inset: 0; z-index: 200; display: flex; flex-direction: column; background: var(--bg); color: var(--text);
-  padding-top: env(safe-area-inset-top);
+  padding-top: var(--sat);
 }
 .rm-head { flex: none; padding: 14px 16px 10px; background: var(--surface); border-bottom: 1px solid var(--border); }
 .rm-title { display: flex; align-items: center; gap: 12px; }
