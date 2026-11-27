@@ -33,6 +33,7 @@ import { PetWithGear } from './PetGear.jsx';
 import { EventsAdmin, ParkSection } from './PetPark.jsx';
 import { OwnSticker, PetPhotoReview, PetPhotoRow, PhotoPet, photoPetOf } from './PetPhoto.jsx';
 import { PetGamesHost, PetGamesSection } from './petgames/PetGamesCard.jsx';
+import { AdoptWaitNote, DeathOffRow, InMemory, PetDeathReview, PetNeglect } from './PetDeath.jsx';
 import { Icon } from './shell/icons.jsx';
 import ServerButton from './ServerButton.jsx';
 
@@ -120,8 +121,11 @@ export function PetsShelf({ actor, balance, buy, busy, onToast, roster = [] }) {
           </div>
           <MorePets levels={levels} room={room} adopting={adopting} setAdopting={setAdopting} />
           {!adopting && <RequestPetLink />}
+          <DeathOffRow onToast={onToast} />
         </section>
       )}
+
+      <InMemory />
 
       {outgoing.length > 0 && (
         <section className="mk-sec">
@@ -149,6 +153,7 @@ export function PetsShelf({ actor, balance, buy, busy, onToast, roster = [] }) {
 
       {actor.admin && <EventsAdmin onToast={onToast} />}
       {actor.admin && <PetPhotoReview onToast={onToast} />}
+      <PetDeathReview onToast={onToast} />
 
       {target && (
         <section className="mk-sec">
@@ -281,6 +286,7 @@ function OwnedPet({ entry, lead, levels, roster, actor, offered, onToast, onPlay
           {ring && <span className={`pf-ring-chip ring-${ring}`}>{RING_NAME[ring]}</span>}
         </p>
         <p className="pet-mood">{moodLine(pet.name, st)}</p>
+        <PetNeglect owner={actor.name} pet={pet} mine />
         <FavoriteFood species={pet.species} />
         <div className="pet-xp" title={nextLevelLine(st)}>
           <span style={{ transform: `scaleX(${Math.max(0.02, st.progress)})` }} />
@@ -613,6 +619,14 @@ function GivePicker({ pet, roster, onPick, onClose }) {
 // Under your pets: adopt another once every pet is level 5 (a baby or a
 // gift needs the same room), or what's still to grow.
 function MorePets({ levels, room, adopting, setAdopting }) {
+  const market = useMarket();
+  // A pet that died holds back adopting another for a while (PetDeath.jsx).
+  if (!room && market?.death?.wait)
+    return (
+      <div className="pf-room">
+        <AdoptWaitNote />
+      </div>
+    );
   if (room) {
     const young = levels.filter((p) => p.level < GROW_LEVEL);
     return (

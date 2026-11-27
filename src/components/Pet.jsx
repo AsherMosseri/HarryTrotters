@@ -8,6 +8,7 @@ import { confirmDialog, promptDialog } from './Dialogs.jsx';
 import { PetWithGear } from './PetGear.jsx';
 import { RequestPetLink } from './PetRequest.jsx';
 import { PetSticker, PhotoPet, photoPetOf, usePetPhoto } from './PetPhoto.jsx';
+import { AdoptWaitNote, PetNeglect } from './PetDeath.jsx';
 
 // Pets (H3): the art lives in PetArt.jsx. They breathe, hop when happy and
 // droop when sad, only while "Moving things" plays (shell.css), with
@@ -92,6 +93,7 @@ export function PetCard({ name, big = false, owner = false, onCare }) {
         </div>
         <p className="pet-title">{titleOf(st.level)}</p>
         <p className="pet-mood">{moodLine(pet.name, st)}</p>
+        <PetNeglect owner={name} pet={pet} mine={name === market.me} />
         <FavoriteFood species={pet.species} />
         <div className="pet-xp" title={nextLevelLine(st)}>
           <span style={{ transform: `scaleX(${Math.max(0.02, st.progress)})` }} />
@@ -150,12 +152,14 @@ export function AdoptPet({ more = false, onDone }) {
   const [name, setName] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const waiting = !!market?.death?.wait;
   return (
     <div className="adopt">
+      <AdoptWaitNote />
       {!more && (
         <p className="muted small">
-          A pet is optional. It grows with your time at the lab, shows on your profile, and gets hungry and bored if nobody looks after it. It
-          never dies, but it misses you when you stay away.
+          A pet is optional. It grows with your time at the lab, shows on your profile, and gets hungry and bored if nobody looks after it. Left
+          with no food and no fun for a whole week, it dies (you get warnings first, and it sleeps safely while you’re away from the lab).
         </p>
       )}
       <div className="adopt-grid" role="radiogroup" aria-label="Pick a pet">
@@ -176,7 +180,7 @@ export function AdoptPet({ more = false, onDone }) {
         <input className="input grow" maxLength={24} value={name} placeholder="Its name" onChange={(e) => setName(e.target.value)} aria-label="Pet name" />
         <button
           className="btn primary"
-          disabled={!species || !name.trim() || busy}
+          disabled={!species || !name.trim() || busy || waiting}
           onClick={async () => {
             setBusy(true);
             setError('');

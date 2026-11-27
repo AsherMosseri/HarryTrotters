@@ -2356,6 +2356,7 @@ export default function Workspace({ store, actor, rename, renames, shutdown, onP
     coinsOn: controls.isOn('coins'),
     photosOn: controls.isOn('photos'),
     inactive,
+    coinsOffForTeam: (controls.doc?.off || []).includes('coins'),
     onToast: (text) => setToast({ text }),
     onBalance: (b) => sync.noteServer(b),
   });

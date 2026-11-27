@@ -5779,3 +5779,51 @@ button.bs-cell:focus-visible { outline: 2px solid var(--accent); outline-offset:
 .pit-count-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
 .pm-fill { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; }
 .ms-comp .link-btn { display: block; padding: 6px 0 0; text-align: left; }
+
+/* Pets can die (3.3, PetDeath.jsx): the warning on a pet's card, sleeping,
+   the funeral card in #general, In memory, the wait to adopt again, and
+   Asher's answers. Soft colors, nothing grim. */
+.pd-line { display: flex; align-items: flex-start; gap: 7px; margin: 2px 0; font-size: 13.5px; line-height: 1.35; }
+.pd-line .icon, .pd-line > span[aria-hidden] { flex: none; margin-top: 1px; }
+.pd-warn { padding: 8px 10px; border-radius: 10px; background: var(--p-high-bg); color: var(--p-high); font-weight: 600; }
+.pd-warn.urgent { background: color-mix(in srgb, var(--danger) 12%, var(--surface)); color: var(--danger); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--danger) 35%, transparent); }
+.pd-sleep { padding: 7px 10px; border-radius: 10px; background: color-mix(in srgb, var(--accent) 9%, var(--surface)); color: var(--text); }
+.pd-safe { color: var(--muted); }
+.pd-off-row { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); }
+.pd-rule { margin: 0; }
+.pd-ask { padding-left: 0; }
+
+.pd-asks { display: flex; flex-direction: column; gap: 10px; }
+.pd-ask-card { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 12px; align-items: start; padding: 10px; border-radius: 12px; background: var(--surface); border: 1px solid var(--border); list-style: none; }
+.pd-ask-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.pd-ask-main .mk-row-btns { margin-top: 8px; }
+.pd-reason { font-style: italic; overflow-wrap: anywhere; }
+
+.pd-art { position: relative; display: inline-grid; place-items: end center; flex: none; width: calc(var(--pd) * 1.15); min-height: calc(var(--pd) * 1.1); padding-top: calc(var(--pd) * 0.12); }
+.pd-art > :not(.pd-halo) { position: relative; }
+.pd-halo { position: absolute; top: 0; left: 50%; width: calc(var(--pd) * 0.5); height: calc(var(--pd) * 0.14); transform: translateX(-50%); border-radius: 50%; border: 2px solid #f2c94c; box-shadow: 0 0 6px color-mix(in srgb, #f2c94c 60%, transparent); }
+
+.cmd-card.cmd-card-funeral { max-width: 520px; border-left-color: #b49cf0; }
+.pd-funeral { position: relative; display: flex; flex-direction: column; gap: 10px; }
+.pd-rainbow { height: 4px; border-radius: 999px; background: linear-gradient(90deg, #f28b82, #fbbc6a, #fde68a, #a7e3a0, #8ecbf2, #b49cf0); opacity: 0.85; }
+.pd-funeral-top { display: flex; align-items: center; gap: 12px; }
+.pd-funeral-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.pd-funeral-title { font-weight: 700; font-size: 16px; line-height: 1.25; overflow-wrap: anywhere; }
+.pd-adopt-line { margin: 0; }
+.pd-respects { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.pd-respects.compact { margin-top: 6px; }
+.pd-respects .danger { flex-basis: 100%; margin: 0; }
+.pd-pay[aria-pressed='true'] { opacity: 1; }
+.pd-who { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+.pd-faces { display: inline-flex; flex: none; }
+.pd-faces > * + * { margin-left: -6px; }
+
+.pd-memorials { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; padding: 0; margin: 0; }
+.pd-memorial { display: flex; gap: 12px; align-items: flex-start; padding: 10px 12px; border-radius: 12px; background: var(--surface); border: 1px solid var(--border); list-style: none; min-width: 0; }
+.pd-memorial-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+
+.pd-wait { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: 12px; background: color-mix(in srgb, #b49cf0 12%, var(--surface)); border: 1px solid color-mix(in srgb, #b49cf0 35%, var(--border)); margin-bottom: 10px; }
+.pd-wait p { margin: 2px 0 0; }
+@media (max-width: 420px) {
+  .pd-memorials { grid-template-columns: minmax(0, 1fr); }
+}

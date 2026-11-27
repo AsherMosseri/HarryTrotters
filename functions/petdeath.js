@@ -9,7 +9,9 @@
 //   petDeathOff/{personId}     asking Asher to turn pet death off, and his answer
 //                              (read by that person and Asher)
 //   petGifts/{id}              an open offer of a pet that died is cancelled
-// petCare (scheduled, a few times a day) checks every pet. Each pets doc is
+// petCare (scheduled, a few times a day) checks every pet. While Jackson
+// coins are off (Asher's Controls) nobody can buy pet items, so every pet
+// sleeps like an inactive teammate's. Each pets doc is
 // changed in one transaction that re-reads it: a pet dies once (its memorial
 // and card have fixed ids), each warning goes once (`neglect.stage`), and two
 // runs at once take turns. Notifications go out only after the write held.
@@ -118,7 +120,9 @@ export function petDeathFunctions({ db, notify, personId, renamer, coinData, ina
     const pets = await db.collection('pets').get();
     if (pets.empty) return { checked: 0 };
     const owners = [...new Set(pets.docs.map((d) => rename(d.get('person') || '')).filter(Boolean))];
-    const [asleepSet, offDocs] = await Promise.all([inactiveNames(rename, owners), db.collection('petDeathOff').get()]);
+    const [asleepSet, offDocs, controls] = await Promise.all([inactiveNames(rename, owners), db.collection('petDeathOff').get(), db.doc('settings/controls').get()]);
+    // With Jackson coins off nobody can buy pet food, so every pet sleeps.
+    if ((controls.get('off') || []).includes('coins')) owners.forEach((n) => asleepSet.add(n));
     const offSet = offNames(
       offDocs.docs.map((d) => d.data()),
       rename,

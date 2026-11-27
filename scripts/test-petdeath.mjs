@@ -26,6 +26,8 @@ import {
   petFate,
   respectsCheck,
   respectsOf,
+  memorialLine,
+  sleepLine,
   streakStart,
   warnNote,
   zeroAt,
@@ -315,6 +317,21 @@ eq(petFate(watched, { now: Math.ceil(both0) + 7 * D - 1 }).status, 'neglected', 
   eq(askCheck({}, { me: 'Cooper Mlezcko', doc: back.doc, owner, now: T0 + 10 * D }).doc.status, 'pending', 'back on: can ask again');
   eq(askCheck({}, { me: owner, doc: null, owner, now: T0 }).doc.status, 'off', 'Asher’s own ask is just done');
   eq(answerCheck({ decision: 'nope' }, { doc: a1.doc, me: owner }).note?.title, 'Approve, decline or turn back on?', 'unknown decision');
+}
+
+// The words on cards: sleeping, and when the owner can adopt again.
+{
+  eq(sleepLine('Pepper', { owner: 'Matthew Kuehl', mine: false, why: 'away' }), 'Pepper is asleep until Matthew is back at the lab.', 'asleep: teammates see why');
+  eq(sleepLine('Pepper', { mine: true, why: 'away' }).startsWith('Pepper is asleep while you’re away'), true, 'asleep: the owner is told it’s safe');
+  eq(sleepLine('Pepper', { why: 'coins' }).includes('Jackson coins are off'), true, 'asleep while coins are off');
+  const m = { id: 'x', person: 'Shrey Kumar', name: 'Noodle', diedAt: T0, respects: [{ name: 'Jackson Lucks', at: T0 }] };
+  eq(memorialLine(m, { me: 'Shrey Kumar', now: T0 + H }), 'You can adopt again once 2 more teammates pay respects, or in 3 days.', 'owner: how long');
+  eq(memorialLine(m, { me: 'Cooper Mlezcko', now: T0 + H }), 'Shrey can adopt again once 2 more teammates pay respects, or in 3 days.', 'teammate: how long');
+  const m3 = { ...m, respects: [...m.respects, { name: 'Sophia Bermudez' }, { name: 'Cooper Mlezcko' }] };
+  eq(memorialLine(m3, { me: 'Shrey Kumar', now: T0 + H }), 'You can adopt a new pet whenever you’re ready.', 'owner: 3 respects frees it');
+  eq(memorialLine(m3, { me: 'Cooper Mlezcko', now: T0 + H }), '', 'teammate: nothing to say once free');
+  eq(memorialLine({ ...m, respects: [] }, { me: 'Shrey Kumar', now: T0 + 3 * D }), 'You can adopt a new pet whenever you’re ready.', 'owner: 3 days frees it');
+  eq(memorialLine({ ...m, respects: [{ name: 'A' }, { name: 'B' }] }, { me: 'Cooper Mlezcko', now: T0 + 2 * D + 20 * H }), 'Shrey can adopt again once 1 more teammate pays respects, or in 4 hours.', 'one more, hours left');
 }
 
 console.log(`\n${passes} passed, ${failures} failed`);

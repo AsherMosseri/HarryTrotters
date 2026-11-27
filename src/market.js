@@ -32,8 +32,9 @@ const saveNum = (key, n) => {
 
 // shifts: under current names. balanceOf(name): coins from the app's wallet
 // (only demo mode uses it; the server reads balances itself).
-// inactive: the Set of inactive names (a sleeping pet can't die).
-export function useMarketData(store, { actor, rename, renames, shifts, balanceOf, coinsOn, photosOn = true, inactive = null, onToast, onBalance }) {
+// inactive: the Set of inactive names (a sleeping pet can't die);
+// coinsOffForTeam: Jackson coins are off for the team: nobody can buy pet items, so every pet sleeps.
+export function useMarketData(store, { actor, rename, renames, shifts, balanceOf, coinsOn, photosOn = true, inactive = null, coinsOffForTeam = false, onToast, onBalance }) {
   const [perks, setPerks] = useState([]);
   const [rawPurchases, setPurchases] = useState([]);
   const [rawPets, setPets] = useState([]);
@@ -203,7 +204,7 @@ export function useMarketData(store, { actor, rename, renames, shifts, balanceOf
   const photos = usePetPhotos(store, { actor, rename, renames, on: photosOn, run });
 
   // Pets that died, respects, and asking to turn pet death off (petDeath.js).
-  const death = usePetDeath(store, { actor, rename, renames, run, inactive, now });
+  const death = usePetDeath(store, { actor, rename, renames, run, inactive, coinsOffForTeam, now });
 
   // The pet games' team boards (functions/petgames.js): read only while the
   // games are open, so the listener isn't on all the time.

@@ -121,6 +121,14 @@ export function neglectLine(petName, fate) {
   return `${petName} has had no food or fun for ${plural(fate.day, 'day')}. ${left} A snack or a toy saves it.`;
 }
 
+// On the card of a pet that's asleep. why: 'away' (its owner is inactive) or
+// 'coins' (Jackson coins are off, so nobody can buy pet items).
+export function sleepLine(petName, { owner = '', mine = false, why = 'away' } = {}) {
+  if (why === 'coins') return `${petName} is napping while Jackson coins are off. It’s safe until they’re back.`;
+  if (mine) return `${petName} is asleep while you’re away from the lab. It’s safe, and wakes up when you’re back.`;
+  return `${petName} is asleep until ${first(owner)} is back at the lab.`;
+}
+
 // ---- When a pet dies ----
 
 // "3 days", "2 weeks", "4 months".
@@ -238,6 +246,18 @@ export function adoptWaitText(w, now = Date.now()) {
 }
 export function adoptWaitNote(w, now = Date.now()) {
   return note(`Not yet. ${w.memorial.name} is still being remembered.`, adoptWaitText(w, now));
+}
+
+// Under a memorial (the funeral card, "In memory"): when its owner can adopt
+// again, said to them or to a teammate.
+export function memorialLine(m, { me, now = Date.now(), rename = (n) => n }) {
+  const owner = rename(m?.person || '');
+  const mine = sameName(owner, me);
+  if (adoptFree(m, now, rename)) return mine ? 'You can adopt a new pet whenever you’re ready.' : '';
+  const need = RESPECTS_NEEDED - respectsOf(m, rename).length;
+  const when = untilText(adoptAt(m), now);
+  if (mine) return `You can adopt again once ${plural(need, 'more teammate')} ${need === 1 ? 'pays' : 'pay'} respects, or ${when}.`;
+  return `${first(owner)} can adopt again once ${plural(need, 'more teammate')} ${need === 1 ? 'pays' : 'pay'} respects, or ${when}.`;
 }
 
 // Open offers to give this pet away (shared/pets.js giftOpen), to cancel.

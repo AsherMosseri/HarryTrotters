@@ -73,6 +73,8 @@ export function demoPetDeath({ get, commit, uid }) {
     const owners = [...new Set((s.pets || []).map((d) => rename(d.person || '')).filter(Boolean))];
     if (!owners.length) return false;
     const asleep = asleepNames(owners, rename, now);
+    // With Jackson coins off nobody can buy pet food, so every pet sleeps (like the server).
+    if ((s.controls?.off || []).includes('coins')) owners.forEach((n) => asleep.add(n));
     const off = offNames(s.petDeathOff, rename);
     let changed = false;
     const docs = [];

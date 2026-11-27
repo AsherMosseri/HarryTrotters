@@ -7,8 +7,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { adoptWait, deathOff, petFate } from '../functions/shared/petdeath.js';
 import { REQUESTS_TO } from './config.js';
 
-// inactive: the Set of inactive names (shared/activity.js, from Workspace).
-export function usePetDeath(store, { actor, rename, renames, run, inactive, now }) {
+// inactive: the Set of inactive names (shared/activity.js, from Workspace);
+// coinsOffForTeam: nobody can buy pet items, so every pet sleeps (like the server).
+export function usePetDeath(store, { actor, rename, renames, run, inactive, coinsOffForTeam = false, now }) {
   const [rawMemorials, setMemorials] = useState([]);
   const [rawAsks, setAsks] = useState([]);
   const owner = !!actor.admin && actor.name === REQUESTS_TO;
@@ -36,11 +37,16 @@ export function usePetDeath(store, { actor, rename, renames, run, inactive, now 
   const waiting = useMemo(() => (owner ? asks.filter((a) => a.status === 'pending').sort((a, b) => a.at - b.at) : []), [owner, asks]);
   const offFor = useMemo(() => (owner ? asks.filter(deathOff).sort((a, b) => a.by.localeCompare(b.by)) : []), [owner, asks]);
 
-  // A pet's fate right now. Your own "off" comes from your ask; anyone
-  // else's from what the server last marked on their pet.
+  // A pet's fate right now, with why it sleeps ('away' or 'coins'). Your own
+  // "off" comes from your ask; anyone else's from what the server last
+  // marked on their pet.
   const fateOf = useCallback(
-    (name, pet) => petFate(pet, { now, asleep: !!inactive?.has(name), off: name === actor.name ? myOff : pet?.neglect?.off === true }),
-    [now, inactive, actor.name, myOff],
+    (name, pet) => {
+      const away = !!inactive?.has(name);
+      const f = petFate(pet, { now, asleep: away || coinsOffForTeam, off: name === actor.name ? myOff : pet?.neglect?.off === true });
+      return { ...f, why: f.status === 'asleep' ? (away ? 'away' : 'coins') : '' };
+    },
+    [now, inactive, coinsOffForTeam, actor.name, myOff],
   );
   const wait = useMemo(() => adoptWait(memorials, { me: actor.name, now }), [memorials, actor.name, now]);
 
