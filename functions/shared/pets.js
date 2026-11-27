@@ -9,7 +9,8 @@
 //   from the market fill them; the server records each one on the pet's doc
 //   (pets/{personId}, written only by the server), so a phone can't fake them.
 // - Its mood comes from those needs and from showing up: it misses you after
-//   a few school days away. It gets sad, but it never dies.
+//   a few school days away. Since 3.2.15 a pet left with no food and no fun
+//   for a week dies (shared/petdeath.js has that rule).
 //
 // The mascot (the team's robot on Today) runs on the whole team's last seven
 // days: lab hours, tasks finished, lab logs, and teammates on a streak.
@@ -587,7 +588,8 @@ export function giftAccept(gift, { me, doc, giverDoc, giver, shifts = [], now = 
   // It keeps its name, needs and whether it had a baby; its level starts over
   // with the new owner's lab time, and its gear was for the level it had.
   // The giver's photo was of their real pet, so it doesn't come along.
-  const { photoAsPet: _photo, ...pet0 } = kept;
+  // Its neglect clock (shared/petdeath.js) was its old owner's; it starts fresh.
+  const { photoAsPet: _photo, neglect: _neglect, ...pet0 } = kept;
   const pet = { ...pet0, adoptedAt: Math.max(now, ...list.map((p) => (p.adoptedAt || 0) + 1)), gear: emptyGear(), cared: 0, inChat: true };
   return { ok: true, doc: docOf(me, [...list, pet]), giverDoc: docOf(giver, theirs.filter((_, k) => k !== j)), pet };
 }
