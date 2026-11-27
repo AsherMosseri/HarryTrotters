@@ -7,6 +7,7 @@
 //                     any more in `more` (shared/pets.js petsIn and docOf)
 //   petGifts/{id}     an offer to give a pet away (read by the two people)
 //   petUnlocks/{id}   event gear a person earned (petevents.js); a style move checks it
+//   petMemorials/{id} pets that died (petdeath.js): adopting waits for 3 respects or 3 days
 // Nothing here costs or pays coins.
 
 import { HttpsError } from 'firebase-functions/v2/https';
@@ -14,6 +15,7 @@ import { logger } from 'firebase-functions';
 import { cleanName } from './shared/team.js';
 import { giftAccept, giftEnd, giftOffer, petEdit } from './shared/pets.js';
 import { earnedIds } from './shared/events.js';
+import { adoptWait, adoptWaitNote } from './shared/petdeath.js';
 
 export function petFamily({ db, notify, personId }) {
   const note = (title, body = '') => ({ note: { title, body } });
@@ -52,6 +54,15 @@ export function petFamily({ db, notify, personId }) {
       return db.runTransaction(async (tx) => {
         const mine = await docOf(tx, aliases);
         const earned = action === 'style' ? await earnedGear(tx, aliases) : [];
+        // A pet that died holds back a new one for a while (3 respects or 3 days).
+        if (action === 'adopt') {
+          const gone = await tx.get(db.collection('petMemorials').where('person', 'in', aliases));
+          const wait = adoptWait(
+            gone.docs.map((d) => d.data()),
+            { me, now, rename: data.rename },
+          );
+          if (wait) return adoptWaitNote(wait, now);
+        }
         const r = petEdit(action, input, { me, doc: mine.data, shifts: data.shifts, earned, now });
         if (r.note) return r;
         save(tx, mine, r.doc);

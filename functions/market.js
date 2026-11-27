@@ -17,7 +17,9 @@
 //   pet({ action, … })             adopt, rename, show in chat, rehome, style,
 //                                  hatch a baby, give a pet to a teammate,
 //                                  photos of real pets (petphotos.js), best
-//                                  scores in the pet games (petgames.js)
+//                                  scores in the pet games (petgames.js),
+//                                  paying respects to a pet that died and
+//                                  asking to turn pet death off (petdeath.js)
 // Scheduled: payTournaments (every 10 minutes) pays out the ones that ended.
 // The checks themselves are in shared/market.js and shared/pets.js (demo
 // mode runs the same ones).
@@ -33,12 +35,13 @@ import { petFamily } from './petfamily.js';
 import { petPhotos } from './petphotos.js';
 import { petGames } from './petgames.js';
 import { PHOTO_ACTIONS } from './shared/petphotos.js';
+import { DEATH_ACTIONS } from './shared/petdeath.js';
 import { memberOk } from './shared/team.js';
 import { coinsText } from './shared/coinText.js';
 
 const OPEN = { maxInstances: 5, invoker: 'public' };
 
-export function marketFunctions({ db, coinData, freshCoins, notify, bankRef, personId, owner, timeZone, loanLock = async () => null }) {
+export function marketFunctions({ db, coinData, freshCoins, notify, bankRef, personId, owner, timeZone, loanLock = async () => null, petDeath = null }) {
   const note = (title, body = '') => ({ note: { title, body } });
   const first = (n) => (n || 'Someone').split(' ')[0];
 
@@ -424,6 +427,8 @@ export function marketFunctions({ db, coinData, freshCoins, notify, bankRef, per
     const ctx = await caller(req);
     if (PHOTO_ACTIONS.includes(req.data?.action)) return runPhotos(ctx, req.data);
     if (req.data?.action === 'gameScore') return runGames(ctx, req.data);
+    // Paying respects, asking Asher to turn pet death off and his answer (petdeath.js).
+    if (petDeath && DEATH_ACTIONS.includes(req.data?.action)) return petDeath(ctx, req.data);
     return runPet(ctx, req.data || {});
   });
 

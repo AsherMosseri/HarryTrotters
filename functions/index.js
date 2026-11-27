@@ -59,6 +59,7 @@ import { coinCheckFunctions } from './coincheck.js';
 import { disputeFunctions } from './disputes.js';
 import * as challenge from './shared/challenge.js';
 import { petEventFunctions } from './petevents.js';
+import { petDeathFunctions } from './petdeath.js';
 import { lifeFunctions } from './life.js';
 import { learnFunctions } from './learn.js';
 import { channelFunctions } from './channels.js';
@@ -1368,6 +1369,11 @@ export const { loanRequest, loanRespond, loanRepay, loanManage, loanTick, loanRe
 const buddies = buddyFunctions({ db, coinData, notify, owner: REQUESTS_TO });
 export const { buddy } = buddies;
 
+// Pets can die (functions/petdeath.js, 3.2.15): petCare checks every pet a
+// few times a day; its callable actions ride on `pet` below.
+const petDeath = petDeathFunctions({ db, notify, personId, renamer, coinData, inactiveNames, owner: REQUESTS_TO, timeZone: TIME_ZONE });
+export const { petCare } = petDeath;
+
 // The market and pets (functions/market.js): buying, tournaments, pet care.
 export const { buy, joinTournament, marketManage, pet, payTournaments } = marketFunctions({
   db,
@@ -1379,6 +1385,7 @@ export const { buy, joinTournament, marketManage, pet, payTournaments } = market
   owner: REQUESTS_TO,
   timeZone: TIME_ZONE,
   loanLock: (name) => loans.lockOf(name),
+  petDeath: petDeath.run,
 });
 
 // Earnings that grow with the balance, and hidden coins (functions/earn.js, 3.2).
