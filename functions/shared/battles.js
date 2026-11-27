@@ -62,14 +62,14 @@ export const OFF_NOTE = ['⚔️ Pet battles are off right now.', 'They’re swi
 // tuned so every kind is worth about the same (scripts/test-battles.mjs plays
 // thousands of battles to check).
 export const KINDS = {
-  hit: { power: 14, acc: 0.95, tip: 'An attack' },
-  strong: { power: 16, acc: 0.83, tip: 'A strong attack that misses more' },
-  sure: { power: 13.5, acc: 1, tip: 'A light attack that never misses' },
-  big: { power: 19, acc: 0.68, tip: 'A heavy attack that often misses' },
-  daze: { power: 11, acc: 0.9, daze: 0.45, tip: 'A light attack that can make them skip a turn' },
-  guard: { block: 0.7, back: 7, rest: true, tip: 'A shield: blocks most of a hit and bounces some back' },
-  dodge: { evade: 0.7, back: 9, rest: true, tip: 'Likely dodges a hit, then hits back' },
-  heal: { heal: 0.11, rest: true, tip: 'Gets back some health' },
+  hit: { short: 'Attack', power: 14, acc: 0.95, tip: 'An attack' },
+  strong: { short: 'Strong attack', power: 16, acc: 0.83, tip: 'A strong attack that misses more' },
+  sure: { short: 'Sure hit', power: 13.5, acc: 1, tip: 'A light attack that never misses' },
+  big: { short: 'Heavy attack', power: 19, acc: 0.68, tip: 'A heavy attack that often misses' },
+  daze: { short: 'Daze', power: 11, acc: 0.9, daze: 0.45, tip: 'A light attack that can make them skip a turn' },
+  guard: { short: 'Shield', block: 0.7, back: 7, rest: true, tip: 'A shield: blocks most of a hit and bounces some back' },
+  dodge: { short: 'Dodge', evade: 0.7, back: 9, rest: true, tip: 'Likely dodges a hit, then hits back' },
+  heal: { short: 'Heal', heal: 0.11, rest: true, tip: 'Gets back some health' },
 };
 export const CRIT = 1 / 16;
 const CRIT_X = 1.5;
